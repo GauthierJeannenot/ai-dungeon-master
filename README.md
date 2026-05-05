@@ -1,36 +1,74 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AI Dungeon Master
 
-## Getting Started
+Application web de jeu de rôle D&D 5e avec un Dungeon Master IA (Claude) comme narrateur et arbitre de règles. Interface battlemap interactive avec chat latéral. Un serveur MCP TypeScript gère tous les calculs mécaniques.
 
-First, run the development server:
+## Stack
+
+- **Frontend** : Next.js 16, TypeScript, Tailwind CSS
+- **IA** : Anthropic SDK avec `claude-sonnet-4-20250514`
+- **MCP** : `@modelcontextprotocol/sdk` — game engine déterministe
+
+## Prérequis
+
+- Node.js 20+
+- Une clé API Anthropic
+
+## Installation
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Configuration
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 1. Clé API
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Éditez `.env.local` et remplacez `your_key_here` par votre clé Anthropic :
 
-## Learn More
+```
+ANTHROPIC_API_KEY=sk-ant-...
+```
 
-To learn more about Next.js, take a look at the following resources:
+### 2. Battlemap (optionnel)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Placez votre image dans `/public/battlemap.jpg`. En l'absence du fichier, un fond sombre est affiché.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### 3. Fichiers de contexte (optionnel)
 
-## Deploy on Vercel
+Les trois fichiers dans `/context/` sont pré-remplis avec une aventure complète :
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- `context/player-rules.md` — Stats, équipement, capacités du joueur
+- `context/dm-rules.md` — Tables de monstres, règles de combat
+- `context/adventure-module.md` — Carte des salles, monstres, trésors, triggers
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Lancement
+
+```bash
+npm run build:mcp   # compile le serveur MCP (une seule fois)
+npm run dev         # lance Next.js + MCP server en parallèle
+```
+
+Ouvrez http://localhost:3000
+
+## Tools MCP disponibles
+
+| Tool | Description |
+|------|-------------|
+| `get_game_state` | État complet du jeu |
+| `move_token` | Déplace un token sur la grille |
+| `update_hp` | Modifie les HP d'une entité |
+| `get_entity_stats` | Stats complètes d'une entité |
+| `roll_dice` | Lance des dés (notation XdY+Z) |
+| `resolve_attack` | Attaque complète (to-hit + dégâts + HP) |
+| `resolve_saving_throw` | Jet de sauvegarde |
+| `apply_condition` | Applique une condition D&D 5e |
+| `enter_combat` | Lance le combat avec initiative |
+| `next_turn` | Passe au combattant suivant |
+| `end_combat` | Termine le combat, distribue XP |
+| `spawn_monster` | Fait apparaître un monstre |
+| `trigger_room_event` | Déclenche un événement de salle |
+| `add_to_log` | Ajoute une entrée au journal |
+
+## Monstres disponibles
+
+`goblin`, `hobgoblin`, `orc`, `skeleton`, `zombie`, `wolf`, `bandit`

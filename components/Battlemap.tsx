@@ -1,0 +1,370 @@
+'use client'
+
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { GameState, MonsterState, PlayerState } from '@/lib/types'
+
+interface BattlemapProps {
+  gameState: GameState
+  cellSize?: number
+}
+
+interface TooltipState {
+  entity: PlayerState | MonsterState
+  x: number
+  y: number
+}
+
+function getHPColor(current: number, max: number): string {
+  const ratio = current / max
+  if (ratio > 0.6) return '#22c55e'   // green
+  if (ratio > 0.3) return '#f59e0b'   // amber
+  return '#ef4444'                     // red
+}
+
+function getHPDescription(current: number, max: number): string {
+  const ratio = current / max
+  if (ratio > 0.75) return 'Vigoureux'
+  if (ratio > 0.5) return 'Légèrement blessé'
+  if (ratio > 0.25) return 'Sérieusement blessé'
+  return 'À l\'agonie'
+}
+
+// ── DEBUG ZONES (à retirer après vérification) ──────────────────────────────
+const DEBUG_ZONES = [
+  { id: '2',   label: 'S2 — Verger',           color: '#22c55e', x: 0, y: 0,  w: 17, h: 3 },
+  { id: '1',   label: 'S1 — Entrée',           color: '#facc15', x: 2, y: 11, w: 7,  h: 4 },
+  { id: '3',   label: 'S3 — Tas de déchets',   color: '#a16207', x: 0, y: 6,  w: 2,  h: 3 },
+  { id: '7',   label: 'S7 — Quai chargement',  color: '#3b82f6', x: 5, y: 4,  w: 3,  h: 5 },
+  { id: '8',   label: 'S8 — Boulangerie',      color: '#f97316', x: 8, y: 4,  w: 7,  h: 5 },
+  { id: 'gap', label: 'Couloir',               color: '#94a3b8', x: 8, y: 9,  w: 1,  h: 5 },
+  { id: '45',  label: 'S4/5 — Boutique/Bureau',color: '#a855f7', x: 5, y: 9,  w: 3,  h: 5 },
+  { id: '9',   label: 'S9 — Appartement',      color: '#f43f5e', x: 9, y: 9,  w: 6,  h: 5 },
+]
+// ────────────────────────────────────────────────────────────────────────────
+
+export default function Battlemap({ gameState, cellSize = 48 }: BattlemapProps) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [tooltip, setTooltip] = useState<TooltipState | null>(null)
+  const [prevPositions, setPrevPositions] = useState<Record<string, { x: number; y: number }>>({})
+  const [animating, setAnimating] = useState<Set<string>>(new Set())
+
+  // Track position changes for animation
+  useEffect(() => {
+    const newPositions: Record<string, { x: number; y: number }> = {
+      player: gameState.player.position,
+    }
+    Object.entries(gameState.monsters).forEach(([id, m]) => {
+      newPositions[id] = m.position
+    })
+
+    const newAnimating = new Set<string>()
+    Object.entries(newPositions).forEach(([id, pos]) => {
+      const prev = prevPositions[id]
+      if (prev && (prev.x !== pos.x || prev.y !== pos.y)) {
+        newAnimating.add(id)
+      }
+    })
+
+    if (newAnimating.size > 0) {
+      setAnimating(newAnimating)
+      setTimeout(() => setAnimating(new Set()), 400)
+    }
+
+    setPrevPositions(newPositions)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameState.player.position, gameState.monsters])
+
+  const handleTokenClick = useCallback((
+    e: React.MouseEvent,
+    entity: PlayerState | MonsterState
+  ) => {
+    e.stopPropagation()
+    const rect = containerRef.current?.getBoundingClientRect()
+    if (!rect) return
+    setTooltip({
+      entity,
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    })
+  }, [])
+
+  const aliveMonsters = Object.values(gameState.monsters).filter(m => m.isAlive)
+
+  // Taille fixe de la carte : 17 cols × 15 rows (calée sur battlemap.jpeg ~880×800px)
+  const MAP_COLS = 17
+  const MAP_ROWS = 15
+  const gridCols = Math.max(MAP_COLS, ...aliveMonsters.map(m => m.position.x + 2), gameState.player.position.x + 2)
+  const gridRows = Math.max(MAP_ROWS, ...aliveMonsters.map(m => m.position.y + 2), gameState.player.position.y + 2)
+
+  return (
+    <div
+      ref={containerRef}
+      className="relative w-full h-full overflow-auto bg-stone-900 rounded-lg border border-amber-900/40 cursor-default"
+      onClick={() => setTooltip(null)}
+    >
+      {/* Zone scrollable — toujours aux dimensions complètes de la carte */}
+      <div
+        className="relative"
+        style={{
+          width: gridCols * cellSize,
+          height: gridRows * cellSize,
+        }}
+      >
+        {/* Image de la battlemap — étirée pour couvrir exactement la grille */}
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage: 'url(/battlemap.png)',
+            backgroundSize: '100% 100%',   // étire l'image pour couvrir toute la grille
+            backgroundRepeat: 'no-repeat',
+            backgroundColor: '#3a2d1a',    // fallback si image absente
+          }}
+        />
+
+        {/* Grid overlay + debug zones */}
+        <svg
+          className="absolute inset-0 pointer-events-none"
+          width={gridCols * cellSize}
+          height={gridRows * cellSize}
+        >
+          <defs>
+            <pattern id="grid" width={cellSize} height={cellSize} patternUnits="userSpaceOnUse">
+              <path
+                d={`M ${cellSize} 0 L 0 0 0 ${cellSize}`}
+                fill="none"
+                stroke="rgba(180,140,60,0.2)"
+                strokeWidth="0.5"
+              />
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#grid)" />
+
+          {/* ── DEBUG : zones du module (retirer après vérification) ── */}
+          {DEBUG_ZONES.map(zone => (
+            <g key={zone.id}>
+              <rect
+                x={zone.x * cellSize}
+                y={zone.y * cellSize}
+                width={zone.w * cellSize}
+                height={zone.h * cellSize}
+                fill={zone.color}
+                fillOpacity={0.22}
+                stroke={zone.color}
+                strokeWidth={2}
+                strokeOpacity={0.8}
+                rx={3}
+              />
+              <text
+                x={zone.x * cellSize + 6}
+                y={zone.y * cellSize + 14}
+                fill={zone.color}
+                fontSize={11}
+                fontWeight="bold"
+                style={{ textShadow: '0 1px 3px #000' }}
+              >
+                {zone.label}
+              </text>
+            </g>
+          ))}
+          {/* ─────────────────────────────────────────────────────────── */}
+        </svg>
+
+        {/* Monster tokens */}
+        {aliveMonsters.map(monster => (
+          <TokenMonster
+            key={monster.id}
+            monster={monster}
+            cellSize={cellSize}
+            isCurrentTurn={gameState.currentTurn === monster.id}
+            isAnimating={animating.has(monster.id)}
+            onClick={(e) => handleTokenClick(e, monster)}
+          />
+        ))}
+
+        {/* Player token */}
+        <TokenPlayer
+          player={gameState.player}
+          cellSize={cellSize}
+          isCurrentTurn={gameState.currentTurn === 'player' || gameState.phase !== 'combat'}
+          isAnimating={animating.has('player')}
+          onClick={(e) => handleTokenClick(e, gameState.player)}
+        />
+
+        {/* Tooltip */}
+        {tooltip && (
+          <EntityTooltip
+            entity={tooltip.entity}
+            x={tooltip.x}
+            y={tooltip.y}
+          />
+        )}
+      </div>
+    </div>
+  )
+}
+
+function TokenPlayer({
+  player, cellSize, isCurrentTurn, isAnimating, onClick
+}: {
+  player: PlayerState
+  cellSize: number
+  isCurrentTurn: boolean
+  isAnimating: boolean
+  onClick: (e: React.MouseEvent) => void
+}) {
+  const px = player.position.x * cellSize + cellSize / 2
+  const py = player.position.y * cellSize + cellSize / 2
+  const r = cellSize * 0.38
+
+  return (
+    <div
+      className="absolute pointer-events-auto cursor-pointer"
+      style={{
+        left: px - r,
+        top: py - r,
+        width: r * 2,
+        height: r * 2,
+        transition: isAnimating ? 'left 0.4s ease, top 0.4s ease' : undefined,
+      }}
+      onClick={onClick}
+    >
+      <div className={`relative w-full h-full rounded-full flex items-center justify-center font-bold text-white select-none
+        ${isCurrentTurn ? 'ring-2 ring-yellow-300 ring-offset-1 ring-offset-transparent' : ''}
+        shadow-lg shadow-blue-900/60`}
+        style={{ background: 'radial-gradient(circle at 35% 35%, #60a5fa, #1d4ed8)' }}
+      >
+        <span style={{ fontSize: cellSize * 0.3 }}>
+          {player.name.slice(0, 2).toUpperCase()}
+        </span>
+        {isCurrentTurn && (
+          <div className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-400 rounded-full animate-pulse" />
+        )}
+      </div>
+
+      {/* HP bar under player token */}
+      <div className="absolute -bottom-2 left-0 right-0 h-1 bg-stone-700 rounded-full overflow-hidden">
+        <div
+          className="h-full rounded-full transition-all duration-300"
+          style={{
+            width: `${(player.hp.current / player.hp.max) * 100}%`,
+            backgroundColor: getHPColor(player.hp.current, player.hp.max),
+          }}
+        />
+      </div>
+    </div>
+  )
+}
+
+function TokenMonster({
+  monster, cellSize, isCurrentTurn, isAnimating, onClick
+}: {
+  monster: MonsterState
+  cellSize: number
+  isCurrentTurn: boolean
+  isAnimating: boolean
+  onClick: (e: React.MouseEvent) => void
+}) {
+  const px = monster.position.x * cellSize + cellSize / 2
+  const py = monster.position.y * cellSize + cellSize / 2
+  const r = cellSize * 0.38
+  const abbrev = monster.name.slice(0, 2).toUpperCase()
+
+  return (
+    <div
+      className="absolute pointer-events-auto cursor-pointer"
+      style={{
+        left: px - r,
+        top: py - r,
+        width: r * 2,
+        height: r * 2,
+        transition: isAnimating ? 'left 0.4s ease, top 0.4s ease' : undefined,
+      }}
+      onClick={onClick}
+    >
+      <div className={`relative w-full h-full rounded-full flex items-center justify-center font-bold text-white select-none
+        ${isCurrentTurn ? 'ring-2 ring-orange-300 ring-offset-1' : ''}
+        shadow-lg shadow-red-900/60`}
+        style={{ background: 'radial-gradient(circle at 35% 35%, #f87171, #991b1b)' }}
+      >
+        <span style={{ fontSize: cellSize * 0.28 }}>{abbrev}</span>
+        {isCurrentTurn && (
+          <div className="absolute -top-1 -right-1 w-3 h-3 bg-orange-400 rounded-full animate-pulse" />
+        )}
+      </div>
+
+      {/* HP bar */}
+      <div className="absolute -bottom-2 left-0 right-0 h-1 bg-stone-700 rounded-full overflow-hidden">
+        <div
+          className="h-full rounded-full transition-all duration-300"
+          style={{
+            width: `${(monster.hp.current / monster.hp.max) * 100}%`,
+            backgroundColor: getHPColor(monster.hp.current, monster.hp.max),
+          }}
+        />
+      </div>
+
+      {/* Name label */}
+      <div
+        className="absolute -bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap text-stone-200 font-medium"
+        style={{ fontSize: Math.max(9, cellSize * 0.18) }}
+      >
+        {monster.name}
+      </div>
+    </div>
+  )
+}
+
+function EntityTooltip({
+  entity, x, y
+}: {
+  entity: PlayerState | MonsterState
+  x: number
+  y: number
+}) {
+  const isMonster = 'isAlive' in entity
+  const stats = entity.stats
+
+  return (
+    <div
+      className="absolute z-50 bg-stone-900/95 border border-amber-800/60 rounded-lg p-3 shadow-xl text-sm pointer-events-none"
+      style={{
+        left: x + 12,
+        top: Math.max(0, y - 10),
+        minWidth: 200,
+        maxWidth: 280,
+      }}
+    >
+      <div className="font-bold text-amber-400 mb-1">{entity.name}</div>
+      {isMonster && (
+        <div className="text-stone-400 text-xs mb-2">
+          {getHPDescription(entity.hp.current, entity.hp.max)}
+        </div>
+      )}
+      {!isMonster && (
+        <div className="text-stone-300 text-xs mb-2">
+          HP: {entity.hp.current}/{entity.hp.max} | CA: {entity.ac}
+        </div>
+      )}
+      <div className="grid grid-cols-3 gap-1 text-xs text-stone-300">
+        {(['str', 'dex', 'con', 'int', 'wis', 'cha'] as const).map(s => (
+          <div key={s} className="text-center">
+            <div className="text-stone-500 uppercase text-[10px]">{s}</div>
+            <div className="font-mono">{stats[s]}</div>
+          </div>
+        ))}
+      </div>
+      {entity.conditions.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1">
+          {entity.conditions.map(c => (
+            <span key={c} className="px-1.5 py-0.5 bg-purple-900/60 text-purple-300 rounded text-[10px]">
+              {c}
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="mt-1 text-stone-500 text-[10px]">
+        Position: ({entity.position.x}, {entity.position.y})
+      </div>
+    </div>
+  )
+}

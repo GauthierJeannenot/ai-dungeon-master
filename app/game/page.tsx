@@ -1,0 +1,208 @@
+'use client'
+
+import { useState, useCallback, useEffect } from 'react'
+import dynamic from 'next/dynamic'
+import Chat from '@/components/Chat'
+import CombatTracker from '@/components/CombatTracker'
+import { GameState, ChatMessage, DMResponse, DMRequest } from '@/lib/types'
+
+// Battlemap uses browser APIs — load client-only
+const Battlemap = dynamic(() => import('@/components/Battlemap'), { ssr: false })
+
+const INITIAL_GAME_STATE: GameState = {
+  phase: 'exploration',
+  player: {
+    id: 'player',
+    name: 'Héros',
+    class: 'Guerrier',
+    level: 1,
+    hp: { current: 20, max: 20 },
+    ac: 16,
+    stats: { str: 16, dex: 12, con: 14, int: 10, wis: 12, cha: 10 },
+    proficiencyBonus: 2,
+    position: { x: 4, y: 13 },  // Chemin d'entrée — à côté de Mac le Tréant (bas-gauche)
+    conditions: [],
+    speed: 30,
+    inventory: [
+      { id: 'longsword', name: 'Épée longue', type: 'weapon', damage: '1d8+3' },
+      { id: 'shield', name: 'Bouclier', type: 'armor', acBonus: 2 },
+      { id: 'potion1', name: 'Potion de soin', type: 'potion', description: '2d4+2 HP' },
+    ],
+  },
+  monsters: {},
+  initiativeOrder: [],
+  currentTurn: null,
+  round: 0,
+  combatLog: [],
+  roomsVisited: [],
+  currentRoomId: null,
+}
+
+function generateId(): string {
+  return `msg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+}
+
+function phaseLabel(phase: GameState['phase']): { label: string; color: string } {
+  switch (phase) {
+    case 'combat': return { label: 'COMBAT', color: 'text-red-400' }
+    case 'dialogue': return { label: 'DIALOGUE', color: 'text-blue-400' }
+    default: return { label: 'EXPLORATION', color: 'text-green-400' }
+  }
+}
+
+export default function GamePage() {
+  const [gameState, setGameState] = useState<GameState>(INITIAL_GAME_STATE)
+  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [inputValue, setInputValue] = useState('')
+  const [error, setError] = useState<string | null>(null)
+
+  // Welcome message
+  useEffect(() => {
+    setMessages([{
+      id: generateId(),
+      role: 'dm',
+      content: 'Le vieux sorcier Tyndareus le Vert vous a confié une mission des plus… particulières. Sa carte en main, vous avez chevauché deux jours jusqu\'à cette bâtisse en pierre abandonnée au bout d\'un chemin de gravier envahi par les herbes folles. L\'odeur vous a frappé bien avant que le bâtiment n\'apparaisse : cannelle, muscade, pommes mûres — un parfum presque magique qui flotte dans l\'air chaud. Devant vous se dressent de grandes portes en bois doubles, à moitié vermoulues. Sur le chemin, un immense pommier aux branches noueuses vous observe… ou du moins, c\'est l\'impression que donne son écorce ridée. Bienvenue à la Boulangerie de Grammy. Que faites-vous ?',
+      timestamp: Date.now(),
+    }])
+  }, [])
+
+  const sendMessage = useCallback(async (text: string) => {
+    if (isLoading) return
+    setError(null)
+    setIsLoading(true)
+    setInputValue('')
+
+    // Add player message immediately
+    const playerMsg: ChatMessage = {
+      id: generateId(),
+      role: 'player',
+      content: text,
+      timestamp: Date.now(),
+    }
+    setMessages(prev => [...prev, playerMsg])
+
+    try {
+      const body: DMRequest = {
+        message: text,
+        gameState,
+      }
+
+      const res = await fetch('/api/dm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error ?? `HTTP ${res.status}`)
+      }
+
+      const data: DMResponse = await res.json()
+
+      // Update game state
+      if (data.newGameState) {
+        setGameState(data.newGameState)
+      }
+
+      const newMessages: ChatMessage[] = []
+
+      // Add mechanical results if any tools were used
+      if (data.toolsUsed && data.toolsUsed.length > 0 && data.newGameState) {
+        const latestLog = data.newGameState.combatLog
+        const prevLogLength = gameState.combatLog.length
+        const newEntries = latestLog.slice(prevLogLength)
+
+        for (const entry of newEntries) {
+          if (entry.mechanicalDetail) {
+            newMessages.push({
+              id: generateId(),
+              role: 'mechanical',
+              content: entry.mechanicalDetail,
+              timestamp: entry.timestamp,
+            })
+          }
+        }
+      }
+
+      // Add DM narrative
+      if (data.narrative) {
+        newMessages.push({
+          id: generateId(),
+          role: 'dm',
+          content: data.narrative,
+          timestamp: Date.now(),
+        })
+      }
+
+      setMessages(prev => [...prev, ...newMessages])
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Erreur inconnue'
+      setError(msg)
+      setMessages(prev => [...prev, {
+        id: generateId(),
+        role: 'dm',
+        content: `[Erreur du système] ${msg}`,
+        timestamp: Date.now(),
+      }])
+    } finally {
+      setIsLoading(false)
+    }
+  }, [isLoading, gameState])
+
+  const { label: phaseText, color: phaseColor } = phaseLabel(gameState.phase)
+
+  return (
+    <div className="flex flex-col h-screen bg-stone-950 text-stone-100 overflow-hidden">
+      {/* Top bar */}
+      <header className="flex-shrink-0 h-10 bg-stone-900 border-b border-amber-900/40 flex items-center px-4 gap-4">
+        <span className="font-bold text-amber-500 tracking-wider text-sm">⚔ AI DUNGEON MASTER</span>
+        <div className="h-4 w-px bg-stone-700" />
+        <span className={`text-xs font-mono font-bold ${phaseColor}`}>{phaseText}</span>
+        <div className="h-4 w-px bg-stone-700" />
+        <span className="text-xs text-stone-500">
+          {gameState.player.name} · {gameState.player.class} niv.{gameState.player.level}
+        </span>
+        <span className="text-xs text-stone-500">
+          HP: <span className={gameState.player.hp.current < gameState.player.hp.max * 0.3 ? 'text-red-400' : 'text-stone-300'}>
+            {gameState.player.hp.current}
+          </span>/{gameState.player.hp.max}
+        </span>
+        <span className="text-xs text-stone-500">CA: {gameState.player.ac}</span>
+        {error && (
+          <span className="ml-auto text-xs text-red-400 bg-red-900/20 px-2 py-0.5 rounded">
+            {error}
+          </span>
+        )}
+      </header>
+
+      {/* Main layout */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left: Battlemap (65%) */}
+        <div className="flex-[65] min-w-0 p-2 overflow-hidden">
+          <Battlemap gameState={gameState} cellSize={52} />
+          {/* Carte : Grammy's Bakery (~880×800px) — grille 17×15 cases à 52px */}
+        </div>
+
+        {/* Right: Chat + CombatTracker (35%) */}
+        <div className="flex-[35] min-w-[320px] max-w-[480px] flex flex-col gap-2 p-2 overflow-hidden">
+          {gameState.phase === 'combat' && (
+            <div className="flex-shrink-0">
+              <CombatTracker gameState={gameState} />
+            </div>
+          )}
+          <div className="flex-1 min-h-0">
+            <Chat
+              messages={messages}
+              isLoading={isLoading}
+              onSendMessage={sendMessage}
+              inputValue={inputValue}
+              onInputChange={setInputValue}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
