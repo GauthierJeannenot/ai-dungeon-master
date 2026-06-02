@@ -41,8 +41,9 @@ jobs:
       - name: Build Next.js
         run: npx next build
         env:
-          # Clé factice pour que le build passe — pas utilisée au build time
-          ANTHROPIC_API_KEY: sk-ant-ci-placeholder-key-not-real
+          # URL factice pour que le build passe — pas de connexion Ollama au build time
+          OLLAMA_BASE_URL: http://localhost:11434
+          OLLAMA_MODEL: qwen2.5:7b
           NODE_ENV: production
 
       - name: Upload build artifact (MCP dist)

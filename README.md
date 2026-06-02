@@ -1,17 +1,107 @@
 # AI Dungeon Master
 
-Application web de jeu de rôle D&D 5e avec un Dungeon Master IA (Claude) comme narrateur et arbitre de règles. Interface battlemap interactive avec chat latéral. Un serveur MCP TypeScript gère tous les calculs mécaniques.
+Application web de jeu de rôle D&D 5e avec un Dungeon Master IA comme narrateur et arbitre de règles. Interface battlemap interactive avec chat latéral. Un serveur MCP TypeScript gère tous les calculs mécaniques (dés, combat, déplacements).
 
 ## Stack
 
 - **Frontend** : Next.js 16, TypeScript, Tailwind CSS
-- **IA** : Anthropic SDK avec `claude-sonnet-4-20250514`
+- **IA** : [Ollama](https://ollama.com) — `qwen2.5:7b` (auto-hébergé, gratuit)
 - **MCP** : `@modelcontextprotocol/sdk` — game engine déterministe
 
 ## Prérequis
 
 - Node.js 20+
-- Une clé API Anthropic
+- Un serveur Ollama accessible (local ou distant) avec le modèle `qwen2.5:7b` installé
+
+---
+
+## 1. Déployer Ollama sur Oracle Cloud (gratuit à vie)
+
+Oracle Cloud Free Tier offre **4 OCPU ARM + 24GB RAM** — largement assez pour Qwen2.5 7B.
+
+### Créer le serveur
+
+1. Crée un compte sur [cloud.oracle.com](https://cloud.oracle.com) (carte bancaire requise, jamais débitée)
+2. Créer une instance :
+   - **Image** : Ubuntu 22.04 LTS
+   - **Shape** : `VM.Standard.A1.Flex` → 4 OCPU, 24GB RAM
+   - **Free tier eligible** : ✅ cocher
+   - Télécharge ou génère une clé SSH
+
+### Installer Ollama
+
+```bash
+# Connexion SSH
+ssh ubuntu@TON-IP-ORACLE
+
+# Installer Ollama
+curl -fsSL https://ollama.com/install.sh | sh
+
+# Configurer Ollama pour écouter sur toutes les interfaces (pas seulement localhost)
+sudo systemctl edit ollama
+```
+
+Ajoute dans l'éditeur :
+```ini
+[Service]
+Environment="OLLAMA_HOST=0.0.0.0:11434"
+```
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl restart ollama
+
+# Télécharger le modèle (~5GB, ~10min sur une bonne connexion)
+ollama pull qwen2.5:7b
+
+# Vérifier
+ollama list
+```
+
+### Ouvrir le port dans Oracle Cloud
+
+Dans la console Oracle : **Networking → Virtual Cloud Networks → Security Lists** → ajoute une règle Ingress :
+- Protocol : TCP
+- Port : `11434`
+- Source : ton IP Next.js (Railway/Render) ou `0.0.0.0/0` avec auth
+
+### Sécuriser avec nginx (recommandé)
+
+```bash
+sudo apt install nginx apache2-utils -y
+
+# Créer un fichier de mots de passe
+sudo htpasswd -c /etc/nginx/.htpasswd dungeon
+
+# Config nginx
+sudo nano /etc/nginx/sites-available/ollama
+```
+
+```nginx
+server {
+    listen 80;
+    server_name _;
+
+    location / {
+        auth_basic "Ollama";
+        auth_basic_user_file /etc/nginx/.htpasswd;
+
+        proxy_pass http://localhost:11434;
+        proxy_set_header Host $host;
+        proxy_read_timeout 120s;
+    }
+}
+```
+
+```bash
+sudo ln -s /etc/nginx/sites-available/ollama /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+Avec cette config, l'URL devient : `http://TON-IP:80` avec Basic Auth.  
+Dans `.env.local`, ajoute : `OLLAMA_API_KEY=ton-mot-de-passe` (le middleware convertit en Bearer).
+
+---
 
 ## Installation
 
@@ -21,12 +111,15 @@ npm install
 
 ## Configuration
 
-### 1. Clé API
+### 1. Variables d'environnement
 
-Éditez `.env.local` et remplacez `your_key_here` par votre clé Anthropic :
+Édite `.env.local` :
 
-```
-ANTHROPIC_API_KEY=sk-ant-...
+```env
+OLLAMA_BASE_URL=http://TON-IP-ORACLE:11434
+OLLAMA_MODEL=qwen2.5:7b
+# Si nginx avec auth :
+# OLLAMA_API_KEY=ton-mot-de-passe
 ```
 
 ### 2. Battlemap (optionnel)

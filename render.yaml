@@ -10,5 +10,10 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      - key: ANTHROPIC_API_KEY
-        sync: false                     # À renseigner manuellement dans le dashboard Render
+      - key: OLLAMA_BASE_URL
+        sync: false          # ex: http://TON-SERVEUR:11434 — à renseigner dans le dashboard
+      - key: OLLAMA_MODEL
+        value: qwen2.5:7b
+      # Optionnel — si reverse proxy avec auth
+      # - key: OLLAMA_API_KEY
+      #   sync: false
