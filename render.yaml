@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: ai-dungeon-master
+    runtime: node
+    plan: free                          # Free tier — mise en veille après 15min sans trafic
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: true                    # Re-déploie à chaque push sur la branche configurée
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: ANTHROPIC_API_KEY
+        sync: false                     # À renseigner manuellement dans le dashboard Render

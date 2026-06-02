@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ── Type-check + Build ────────────────────────────────────────────────────
+  build:
+    name: Type-check & Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Type-check MCP server (TypeScript strict)
+      - name: Type-check MCP server
+        run: npx tsc -p mcp-server/tsconfig.json --noEmit
+
+      # Compile MCP server (needed for next build to pass — API route imports it at runtime)
+      - name: Build MCP server
+        run: npm run build:mcp
+
+      # Type-check Next.js app
+      - name: Type-check Next.js
+        run: npx tsc --noEmit
+
+      # Full production build
+      - name: Build Next.js
+        run: npx next build
+        env:
+          # Clé factice pour que le build passe — pas utilisée au build time
+          ANTHROPIC_API_KEY: sk-ant-ci-placeholder-key-not-real
+          NODE_ENV: production
+
+      - name: Upload build artifact (MCP dist)
+        uses: actions/upload-artifact@v4
+        with:
+          name: mcp-dist
+          path: mcp-server/dist/
+          retention-days: 1
