@@ -10,10 +10,10 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 })
 
-const MODEL = 'claude-sonnet-4-6'
+const MODEL = 'claude-haiku-4-5'
 // 3 itérations max : couvre le cas le plus complexe (spawn_monster + enter_combat + narration)
 const MAX_TOOL_ITERATIONS = 3
-const MAX_TOKENS = 1024
+const MAX_TOKENS = 400
 const COMBAT_LOG_TAIL = 6        // seules les 6 dernières entrées envoyées au modèle
 
 // ── Cache des tools MCP ───────────────────────────────────────────────────────
