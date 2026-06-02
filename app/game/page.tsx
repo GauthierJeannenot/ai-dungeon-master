@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import Chat from '@/components/Chat'
 import CombatTracker from '@/components/CombatTracker'
-import { GameState, ChatMessage, DMResponse, DMRequest } from '@/lib/types'
+import { GameState, ChatMessage, DMResponse, DMRequest, ConversationTurn } from '@/lib/types'
 
 // Battlemap uses browser APIs — load client-only
 const Battlemap = dynamic(() => import('@/components/Battlemap'), { ssr: false })
@@ -56,6 +56,8 @@ export default function GamePage() {
   const [isLoading, setIsLoading] = useState(false)
   const [inputValue, setInputValue] = useState('')
   const [error, setError] = useState<string | null>(null)
+  // Résumé compressé des échanges anciens — stocké ici, renvoyé à chaque requête
+  const [summaryContext, setSummaryContext] = useState<string | undefined>(undefined)
 
   // Welcome message
   useEffect(() => {
@@ -83,9 +85,20 @@ export default function GamePage() {
     setMessages(prev => [...prev, playerMsg])
 
     try {
+      // Construit l'historique : messages player/dm uniquement (pas mechanical),
+      // sans le message courant qui vient d'être ajouté à la liste.
+      // On l'exclut en prenant tous les messages AVANT l'ajout du playerMsg.
+      const history: ConversationTurn[] = messages
+        .filter((m): m is ChatMessage & { role: 'player' | 'dm' } =>
+          m.role === 'player' || m.role === 'dm'
+        )
+        .map(m => ({ role: m.role, content: m.content }))
+
       const body: DMRequest = {
         message: text,
         gameState,
+        history,
+        summaryContext,
       }
 
       const res = await fetch('/api/dm', {
@@ -104,6 +117,11 @@ export default function GamePage() {
       // Update game state
       if (data.newGameState) {
         setGameState(data.newGameState)
+      }
+
+      // Si une compression a eu lieu, on stocke le nouveau résumé
+      if (data.summaryContext) {
+        setSummaryContext(data.summaryContext)
       }
 
       const newMessages: ChatMessage[] = []

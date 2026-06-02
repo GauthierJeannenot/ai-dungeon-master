@@ -120,16 +120,28 @@ export interface SavingThrowResult {
   mechanicalSummary: string
 }
 
+// Un tour de conversation envoyé au LLM (player/dm uniquement — pas mechanical)
+export interface ConversationTurn {
+  role: 'player' | 'dm'
+  content: string
+}
+
 // API request/response types
 export interface DMRequest {
   message: string
   gameState?: GameState
+  // Historique récent gardé verbatim (derniers N messages player/dm)
+  history?: ConversationTurn[]
+  // Résumé compressé des échanges plus anciens (généré par le LLM quand l'historique est trop long)
+  summaryContext?: string
 }
 
 export interface DMResponse {
   narrative: string
   newGameState: GameState
   toolsUsed: string[]
+  // Nouveau résumé retourné si une compression a eu lieu pendant cette requête
+  summaryContext?: string
   error?: string
 }
 
