@@ -10,7 +10,7 @@ export const maxDuration = 60
 // OLLAMA_MODEL    : modèle à utiliser (ex: qwen2.5:7b)
 // OLLAMA_API_KEY  : optionnel — si tu protèges Ollama avec un reverse proxy auth
 const OLLAMA_BASE_URL = (process.env.OLLAMA_BASE_URL ?? 'http://localhost:11434').replace(/\/$/, '')
-const MODEL           = process.env.OLLAMA_MODEL ?? 'qwen2.5:7b'
+const MODEL           = process.env.OLLAMA_MODEL ?? 'qwen2.5:3b'
 const OLLAMA_API_KEY  = process.env.OLLAMA_API_KEY  // optionnel
 
 const MAX_TOOL_ITERATIONS = 3

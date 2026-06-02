@@ -42,3 +42,8 @@ next-env.d.ts
 
 # MCP server compiled output
 mcp-server/dist/
+
+# SSH keys — ne jamais commiter
+*.key
+*.pem
+*.pub
