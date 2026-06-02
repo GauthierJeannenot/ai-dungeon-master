@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "npm run build:mcp && concurrently \"next dev\" \"node mcp-server/dist/mcp-server/index.js\"",
-    "build:mcp": "tsc -p mcp-server/tsconfig.json",
+    "build:mcp": "npx tsc -p mcp-server/tsconfig.json",
     "build": "npm run build:mcp && next build",
     "start": "next start"
   },
