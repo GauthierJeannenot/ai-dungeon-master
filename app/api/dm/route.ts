@@ -11,9 +11,10 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 })
 
-const MODEL = 'claude-haiku-4-5'
+const MODEL = 'claude-sonnet-4-6'
 // Limité à 8 : évite les boucles infinies tout en permettant 4-5 tool calls + narration
 const MAX_TOOL_ITERATIONS = 8
+
 
 // Contenu statique — mis en cache (ne change pas entre les requêtes)
 function buildStaticPrompt(): string {
@@ -131,6 +132,23 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       } catch {
         return NextResponse.json({ error: 'Serveur MCP non disponible.' }, { status: 503 })
       }
+    }
+
+    // Sync MCP server avec l'état frontend (évite la désynchronisation des positions)
+    try {
+      await callMCPTool('move_token', {
+        tokenId: 'player',
+        x: currentGameState.player.position.x,
+        y: currentGameState.player.position.y,
+      })
+      // Sync monstres vivants
+      for (const [id, monster] of Object.entries(currentGameState.monsters)) {
+        if (monster.isAlive) {
+          await callMCPTool('move_token', { tokenId: id, x: monster.position.x, y: monster.position.y })
+        }
+      }
+    } catch {
+      // Non bloquant — on continue avec l'état client
     }
 
     const systemBlocks = buildSystemBlocks(currentGameState)

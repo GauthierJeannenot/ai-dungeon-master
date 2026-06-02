@@ -20,7 +20,7 @@ const INITIAL_GAME_STATE: GameState = {
     ac: 16,
     stats: { str: 16, dex: 12, con: 14, int: 10, wis: 12, cha: 10 },
     proficiencyBonus: 2,
-    position: { x: 4, y: 13 },  // Chemin d'entrée — à côté de Mac le Tréant (bas-gauche)
+    position: { x: 10, y: 13 },  // Chemin d'entrée — à côté de Mac le Tréant (bas-gauche)
     conditions: [],
     speed: 30,
     inventory: [
@@ -108,12 +108,9 @@ export default function GamePage() {
 
       const newMessages: ChatMessage[] = []
 
-      // Add mechanical results if any tools were used
+      // Add mechanical results from combat log
       if (data.toolsUsed && data.toolsUsed.length > 0 && data.newGameState) {
-        const latestLog = data.newGameState.combatLog
-        const prevLogLength = gameState.combatLog.length
-        const newEntries = latestLog.slice(prevLogLength)
-
+        const newEntries = data.newGameState.combatLog.slice(gameState.combatLog.length)
         for (const entry of newEntries) {
           if (entry.mechanicalDetail) {
             newMessages.push({

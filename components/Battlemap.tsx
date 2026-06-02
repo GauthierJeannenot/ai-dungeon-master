@@ -29,18 +29,6 @@ function getHPDescription(current: number, max: number): string {
   return 'À l\'agonie'
 }
 
-// ── DEBUG ZONES (à retirer après vérification) ──────────────────────────────
-const DEBUG_ZONES = [
-  { id: '2',   label: 'S2 — Verger',           color: '#22c55e', x: 0, y: 0,  w: 17, h: 3 },
-  { id: '1',   label: 'S1 — Entrée',           color: '#facc15', x: 2, y: 11, w: 7,  h: 4 },
-  { id: '3',   label: 'S3 — Tas de déchets',   color: '#a16207', x: 0, y: 6,  w: 2,  h: 3 },
-  { id: '7',   label: 'S7 — Quai chargement',  color: '#3b82f6', x: 5, y: 4,  w: 3,  h: 5 },
-  { id: '8',   label: 'S8 — Boulangerie',      color: '#f97316', x: 8, y: 4,  w: 7,  h: 5 },
-  { id: 'gap', label: 'Couloir',               color: '#94a3b8', x: 8, y: 9,  w: 1,  h: 5 },
-  { id: '45',  label: 'S4/5 — Boutique/Bureau',color: '#a855f7', x: 5, y: 9,  w: 3,  h: 5 },
-  { id: '9',   label: 'S9 — Appartement',      color: '#f43f5e', x: 9, y: 9,  w: 6,  h: 5 },
-]
-// ────────────────────────────────────────────────────────────────────────────
 
 export default function Battlemap({ gameState, cellSize = 48 }: BattlemapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -121,7 +109,7 @@ export default function Battlemap({ gameState, cellSize = 48 }: BattlemapProps) 
           }}
         />
 
-        {/* Grid overlay + debug zones */}
+        {/* Grid overlay — léger, non-intrusif */}
         <svg
           className="absolute inset-0 pointer-events-none"
           width={gridCols * cellSize}
@@ -138,35 +126,6 @@ export default function Battlemap({ gameState, cellSize = 48 }: BattlemapProps) 
             </pattern>
           </defs>
           <rect width="100%" height="100%" fill="url(#grid)" />
-
-          {/* ── DEBUG : zones du module (retirer après vérification) ── */}
-          {DEBUG_ZONES.map(zone => (
-            <g key={zone.id}>
-              <rect
-                x={zone.x * cellSize}
-                y={zone.y * cellSize}
-                width={zone.w * cellSize}
-                height={zone.h * cellSize}
-                fill={zone.color}
-                fillOpacity={0.22}
-                stroke={zone.color}
-                strokeWidth={2}
-                strokeOpacity={0.8}
-                rx={3}
-              />
-              <text
-                x={zone.x * cellSize + 6}
-                y={zone.y * cellSize + 14}
-                fill={zone.color}
-                fontSize={11}
-                fontWeight="bold"
-                style={{ textShadow: '0 1px 3px #000' }}
-              >
-                {zone.label}
-              </text>
-            </g>
-          ))}
-          {/* ─────────────────────────────────────────────────────────── */}
         </svg>
 
         {/* Monster tokens */}

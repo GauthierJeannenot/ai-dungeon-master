@@ -22,24 +22,24 @@ Le vieux sorcier Tyndareus le Vert a envoyé le joueur récupérer la recette se
 GRILLE : 17 colonnes (x:0-16) × 15 rangées (y:0-14) — cellule 52px
 
   0   1   2   3   4   5   6   7   8   9  10  11  12  13  14  15  16
-0 [   Verger — Pommiers (Salle 2)                                   ]
-1 [   Verger — Pommiers (Salle 2)                                   ]
-2 [   Verger — Pommiers (Salle 2)                                   ]
-3 [ext][ext][ext][ext][ext][ Entrée / chemin (Salle 1)    ][ext][ext]
-4 [ext][ext][ext][ext][ext][QDC][QDC][QDC][BSF][BSF][BSF][BSF][BSF][BSF][BSF][ext]
-5 [ext][ext][ext][ext][ext][QDC][QDC][QDC][BSF][BSF][BSF][BSF][BSF][BSF][BSF][ext]
-6 [TAS][TAS][ext][ext][ext][QDC][QDC][QDC][BSF][BSF][BSF][BSF][BSF][BSF][BSF][ext]
-7 [TAS][TAS][ext][ext][ext][QDC][QDC][QDC][BSF][BSF][BSF][BSF][BSF][BSF][BSF][ext]
-8 [TAS][TAS][ext][ext][ext][QDC][QDC][QDC][BSF][BSF][BSF][BSF][BSF][BSF][BSF][ext]
-9 [ext][ext][ext][ext][ext][BOU][BOU][BOU][GAP][APP][APP][APP][APP][APP][APP][ext]
-10[ext][ext][ext][ext][ext][BOU][BOU][BOU][GAP][APP][APP][APP][APP][APP][APP][ext]
-11[ext][ext][ext][ext][ext][BOU][BOU][BOU][GAP][APP][APP][APP][APP][APP][APP][ext]
-12[ext][ext][ext][ext][ext][BOU][BOU][BOU][GAP][APP][APP][APP][APP][APP][APP][ext]
-13[ext][ext][ext][ext][ext][BOU][BOU][BOU][GAP][APP][APP][APP][APP][APP][APP][ext]
+0 [ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext]
+1 [ext][ext][ext][Ver][Ver][Ver][Ver][Ver][Ver][Ver][Ver][Ver][Ver][Ver][Ver][Ver]
+2 [ext][ext][ext][Ver][Ver][Ver][Ver][Ver][Ver][Ver][Ver][Ver][Ver][Ver][Ver][Ver]
+3 [ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext]
+4 [ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext]
+5 [ext][ext][ext][QDC][QDC][QDC][BSF][BSF][BSF][BSF][BSF][BSF][TAS][TAS][ext][ext]
+6 [ext][ext][ext][QDC][QDC][QDC][BSF][BSF][BSF][BSF][BSF][BSF][TAS][TAS][ext][ext]
+7 [ext][ext][ext][QDC][QDC][QDC][BSF][BSF][BSF][BSF][BSF][BSF][TAS][TAS][ext][ext]
+8 [ext][ext][ext][ext][ext][BOU][BOU][BSF][BSF][BSF][BSF][BSF][ext][ext][ext][ext]
+9 [ext][ext][ext][ext][ext][BOU][BOU][APP][APP][APP][ENT][ENT][ENT][ENT][ext][ext]
+10[ext][ext][ext][ext][ext][BOU][BOU][APP][APP][APP][ENT][ENT][ENT][ENT][ext][ext]
+11[ext][ext][ext][ext][ext][BOU][BOU][APP][APP][APP][ENT][ENT][ENT][ENT][ext][ext]
+12[ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ENT][ENT][ENT][ENT][ext][ext]
+13[ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext]
 14[ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext]
 
-Légende : QDC=Quai de chargement | BSF=Sol boulangerie | TAS=Tas déchets
-          BOU=Boutique/Bureau/Gardes | APP=Appartement Grammy | GAP=Couloir
+Légende : QDC=Quai de chargement | BSF=Sol boulangerie | TAS=Tas déchets | Ver=Verger
+          BOU=Boutique/Bureau/Gardes | APP=Appartement Grammy | ENT=entrée
 ```
 
 ---
@@ -48,12 +48,14 @@ Légende : QDC=Quai de chargement | BSF=Sol boulangerie | TAS=Tas déchets
 
 | Depuis → Vers | Coordonnée d'arrivée | Condition |
 |---------------|---------------------|-----------|
-| Départ (extérieur) | (4, 13) | Position initiale — à côté de Mac |
-| Entrée → Sol boulangerie | (9, 6) | Portes principales (haut du bâtiment) |
-| Extérieur → Quai chargement | (6, 5) | Porte latérale coulissante |
-| Entrée → Boutique | (6, 10) | Porte droite dans le couloir |
-| Sol boulangerie → Boutique | (7, 9) | Porte intérieure |
-| Sol boulangerie → Appartement | (10, 9) | Couloir intérieur |
+| Départ (extérieur) | (9, 13) | Position initiale — à côté de Mac |
+| Extérieur → Entrée | (11, 13) | double porte vers l'entrée |
+| Entrée → Sol boulangerie | (11, 9) | double porte au nord de l'entrée |
+| Entrée → Appartement Grammy | (10, 10) | porte à gauche de l'entrée |
+| Extérieur → Quai chargement | (3, 6) | Porte latérale coulissante |
+| Quai chargement → Sol boulangerie | (6, 6) | porte latérale coulissante ouverte en grand |
+| Sol boulangerie → Boutique | (6, 8) | Porte intérieure |
+| Sol boulangerie → Appartement | (8, 9) | Porte intérieure |
 | Boutique → Bureau | (6, 11) | Porte intérieure |
 
 **Le joueur commence à : (4, 13) — chemin d'entrée, à côté de Mac le Tréant**
@@ -61,7 +63,7 @@ Légende : QDC=Quai de chargement | BSF=Sol boulangerie | TAS=Tas déchets
 ---
 
 ## Salle 1 — Entrée extérieure
-**Zone** : x:2-8, y:11-14 (chemin gravier devant les portes, bas-gauche de la carte)  
+**Zone** : x:3-16 y:13-14 (chemin gravier devant les portes, bas-gauche de la carte)  
 **Point d'entrée** : (4, 13)
 
 ### Description
@@ -69,7 +71,7 @@ Le chemin de gravier serpente à travers une pelouse envahie par les mauvaises h
 
 ### Contenu
 **Mac le Tréant** (pommier animé, non hostile si ignoré) :
-- Position : (3, 13) — grand pommier à gauche du chemin d'entrée (bas-gauche de la carte)
+- Position : (7, 13) — grand pommier à gauche du chemin d'entrée (bas-gauche de la carte)
 - Ne s'implique pas si on le laisse tranquille
 - Si les plantes sont menacées → hostile (vise à neutraliser, jamais tuer)
 - DD 12 Persuasion ou Investigation → révèle que les dryades du verger connaissent des secrets
@@ -92,8 +94,8 @@ trigger_room_event({ roomId: "1", eventType: "enter",
 ---
 
 ## Salle 2 — Le Verger de Pommiers
-**Zone** : x:0-16, y:0-2  
-**Point d'entrée** : (8, 1)
+**Zone** : x:3-15, y:1-2  
+**Point d'entrée** : (14, 3)
 
 ### Description
 Les pommiers plus anciens sont disposés en rangées ordonnées, mais les jeunes pousses sauvages ont envahi tout l'espace disponible. Un murmure mystérieux parcourt les feuilles, et des pommes à moitié mûres jonchent le sol. Soudain, une pomme fend l'air — suivie d'un éclat de rire cristallin.
@@ -115,8 +117,8 @@ trigger_room_event({ roomId: "2", eventType: "enter",
 ---
 
 ## Salle 3 — Tas de Déchets
-**Zone** : x:0-2, y:6-8  
-**Point d'entrée** : (1, 7)
+**Zone** : x:12-13, y:5-7  
+**Point d'entrée** : (13, 6)
 
 ### Description
 Ce qui était autrefois une rangée ordonnée de composteurs est devenu un amoncellement nauséabond de déchets organiques. Des champignons violets et autres décomposeurs prolifèrent dans cette manne pourrie. L'odeur est âcre, portée par la brise.
@@ -124,7 +126,7 @@ Ce qui était autrefois une rangée ordonnée de composteurs est devenu un amonc
 ### Contenu
 **Champignon violet** (créature hostile) :
 - Spawn si quelqu'un s'approche à moins d'une case (5 pieds)
-- Utiliser `spawn_monster({ monsterType: "zombie", cell: {x:1, y:7}, name: "Champignon Violet" })`  
+- Utiliser `spawn_monster({ monsterType: "zombie", cell: {x:13, y:6}, name: "Champignon Violet" })`  
   *(statistiques de zombie, déplacement lent, attaque empoisonnée)*
 
 ### Trigger — Approche
@@ -135,12 +137,12 @@ trigger_room_event({ roomId: "3", eventType: "trap",
 
 ---
 
-## Salle 4 — La Boutique (façade)
-**Zone** : x:5-8, y:9-13 *(section avant)*  
-**Point d'entrée** : (6, 10)
+## Salle 4 — L'entrée (façade)
+**Zone** : x:10-13, y:9-12 *(section avant)*  
+**Point d'entrée** : (11, 12)
 
 ### Description
-La boutique était le visage public de la boulangerie. Un comptoir en chêne occupe le fond de la pièce, entouré d'étagères murales qui accueillaient jadis des boîtes de tartes joliment emballées. Désormais, du papier froissé, des rubans et de la ficelle jonchent le sol de pierre. Deux tables ont été renversées au centre de la pièce. Trois portes donnent sur l'extérieur, le bureau et le sol de la boulangerie.
+L'entrée' était le visage public de la boulangerie. Un comptoir en chêne occupe le fond de la pièce, entouré d'étagères murales qui accueillaient jadis des boîtes de tartes joliment emballées. Désormais, du papier froissé, des rubans et de la ficelle jonchent le sol de pierre. Deux tables ont été renversées au centre de la pièce. Trois portes donnent sur l'extérieur, l'appartement et le sol de la boulangerie.
 
 ### Contenu
 - Indices d'infestation de gobelins visibles (traces, déjections, morsures)
@@ -153,8 +155,8 @@ La boutique était le visage public de la boulangerie. Un comptoir en chêne occ
 ---
 
 ## Salle 5 — Le Bureau
-**Zone** : x:5-8, y:9-13 *(section arrière)*  
-**Point d'entrée** : (6, 11)
+**Zone** : x:5-6, y:8-11 
+**Point d'entrée** : (6, 8)
 
 ### Description
 Cette pièce au mobilier en acajou imposant et aux rideaux de velours prune contenait deux bureaux couverts de paperasse et des classeurs muraux. L'odeur de gobelin y est moins forte — ils ne comprennent pas l'utilité des papiers. Les registres financiers éparpillés montrent que l'affaire était florissante.
@@ -184,24 +186,9 @@ trigger_room_event({ roomId: "5", eventType: "trap",
 
 ---
 
-## Salle 6 — Salle des Gardes
-**Zone** : x:5-6, y:9-10 *(alcôve dans le coin de la salle boutique/bureau)*  
-**Point d'entrée** : (5, 9)
-
-### Description
-Grammy employait quelques jeunes hommes du village comme gardes, plus pour les occuper que par nécessité réelle. La salle contient trois bâtons de combat tombés à terre, une petite table renversée avec deux chaises. Un coffre verrouillé est posé contre le mur opposé.
-
-### Contenu
-- **Bâtons de combat ×3** : bois mal conservé — à chaque attaque ratée, jet d6 → sur 5-6, le bâton se brise
-- **Coffre verrouillé** :
-  - DD 15 Dextérité ou DD 17 Force pour ouvrir
-  - Contenu : **3 fioles d'huile de Chêne-Tige** *(fonctionne comme le sort Shillelagh sur un bâton ou gourdin — dégâts magiques 1d8, modificateur de Sagesse)*
-
----
-
 ## Salle 7 — Quai de Chargement
-**Zone** : x:5-8, y:4-8  
-**Point d'entrée** : (6, 5)
+**Zone** : x:3-5, y:5-7  
+**Point d'entrée** : (3, 6)
 
 ### Description
 Une porte coulissante en bois donne accès à cette salle aux murs de pierre bruts et au sol nu. Un vieux chariot en bois abandonné prend la poussière dans un coin. On peut voir, depuis ici, l'intérieur de la boulangerie : une patrouille de deux gobelins passe devant l'ouverture, l'air de rien.
@@ -213,8 +200,8 @@ Une porte coulissante en bois donne accès à cette salle aux murs de pierre bru
 
 **Si repéré :**
 ```
-spawn_monster({ monsterType: "goblin", cell: {x:7, y:7}, name: "Gobelin Patrouille" })
-spawn_monster({ monsterType: "goblin", cell: {x:7, y:6}, name: "Gobelin Patrouille" })
+spawn_monster({ monsterType: "goblin", cell: {x:5, y:5}, name: "Gobelin Patrouille" })
+spawn_monster({ monsterType: "goblin", cell: {x:5, y:6}, name: "Gobelin Patrouille" })
 enter_combat({ combatants: ["player", "[ids des gobelins]"] })
 ```
 
@@ -229,8 +216,8 @@ trigger_room_event({ roomId: "7", eventType: "enter",
 ---
 
 ## Salle 8 — Sol de la Boulangerie
-**Zone** : x:8-15, y:4-8  
-**Point d'entrée** : (9, 5)
+**Zone** : x:6-11, y:5-8  
+**Point d'entrée** : (11, 9) et (6, 6)
 
 ### Description
 Le sol de la boulangerie est un vaste espace aux plafonds hauts avec des poutres en bois apparentes. Six longs plans de travail occupent le centre de la salle, couverts de moules à tarte, rouleaux à pâtisserie et autres ustensiles. Certains rouleaux roulent encore paresseusement — un enchantement les maintient en mouvement perpétuel. Des couteaux émoussés hachent en l'air des pommes depuis longtemps disparues. Six immenses fours sont alignés contre le mur droit, leurs portes s'ouvrant et se refermant périodiquement comme s'ils attendaient toujours une fournée. L'ensemble est dans un désordre total — quelqu'un a manifestement essayé, et échoué, de recréer les tartes de Grammy.
@@ -264,8 +251,8 @@ Le sol de la boulangerie est un vaste espace aux plafonds hauts avec des poutres
 **Trigger** : Si le joueur interagit avec les objets magiques (rouleaux, couteaux enchantés, ouvrir un four) :
 ```
 spawn_monster({ monsterType: "goblin", cell: {x:10, y:5}, name: "Gobelin Charpentier" })
-spawn_monster({ monsterType: "goblin", cell: {x:12, y:6}, name: "Gobelin Charpentier" })
-spawn_monster({ monsterType: "goblin", cell: {x:9, y:7}, name: "Gobelin Charpentier" })
+spawn_monster({ monsterType: "goblin", cell: {x:10, y:8}, name: "Gobelin Charpentier" })
+spawn_monster({ monsterType: "goblin", cell: {x:7, y:7}, name: "Gobelin Charpentier" })
 enter_combat({ combatants: ["player", "[ids]"] })
 ```
 
@@ -279,14 +266,12 @@ enter_combat({ combatants: ["player", "[ids]"] })
 |-------|----------|
 | Table 1 | (9, 6) |
 | Table 2 | (11, 6) |
-| Table 3 | (9, 7) |
-| Table 4 | (11, 7) |
-| Table 5 | (13, 5) |
-| Table 6 | (13, 7) |
-| Fours (rangée) | (14-15, 4-8) |
-| Armoire en verre | (12, 8) |
-| Salle stockage 1 | (10, 4) |
-| Salle stockage 2 | (11, 4) |
+| Table 3 | (7, 6) |
+| Table 4 | (7, 8) |
+| Table 5 | (11, 8) |
+| Table 6 | (9, 8) |
+| Fours (rangée) | (12-12, 5-9) |
+| Armoire en verre | (6, 7) |
 
 ### Trigger — Déclenchement des gobelins
 ```
@@ -297,8 +282,8 @@ trigger_room_event({ roomId: "8", eventType: "ambush",
 ---
 
 ## Salle 9 — L'Appartement de Grammy *(SALLE FINALE)*
-**Zone** : x:9-15, y:9-13  
-**Point d'entrée** : (10, 10)
+**Zone** : x:7-9, y:8-11  
+**Point d'entrée** : (8, 9)
 
 ### Description
 Cet appartement douillet a été transformé en véritable tanière de gobelins. Un mobilier en acajou ancien trône encore dans la pièce — trop lourd pour être déplacé. Un lit sans matelas, une armoire remplie d'armes grossières, et contre un mur, un bureau couvert de fourrures et trophées de chasse. Au centre de la pièce, deux gobelins et leur chef vous dévisagent avec des sourires mauvais. *"Encore un vermisseau dans NOS couloirs. Tuez-le."*
@@ -307,9 +292,9 @@ Cet appartement douillet a été transformé en véritable tanière de gobelins.
 
 **Trigger — Entrée dans la salle :**
 ```
-spawn_monster({ monsterType: "goblin", cell: {x:11, y:11}, name: "Gobelin Garde" })
-spawn_monster({ monsterType: "goblin", cell: {x:13, y:11}, name: "Gobelin Garde" })
-spawn_monster({ monsterType: "hobgoblin", cell: {x:12, y:10}, name: "Chef Grukk", hpOverride: 18 })
+spawn_monster({ monsterType: "goblin", cell: {x:9, y:11}, name: "Gobelin Garde" })
+spawn_monster({ monsterType: "goblin", cell: {x:9, y:10}, name: "Gobelin Garde" })
+spawn_monster({ monsterType: "hobgoblin", cell: {x:7, y:11}, name: "Chef Grukk", hpOverride: 18 })
 enter_combat({ combatants: ["player", "[id_gobelin_1]", "[id_gobelin_2]", "[id_chef]"] })
 ```
 
@@ -332,9 +317,9 @@ enter_combat({ combatants: ["player", "[id_gobelin_1]", "[id_gobelin_2]", "[id_c
 ### Positions clés dans l'appartement
 | Objet | Position |
 |-------|----------|
-| Bureau de Grammy | (12, 10) |
-| Lit sans matelas | (10, 12) |
-| Armoire à armes | (14, 12) |
+| Bureau de Grammy | (7, 11) |
+| Lit sans matelas | (7, 10) |
+| Armoire à armes | (9, 11) |
 | Chef Grukk (spawn) | (12, 10) |
 | Gobelin 1 (spawn) | (11, 11) |
 | Gobelin 2 (spawn) | (13, 11) |
