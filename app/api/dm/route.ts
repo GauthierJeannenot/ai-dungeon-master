@@ -3,7 +3,7 @@ import { loadContextFiles } from '@/lib/context-loader'
 import { callMCPTool, listMCPTools } from '@/lib/mcp-client'
 import { DMRequest, DMResponse, GameState, ConversationTurn } from '@/lib/types'
 
-export const maxDuration = 300
+export const maxDuration = 60
 
 // ── Configuration Ollama ──────────────────────────────────────────────────────
 // OLLAMA_BASE_URL : URL de ton serveur Ollama (ex: http://1.2.3.4:11434)
@@ -102,7 +102,7 @@ async function ollamaChat(
     method: 'POST',
     headers,
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(280_000), // 280s — en dessous du maxDuration de 300s
+    signal: AbortSignal.timeout(55_000), // 55s — en dessous du maxDuration de 60s
   })
 
   if (!res.ok) {
