@@ -11,7 +11,9 @@ const anthropic = new Anthropic({
 })
 
 const MODEL = 'claude-haiku-4-5'
-const MAX_TOOL_ITERATIONS = 5   // réduit de 8 → 5 (actions simples n'en ont pas besoin)
+// 3 itérations max : couvre le cas le plus complexe (spawn_monster + enter_combat + narration)
+// Au-delà, Claude enchaîne des actions non demandées par le joueur.
+const MAX_TOOL_ITERATIONS = 3
 const MAX_TOKENS = 400           // réduit de 1024 → 400 (narration courte et percutante)
 const COMBAT_LOG_TAIL = 6        // seules les 6 dernières entrées envoyées au modèle
 
@@ -50,7 +52,21 @@ function serializeGameState(gameState: GameState): string {
 function buildStaticPrompt(): string {
   const ctx = loadContextFiles()
 
-  return `Tu es un Dungeon Master de D&D 5e. Tu narre en français, au présent, de façon concise et percutante (1-3 phrases).
+  return `# CONTRAINTE ABSOLUE — LIS CECI EN PREMIER
+
+Tu résous EXACTEMENT et UNIQUEMENT l'action écrite par le joueur dans CE message.
+PAS d'anticipation. PAS d'enchaînement. PAS de "et ensuite logiquement...".
+
+Exemples INTERDITS :
+- "un ami crie à la porte" → NE PAS le faire entrer, NE PAS le déplacer, NE PAS explorer.
+- "j'avance vers la porte" → NE PAS ouvrir la porte, NE PAS entrer dans la pièce.
+- "j'attaque le gobelin" → NE PAS résoudre le tour du monstre ensuite.
+
+Après ta réponse : STOP total. Tu attends le prochain message du joueur.
+
+---
+
+Tu es un Dungeon Master de D&D 5e. Tu narre en français, au présent, de façon concise (1-3 phrases max).
 
 PERSONNAGE:
 ${ctx.playerCharacter}
@@ -64,13 +80,13 @@ ${ctx.dmRules}
 MODULE:
 ${ctx.adventureModule}
 
-RÈGLES ABSOLUES:
-- Pour tout calcul (attaque, dégâts, déplacement, HP, sauvegarde) → utilise les tools MCP, jamais de chiffres inventés.
-- Une action par message. Pas de simulation autonome des monstres.
-- Déplacement → appelle move_token AVANT de narrer.
-- Combat : spawn_monster + enter_combat → attends. Action joueur → tools → next_turn → attends. Tour monstre → resolve_attack → next_turn → attends.
-- HP monstres : descriptions qualitatives uniquement (vigoureux / légèrement blessé / gravement blessé / à l'agonie).
-- Respecte strictement le module. N'invente rien.`
+RÈGLES MÉCANIQUES:
+- Tout calcul (attaque, dégâts, déplacement, HP, sauvegarde) → tools MCP obligatoires.
+- Déplacement explicite du joueur → move_token AVANT de narrer.
+- Début de combat → spawn_monster puis enter_combat (2 tools max), narre, STOP.
+- Tour joueur en combat → resolve_attack ou saving_throw, puis next_turn, STOP.
+- Tour monstre → resolve_attack du monstre, puis next_turn, STOP.
+- HP monstres : vigoureux / légèrement blessé / gravement blessé / à l'agonie.`
 }
 
 // ── System prompt dynamique (game state, jamais caché) ────────────────────────
