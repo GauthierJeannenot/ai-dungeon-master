@@ -1,0 +1,31 @@
+name: Deploy → Railway
+
+on:
+  push:
+    branches: [main, master]
+  # Déclencher manuellement depuis l'onglet Actions
+  workflow_dispatch:
+
+# N'autoriser qu'un seul déploiement simultané
+concurrency:
+  group: deploy-railway
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy to Railway
+    runs-on: ubuntu-latest
+    # Ne déploie que si le CI passe (dépend du workflow ci.yml)
+    needs: []   # Retirer [] et ajouter "build" si tu veux chaîner avec ci.yml
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Deploy to Railway
+        run: railway up --detach
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}

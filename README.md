@@ -72,3 +72,131 @@ Ouvrez http://localhost:3000
 ## Monstres disponibles
 
 `goblin`, `hobgoblin`, `orc`, `skeleton`, `zombie`, `wolf`, `bandit`
+
+---
+
+## Déploiement (free tier)
+
+> ⚠️ **Vercel / Netlify non compatibles** — le serveur MCP tourne comme processus enfant persistant (stdio), incompatible avec les fonctions serverless.
+
+### Architecture de déploiement
+
+```
+GitHub repo
+    │
+    ├── Push sur main
+    │       │
+    │       ├── GitHub Actions CI → type-check + build
+    │       │
+    │       └── Auto-deploy → Railway ou Render
+    │
+    └── Serveur persistant Node.js
+            ├── Next.js (app + API routes)
+            └── MCP server (processus enfant, spawné par l'API)
+```
+
+---
+
+### Option A — Railway (recommandé)
+
+**Avantages** : pas de mise en veille, meilleure DX, `railway.json` inclus  
+**Coût** : $5 de crédits gratuits à l'inscription (≈ 2-3 mois pour un petit projet)
+
+#### 1. Créer le projet Railway
+
+```bash
+# Installer Railway CLI
+npm install -g @railway/cli
+
+# Se connecter
+railway login
+
+# Lier le repo courant à un projet Railway (crée le projet si besoin)
+railway init
+```
+
+#### 2. Configurer les variables d'environnement
+
+```bash
+railway variables set ANTHROPIC_API_KEY=sk-ant-ta-vraie-cle
+railway variables set NODE_ENV=production
+```
+
+#### 3. Premier déploiement
+
+```bash
+railway up
+```
+
+#### 4. Activer l'auto-deploy GitHub
+
+Dans le dashboard Railway → ton projet → **Settings → Source** → connecte ton repo GitHub → branche `main`.
+
+À partir de là, chaque `git push origin main` déclenche un redéploiement automatique.
+
+#### 5. Activer le déploiement via GitHub Actions (optionnel)
+
+Si tu veux un pipeline CI qui valide avant de déployer :
+
+1. Dans Railway → Settings → Tokens → **Create token**
+2. Dans GitHub → Settings → Secrets → `RAILWAY_TOKEN` → colle le token
+3. Le workflow `.github/workflows/deploy-railway.yml` se déclenche automatiquement sur push main
+
+---
+
+### Option B — Render (gratuit permanent)
+
+**Avantages** : free tier sans limite de temps (750h/mois)  
+**Inconvénient** : mise en veille après 15 min d'inactivité (cold start ~30 sec)
+
+#### 1. Créer le service
+
+1. Ouvre [render.com](https://render.com) → New → **Web Service**
+2. Connecte ton repo GitHub
+3. Render détecte automatiquement `render.yaml` → configuration appliquée
+
+#### 2. Variables d'environnement
+
+Dans le dashboard Render → ton service → **Environment** :
+```
+ANTHROPIC_API_KEY = sk-ant-ta-vraie-cle
+```
+
+#### 3. Auto-deploy
+
+Activé par défaut (`autoDeploy: true` dans `render.yaml`). Chaque push sur la branche configurée redéploie.
+
+---
+
+### Option C — Koyeb (free tier permanent, sans mise en veille)
+
+**Avantages** : 2 instances gratuites permanentes, pas de mise en veille  
+**Coût** : gratuit
+
+1. Ouvre [koyeb.com](https://koyeb.com) → Create App → **GitHub**
+2. Sélectionne ton repo
+3. Build command : `npm ci && npm run build`
+4. Start command : `npm start`
+5. Port : `3000`
+6. Variables : `ANTHROPIC_API_KEY`, `NODE_ENV=production`
+
+---
+
+### CI — GitHub Actions
+
+Le workflow `.github/workflows/ci.yml` se déclenche sur chaque push et PR :
+
+| Étape | Description |
+|-------|-------------|
+| `tsc -p mcp-server/tsconfig.json --noEmit` | Type-check strict du serveur MCP |
+| `npm run build:mcp` | Compile le serveur MCP |
+| `tsc --noEmit` | Type-check Next.js |
+| `next build` | Build de production complet |
+
+Aucune clé Anthropic réelle n'est nécessaire pour le CI — une clé placeholder est utilisée (la clé n'est pas lue au build time).
+
+---
+
+### Note sur la persistance d'état
+
+Le game state est stocké **en mémoire** dans le processus MCP. Un redéploiement ou un redémarrage efface la partie en cours. C'est acceptable pour un projet démo. Pour une persistance entre sessions, il faudrait migrer vers Redis ou une base de données.
