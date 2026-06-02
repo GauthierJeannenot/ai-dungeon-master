@@ -2,7 +2,7 @@ name: Deploy → Railway
 
 on:
   push:
-    branches: [main]
+    branches: [main, master]
   # Déclencher manuellement depuis l'onglet Actions
   workflow_dispatch:
 
