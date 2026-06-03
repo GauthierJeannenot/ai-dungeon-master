@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { loadContextFiles } from '@/lib/context-loader'
+import { loadContextFiles, extractCurrentRoom } from '@/lib/context-loader'
 import { callMCPTool, listMCPTools } from '@/lib/mcp-client'
 import { DMRequest, DMResponse, GameState, ConversationTurn } from '@/lib/types'
 
@@ -127,59 +127,71 @@ function serializeGameState(gs: GameState): string {
   })
 }
 
-// ── System prompt ─────────────────────────────────────────────────────────────
-// Tout en un seul message system (Ollama n'a pas de prompt caching)
+// ── System prompt optimisé pour llama3.3:70b ─────────────────────────────────
+// Principes d'optimisation :
+// 1. XML tags → llama3.3 suit mieux les sections structurées
+// 2. Stats joueur inlinées depuis game state → pas de duplication avec player-character.md
+// 3. Salle courante seulement → -80% de tokens sur le module (~3000 → ~400)
+// 4. Règles DM ultra-compressées → llama3.3 connaît D&D 5e, inutile de tout ré-expliquer
+// 5. Instructions tool calling en tête + très explicites
+// Résultat : ~6000 tokens → ~1200 tokens par requête
 function buildSystemPrompt(gs: GameState, summaryContext: string | undefined): string {
   const ctx = loadContextFiles()
-  const parts: string[] = []
+  const p = gs.player
+  const aliveMonsters = Object.values(gs.monsters).filter(m => m.isAlive)
+  const activeConditions = p.conditions.length > 0 ? p.conditions.join(', ') : 'aucune'
 
-  parts.push(`# CONTRAINTE ABSOLUE — LIS CECI EN PREMIER
+  // Extrait uniquement la salle courante + synopsis (pas tout le module)
+  const moduleContext = extractCurrentRoom(ctx.adventureModule, gs.currentRoomId)
 
-Tu résous EXACTEMENT et UNIQUEMENT l'action écrite par le joueur dans CE message.
-PAS d'anticipation. PAS d'enchaînement. PAS de "et ensuite logiquement...".
+  return `<system>
+<rules>
+Tu es un Dungeon Master D&D 5e. Narre en français, au présent, 2-3 phrases max.
 
-Exemples INTERDITS :
-- "un ami crie à la porte" → NE PAS le faire entrer, NE PAS explorer.
-- "j'avance vers la porte" → NE PAS ouvrir la porte, NE PAS entrer.
-- "j'attaque le gobelin" → NE PAS résoudre le tour du monstre ensuite.
+UNE ACTION PAR MESSAGE. Pas d'anticipation, pas d'enchaînement.
+Interdit : "un ami crie" → NE PAS le faire entrer. "j'avance vers X" → NE PAS entrer dans X.
 
-Après ta réponse : STOP. Tu attends le prochain message.
-
----
-
-Tu es un Dungeon Master de D&D 5e. Tu narre en français, au présent (1-3 phrases max).
-
-PERSONNAGE:
-${ctx.playerCharacter}
-
-RÈGLES JOUEUR:
-${ctx.playerRules}
-
-RÈGLES DM:
-${ctx.dmRules}
-
-MODULE:
-${ctx.adventureModule}
-
-RÈGLES MÉCANIQUES — FUNCTION CALLING OBLIGATOIRE:
-⚠️ Tu as accès à des fonctions (tools). Tu DOIS les appeler via le mécanisme function_call de l'API.
-NE JAMAIS écrire un appel de tool dans le texte de ta réponse (pas de backticks, pas de "trigger_room_event(...)").
-Appelle TOUJOURS la fonction via l'API, puis attends le résultat avant de narrer.
-
-- Déplacement explicite → appelle move_token, puis narre.
-- Entrée dans une salle → appelle trigger_room_event.
-- Début combat → appelle spawn_monster puis enter_combat.
-- Attaque joueur → appelle resolve_attack puis next_turn.
-- Tour monstre → appelle resolve_attack puis next_turn.
+FUNCTION CALLING OBLIGATOIRE :
+Appelle les tools via l'API (function_call). JAMAIS dans le texte de ta réponse.
+- Déplacement → move_token PUIS narration.
+- Entrée salle → trigger_room_event.
+- Combat → spawn_monster + enter_combat, STOP.
+- Attaque joueur → resolve_attack + next_turn, STOP.
+- Tour monstre → resolve_attack + next_turn, STOP.
 - HP monstres : vigoureux / légèrement blessé / gravement blessé / à l'agonie.
+</rules>
 
-ÉTAT DU JEU: ${serializeGameState(gs)}`)
+<player>
+${p.name} — Guerrier Niv.${p.level} | HP ${p.hp.current}/${p.hp.max} | CA ${p.ac} | Pos (${p.position.x},${p.position.y})
+Conditions : ${activeConditions} | Vitesse : ${p.speed} pieds
+Attaque : 1d20+5 | Épée longue : 1d8+3 (Sap) | Hache de main : 1d6+3 (Lent)
+Action bonus : Second Souffle 1d10+${p.level} PV (1×/repos court)
+Inventaire : ${p.inventory.map(i => i.name).join(', ')}
+Background : ex-mercenaire en quête de rédemption, méfiant envers la magie
+</player>
+${aliveMonsters.length > 0 ? `
+<combat>
+Phase : ${gs.phase} | Round : ${gs.round} | Tour : ${gs.currentTurn ?? '—'}
+Monstres : ${aliveMonsters.map(m => `${m.name}(${m.id}) HP${m.hp.current}/${m.hp.max} CA${m.ac}`).join(' | ')}
+Initiative : ${gs.initiativeOrder.join(' → ')}
+</combat>` : `<phase>${gs.phase}</phase>`}
 
-  if (summaryContext) {
-    parts.push(`RÉSUMÉ SESSION (échanges précédents):\n${summaryContext}`)
-  }
+<adventure>
+${moduleContext}
+</adventure>
 
-  return parts.join('\n\n')
+<state>
+Salle : ${gs.currentRoomId ?? 'extérieur'} | Visitées : ${gs.roomsVisited.join(', ') || 'aucune'}
+${gs.combatLog.length > 0 ? `Dernières actions : ${gs.combatLog.slice(-2).map(e => e.mechanicalDetail ?? e.action).join(' | ')}` : ''}
+${summaryContext ? `Résumé session : ${summaryContext}` : ''}
+</state>
+
+<dm_rules>
+DCs : Facile 10, Moyen 15, Difficile 20. DC créature = 8+mod+maîtrise.
+Raté de 1-2 → offrir succès à un coût narratif.
+Tous les combats sont évitables : CHA/SAG DD 13 + plan crédible.
+</dm_rules>
+</system>`
 }
 
 // ── Compression de l'historique ───────────────────────────────────────────────

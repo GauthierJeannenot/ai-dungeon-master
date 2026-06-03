@@ -39,6 +39,33 @@ export function invalidateContextCache(): void {
   cached = null
 }
 
+// ── Extraction dynamique de la salle courante ─────────────────────────────────
+// Retourne uniquement la section `## Salle X` correspondant à roomId.
+// Réduit le contexte de ~3000 tokens à ~300-500 tokens par requête.
+export function extractCurrentRoom(moduleText: string, roomId: string | null): string {
+  // Extrait le synopsis (toujours utile — objectif + ton de l'aventure)
+  const synopsisMatch = moduleText.match(/^## Synopsis[\s\S]*?(?=\n---|\n## )/m)
+  const synopsis = synopsisMatch ? synopsisMatch[0].trim() : ''
+
+  // Extrait la table de navigation (courte, utile pour les déplacements)
+  const navMatch = moduleText.match(/## Points d'entrée[\s\S]*?(?=\n---|\n## Salle)/m)
+  const nav = navMatch ? navMatch[0].trim() : ''
+
+  if (!roomId) {
+    // Pas encore dans une salle — donne le synopsis + nav + salle 1
+    const room1Match = moduleText.match(/^## Salle 1[\s\S]*?(?=\n## Salle \d|\n## Récap|\n---\n\n## Récap|$)/m)
+    return [synopsis, nav, room1Match?.[0] ?? ''].filter(Boolean).join('\n\n---\n\n')
+  }
+
+  // Cherche la salle par son ID (ex: "1", "2", "7"...)
+  const roomPattern = new RegExp(`^## Salle ${roomId}[\\s\\S]*?(?=\\n## Salle \\d|\\n## Récap|$)`, 'm')
+  const roomMatch = moduleText.match(roomPattern)
+
+  if (!roomMatch) return synopsis  // fallback si salle non trouvée
+
+  return [synopsis, roomMatch[0].trim()].filter(Boolean).join('\n\n---\n\n')
+}
+
 const DEFAULT_PLAYER_CHARACTER = `
 # Fiche de Personnage
 
