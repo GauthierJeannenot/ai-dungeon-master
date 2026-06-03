@@ -81,6 +81,13 @@ function createSessionId(): string {
   return `session-${Date.now()}-${Math.random().toString(36).slice(2)}`
 }
 
+function createClientRequestId(): string {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return `client-${crypto.randomUUID()}`
+  }
+  return `client-${Date.now()}-${Math.random().toString(36).slice(2)}`
+}
+
 function getOrCreateSessionId(): string {
   try {
     const existing = sessionStorage.getItem(SESSION_KEYS.sessionId)
@@ -282,6 +289,7 @@ export default function GamePage() {
 
     const activeSessionId = sessionId ?? getOrCreateSessionId()
     if (!sessionId) setSessionId(activeSessionId)
+    const clientRequestId = createClientRequestId()
 
     // Add player message immediately
     const playerMsg: ChatMessage = {
@@ -304,6 +312,7 @@ export default function GamePage() {
 
       const body: DMRequest = {
         message: text,
+        clientRequestId,
         sessionId: activeSessionId,
         gameState,
         history,
@@ -311,6 +320,7 @@ export default function GamePage() {
         clientMeta,
       }
       appendClientDebugLog(activeSessionId, 'client.dm.request', {
+        clientRequestId,
         message: truncateClientText(text),
         inputMode: clientMeta.inputMode ?? 'text',
         voice: clientMeta.voice,
@@ -335,6 +345,7 @@ export default function GamePage() {
 
       const data: DMResponse = await res.json()
       appendClientDebugLog(activeSessionId, 'client.dm.response', {
+        clientRequestId,
         inputMode: clientMeta.inputMode ?? 'text',
         narrative: truncateClientText(data.narrative ?? ''),
         toolsUsed: data.toolsUsed,
@@ -386,6 +397,7 @@ export default function GamePage() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Erreur inconnue'
       appendClientDebugLog(activeSessionId, 'client.dm.error', {
+        clientRequestId,
         message: truncateClientText(text),
         inputMode: clientMeta.inputMode ?? 'text',
         error: msg,

@@ -15,7 +15,13 @@ export interface AnthropicUsage {
   inference_geo?: string | null
 }
 
-export interface AnthropicUsageLogEntry {
+export interface AnthropicUsageLogContext {
+  sessionId?: string
+  inputMode?: string
+  clientRequestId?: string
+}
+
+export interface AnthropicUsageLogEntry extends AnthropicUsageLogContext {
   requestId: string
   operation: string
   model: string
@@ -74,6 +80,9 @@ function estimateHaiku45CostUsd(usage: AnthropicUsage): number {
 
 export function logAnthropicUsage({
   requestId,
+  sessionId,
+  inputMode,
+  clientRequestId,
   operation,
   model,
   usage,
@@ -81,6 +90,9 @@ export function logAnthropicUsage({
   metadata,
 }: {
   requestId: string
+  sessionId?: string
+  inputMode?: string
+  clientRequestId?: string
   operation: string
   model: string
   usage: AnthropicUsage
@@ -96,6 +108,9 @@ export function logAnthropicUsage({
 
   const entry: AnthropicUsageLogEntry = {
     requestId,
+    sessionId,
+    inputMode,
+    clientRequestId,
     operation,
     model,
     inputTokens,
@@ -119,7 +134,8 @@ export function logAnthropicUsage({
 export function logAnthropicUsageSummary(
   requestId: string,
   entries: AnthropicUsageLogEntry[],
-  metadata?: Record<string, unknown>
+  metadata?: Record<string, unknown>,
+  context?: AnthropicUsageLogContext
 ): void {
   if (entries.length === 0) return
 
@@ -144,8 +160,12 @@ export function logAnthropicUsageSummary(
     }
   )
 
+  const firstEntry = entries[0]
   logEvent('info', 'anthropic.usage_summary', {
     requestId,
+    sessionId: context?.sessionId ?? firstEntry.sessionId,
+    inputMode: context?.inputMode ?? firstEntry.inputMode,
+    clientRequestId: context?.clientRequestId ?? firstEntry.clientRequestId,
     ...summary,
     estimatedCostUsd: roundUsd(summary.estimatedCostUsd),
     metadata,

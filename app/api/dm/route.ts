@@ -337,7 +337,9 @@ async function compressHistory(
   existingSummary: string | undefined,
   usageLog: AnthropicUsageLogEntry[],
   requestId: string,
-  sessionId: string | undefined
+  sessionId: string | undefined,
+  inputMode: string,
+  clientRequestId: string | undefined
 ): Promise<string> {
   const startedAt = Date.now()
   const exchangeText = oldTurns
@@ -369,6 +371,9 @@ async function compressHistory(
 
   usageLog.push(logAnthropicUsage({
     requestId,
+    sessionId,
+    inputMode,
+    clientRequestId,
     operation: 'history.compress',
     model: MODEL,
     usage: response.usage,
@@ -399,7 +404,9 @@ async function processHistory(
   existingSummary: string | undefined,
   usageLog: AnthropicUsageLogEntry[],
   requestId: string,
-  sessionId: string | undefined
+  sessionId: string | undefined,
+  inputMode: string,
+  clientRequestId: string | undefined
 ): Promise<{ recent: ConversationTurn[]; newSummary: string | undefined }> {
   // Pas assez de messages pour avoir une partie "ancienne"
   if (history.length <= HISTORY_KEEP_RECENT) {
@@ -444,7 +451,15 @@ async function processHistory(
     return { recent: history, newSummary: undefined }
   }
 
-  const newSummary = await compressHistory(oldTurns, existingSummary, usageLog, requestId, sessionId)
+  const newSummary = await compressHistory(
+    oldTurns,
+    existingSummary,
+    usageLog,
+    requestId,
+    sessionId,
+    inputMode,
+    clientRequestId
+  )
   logEvent('info', 'dm.history.process.compressed', {
     requestId,
     historyLength: history.length,
@@ -1796,6 +1811,8 @@ async function generateFinalNarration(
   params: {
     requestId: string
     sessionId: string | undefined
+    inputMode: string
+    clientRequestId: string | undefined
     playerMessage: string
     draftNarrative: string
     gameState: GameState
@@ -1808,6 +1825,8 @@ async function generateFinalNarration(
   const {
     requestId,
     sessionId,
+    inputMode,
+    clientRequestId,
     playerMessage,
     draftNarrative,
     gameState,
@@ -1857,6 +1876,9 @@ async function generateFinalNarration(
 
     usageLog.push(logAnthropicUsage({
       requestId,
+      sessionId,
+      inputMode,
+      clientRequestId,
       operation: 'dm.final_narration',
       model: MODEL,
       usage: response.usage,
@@ -1893,6 +1915,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const requestStartedAt = Date.now()
   const requestId = generateRequestId()
   let releaseSessionLock: (() => void) | null = null
+  let sessionIdForLog: string | undefined
+  let inputModeForLog = 'text'
+  let clientRequestIdForLog: string | undefined
   try {
     const usageLog: AnthropicUsageLogEntry[] = []
     logEvent('info', 'dm.request.start', {
@@ -1905,11 +1930,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     })
 
     const body: DMRequest = await req.json()
-    const { message, gameState, history = [], summaryContext, sessionId, clientMeta } = body
+    const { message, clientRequestId, gameState, history = [], summaryContext, sessionId, clientMeta } = body
+    const inputMode = clientMeta?.inputMode ?? 'text'
+    sessionIdForLog = sessionId
+    inputModeForLog = inputMode
+    clientRequestIdForLog = clientRequestId
     logEvent('info', 'dm.request.received', {
       requestId,
+      clientRequestId,
       sessionId,
-      inputMode: clientMeta?.inputMode ?? 'text',
+      inputMode,
       clientMeta,
       messageLength: message?.length ?? 0,
       message,
@@ -1922,7 +1952,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     if (!message?.trim()) {
       logEvent('warn', 'dm.request.invalid', {
         requestId,
+        clientRequestId,
         sessionId,
+        inputMode,
         reason: 'missing-message',
         durationMs: Date.now() - requestStartedAt,
       })
@@ -1932,8 +1964,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     if (clientMeta?.inputMode === 'voice') {
       logEvent('info', 'dm.voice.cost_guard', {
         requestId,
+        clientRequestId,
         sessionId,
-        inputMode: clientMeta.inputMode,
+        inputMode,
         transcriptChars: clientMeta.voice?.transcriptChars,
         inputProvider: clientMeta.voice?.inputProvider,
         outputProvider: clientMeta.voice?.outputProvider,
@@ -2038,7 +2071,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       requestSummaryContext,
       usageLog,
       requestId,
-      sessionId
+      sessionId,
+      inputMode,
+      clientRequestId
     )
     const activeSummary = newSummary ?? requestSummaryContext
     const requiredMechanicalAction = detectRequiredMechanicalAction(message, currentGameState)
@@ -2132,6 +2167,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
       usageLog.push(logAnthropicUsage({
         requestId,
+        sessionId,
+        inputMode,
+        clientRequestId,
         operation: 'dm.iteration',
         model: MODEL,
         usage: response.usage,
@@ -2390,6 +2428,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
       usageLog.push(logAnthropicUsage({
         requestId,
+        sessionId,
+        inputMode,
+        clientRequestId,
         operation: 'dm.final_narration_fallback',
         model: MODEL,
         usage: finalResponse.usage,
@@ -2517,6 +2558,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       const finalNarrative = await generateFinalNarration({
         requestId,
         sessionId,
+        inputMode,
+        clientRequestId,
         playerMessage: message,
         draftNarrative: narrative,
         gameState: currentGameState,
@@ -2573,18 +2616,23 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     logAnthropicUsageSummary(requestId, usageLog, {
-      inputMode: clientMeta?.inputMode ?? 'text',
+      inputMode,
       voice: clientMeta?.voice,
       iterations,
       toolsUsed: [...new Set(toolsUsed)],
       compressedHistory: Boolean(newSummary),
+    }, {
+      sessionId,
+      inputMode,
+      clientRequestId,
     })
 
     logEvent('info', 'dm.request.complete', {
       requestId,
+      clientRequestId,
       sessionId,
       durationMs: Date.now() - requestStartedAt,
-      inputMode: clientMeta?.inputMode ?? 'text',
+      inputMode,
       voice: clientMeta?.voice,
       iterations,
       toolsUsed: [...new Set(toolsUsed)],
@@ -2598,6 +2646,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   } catch (err) {
     logEvent('error', 'dm.request.error', {
       requestId,
+      clientRequestId: clientRequestIdForLog,
+      sessionId: sessionIdForLog,
+      inputMode: inputModeForLog,
       durationMs: Date.now() - requestStartedAt,
       err,
     })
@@ -2606,7 +2657,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   } finally {
     if (releaseSessionLock) {
       releaseSessionLock()
-      logEvent('debug', 'dm.session_lock.released', { requestId })
+      logEvent('debug', 'dm.session_lock.released', {
+        requestId,
+        clientRequestId: clientRequestIdForLog,
+        sessionId: sessionIdForLog,
+        inputMode: inputModeForLog,
+      })
     }
   }
 }

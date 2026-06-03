@@ -147,6 +147,8 @@ export interface DMClientMeta {
 // API request/response types
 export interface DMRequest {
   message: string
+  // Per-client request id for correlating browser and server logs.
+  clientRequestId?: string
   // Per-tab browser session used to isolate MCP game state on the server.
   sessionId?: string
   gameState?: GameState
