@@ -65,6 +65,7 @@ export interface MonsterState {
   speed: number
   initiative?: number
   isAlive: boolean
+  xpAwarded?: boolean
 }
 
 export interface CombatLogEntry {

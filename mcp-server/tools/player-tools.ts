@@ -21,8 +21,8 @@ const EntityStatsSchema = z.object({
 })
 
 const PositionSchema = z.object({
-  x: z.number().int().min(0),
-  y: z.number().int().min(0),
+  x: z.number().int().min(0).max(16),
+  y: z.number().int().min(0).max(14),
 })
 
 const HpSchema = z.object({
@@ -78,6 +78,7 @@ const MonsterStateSchema = z.object({
   speed: z.number().int().positive(),
   initiative: z.number().optional(),
   isAlive: z.boolean(),
+  xpAwarded: z.boolean().optional(),
 })
 
 const CombatLogEntrySchema = z.object({
@@ -101,6 +102,84 @@ const GameStateSchema = z.object({
   combatLog: z.array(CombatLogEntrySchema),
   roomsVisited: z.array(z.string()),
   currentRoomId: z.string().nullable(),
+}).superRefine((state, ctx) => {
+  if (state.player.hp.current > state.player.hp.max) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['player', 'hp', 'current'],
+      message: 'Player current HP cannot exceed max HP.',
+    })
+  }
+
+  const monsterIds = new Set(Object.keys(state.monsters))
+  for (const [key, monster] of Object.entries(state.monsters)) {
+    if (monster.id !== key) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['monsters', key, 'id'],
+        message: 'Monster id must match its record key.',
+      })
+    }
+    if (monster.hp.current > monster.hp.max) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['monsters', key, 'hp', 'current'],
+        message: 'Monster current HP cannot exceed max HP.',
+      })
+    }
+    if (monster.isAlive !== (monster.hp.current > 0)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['monsters', key, 'isAlive'],
+        message: 'Monster isAlive must match current HP.',
+      })
+    }
+  }
+
+  const validEntityIds = new Set(['player', ...monsterIds])
+  const initiativeSeen = new Set<string>()
+  for (const [index, id] of state.initiativeOrder.entries()) {
+    if (initiativeSeen.has(id)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['initiativeOrder', index],
+        message: 'Initiative order cannot contain duplicate IDs.',
+      })
+    }
+    initiativeSeen.add(id)
+    if (!validEntityIds.has(id)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['initiativeOrder', index],
+        message: 'Initiative order contains an unknown entity ID.',
+      })
+    }
+  }
+
+  if (state.phase === 'combat') {
+    if (!state.currentTurn || !initiativeSeen.has(state.currentTurn)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['currentTurn'],
+        message: 'Combat currentTurn must be present in initiativeOrder.',
+      })
+    }
+    if (state.round < 1) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['round'],
+        message: 'Combat round must be at least 1.',
+      })
+    }
+  } else {
+    if (state.currentTurn !== null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['currentTurn'],
+        message: 'Non-combat currentTurn must be null.',
+      })
+    }
+  }
 })
 
 export function registerPlayerTools(server: McpServer): void {

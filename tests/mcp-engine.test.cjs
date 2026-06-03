@@ -164,6 +164,23 @@ test('advanceTurn keeps a dying player in initiative for death saves', () => {
   assert.ok(state.player.conditions.includes('unconscious'))
 })
 
+test('player damage at 0 HP records death failures and ordinary healing does not revive the dead', () => {
+  gameState.updatePlayerHP(-99)
+  gameState.updatePlayerHP(-1)
+  gameState.updatePlayerHP(-1)
+  gameState.updatePlayerHP(-1)
+
+  const deadState = gameState.getState()
+  assert.equal(deadState.player.hp.current, 0)
+  assert.equal(deadState.player.deathSaves.dead, true)
+  assert.equal(deadState.player.deathSaves.failures, 3)
+
+  gameState.updatePlayerHP(20)
+  const healedState = gameState.getState()
+  assert.equal(healedState.player.hp.current, 0)
+  assert.equal(healedState.player.deathSaves.dead, true)
+})
+
 test('MCP server accepts replace_game_state and move_token toCell contracts', async () => {
   await withMcpClient(async client => {
     const state = await callTool(client, 'get_game_state')
@@ -225,6 +242,25 @@ test('MCP rules reject out-of-bounds movement destinations', async () => {
 
     const stateAfter = await callTool(client, 'get_game_state')
     assert.deepEqual(stateAfter.player.position, { x: 4, y: 13 })
+  })
+})
+
+test('MCP rules reject out-of-bounds monster spawns and encounter cells', async () => {
+  await withMcpClient(async client => {
+    const spawn = await callTool(client, 'spawn_monster', {
+      monsterType: 'goblin',
+      cell: { x: 99, y: 6 },
+    })
+    assert.equal(spawn.code, 'INVALID_GRID_CELL')
+
+    const encounter = await callTool(client, 'start_encounter', {
+      monsters: [{
+        monsterType: 'goblin',
+        cell: { x: 5, y: 99 },
+        name: 'Gobelin hors carte',
+      }],
+    })
+    assert.equal(encounter.code, 'INVALID_GRID_CELL')
   })
 })
 
@@ -535,6 +571,31 @@ test('MCP roll_ability_check is limited to the actor turn in combat', async () =
   })
 })
 
+test('MCP resolve_saving_throw does not consume the combat action', async () => {
+  await withForcedDiceSequence('12', async () => {
+    await withMcpClient(async client => {
+      const baseState = await callTool(client, 'get_game_state')
+
+      await callTool(client, 'replace_game_state', {
+        gameState: makeCombatState(baseState),
+      })
+
+      const save = await callTool(client, 'resolve_saving_throw', {
+        entityId: 'player',
+        ability: 'dex',
+        dc: 10,
+      })
+      assert.equal(save.success, true)
+
+      const stateAfter = await callTool(client, 'get_game_state')
+      assert.equal(stateAfter.actionUsed.player, undefined)
+
+      const nextTurn = await callTool(client, 'next_turn', { actorId: 'player' })
+      assert.equal(nextTurn.code, 'TURN_ACTION_REQUIRED')
+    })
+  })
+})
+
 test('MCP use_healing_potion heals, consumes inventory, and consumes a combat action', async () => {
   await withForcedDiceSequence('3,4', async () => {
     await withMcpClient(async client => {
@@ -644,6 +705,61 @@ test('MCP rules require force to end combat with active enemies', async () => {
 
     const stateAfter = await callTool(client, 'get_game_state')
     assert.equal(Object.values(stateAfter.monsters).filter(monster => monster.isAlive).length, 0)
+  })
+})
+
+test('MCP end_combat sees all living monsters and awards XP only once', async () => {
+  await withMcpClient(async client => {
+    const baseState = await callTool(client, 'get_game_state')
+    const state = makeCombatState(baseState)
+    const sideMonster = makeMonster('goblin_b')
+    sideMonster.position = { x: 2, y: 0 }
+    state.monsters.goblin_b = sideMonster
+    state.monsters.goblin_a.hp.current = 0
+    state.monsters.goblin_a.isAlive = false
+    state.initiativeOrder = ['player', 'goblin_a']
+
+    await callTool(client, 'replace_game_state', { gameState: state })
+
+    const blocked = await callTool(client, 'end_combat')
+    assert.equal(blocked.code, 'COMBATANTS_STILL_ACTIVE')
+    assert.deepEqual(blocked.detail.livingCombatants, ['goblin_b'])
+
+    state.monsters.goblin_b.hp.current = 0
+    state.monsters.goblin_b.isAlive = false
+    state.initiativeOrder = ['player', 'goblin_a', 'goblin_b']
+    await callTool(client, 'replace_game_state', { gameState: state })
+
+    const ended = await callTool(client, 'end_combat')
+    assert.equal(ended.xpAwarded, 100)
+    assert.equal(ended.defeatedMonsters.length, 2)
+
+    const afterFirstCombat = await callTool(client, 'get_game_state')
+    const newThreat = makeMonster('goblin_c')
+    newThreat.position = { x: 1, y: 0 }
+    await callTool(client, 'replace_game_state', {
+      gameState: {
+        ...afterFirstCombat,
+        phase: 'combat',
+        currentTurn: 'player',
+        round: 1,
+        initiativeOrder: ['player', 'goblin_c'],
+        movementUsed: {},
+        actionUsed: {},
+        monsters: {
+          ...afterFirstCombat.monsters,
+          goblin_c: newThreat,
+        },
+      },
+    })
+    const secondState = await callTool(client, 'get_game_state')
+    secondState.monsters.goblin_c.hp.current = 0
+    secondState.monsters.goblin_c.isAlive = false
+    await callTool(client, 'replace_game_state', { gameState: secondState })
+
+    const secondEnded = await callTool(client, 'end_combat')
+    assert.equal(secondEnded.xpAwarded, 50)
+    assert.deepEqual(secondEnded.defeatedMonsters.map(monster => monster.id), ['goblin_c'])
   })
 })
 

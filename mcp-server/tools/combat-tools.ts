@@ -461,9 +461,6 @@ export function registerCombatTools(server: McpServer): void {
         action: `${entity.name} — Jet de sauvegarde ${ability.toUpperCase()} DD ${dc}`,
         mechanicalDetail: mechanicalSummary,
       })
-      if (gs.getState().phase === 'combat' && gs.getState().currentTurn === entityId) {
-        rules.recordAction(entityId)
-      }
 
       return { content: [{ type: 'text', text: JSON.stringify(result) }] }
     }

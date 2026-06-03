@@ -281,6 +281,10 @@ function assertEncounterCanStart(playerCell: { x: number; y: number } | undefine
     throw new rules.RuleViolation('ENCOUNTER_EMPTY', 'An encounter requires at least one monster.')
   }
 
+  if (playerCell) {
+    rules.validateMapCell(playerCell, 'playerCell')
+  }
+
   const occupied = new Map<string, string>()
   for (const entity of gs.getAllEntities()) {
     if (rules.isAlive(entity)) {
@@ -302,6 +306,7 @@ function assertEncounterCanStart(playerCell: { x: number; y: number } | undefine
   }
 
   for (const monster of monsters) {
+    rules.validateMapCell(monster.cell, 'monster.cell')
     const key = `${monster.cell.x},${monster.cell.y}`
     const blockerId = occupied.get(key)
     if (blockerId) {
@@ -443,7 +448,6 @@ export function registerPhaseTools(server: McpServer): void {
               movedPlayer,
               spawnedMonsters,
               combat,
-              gameState: state,
             }),
           }],
         }
@@ -564,11 +568,15 @@ export function registerPhaseTools(server: McpServer): void {
       const state = gs.getState()
 
       // Calculate XP from defeated monsters
-      const deadMonsters = Object.values(state.monsters).filter(m => !m.isAlive)
+      const deadMonsters = Object.values(state.monsters).filter(m => !m.isAlive && !m.xpAwarded)
       const disengagedMonsters = force
         ? Object.values(state.monsters).filter(m => m.isAlive)
         : []
       const totalXP = deadMonsters.reduce((sum, m) => sum + m.xpValue, 0)
+
+      for (const monster of deadMonsters) {
+        monster.xpAwarded = true
+      }
 
       for (const monster of disengagedMonsters) {
         gs.removeMonster(monster.id)

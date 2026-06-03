@@ -490,7 +490,12 @@ function historyToAnthropicMessages(turns: ConversationTurn[]): Anthropic.Messag
 
     // Évite deux messages consécutifs du même rôle (invalide pour l'API Anthropic)
     const last = msgs[msgs.length - 1]
-    if (last && last.role === role) continue
+    if (last && last.role === role) {
+      if (typeof last.content === 'string') {
+        last.content = `${last.content}\n\n${turn.content}`
+      }
+      continue
+    }
 
     msgs.push({ role, content: turn.content })
   }
@@ -673,8 +678,10 @@ RÈGLES MÉCANIQUES:
 - Ouvrir/fouiller un tiroir, coffre, armoire, livre ou objet local ne déplace jamais le pion. move_token sert seulement à changer de case/salle ou franchir une porte/seuil.
 - Les tools MCP refusent les actions illégales (mauvais tour, cible morte, hors portée, déplacement trop long). Si un tool renvoie une erreur, narre sobrement pourquoi l'action échoue ou demande une action valide.
 - Déplacement explicite du joueur → move_token AVANT de narrer.
-- Début de combat / rencontre de salle → start_encounter en un seul tool, narre, STOP. Ne jamais inventer d'IDs de monstres.
+- Début de combat / rencontre de salle → start_encounter en un seul tool seulement si le trigger du module est atteint, narre, STOP. Ne jamais inventer d'IDs de monstres.
 - Rencontres connues: bakery_floor_goblins (salle 8), loading_dock_patrol (salle 7), grammy_apartment_guards (salle 9), violet_fungus_heap (salle 3).
+- Salle 7: entrer discrètement par le quai ne déclenche pas la patrouille; elle apparaît seulement si le joueur l'affronte, fait du bruit, se montre ou rate une approche.
+- Salle 8: entrer sur le sol de la boulangerie ne déclenche pas seul les gobelins. Ils tombent des poutres si le joueur touche/manipule les objets enchantés ou ouvre un four, ou s'il les provoque explicitement.
 - Salle 2: les dryades du verger ne sont pas une rencontre de combat prédéfinie. Si elles sont offensées, elles esquivent, lancent des pommes pourries et mettent la pression; ne déclenche pas start_encounter pour elles.
 - Tour joueur en combat → resolve_player_attack ou saving_throw, puis STOP. Pour une cible spatiale ("a ma droite", "le plus proche"), utilise resolve_player_attack avec targetHint.
 - Si le joueur nomme une cible ("Grukk", "Chef Grukk", "hobgobelin"), resolve_player_attack doit recevoir targetName ou targetId. Ne remplace jamais une cible nommée par "nearest".
@@ -1094,6 +1101,7 @@ const TOOL_INTENT_SATISFIERS: Record<string, string[]> = {
   'player-death-save-intent': ['roll_death_save'],
   'healing-potion-intent': ['use_healing_potion'],
   'ability-check-intent': ['roll_ability_check'],
+  'local-object-interaction-intent': ['trigger_room_event', 'roll_ability_check', 'start_encounter', 'use_healing_potion'],
   'exploration-movement-intent': ['move_token', 'trigger_room_event', 'start_encounter', 'end_combat'],
   'encounter-or-attack-intent': ['start_encounter', 'resolve_player_attack'],
 }
@@ -1159,6 +1167,14 @@ function selectToolsForLlm(
 
   if (requiredAction?.reason === 'encounter-or-attack-intent') {
     return pickTools(allTools, LLM_TOOL_SETS.explorationEncounter)
+  }
+
+  if (requiredAction?.reason === 'local-object-interaction-intent') {
+    return pickTools(allTools, LLM_TOOL_SETS.explorationEncounter)
+  }
+
+  if (!requiredAction && gameState.phase === 'exploration') {
+    return []
   }
 
   return pickTools(allTools, LLM_TOOL_SETS.explorationDefault)
@@ -1356,6 +1372,8 @@ function detectRequiredMechanicalAction(message: string, gameState: GameState): 
   const hostileCreatureIntent = mentionsCreature && /\b(attaquent?|attaquer|hostiles?|menacent?|chargent?|surgissent?|arrivent?|debarquent?|foncent?|encerclent?)\b/.test(text)
   const encounterIntent = explicitEncounterIntent || hostileCreatureIntent
   const abilityCheckIntent = /\b(test|jet|persuasion|intimidation|athletisme|athletics|perception|discretion|stealth|convain|convaincre|negoci|negocier|mentir|mensonge|baratin|crocheter|fouiller|chercher|intimider|forcer|soulever|pousser|soumet|soumission|reddition|rends toi|rendez vous|rejoignez|rejoins moi|parlemente|capitule)\b/.test(text)
+  const localObjectIntent = /\b(ouvres?|ouvrir|fouilles?|fouiller|inspectes?|inspecter|examines?|examiner|tiroirs?|coffres?|armoires?|livres?|four|fours|rouleaux?|couteaux?|objets?|potions?)\b/.test(text) &&
+    (referencesLocalObjectInsteadOfRoom(text) || /\b(four|fours|rouleaux?|couteaux?|objets? magiques?|potions?)\b/.test(text))
 
   if (gameState.phase === 'combat' && gameState.currentTurn === 'player' && attackIntent) {
     return { reason: 'player-combat-attack-intent', suggestedTools: ['resolve_player_attack', 'move_token'] }
@@ -1371,6 +1389,10 @@ function detectRequiredMechanicalAction(message: string, gameState: GameState): 
 
   if (abilityCheckIntent) {
     return { reason: 'ability-check-intent', suggestedTools: ['roll_ability_check'] }
+  }
+
+  if (localObjectIntent) {
+    return { reason: 'local-object-interaction-intent', suggestedTools: ['trigger_room_event', 'roll_ability_check', 'start_encounter'] }
   }
 
   if (attackIntent || encounterIntent) {
@@ -1537,6 +1559,49 @@ function encounterIdForRoom(roomId: string | null | undefined): string | null {
   return Object.values(ENCOUNTERS).find(encounter => encounter.roomId === roomId)?.id ?? null
 }
 
+function roomEncounterTriggerReason(
+  message: string,
+  gameState: GameState,
+  targetRoomId: string | null,
+  encounterId: string | null
+): string | null {
+  if (!targetRoomId || !encounterId) return null
+  if (gameState.phase !== 'exploration' || countAliveMonsters(gameState) > 0) return null
+
+  const text = normalizeFrenchText(message)
+  const hostileOrExplicit = /\b(attaque|attaquer|frappe|frapper|charge|combat|initiative|hostile|menace|provoque|provoquer|debarques?|perissez|fuyez|spawn|apparaitre|carte)\b/.test(text)
+  const huntsCreatures = /\b(cherches?|chercher|trouves?|trouver|traques?|traquer|pistes?|pister|suis|suivre|poursuis|poursuivre)\b(?=.{0,80}\b(gobelins?|ennemis?|monstres?|creatures?|patrouille|grukk)\b)/.test(text)
+
+  if (targetRoomId === '9') {
+    return 'Le joueur entre dans la salle finale ou provoque la garde de Grukk.'
+  }
+
+  if (targetRoomId === '3') {
+    return 'Le joueur approche assez du tas de dechets pour reveiller le champignon violet.'
+  }
+
+  if (targetRoomId === '8') {
+    const magicalObjectTrigger = /\b(four|fours|rouleaux?|couteaux?|enchantes?|magiques?)\b/.test(text) &&
+      /\b(ouvres?|ouvrir|touches?|toucher|manipules?|manipuler|actionnes?|actionner|joues?|jouer|inspectes?|inspecter|fouilles?|fouiller)\b/.test(text)
+    if (hostileOrExplicit || huntsCreatures || magicalObjectTrigger) {
+      return 'Le joueur declenche les gobelins de la boulangerie par une interaction dangereuse ou hostile.'
+    }
+    return null
+  }
+
+  if (targetRoomId === '7') {
+    const patrolTrigger = /\b(gobelins?|patrouille|directement|bruyamment|sans discretion|je me montre|j'entre en force|j entre en force)\b/.test(text)
+    if (hostileOrExplicit || huntsCreatures || patrolTrigger) {
+      return 'Le joueur attire ou affronte la patrouille du quai de chargement.'
+    }
+    return null
+  }
+
+  return hostileOrExplicit || huntsCreatures
+    ? 'Le joueur provoque explicitement une rencontre hostile.'
+    : null
+}
+
 function relativeRoomIdForExplorationMove(text: string, gameState: GameState): string | null {
   const doorAction = isDoorTraversalIntent(text)
 
@@ -1662,7 +1727,8 @@ function cellFromToolInput(value: unknown): { x: number; y: number } | null {
 
 function validateStartEncounterToolInput(
   input: unknown,
-  gameState: GameState
+  gameState: GameState,
+  playerMessage: string
 ): Record<string, unknown> | null {
   if (!isObjectRecord(input)) {
     return {
@@ -1685,6 +1751,21 @@ function validateStartEncounterToolInput(
     return {
       error: `Encounter ${encounterId} belongs to room ${preset.roomId}, not current target room ${allowedRoomId}.`,
       code: 'ENCOUNTER_ROOM_MISMATCH',
+      detail: {
+        encounterId,
+        encounterRoomId: preset.roomId,
+        currentRoomId: gameState.currentRoomId,
+        playerCell,
+        playerCellRoomId,
+      },
+    }
+  }
+
+  const triggerReason = roomEncounterTriggerReason(playerMessage, gameState, preset.roomId, encounterId)
+  if (!triggerReason) {
+    return {
+      error: `Encounter ${encounterId} is not triggered by the current player action.`,
+      code: 'ENCOUNTER_TRIGGER_NOT_MET',
       detail: {
         encounterId,
         encounterRoomId: preset.roomId,
@@ -2073,11 +2154,13 @@ async function resolveServerFirstAction(
       if (toCell) {
         const targetRoomId = inferMappedAdventureRoomId(toCell)
         const encounterId = encounterIdForRoom(targetRoomId)
+        const encounterTriggerReason = roomEncounterTriggerReason(message, gameState, targetRoomId, encounterId)
         const shouldStartEncounter =
           gameState.phase === 'exploration' &&
           countAliveMonsters(gameState) === 0 &&
           targetRoomId !== null &&
           encounterId &&
+          encounterTriggerReason &&
           (
             targetRoomId !== gameState.currentRoomId ||
             !gameState.roomsVisited.includes(targetRoomId)
@@ -2088,7 +2171,7 @@ async function resolveServerFirstAction(
           input = {
             encounterId,
             playerCell: toCell,
-            reason: 'Le joueur entre dans une salle occupee.',
+            reason: encounterTriggerReason ?? 'Le joueur declenche une rencontre de salle.',
           }
         } else {
           toolName = 'move_token'
@@ -2157,6 +2240,15 @@ async function autoAdvanceCompletedTurn(
   sessionId: string | undefined,
   requestId: string
 ): Promise<{ gameState: GameState; advanced: boolean }> {
+  if (gameState.currentTurn === 'player') {
+    logEvent('info', 'dm.turn.auto_advance.skipped_player_table_mode', {
+      requestId,
+      sessionId,
+      gameState: summarizeGameState(gameState),
+    })
+    return { gameState, advanced: false }
+  }
+
   if (!hasCompletedCurrentAction(gameState)) {
     return { gameState, advanced: false }
   }
@@ -2641,7 +2733,7 @@ async function generateFinalNarration(
 
   const finalPrompt = [
     `Action du joueur:\n${playerMessage}`,
-    draftNarrative ? `Brouillon narratif précédent, potentiellement incomplet:\n${draftNarrative}` : undefined,
+    draftNarrative ? `Notes moteur non autoritaires, a utiliser seulement si elles ne contredisent pas les resultats mecaniques:\n${draftNarrative}` : undefined,
     `Résultats mécaniques faisant autorité:\n${formatCombatLogEntries(newCombatLogEntries)}`,
     `Écris la réponse finale au joueur en français correct, au présent, en 2-5 phrases courtes. Elle doit être naturelle à l'oral et donner de l'élan: mouvement, réplique, menace, opportunité ou information exploitable. Respecte strictement les résultats mécaniques. N'annonce aucune action future non résolue. Pas de Markdown, pas de liste, pas de parenthèse, pas d'excuse, pas de méta, pas de menu, pas de mention du système, du moteur, des tools, de MCP ou de l'IA. Pas de coordonnées ni d'ID technique sauf demande explicite du joueur. Ne déclare pas de fin de quête/campagne ni de conclusion alternative sauf demande explicite. Pas de time-skip: seulement la prochaine minute jouable. Si le joueur critique le style, la longueur, le système ou un bug, ne réponds pas à la critique: applique la correction silencieusement et reprends la scène en fiction.`,
   ].filter(Boolean).join('\n\n')
@@ -2982,8 +3074,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         .map(block => block.text)
         .join('\n\n')
       const narrativeBeforeResponse = narrative
-      if (responseText) {
+      if (responseText && response.stop_reason !== 'tool_use') {
         narrative += (narrative ? '\n\n' : '') + responseText
+      } else if (responseText) {
+        logEvent('debug', 'dm.narrative.discarded_pre_tool_text', {
+          requestId,
+          sessionId,
+          iteration: iterations,
+          textLength: responseText.length,
+          text: responseText,
+        })
       }
       logEvent('debug', 'dm.narrative.updated', {
         requestId,
@@ -3091,7 +3191,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           }
 
           if (toolUse.name === 'start_encounter') {
-            const validationError = validateStartEncounterToolInput(toolUse.input, currentGameState)
+            const validationError = validateStartEncounterToolInput(toolUse.input, currentGameState, message)
             if (validationError) {
               sawMcpToolError = true
               logEvent('warn', 'dm.tool_use.blocked_start_encounter_mismatch', {
@@ -3220,7 +3320,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       break
     }
 
-    if (!narrative && iterations >= MAX_TOOL_ITERATIONS) {
+    if (!narrative && iterations >= MAX_TOOL_ITERATIONS && toolsUsed.length > 0) {
+      logEvent('warn', 'dm.final_fallback.skipped_after_tools', {
+        requestId,
+        sessionId,
+        iterations,
+        toolsUsed: [...new Set(toolsUsed)],
+      })
+    } else if (!narrative && iterations >= MAX_TOOL_ITERATIONS) {
       const fallbackStartedAt = Date.now()
       logEvent('warn', 'dm.final_fallback.start', {
         requestId,

@@ -103,7 +103,7 @@ function assertInInitiative(entityId: string): void {
   }
 }
 
-function assertValidMapCell(cell: { x: number; y: number }, fieldName: string): void {
+export function validateMapCell(cell: { x: number; y: number }, fieldName = 'cell'): void {
   const validCoordinates = Number.isFinite(cell.x) &&
     Number.isFinite(cell.y) &&
     Number.isInteger(cell.x) &&
@@ -151,7 +151,7 @@ function attackRangeCells(weaponOrSpell: string, rangeCells?: number): number {
 export function validateMove(tokenId: string, toCell: { x: number; y: number }): { distance: number; remaining: number | null } {
   const entity = assertEntity(tokenId)
   assertAlive(tokenId, entity)
-  assertValidMapCell(toCell, 'toCell')
+  validateMapCell(toCell, 'toCell')
 
   const blocker = occupiedByLivingEntity(toCell, tokenId)
   if (blocker) {
@@ -258,6 +258,12 @@ export function validateConditionTarget(entityId: string): void {
 export function validateHPUpdate(entityId: string, delta: number): void {
   const entity = assertEntity(entityId)
   if (delta < 0) assertAlive(entityId, entity)
+  if (entityId === 'player' && delta > 0 && 'deathSaves' in entity && entity.deathSaves?.dead) {
+    throw new RuleViolation('PLAYER_DEAD', 'A dead player cannot be healed by ordinary HP recovery.', {
+      entityId,
+      deathSaves: entity.deathSaves,
+    })
+  }
 }
 
 export function validateEnterCombat(combatants: string[]): void {
@@ -320,10 +326,7 @@ export function validateEndCombat(force?: boolean): void {
     throw new RuleViolation('NOT_IN_COMBAT', 'Cannot end combat because combat is not active.', { phase: state.phase })
   }
 
-  const livingEnemies = state.initiativeOrder
-    .filter(id => id !== 'player')
-    .map(id => gs.getEntity(id))
-    .filter((entity): entity is Entity => !!entity && isAlive(entity))
+  const livingEnemies = Object.values(state.monsters).filter(monster => isAlive(monster))
 
   if (!force && livingEnemies.length > 0) {
     throw new RuleViolation('COMBATANTS_STILL_ACTIVE', 'Cannot end combat while non-player combatants are still active unless force is true.', {
@@ -339,6 +342,8 @@ export function validateSpawn(cell: { x: number; y: number }): void {
       currentTurn: state.currentTurn,
     })
   }
+
+  validateMapCell(cell, 'cell')
 
   const blocker = occupiedByLivingEntity(cell)
   if (blocker) {

@@ -110,8 +110,26 @@ export function getEntity(id: string): PlayerState | MonsterState | undefined {
 
 export function updatePlayerHP(delta: number): PlayerState {
   const player = state.player
-  player.hp.current = Math.max(0, Math.min(player.hp.max, player.hp.current + delta))
   player.deathSaves ??= { successes: 0, failures: 0 }
+
+  if (player.deathSaves.dead && delta > 0) {
+    return player
+  }
+
+  if (player.hp.current <= 0 && delta < 0 && !player.deathSaves.dead) {
+    player.hp.current = 0
+    player.deathSaves.stable = false
+    player.deathSaves.failures = Math.min(3, player.deathSaves.failures + 1)
+    if (player.deathSaves.failures >= 3) {
+      player.deathSaves.dead = true
+    }
+    if (!player.conditions.includes('unconscious')) {
+      player.conditions.push('unconscious')
+    }
+    return player
+  }
+
+  player.hp.current = Math.max(0, Math.min(player.hp.max, player.hp.current + delta))
 
   if (player.hp.current <= 0) {
     player.hp.current = 0
