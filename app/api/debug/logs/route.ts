@@ -11,6 +11,7 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 const VALID_LEVELS = new Set<LogLevel>(['debug', 'info', 'warn', 'error'])
+const PUBLIC_READ_ENABLED = process.env.APP_DEBUG_LOG_PUBLIC_READ !== 'false'
 
 function configuredToken(): string | null {
   const token = process.env.APP_DEBUG_LOG_TOKEN?.trim()
@@ -89,8 +90,10 @@ function parseLevel(req: NextRequest): LogLevel | undefined {
 }
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
-  const unauthorized = authorize(req)
-  if (unauthorized) return unauthorized
+  if (!PUBLIC_READ_ENABLED) {
+    const unauthorized = authorize(req)
+    if (unauthorized) return unauthorized
+  }
 
   const limit = parseLimit(req)
   const result = getBufferedLogEvents({
@@ -105,6 +108,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   logEvent('info', 'debug_logs.read', {
     path: req.nextUrl.pathname,
+    publicRead: PUBLIC_READ_ENABLED,
     returned: result.entries.length,
     totalBuffered: result.totalBuffered,
     nextAfter: result.nextAfter,
@@ -125,6 +129,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     totalBuffered: result.totalBuffered,
     bufferLimit: result.bufferLimit,
     nextAfter: result.nextAfter,
+    publicRead: PUBLIC_READ_ENABLED,
   })
 }
 

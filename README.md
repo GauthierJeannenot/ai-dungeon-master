@@ -246,6 +246,7 @@ APP_LOG_ARRAY_LIMIT=30
 APP_LOG_OBJECT_KEY_LIMIT=80
 APP_LOG_BUFFER_ENABLED=true
 APP_LOG_BUFFER_LIMIT=1000
+APP_DEBUG_LOG_PUBLIC_READ=true
 ```
 
 En `NODE_ENV=production`, `APP_LOG_LEVEL=info` et `APP_LOG_INCLUDE_TEXT=false` sont les valeurs par defaut. Passez temporairement `APP_LOG_LEVEL=debug` et `APP_LOG_INCLUDE_TEXT=true` si vous voulez diagnostiquer une partie en detail.
@@ -274,6 +275,6 @@ curl -X DELETE -H "Authorization: Bearer un-token-long-aleatoire" \
   "https://votre-app.railway.app/api/debug/logs"
 ```
 
-L'endpoint `/api/debug/logs` retourne les logs recents gardes en memoire par le process Node. Il reste desactive tant que `APP_DEBUG_LOG_TOKEN` n'est pas configure, et refuse les tokens de moins de 16 caracteres. Utilisez de preference le header `Authorization: Bearer ...`. Le parametre `?token=` est desactive par defaut; activez-le seulement pour depannage manuel avec `APP_DEBUG_LOG_TOKEN_QUERY_ENABLED=true`, car il peut fuiter dans des historiques navigateur/proxy.
+L'endpoint `GET /api/debug/logs` retourne les logs recents gardes en memoire par le process Node. Pendant le debug live, la lecture est publique par defaut pour permettre une surveillance externe sans acces Railway; remettez `APP_DEBUG_LOG_PUBLIC_READ=false` ou retirez ce mode apres la session. `DELETE /api/debug/logs` reste protege par `APP_DEBUG_LOG_TOKEN`. Utilisez de preference le header `Authorization: Bearer ...`. Le parametre `?token=` est desactive par defaut; activez-le seulement pour depannage manuel avec `APP_DEBUG_LOG_TOKEN_QUERY_ENABLED=true`, car il peut fuiter dans des historiques navigateur/proxy.
 
 Les logs incluent notamment `requestId`, `sessionId`, appels Anthropic, usage tokens/cout estime, appels MCP, erreurs de regles, resume compact du `GameState`, persistance session et durees. Les valeurs ressemblant a des secrets/tokens sont masquees automatiquement.
