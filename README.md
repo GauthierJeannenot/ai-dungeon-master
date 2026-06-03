@@ -54,6 +54,14 @@ Modes disponibles :
 | `LLM_MAX_CALLS_PER_REQUEST=10` | Coupe une requete trop bavarde |
 | `LLM_MAX_CALLS_PER_SESSION=0` | Budget live par session (`0` = illimite) |
 | `LLM_MODULE_CONTEXT_MAX_CHARS=6500` | Limite le contexte du module envoye au LLM |
+| `LLM_FINAL_NARRATION_MAX_TOKENS=180` | Plafond de sortie pour les narrations finales breves |
+
+En mode live, la route DM reduit aussi le cout sans passer en mock :
+
+- actions evidentes de combat/deplacement par coordonnees/passage de tour resolues cote moteur avant Anthropic
+- tools MCP filtres selon la phase et l'intention au lieu d'envoyer tous les schemas a chaque appel
+- narration finale avec prompt court specialise et reponses visees a 1-2 phrases
+- correction serveur directe des narrations qui contredisent l'etat moteur, sans retry LLM supplementaire
 
 ### 4. Fichiers de contexte (optionnel)
 

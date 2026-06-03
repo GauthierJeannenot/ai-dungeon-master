@@ -25,6 +25,7 @@ const anthropic = new Anthropic({
 const MODEL = 'claude-haiku-4-5'
 const MAX_TOOL_ITERATIONS = 3
 const MAX_TOKENS = 400
+const FINAL_NARRATION_MAX_TOKENS = parsePositiveInt(process.env.LLM_FINAL_NARRATION_MAX_TOKENS, 180)
 const COMBAT_LOG_TAIL = 6
 const MAX_AUTO_NPC_TURNS = 8
 type LlmMode = 'live' | 'mock' | 'record' | 'replay'
@@ -587,7 +588,7 @@ Après ta réponse : STOP total. Tu attends le prochain message du joueur.
 
 ---
 
-Tu es un Dungeon Master de D&D 5e. Tu narre en français, au présent, de façon concise (1-3 phrases max).
+Tu es un Dungeon Master de D&D 5e. Tu narre en français, au présent, de façon brève et dense (1-2 phrases par défaut, 3 seulement si un résultat mécanique complexe l'exige).
 
 PERSONNAGE:
 ${ctx.playerCharacter}
@@ -640,6 +641,31 @@ function buildSystemBlocks(
     {
       type: 'text',
       text: buildStaticPrompt(),
+      cache_control: { type: 'ephemeral' },
+    },
+    {
+      type: 'text',
+      text: buildDynamicPrompt(gameState, summaryContext),
+    },
+  ]
+}
+
+function buildNarrationStaticPrompt(): string {
+  return `Tu es le Dungeon Master d'une partie D&D 5e en francais.
+Narre uniquement la consequence immediate de l'action du joueur.
+Respecte strictement les resultats mecaniques fournis: jets, degats, morts, positions, tour courant.
+Ne lance aucun de, n'invente aucun nouvel ennemi, ne resous aucun tour futur.
+Reponse breve: 1-2 phrases, present, style vivant mais clair. Une 3e phrase est autorisee seulement pour clarifier un resultat mecanique complexe.`
+}
+
+function buildNarrationSystemBlocks(
+  gameState: GameState,
+  summaryContext: string | undefined
+): Anthropic.TextBlockParam[] {
+  return [
+    {
+      type: 'text',
+      text: buildNarrationStaticPrompt(),
       cache_control: { type: 'ephemeral' },
     },
     {
@@ -726,6 +752,17 @@ const TOOL_INTENT_SATISFIERS: Record<string, string[]> = {
   'encounter-or-attack-intent': ['start_encounter', 'resolve_player_attack'],
 }
 
+const LLM_TOOL_SETS = {
+  explorationDefault: ['roll_dice', 'trigger_room_event', 'get_entity_stats'],
+  explorationMovement: ['move_token', 'trigger_room_event', 'start_encounter', 'roll_dice', 'get_entity_stats'],
+  explorationEncounter: ['start_encounter', 'move_token', 'trigger_room_event', 'roll_dice', 'get_entity_stats'],
+  combatPlayer: ['resolve_player_attack', 'move_token', 'pass_turn', 'end_combat', 'roll_dice', 'get_entity_stats', 'resolve_saving_throw'],
+  combatNonPlayer: ['roll_dice', 'get_entity_stats'],
+  dialogue: ['roll_dice', 'get_entity_stats', 'apply_condition'],
+} as const
+
+type PlayerAttackTargetHint = 'nearest' | 'right' | 'left' | 'front' | 'back' | 'wounded'
+
 function hasToolSatisfyingMechanicalAction(
   requiredAction: RequiredMechanicalAction,
   toolsUsed: string[]
@@ -733,6 +770,48 @@ function hasToolSatisfyingMechanicalAction(
   const satisfiers = TOOL_INTENT_SATISFIERS[requiredAction.reason] ?? requiredAction.suggestedTools
   const satisfierSet = new Set(satisfiers)
   return toolsUsed.some(toolName => satisfierSet.has(toolName))
+}
+
+function pickTools(allTools: Anthropic.Tool[], names: readonly string[]): Anthropic.Tool[] {
+  const byName = new Map(allTools.map(tool => [tool.name, tool]))
+  return names
+    .map(name => byName.get(name))
+    .filter((tool): tool is Anthropic.Tool => Boolean(tool))
+}
+
+function selectToolsForLlm(
+  allTools: Anthropic.Tool[],
+  gameState: GameState,
+  requiredAction: RequiredMechanicalAction | null
+): Anthropic.Tool[] {
+  if (allTools.length === 0) return []
+
+  if (gameState.phase === 'combat') {
+    return pickTools(
+      allTools,
+      gameState.currentTurn === 'player'
+        ? LLM_TOOL_SETS.combatPlayer
+        : LLM_TOOL_SETS.combatNonPlayer
+    )
+  }
+
+  if (gameState.phase === 'dialogue') {
+    return pickTools(allTools, LLM_TOOL_SETS.dialogue)
+  }
+
+  if (requiredAction?.reason === 'exploration-movement-intent') {
+    return pickTools(allTools, LLM_TOOL_SETS.explorationMovement)
+  }
+
+  if (requiredAction?.reason === 'encounter-or-attack-intent') {
+    return pickTools(allTools, LLM_TOOL_SETS.explorationEncounter)
+  }
+
+  return pickTools(allTools, LLM_TOOL_SETS.explorationDefault)
+}
+
+function aliveMonsters(gameState: GameState): MonsterState[] {
+  return Object.values(gameState.monsters).filter(monster => monster.isAlive)
 }
 
 type NarrativeStateContractIssue = {
@@ -805,6 +884,169 @@ function detectRequiredMechanicalAction(message: string, gameState: GameState): 
   }
 
   return null
+}
+
+function detectPassTurnIntent(message: string, gameState: GameState): boolean {
+  if (gameState.phase !== 'combat' || gameState.currentTurn !== 'player') return false
+  const text = normalizeFrenchText(message)
+  return /\b(passe|passer|attends?|attendre|patient|patiente|ne fais rien|reste sur place)\b/.test(text)
+}
+
+function parseCoordinateMove(message: string, gameState: GameState): { x: number; y: number } | null {
+  const text = normalizeFrenchText(message)
+  if (!/\b(va|vais|aller|avance|bouge|deplace|marche|case|coordonnees?)\b/.test(text)) {
+    return null
+  }
+
+  const coordinateMatch = text.match(/\(?\s*(\d{1,2})\s*[,;]\s*(\d{1,2})\s*\)?/)
+  if (!coordinateMatch) return null
+
+  const x = Number(coordinateMatch[1])
+  const y = Number(coordinateMatch[2])
+  if (!Number.isInteger(x) || !Number.isInteger(y)) return null
+  if (x === gameState.player.position.x && y === gameState.player.position.y) return null
+
+  return { x, y }
+}
+
+function parseTargetHint(message: string): PlayerAttackTargetHint | null {
+  const text = normalizeFrenchText(message)
+  if (/\b(droite|a droite|sur ma droite)\b/.test(text)) return 'right'
+  if (/\b(gauche|a gauche|sur ma gauche)\b/.test(text)) return 'left'
+  if (/\b(devant|face|en face)\b/.test(text)) return 'front'
+  if (/\b(derriere|arriere|dans mon dos)\b/.test(text)) return 'back'
+  if (/\b(blesse|blessure|affaibli|agonie|chancelant)\b/.test(text)) return 'wounded'
+  if (/\b(proche|plus proche|nearest|au contact)\b/.test(text)) return 'nearest'
+  return null
+}
+
+function lastMonsterThatAttackedPlayer(gameState: GameState): string | null {
+  const aliveIds = new Set(aliveMonsters(gameState).map(monster => monster.id))
+
+  for (const entry of [...gameState.combatLog].reverse()) {
+    if (!aliveIds.has(entry.turn)) continue
+    if (!/\battaque\b/i.test(entry.action)) continue
+    if (/heros|héros|player|joueur/i.test(entry.action)) return entry.turn
+  }
+
+  return null
+}
+
+function parseWeaponOrSpell(message: string): string {
+  const text = normalizeFrenchText(message)
+  if (/\b(hache|hachette)\b/.test(text)) return 'handaxe'
+  if (/\b(epee|lame|longsword)\b/.test(text)) return 'longsword'
+  return 'longsword'
+}
+
+function parsePlayerAttackInput(
+  message: string,
+  gameState: GameState
+): Record<string, unknown> | null {
+  if (gameState.phase !== 'combat' || gameState.currentTurn !== 'player') return null
+  const requiredAction = detectRequiredMechanicalAction(message, gameState)
+  if (requiredAction?.reason !== 'player-combat-attack-intent') return null
+
+  const monsters = aliveMonsters(gameState)
+  if (monsters.length === 0) return null
+
+  const text = normalizeFrenchText(message)
+  const targetId = /\b(dernier|precedent|m[' ]?a attaque|vient de m[' ]?attaquer)\b/.test(text)
+    ? lastMonsterThatAttackedPlayer(gameState)
+    : monsters.length === 1
+      ? monsters[0].id
+      : null
+
+  const targetHint = parseTargetHint(message) ?? (targetId ? null : 'nearest')
+  const input: Record<string, unknown> = {
+    weaponOrSpell: parseWeaponOrSpell(message),
+  }
+
+  if (targetId) input.targetId = targetId
+  else if (targetHint) input.targetHint = targetHint
+
+  if (/\b(avantage|advantage)\b/.test(text)) input.advantage = true
+  if (/\b(desavantage|désavantage|disadvantage)\b/.test(text)) input.disadvantage = true
+
+  return input
+}
+
+function summarizeMcpResultForNarration(toolName: string, result: unknown): string {
+  if (isObjectRecord(result)) {
+    if (typeof result.mechanicalSummary === 'string') return result.mechanicalSummary
+    if (typeof result.error === 'string') return `Debug moteur: ${toolName} refuse l'action (${result.error}).`
+    if (typeof result.reason === 'string') return result.reason
+  }
+
+  return `Action moteur resolue par ${toolName}.`
+}
+
+async function resolveServerFirstAction(
+  message: string,
+  gameState: GameState,
+  sessionId: string | undefined,
+  requestId: string
+): Promise<{
+  handled: boolean
+  gameState: GameState
+  toolsUsed: string[]
+  draftNarrative: string
+  sawMcpToolError: boolean
+}> {
+  const startedAt = Date.now()
+  let toolName: string | null = null
+  let input: Record<string, unknown> | null = null
+
+  const attackInput = parsePlayerAttackInput(message, gameState)
+  if (attackInput) {
+    toolName = 'resolve_player_attack'
+    input = attackInput
+  } else if (detectPassTurnIntent(message, gameState)) {
+    toolName = 'pass_turn'
+    input = { reason: 'Le joueur attend et passe son tour.' }
+  } else {
+    const toCell = parseCoordinateMove(message, gameState)
+    if (toCell) {
+      toolName = 'move_token'
+      input = { tokenId: 'player', toCell }
+    }
+  }
+
+  if (!toolName || !input) {
+    return { handled: false, gameState, toolsUsed: [], draftNarrative: '', sawMcpToolError: false }
+  }
+
+  logEvent('info', 'dm.cost.engine_first.start', {
+    requestId,
+    sessionId,
+    toolName,
+    input,
+    gameState: summarizeGameState(gameState),
+  })
+
+  const result = await callMCPTool(toolName, input, sessionId)
+  const sawMcpToolError = isMcpErrorResult(result)
+  const nextGameState = await callMCPTool('get_game_state', {}, sessionId) as GameState
+  const draftNarrative = summarizeMcpResultForNarration(toolName, result)
+
+  logEvent(sawMcpToolError ? 'warn' : 'info', 'dm.cost.engine_first.complete', {
+    requestId,
+    sessionId,
+    durationMs: Date.now() - startedAt,
+    toolName,
+    input,
+    result,
+    draftNarrative,
+    gameState: summarizeGameState(nextGameState),
+  })
+
+  return {
+    handled: true,
+    gameState: nextGameState,
+    toolsUsed: [toolName],
+    draftNarrative,
+    sawMcpToolError,
+  }
 }
 
 function logRoomStateAnomaly(gameState: GameState, requestId: string, sessionId: string | undefined, stage: string): void {
@@ -1229,21 +1471,14 @@ async function generateFinalNarration(
     `Action du joueur:\n${playerMessage}`,
     draftNarrative ? `Brouillon narratif precedent, potentiellement incomplet:\n${draftNarrative}` : undefined,
     `Resultats mecaniques faisant autorite:\n${formatCombatLogEntries(newCombatLogEntries)}`,
-    `Ecris la reponse finale au joueur en francais, au present, en 1-3 phrases. Respecte strictement les resultats mecaniques. N'annonce aucune action future non resolue.`,
+    `Ecris la reponse finale au joueur en francais, au present, en 1-2 phrases. Respecte strictement les resultats mecaniques. N'annonce aucune action future non resolue. Ajoute une 3e phrase seulement si elle clarifie un resultat mecanique complexe.`,
   ].filter(Boolean).join('\n\n')
 
   try {
     const response = await createLlmMessage({
       model: MODEL,
-      max_tokens: MAX_TOKENS,
-      system: [
-        {
-          type: 'text',
-          text: buildStaticPrompt() + '\n\nMODE NARRATION FINALE: narre uniquement. Aucun tool. Les resultats mecaniques fournis font autorite.',
-          cache_control: { type: 'ephemeral' },
-        },
-        { type: 'text', text: buildDynamicPrompt(gameState, summaryContext) },
-      ],
+      max_tokens: FINAL_NARRATION_MAX_TOKENS,
+      system: buildNarrationSystemBlocks(gameState, summaryContext),
       messages: [{ role: 'user', content: finalPrompt }],
     }, {
       requestId,
@@ -1433,6 +1668,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       sessionId
     )
     const activeSummary = newSummary ?? requestSummaryContext
+    const requiredMechanicalAction = detectRequiredMechanicalAction(message, currentGameState)
     logEvent('debug', 'dm.history.ready', {
       requestId,
       sessionId,
@@ -1446,6 +1682,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     // ── Construction des messages pour l'appel LLM ──────────────────────────
     const systemBlocks = buildSystemBlocks(currentGameState, activeSummary)
+    const llmTools = selectToolsForLlm(mcpTools, currentGameState, requiredMechanicalAction)
     const messages: Anthropic.MessageParam[] = [
       ...historyMessages,
       { role: 'user', content: message },
@@ -1456,23 +1693,32 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       messageCount: messages.length,
       historyMessageCount: historyMessages.length,
       systemBlockCount: systemBlocks.length,
-      toolsAvailable: mcpTools.length,
-      toolNames: mcpTools.map(tool => tool.name),
+      rawToolsAvailable: mcpTools.length,
+      toolsAvailable: llmTools.length,
+      toolNames: llmTools.map(tool => tool.name),
       gameState: summarizeGameState(currentGameState),
+      requiredMechanicalAction,
     })
 
     let narrative = ''
     let iterations = 0
     let turnBoundaryReached = false
     let mechanicalRetryInjected = false
-    let narrativeContractRetryInjected = false
     let maxTokensRetryInjected = false
     let sawMcpToolError = false
     let lastStopReason: Anthropic.Message['stop_reason'] | null = null
     let lastEndTurnNarrative = ''
-    const requiredMechanicalAction = detectRequiredMechanicalAction(message, currentGameState)
 
-    while (iterations < MAX_TOOL_ITERATIONS) {
+    const engineFirst = await resolveServerFirstAction(message, currentGameState, sessionId, requestId)
+    if (engineFirst.handled) {
+      currentGameState = engineFirst.gameState
+      narrative = engineFirst.draftNarrative
+      sawMcpToolError = engineFirst.sawMcpToolError
+      toolsUsed.push(...engineFirst.toolsUsed)
+      logRoomStateAnomaly(currentGameState, requestId, sessionId, 'after-engine-first')
+    }
+
+    while (!engineFirst.handled && iterations < MAX_TOOL_ITERATIONS) {
       iterations++
       const iterationStartedAt = Date.now()
       logEvent('info', 'dm.anthropic.iteration.start', {
@@ -1482,14 +1728,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         model: MODEL,
         maxTokens: MAX_TOKENS,
         messageCount: messages.length,
-        toolsAvailable: mcpTools.length,
+        toolsAvailable: llmTools.length,
+        toolNames: llmTools.map(tool => tool.name),
       })
 
       const response = await createLlmMessage({
         model: MODEL,
         max_tokens: MAX_TOKENS,
         system: systemBlocks,
-        tools: mcpTools.length > 0 ? mcpTools : undefined,
+        tools: llmTools.length > 0 ? llmTools : undefined,
         messages,
       }, {
         requestId,
@@ -1498,7 +1745,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         requestCallCount: usageLog.length + 1,
         gameState: currentGameState,
         playerMessage: message,
-        tools: mcpTools,
+        tools: llmTools,
       })
       logEvent('info', 'dm.anthropic.iteration.response', {
         requestId,
@@ -1518,7 +1765,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         stopReason: response.stop_reason,
         metadata: {
           iteration: iterations,
-          toolsAvailable: mcpTools.length,
+          toolsAvailable: llmTools.length,
+          rawToolsAvailable: mcpTools.length,
         },
       }))
 
@@ -1568,14 +1816,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         }
 
         const narrativeStateIssue = detectNarrativeStateContractIssue(responseText, currentGameState)
-        if (
-          narrativeStateIssue &&
-          !narrativeContractRetryInjected &&
-          iterations < MAX_TOOL_ITERATIONS
-        ) {
-          narrativeContractRetryInjected = true
+        if (narrativeStateIssue) {
           narrative = narrativeBeforeResponse
-          lastEndTurnNarrative = ''
+          lastEndTurnNarrative = "Debug moteur: narration corrigée. Aucun ennemi physique n'est présent sur la carte et aucun combat n'est engagé dans l'état moteur actuel; les signes hostiles restent hors champ tant qu'une rencontre n'est pas déclenchée."
+          narrative = narrative
+            ? `${narrative}\n\n${lastEndTurnNarrative}`
+            : lastEndTurnNarrative
           logEvent('warn', 'anomaly.narrative_state_contract', {
             requestId,
             sessionId,
@@ -1584,14 +1830,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             toolsUsed,
             message,
             responseText,
+            serverCorrection: lastEndTurnNarrative,
             gameState: summarizeGameState(currentGameState),
           })
-          messages.push({ role: 'assistant', content: response.content })
-          messages.push({
-            role: 'user',
-            content: `SYSTEM: Ta narration vient de faire exister des ennemis physiquement presents ou un combat imminent alors que l'etat moteur indique exploration avec 0 monstre vivant (${narrativeStateIssue.reason}, triggers: ${narrativeStateIssue.matchedTriggers.join(', ')}). Corrige maintenant. Si les ennemis sont reels et presents, appelle start_encounter. Sinon, reponds avec une correction explicite qui commence par "Debug moteur:" et precise que ce sont seulement des bruits/mouvements hors champ, sans ennemi sur la carte ni combat engage.`,
-          })
-          continue
+          break
         }
 
         logEvent('info', 'dm.anthropic.end_turn', {
@@ -1750,15 +1992,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       })
       const finalResponse = await createLlmMessage({
         model: MODEL,
-        max_tokens: 300,
-        system: [
-          {
-            type: 'text',
-            text: buildStaticPrompt() + '\n\nNarre uniquement, sans appeler de tools.',
-            cache_control: { type: 'ephemeral' },
-          },
-          { type: 'text', text: buildDynamicPrompt(currentGameState!, activeSummary) },
-        ],
+        max_tokens: FINAL_NARRATION_MAX_TOKENS,
+        system: buildNarrationSystemBlocks(currentGameState!, activeSummary),
         messages: [{ role: 'user', content: message }],
       }, {
         requestId,
