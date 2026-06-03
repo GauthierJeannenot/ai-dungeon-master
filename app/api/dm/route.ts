@@ -1105,12 +1105,19 @@ function detectNarrativeStateContractIssue(
   }
 
   const text = normalizeFrenchText(responseText)
-  const mentionsEnemies = /\b(gobelins?|ennemis?|monstres?|creatures?|silhouettes?|eclaireurs?)\b/.test(text)
+  const mentionsEnemies = /\b(gobelins?|ennemis?|monstres?|creatures?|silhouettes?|eclaireurs?|grukk|chef grukk)\b/.test(text) ||
+    /\b(silhouettes?|formes?)\s+vertes?\b/.test(text)
   if (!mentionsEnemies) return null
 
+  const onlySaysNoVisibleEnemies = /\b(aucun|pas de|rien|personne)\b.{0,60}\b(gobelins?|ennemis?|monstres?|creatures?|silhouettes?|grukk)\b.{0,80}\b(visible|en vue|se montre|devant toi)\b/.test(text)
+  const explicitVisibleEnemy = /\b(une?|des|deux|trois|quatre|cinq|plusieurs)\s+(gobelins?|ennemis?|monstres?|creatures?|silhouettes?|formes?)\b/.test(text) ||
+    /\b(silhouettes?|formes?)\s+vertes?\b/.test(text) ||
+    /\bchef grukk\b/.test(text)
+
   const triggerPatterns: Array<[string, RegExp]> = [
-    ['enemy_enters_or_moves', /\b(entrent?|rentrent?|arrivent?|approchent?|surgissent?|debarquent?|passent?|descendent|convergent|encerclent?|se rapprochent|suivent?|poursuivent?)\b/],
-    ['enemy_takes_action', /\b(degainent?|attaquent?|frappent?|chargent?|scrutent?|fouillent?|poussent?|se retournent?|reperent?|repere|voient?|apercoivent?|crient?)\b/],
+    ['enemy_visible_without_tokens', /\b(vois|voyez|apercois|apercevez|distingues?|detectes?|remarques?|visible|en vue|se montre|se tiennent?|au fond|pres de|devant toi|dans la salle|mouvement)\b/],
+    ['enemy_enters_or_moves', /\b(entrent?|rentrent?|arrivent?|approchent?|surgissent?|debarquent?|emergent?|emerge|apparai(?:t|ssent)|passent?|descendent|convergent|encerclent?|se rapprochent|suivent?|poursuivent?|trainent?|se deplacent?)\b/],
+    ['enemy_takes_action', /\b(degainent?|attaquent?|frappent?|chargent?|scrutent?|fouillent?|poussent?|se retournent?|reperent?|repere|voient?|apercoivent?|crient?|grondent?)\b/],
     ['combat_state_without_engine', /\b(combat imminent|initiative|armes? degainees?|epees? degainees?|vous etes repere|intrus)\b/],
   ]
   const matchedTriggers = triggerPatterns
@@ -1118,12 +1125,64 @@ function detectNarrativeStateContractIssue(
     .map(([name]) => name)
 
   if (matchedTriggers.length === 0) return null
+  if (onlySaysNoVisibleEnemies && !explicitVisibleEnemy && matchedTriggers.every(trigger => trigger === 'enemy_visible_without_tokens')) {
+    return null
+  }
 
   return {
     reason: 'enemy_presence_without_engine_state',
     matchedTriggers,
     suggestedTools: ['start_encounter'],
   }
+}
+
+function detectNarrativeRoomContractIssue(
+  responseText: string,
+  gameState: GameState,
+  toolsUsed: string[]
+): NarrativeStateContractIssue | null {
+  if (!responseText || !gameState.currentRoomId) return null
+  if (toolsUsed.some(toolName => toolName === 'move_token' || toolName === 'start_encounter')) {
+    return null
+  }
+
+  const text = normalizeFrenchText(responseText)
+  const narratesTransition = /\b(tu|vous)\s+(?:te|vous)?\s*(?:approches?|approchez|avances?|avancez|entres?|entrez|passes?|passez|traverses?|traversez|arrives?|arrivez|remontes?|remontez|retournes?|retournez|descends?|descendez|montes?|montez)\b/.test(text) ||
+    /\b(tu|vous)\s+(?:l[' ]?)?(?:ouvres?|ouvrez|pousses?|poussez|franchis|franchissez)\b/.test(text) ||
+    /\b(?:te|vous)\s+voila\s+(?:dans|pres de|devant)\b/.test(text) ||
+    /\b(?:tu|vous)\s+etes\s+(?:dans|pres de|devant|au fond de)\b/.test(text)
+
+  if (!narratesTransition) return null
+
+  const targetRoomPatterns: Array<[string, RegExp]> = [
+    ['2', /\b(verger|pommiers?|pommier|arbres?)\b/],
+    ['3', /\b(tas de dechets?|dechets?|champignons?|violets?)\b/],
+    ['5', /\b(bureau|paperasse|registres?|classeurs?)\b/],
+    ['7', /\b(quai de chargement|quai|chargement|porte laterale|chariot)\b/],
+    ['8', /\b(sol(?: de la)? boulangerie|fours?|fournee|reserve|reserves|porte des reserves|plans de travail|sacs de farine|tonneaux|etageres effondrees)\b/],
+    ['9', /\b(appartement|grammy|chef grukk|grukk|lit|armoire|taniere)\b/],
+  ]
+
+  const matchedRooms = targetRoomPatterns
+    .filter(([roomId, pattern]) => roomId !== gameState.currentRoomId && pattern.test(text))
+    .map(([roomId]) => roomId)
+
+  if (matchedRooms.length === 0) return null
+
+  return {
+    reason: 'room_transition_without_engine_state',
+    matchedTriggers: matchedRooms.map(roomId => `room_${roomId}_mentioned_without_move`),
+    suggestedTools: ['move_token', 'start_encounter'],
+  }
+}
+
+function buildNarrativeStateCorrection(gameState: GameState): string {
+  const roomName = getCurrentRoomName(gameState)
+  if (roomName) {
+    return `Tu restes dans ${roomName}. Tu percois des traces et des bruits dans le batiment, mais aucun ennemi n'est visible devant toi pour l'instant.`
+  }
+
+  return "Tu percois des traces et des bruits dans le batiment, mais aucun ennemi n'est visible devant toi pour l'instant."
 }
 
 function detectRequiredMechanicalAction(message: string, gameState: GameState): RequiredMechanicalAction | null {
@@ -1134,7 +1193,7 @@ function detectRequiredMechanicalAction(message: string, gameState: GameState): 
   }
 
   const attackIntent = /\b(attaque|attaquer|frappe|frapper|tape|coup|assene|charge|tire|lance)\b/.test(text)
-  const directMovementIntent = /\b(deplaces?|deplacer|avances?|avancer|bouges?|bouger|aller|vers|entres?|entrer|rentres?|retournes?|retourner|rejoins?|rejoindre|retrouves?|retrouver|rends|traverses?|approches?|explores?|explorer|montes?|monter|grimpes?|grimpe|empruntes?|prends|fuis|fuite|recules?|ouvres?|ouvrir|enfonces?|enfoncer|portes?|glisses?|glisser)\b/.test(text)
+  const directMovementIntent = /\b(deplaces?|deplacer|avances?|avancer|bouges?|bouger|aller|vers|entres?|entrer|rentres?|retournes?|retourner|rejoins?|rejoindre|retrouves?|retrouver|rends|traverses?|approches?|explores?|explorer|aventures?|aventurer|continues?|continuer|plus loin|montes?|monter|grimpes?|grimpe|empruntes?|prends|fuis|fuite|recules?|ouvres?|ouvrir|enfonces?|enfoncer|portes?|glisses?|glisser)\b/.test(text)
   const goToMovementIntent = /\b(vais|va)\b(?=.{0,80}\b(vers|au|aux|a la|a l|dans|voir|parler|rejoindre|retrouver|retourner|salle|piece|bureau|appartement|boulangerie|quai|verger|pommier)\b)/.test(text)
   const baseMovementIntent = directMovementIntent || goToMovementIntent
   const followIntent = /\b(suis|suivre|poursuis|poursuivre)\b/.test(text) && /\b(gobelins?|ennemis?|monstres?|creatures?|silhouettes?|eux|traces?)\b/.test(text)
@@ -1169,6 +1228,24 @@ function detectPassTurnIntent(message: string, gameState: GameState): boolean {
   return /\b(passe|passer|attends?|attendre|patient|patiente|ne fais rien|reste sur place)\b/.test(text)
 }
 
+function detectDebugStateQuestion(message: string): boolean {
+  const text = normalizeFrenchText(message)
+  const mentionsDebugSurface = /\b(client|javascript|js|serveur|pion|token|jeton|carte|battlemap|affichage|desynchro|desynchronise|bug|bonne salle|bonne piece)\b/.test(text)
+  const asksForLocation = /\b(position|salle|piece|ou je suis|ou suis|bonne salle|bonne piece|bon endroit|la ou je devrais etre)\b/.test(text)
+  return mentionsDebugSurface && asksForLocation
+}
+
+function buildDebugStateNarrative(gameState: GameState): string {
+  const roomName = getCurrentRoomName(gameState) ?? 'une zone non identifiee'
+  const position = gameState.player.position
+  const aliveCount = countAliveMonsters(gameState)
+  const monsterText = aliveCount > 0
+    ? `${aliveCount} ennemi${aliveCount > 1 ? 's' : ''} actif${aliveCount > 1 ? 's' : ''} existe${aliveCount > 1 ? 'nt' : ''} dans l'etat de jeu.`
+    : "Aucun ennemi actif n'existe dans l'etat de jeu."
+
+  return `Cote serveur, ton pion est dans ${roomName}, case x ${position.x}, y ${position.y}. ${monsterText} Si l'ecran montre autre chose, l'affichage client est en retard.`
+}
+
 function parseCoordinateMove(message: string, gameState: GameState): { x: number; y: number } | null {
   const text = normalizeFrenchText(message)
   if (!/\b(va|vais|aller|avance|bouge|deplace|marche|case|coordonnees?)\b/.test(text)) {
@@ -1201,12 +1278,58 @@ function encounterIdForRoom(roomId: string | null | undefined): string | null {
   return Object.values(ENCOUNTERS).find(encounter => encounter.roomId === roomId)?.id ?? null
 }
 
+function relativeRoomIdForExplorationMove(text: string, gameState: GameState): string | null {
+  if (!/\b(plus loin|continue|continuer|aventure|aventurer|avance|avancer|explore|explorer|nourriture|manger|reserve|reserves)\b/.test(text)) {
+    return null
+  }
+
+  if (gameState.currentRoomId === '1') return '4'
+  if (gameState.currentRoomId === '4') return '8'
+  return null
+}
+
+function contextualRoomIdFromRecentDm(
+  message: string,
+  gameState: GameState,
+  recentHistory: ConversationTurn[]
+): string | null {
+  const text = normalizeFrenchText(message)
+  const anaphoricAction = /\b(investig\w*|inspect\w*|examin\w*|fouill\w*|regard\w*|ouvr\w*|entr\w*|avanc\w*|j[' ]?y vais|vas y)\b/.test(text)
+  if (!anaphoricAction) return null
+
+  const lastDmTurn = [...recentHistory].reverse().find(turn => turn.role === 'dm')
+  if (!lastDmTurn) return null
+
+  const context = normalizeFrenchText(lastDmTurn.content)
+  const candidates: Array<[string, RegExp]> = [
+    ['8', /\b(porte des reserves?|reserves?|sol(?: de la)? boulangerie|fours?|fournee|plans de travail)\b/],
+    ['9', /\b(appartement(?: de grammy)?|grammy|chef grukk|grukk)\b/],
+    ['7', /\b(quai de chargement|quai|chargement|porte laterale)\b/],
+    ['5', /\b(bureau|paperasse|registres?|classeurs?)\b/],
+    ['3', /\b(tas de dechets?|dechets?|champignons? violets?)\b/],
+    ['2', /\b(verger|pommiers?|pommier)\b/],
+  ]
+
+  const matchedRoomIds = candidates
+    .filter(([roomId, pattern]) => roomId !== gameState.currentRoomId && pattern.test(context))
+    .map(([roomId]) => roomId)
+
+  if (matchedRoomIds.length === 1) return matchedRoomIds[0]
+
+  if (gameState.currentRoomId === '4' && /\b(porte des reserves?|reserves?|fours?)\b/.test(context)) {
+    return '8'
+  }
+
+  return null
+}
+
 function parseNamedRoomMove(message: string, gameState: GameState): { x: number; y: number } | null {
   const text = normalizeFrenchText(message)
-  const hasMovementVerb = /\b(vers|vais|aller|va |deplace|rends|rejoins?|rejoint|entre|entrer|retournes?|retourner|montes?|monter|grimpes?|grimpe|empruntes?|prends|suis|suivre)\b/.test(text)
+  const hasMovementVerb = /\b(vers|vais|aller|va |deplace|rends|rejoins?|rejoint|entre|entrer|retournes?|retourner|montes?|monter|grimpes?|grimpe|empruntes?|prends|suis|suivre|aventure|aventurer|continue|continuer|avances?|avancer|explores?|explorer|investig\w*|inspect\w*|examin\w*|fouill\w*)\b/.test(text)
   if (!hasMovementVerb) return null
 
-  if (!/\b(salle|piece|bureau|appartement|boulangerie|quai|verger|mac|treant|pommier|etage|haut|escalier)\b/.test(text)) {
+  const relativeRoomId = relativeRoomIdForExplorationMove(text, gameState)
+  if (!relativeRoomId && !/\b(salle|piece|bureau|appartement|boulangerie|quai|verger|mac|treant|pommier|etage|haut|escalier|four|cuisine|reserve|reserves)\b/.test(text)) {
     return null
   }
 
@@ -1231,10 +1354,19 @@ function parseNamedRoomMove(message: string, gameState: GameState): { x: number;
     ['1', /\b(exterieur|dehors|sortie)\b/],
   ]
 
-  const targetRoomId = roomAliases.find(([, pattern]) => pattern.test(text))?.[0]
+  const targetRoomId = relativeRoomId ?? roomAliases.find(([, pattern]) => pattern.test(text))?.[0]
   if (!targetRoomId || targetRoomId === gameState.currentRoomId) return null
 
   return centerCellForRoom(targetRoomId)
+}
+
+function parseContextualRoomMove(
+  message: string,
+  gameState: GameState,
+  recentHistory: ConversationTurn[]
+): { x: number; y: number } | null {
+  const targetRoomId = contextualRoomIdFromRecentDm(message, gameState, recentHistory)
+  return targetRoomId ? centerCellForRoom(targetRoomId) : null
 }
 
 function parseTargetHint(message: string): PlayerAttackTargetHint | null {
@@ -1314,6 +1446,7 @@ function parseEncounterRepairInput(
 
   return {
     encounterId,
+    playerCell: gameState.player.position,
     reason: 'Synchronisation serveur: la scene decrit une rencontre de salle qui doit exister sur la carte.',
   }
 }
@@ -1333,7 +1466,8 @@ async function resolveServerFirstAction(
   message: string,
   gameState: GameState,
   sessionId: string | undefined,
-  requestId: string
+  requestId: string,
+  recentHistory: ConversationTurn[]
 ): Promise<{
   handled: boolean
   gameState: GameState
@@ -1344,6 +1478,24 @@ async function resolveServerFirstAction(
   const startedAt = Date.now()
   let toolName: string | null = null
   let input: Record<string, unknown> | null = null
+
+  if (detectDebugStateQuestion(message)) {
+    const draftNarrative = buildDebugStateNarrative(gameState)
+    logEvent('info', 'dm.cost.engine_first.debug_state', {
+      requestId,
+      sessionId,
+      durationMs: Date.now() - startedAt,
+      draftNarrative,
+      gameState: summarizeGameState(gameState),
+    })
+    return {
+      handled: true,
+      gameState,
+      toolsUsed: [],
+      draftNarrative,
+      sawMcpToolError: false,
+    }
+  }
 
   const attackInput = parsePlayerAttackInput(message, gameState)
   const encounterRepairInput = parseEncounterRepairInput(message, gameState)
@@ -1357,7 +1509,10 @@ async function resolveServerFirstAction(
     toolName = 'pass_turn'
     input = { reason: 'Le joueur attend et passe son tour.' }
   } else {
-    const toCell = parseCoordinateMove(message, gameState) ?? parseNamedRoomMove(message, gameState)
+    const toCell =
+      parseCoordinateMove(message, gameState) ??
+      parseNamedRoomMove(message, gameState) ??
+      parseContextualRoomMove(message, gameState, recentHistory)
     if (toCell) {
       const targetRoomId = inferMappedAdventureRoomId(toCell)
       const encounterId = encounterIdForRoom(targetRoomId)
@@ -1375,6 +1530,7 @@ async function resolveServerFirstAction(
         toolName = 'start_encounter'
         input = {
           encounterId,
+          playerCell: toCell,
           reason: 'Le joueur entre dans une salle occupee.',
         }
       } else {
@@ -2117,7 +2273,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     let lastStopReason: Anthropic.Message['stop_reason'] | null = null
     let lastEndTurnNarrative = ''
 
-    const engineFirst = await resolveServerFirstAction(message, currentGameState, sessionId, requestId)
+    const engineFirst = await resolveServerFirstAction(message, currentGameState, sessionId, requestId, recentHistory)
     if (engineFirst.handled) {
       currentGameState = engineFirst.gameState
       narrative = engineFirst.draftNarrative
@@ -2226,10 +2382,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           continue
         }
 
-        const narrativeStateIssue = detectNarrativeStateContractIssue(responseText, currentGameState)
+        const narrativeStateIssue =
+          detectNarrativeStateContractIssue(responseText, currentGameState) ??
+          detectNarrativeRoomContractIssue(responseText, currentGameState, toolsUsed)
         if (narrativeStateIssue) {
           narrative = narrativeBeforeResponse
-          lastEndTurnNarrative = "Un bruit bouge hors champ, mais rien ne se montre devant toi pour l'instant."
+          lastEndTurnNarrative = buildNarrativeStateCorrection(currentGameState)
           narrative = narrative
             ? `${narrative}\n\n${lastEndTurnNarrative}`
             : lastEndTurnNarrative
@@ -2584,6 +2742,24 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         oralNarrative: oralNarrative.narrative,
       })
       narrative = oralNarrative.narrative
+    }
+
+    const finalNarrativeStateIssue =
+      detectNarrativeStateContractIssue(narrative, currentGameState) ??
+      detectNarrativeRoomContractIssue(narrative, currentGameState, toolsUsed)
+    if (finalNarrativeStateIssue) {
+      const serverCorrection = buildNarrativeStateCorrection(currentGameState)
+      logEvent('warn', 'anomaly.final_narrative_state_contract', {
+        requestId,
+        sessionId,
+        issue: finalNarrativeStateIssue,
+        toolsUsed,
+        message,
+        originalNarrative: narrative,
+        serverCorrection,
+        gameState: summarizeGameState(currentGameState),
+      })
+      narrative = serverCorrection
     }
 
     const persistedHistory = [
