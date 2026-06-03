@@ -64,8 +64,8 @@ interface SpeechWindow extends Window {
 }
 
 const VOICE_LANGUAGE = 'fr-FR'
-const MAX_SPOKEN_SENTENCES = 3
-const MAX_SPOKEN_CHARS = 360
+const MAX_SPOKEN_SENTENCES = 7
+const MAX_SPOKEN_CHARS = 650
 const MAX_SPEECH_SEGMENT_CHARS = 180
 const MAX_RECOGNITION_AUTO_RESTARTS = 20
 const MAX_RECOGNITION_SESSION_MS = 120_000
@@ -77,19 +77,19 @@ const PLACEHOLDERS = {
     'Lever le bouclier, viser le chef, renverser une table...',
   ],
   dialogue: [
-    'Mentir avec aplomb, proposer un marche, demander le detail qui fache...',
-    'Sourire trop fort, negocier la recette, accuser une odeur suspecte...',
+    'Mentir avec aplomb, proposer un marché, demander le détail qui fâche...',
+    'Sourire trop fort, négocier la recette, accuser une odeur suspecte...',
   ],
   bakeryEntrance: [
     "Amadouer l'arbre, forcer la porte, accuser une pomme d'espionnage...",
-    "Inspecter l'ecorce, toquer a la porte, flairer le piege a tarte...",
+    "Inspecter l'écorce, toquer à la porte, flairer le piège à tarte...",
   ],
   bakeryFloor: [
-    'Negocier avec Grukk, lever le bouclier, demander qui tient la recette...',
+    'Négocier avec Grukk, lever le bouclier, demander qui tient la recette...',
     'Observer les gobelins, chercher une sortie, parler plus fort que le danger...',
   ],
   exploration: [
-    "Fouiller les comptoirs, ecouter derriere une porte, suivre l'odeur de cannelle...",
+    "Fouiller les comptoirs, écouter derrière une porte, suivre l'odeur de cannelle...",
     'Avancer prudemment, tenter un plan bancal, faire confiance au nez...',
   ],
 }
@@ -149,7 +149,7 @@ function textForSpeech(text: string): string {
     .replace(/\bHP\b/gi, 'points de vie')
     .replace(/\bPV\b/gi, 'points de vie')
     .replace(/\bCA\b/g, "classe d'armure")
-    .replace(/\bDD\b/g, 'degre de difficulte')
+    .replace(/\bDD\b/g, 'degré de difficulté')
     .replace(/\b(\d+)d(\d+)\b/gi, (_, count: string, sides: string) =>
       `${count} de ${sides}`
     )
@@ -160,6 +160,10 @@ function textForSpeech(text: string): string {
   const sentences = cleaned.match(/[^.!?]+[.!?]+|[^.!?]+$/g)
     ?.map(sentence => sentence.trim())
     .filter(Boolean) ?? []
+
+  if (cleaned.length <= MAX_SPOKEN_CHARS) {
+    return cleaned
+  }
 
   const selectedSentences = sentences.slice(0, MAX_SPOKEN_SENTENCES)
   let spokenText = selectedSentences.join(' ')
@@ -752,7 +756,7 @@ export default function Chat({
   const voiceStatus = voiceError
     ? voiceError
     : isListening
-      ? speechPreview || "Je t'ecoute. Clique Envoyer quand tu as fini."
+      ? speechPreview || "Je t'écoute. Clique Envoyer quand tu as fini."
       : speechPreview || "Osez le plan bancal. Les des adorent le chaos."
 
   return (
@@ -789,8 +793,8 @@ export default function Chat({
             type="button"
             onClick={handleToggleSpeaker}
             disabled={!speechSynthesisSupported}
-            title="Lire les reponses du DM a voix haute"
-            aria-label="Lire les reponses du DM a voix haute"
+            title="Lire les réponses du DM à voix haute"
+            aria-label="Lire les réponses du DM à voix haute"
             className={`h-7 min-w-[4.25rem] rounded border px-2 text-[11px] font-semibold transition-colors ${
               speakerEnabled
                 ? 'border-amber-500/60 bg-amber-800/70 text-amber-50'

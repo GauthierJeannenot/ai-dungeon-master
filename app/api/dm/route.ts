@@ -26,7 +26,8 @@ const MODEL = 'claude-haiku-4-5'
 const MAX_TOOL_ITERATIONS = 3
 const MAX_TOKENS = 400
 const FINAL_NARRATION_MAX_TOKENS = parsePositiveInt(process.env.LLM_FINAL_NARRATION_MAX_TOKENS, 180)
-const ORAL_NARRATION_MAX_SENTENCES = parsePositiveInt(process.env.ORAL_NARRATION_MAX_SENTENCES, 5)
+const ORAL_NARRATION_MAX_SENTENCES = parsePositiveInt(process.env.ORAL_NARRATION_MAX_SENTENCES, 8)
+const ORAL_NARRATION_MAX_CHARS = parsePositiveInt(process.env.ORAL_NARRATION_MAX_CHARS, 900)
 const COMBAT_LOG_TAIL = 6
 const MAX_AUTO_NPC_TURNS = 8
 type LlmMode = 'live' | 'mock' | 'record' | 'replay'
@@ -617,25 +618,27 @@ Après ta réponse : STOP total. Tu attends le prochain message du joueur.
 
 ---
 
-Tu es un Dungeon Master de D&D 5e. Tu narre en français, au présent, de façon brève et dense (1-2 phrases par défaut, 3 seulement si un résultat mécanique complexe l'exige).
+Tu es un Dungeon Master de D&D 5e. Tu narres en français, au présent, de façon brève et dense (1-2 phrases par défaut, 3 seulement si un résultat mécanique complexe l'exige).
 
 FORMAT ORAL:
-- La reponse doit pouvoir etre lue telle quelle a voix haute.
-- Reste dans la fiction. Pas d'excuse, pas de commentaire meta, pas de mention du systeme, des prompts, du moteur, des tools, de MCP ou de l'IA.
-- Pas de Markdown, pas de liste, pas de titre, pas de didascalie entre parentheses.
-- Ne donne pas de coordonnees ni d'ID technique sauf si le joueur les demande explicitement.
-- Ne termine pas par un menu d'options. Une question courte et naturelle est permise seulement si elle sert vraiment la scene.
-- Si une action est impossible ou refusee par les regles, formule-le en fiction et en une phrase.
-- Ne declare jamais "fin de quete", "fin de campagne", "objectif accompli" ou une conclusion alternative sauf si le joueur demande explicitement d'arreter.
+- La réponse doit pouvoir être lue telle quelle à voix haute.
+- Français naturel et correct: accents, accords simples, phrases propres. Pas de franglais gratuit.
+- Reste dans la fiction. Pas d'excuse, pas de commentaire méta, pas de mention du système, des prompts, du moteur, des tools, de MCP ou de l'IA.
+- Pas de Markdown, pas de liste, pas de titre, pas de didascalie entre parenthèses.
+- Ne donne pas de coordonnées ni d'ID technique sauf si le joueur les demande explicitement.
+- Ne termine pas par un menu d'options. Une question courte et naturelle est permise seulement si elle sert vraiment la scène.
+- Si une action est impossible ou refusée par les règles, formule-le en fiction et en une phrase.
+- Ne déclare jamais "fin de quête", "fin de campagne", "objectif accompli" ou une conclusion alternative sauf si le joueur demande explicitement d'arrêter.
 - Si le joueur annonce un plan long, accepte l'intention mais ne saute pas des heures ou des jours: narre seulement la prochaine minute jouable.
 
 RYTHME DE TABLE:
-- Court ne veut pas dire sec: vise 2-5 phrases courtes avec un mouvement, une reaction ou une information utile.
-- Evite les reponses purement atmospheriques. Chaque reponse doit faire avancer la scene, meme legerement.
-- Si un PNJ repond, donne une replique savoureuse ou une decision visible, pas seulement une description.
-- Si le joueur semble perdu, sois directif: donne la meilleure piste immediate en fiction et une pression claire.
-- Termine sur une situation qui appelle naturellement l'action du joueur, sans menu ni formule froide. Evite "que fais-tu ?" et "vous allez ou ?".
-- Si le joueur critique le style, la longueur, le systeme ou un bug, ne reponds pas a la critique et ne t'excuse pas: applique la correction silencieusement puis reprends la scene en fiction.
+- Court ne veut pas dire sec: vise 2-5 phrases courtes avec un mouvement, une réaction ou une information utile.
+- Évite les réponses purement atmosphériques. Chaque réponse doit faire avancer la scène, même légèrement.
+- Ajoute souvent une pression active: bruit qui se rapproche, porte qui cède, PNJ qui coupe la parole, trace fraîche, odeur nouvelle, minute qui file, danger hors champ.
+- Si un PNJ répond, donne une réplique savoureuse ou une décision visible, pas seulement une description.
+- Si le joueur semble perdu, relance par un événement de scène ou une piste évidente, sans lui donner d'ordre.
+- Termine sur une tension jouable, pas sur une formule froide. Évite "que fais-tu ?" et "vous allez où ?".
+- Si le joueur critique le style, la longueur, le système ou un bug, ne réponds pas à la critique et ne t'excuse pas: applique la correction silencieusement puis reprends la scène en fiction.
 
 PERSONNAGE:
 ${ctx.playerCharacter}
@@ -698,18 +701,19 @@ function buildSystemBlocks(
 }
 
 function buildNarrationStaticPrompt(): string {
-  return `Tu es le Dungeon Master d'une partie D&D 5e en francais.
-Narre uniquement la consequence immediate de l'action du joueur.
-Respecte strictement les resultats mecaniques fournis: jets, degats, morts, positions, tour courant.
-Ne lance aucun de, n'invente aucun nouvel ennemi, ne resous aucun tour futur.
-Reponse breve: 2-5 phrases courtes, present, style vivant mais clair.
-Format vocal: pas de Markdown, pas de liste, pas de titre, pas de parenthese, pas d'excuse, pas de commentaire meta, pas de mention du systeme, des prompts, du moteur, des tools, de MCP ou de l'IA.
-Ne donne pas de coordonnees ni d'ID technique sauf si le joueur les demande explicitement.
-Ne termine pas par un menu d'options. Evite "que fais-tu ?" et "vous allez ou ?"; prefere une pression concrete ou une piste directe.
-Ne declare pas de fin de quete/campagne ni de conclusion alternative sauf demande explicite. Pas de time-skip: seulement la prochaine minute jouable.
-Donne de l'elan: un mouvement, une replique, une menace, une opportunite ou une information exploitable. Evite les sorties qui ne font que decrire une ambiance.
-Si le joueur semble perdu, sois directif: indique la piste immediate la plus interessante en fiction.
-Si le joueur critique le style, la longueur, le systeme ou un bug, ne reponds pas a la critique: applique la correction silencieusement et reprends la scene en fiction.`
+  return `Tu es le Dungeon Master d'une partie D&D 5e en français.
+Narre uniquement la conséquence immédiate de l'action du joueur.
+Respecte strictement les résultats mécaniques fournis: jets, dégâts, morts, positions, tour courant.
+Ne lance aucun dé, n'invente aucun nouvel ennemi, ne résous aucun tour futur.
+Réponse brève: 2-5 phrases courtes, au présent, style vivant mais clair.
+Français naturel et correct: accents, accords simples, phrases propres. Pas de franglais gratuit.
+Format vocal: pas de Markdown, pas de liste, pas de titre, pas de parenthèse, pas d'excuse, pas de commentaire méta, pas de mention du système, des prompts, du moteur, des tools, de MCP ou de l'IA.
+Ne donne pas de coordonnées ni d'ID technique sauf si le joueur les demande explicitement.
+Ne termine pas par un menu d'options. Évite "que fais-tu ?" et "vous allez où ?"; préfère une tension concrète ou une piste en fiction.
+Ne déclare pas de fin de quête/campagne ni de conclusion alternative sauf demande explicite. Pas de time-skip: seulement la prochaine minute jouable.
+Donne de l'élan: un mouvement, une réplique, une menace, une opportunité ou une information exploitable. Évite les sorties qui ne font que décrire une ambiance.
+Si le joueur semble perdu, relance par un événement de scène ou une piste évidente, sans lui donner d'ordre.
+Si le joueur critique le style, la longueur, le système ou un bug, ne réponds pas à la critique: applique la correction silencieusement et reprends la scène en fiction.`
 }
 
 function buildNarrationSystemBlocks(
@@ -811,29 +815,29 @@ function getCurrentRoomName(gameState: GameState): string | null {
 function buildDirectiveSceneNarrative(gameState: GameState): string {
   if (gameState.phase === 'combat') {
     return gameState.currentTurn === 'player'
-      ? "Le combat est a toi. Choisis vite: frappe l'ennemi le plus proche, recule pour respirer, ou tente quelque chose de sale avec le decor."
-      : "Le combat continue sans pause. Reste en garde: ca va bouger autour de toi."
+      ? "Le combat se resserre autour de toi. L'ennemi le plus proche baisse sa garde une fraction de seconde, tandis qu'une échappée s'ouvre près du décor."
+      : "Le combat continue sans pause. Quelque chose heurte le sol derrière toi, et l'air se charge d'une menace immédiate."
   }
 
   switch (gameState.currentRoomId) {
     case '1':
-      return "Tu es devant la boulangerie. La grande porte mene droit a l'entree; sur le flanc, le quai de chargement promet une approche plus risquee. Si tu veux trouver les gobelins, entre maintenant ou contourne par le quai."
+      return "La façade de la boulangerie grince sous le vent. Derrière la grande porte, un choc sourd répond presque à ton souffle; sur le flanc, le quai de chargement reste entrouvert dans l'ombre."
     case '2':
-      return "Tu es dans le verger. Les arbres cachent des angles morts, mais la piste chaude repart vers le batiment. Choisis: fouiller les pommiers, revenir vers l'entree, ou longer le mur vers le quai."
+      return "Dans le verger, les branches se referment comme des doigts au-dessus de toi. Une pomme tombe seule dans l'herbe, puis roule vers le mur de la boulangerie où la piste devient plus fraîche."
     case '3':
-      return "Tu es pres du tas de dechets. Ca sent mauvais et ca remue peut-etre sous les gravats, mais la vraie piste mene encore vers la boulangerie. Fouille le tas si tu oses, sinon reviens vers l'entree."
+      return "Le tas de déchets soupire sous les gravats, avec une odeur aigre de cave humide. Un éclat métallique dépasse près de ta botte, tandis que la boulangerie craque plus loin."
     case '4':
-      return "Tu es dans l'entree. Les traces les plus fraiches partent vers les fours, et l'appartement de Grammy sent la taniere occupee. Si tu veux de l'action, pousse vers le sol de la boulangerie; si tu veux le chef, vise l'appartement."
+      return "Dans l'entrée, les traces les plus fraîches rayent la poussière vers les fours. Au-dessus, l'appartement de Grammy laisse filtrer une odeur de fourrure et de viande sèche."
     case '5':
-      return "Tu es dans le bureau. Les papiers peuvent donner une piste, mais le danger est ailleurs. Fouille vite les registres, puis repars vers l'entree ou l'appartement."
+      return "Le bureau semble mort, mais un tiroir mal fermé tremble encore contre le bois. Entre deux registres moisis, un papier plus récent dépasse, taché de sucre et de boue."
     case '7':
-      return "Tu es au quai de chargement. La porte laterale donne sur le sol de la boulangerie, parfait pour surprendre ce qui traine dedans. Ouvre, observe une seconde, puis entre franchement."
+      return "Au quai de chargement, la porte latérale bat doucement contre son rail. De l'autre côté, les fours claquent dans le noir comme des mâchoires mal réglées."
     case '8':
-      return "Tu es au sol de la boulangerie. Les fours claquent, les poutres grincent, et la reserve pue la farine rance. Prends l'initiative: fouille les fours, ouvre la reserve, ou grimpe vers les poutres."
+      return "Au sol de la boulangerie, les fours claquent et les poutres grincent au-dessus de toi. La réserve pue la farine rance, et quelque chose vient de faire tomber un moule derrière une table renversée."
     case '9':
-      return "Tu es dans l'appartement de Grammy. Ici, ca sent la fourrure, la viande sechee et l'autorite brutale. Si tu veux negocier, parle fort; si tu veux survivre, garde ta lame prete."
+      return "Dans l'appartement de Grammy, l'odeur de fourrure et de viande séchée colle aux rideaux. Un trophée mal fixé pivote sur le mur, comme si quelqu'un venait juste de le frôler."
     default:
-      return "La piste est confuse, mais pas morte. Reviens vers l'entree, cherche une porte claire, ou annonce franchement ce que tu veux obtenir."
+      return "La piste se brouille, mais elle n'est pas morte. Un courant d'air froid file le long du sol et désigne une ouverture que tu n'avais pas remarquée."
   }
 }
 
@@ -848,7 +852,7 @@ function buildOralFallbackNarrative(gameState: GameState, toolsUsed: string[]): 
 
   if (gameState.phase === 'combat') {
     return gameState.currentTurn === 'player'
-      ? "Le combat se resserre autour de toi; l'ouverture est a toi."
+      ? "Le combat se resserre autour de toi; l'ouverture est à toi."
       : "Le combat continue dans une tension brutale."
   }
 
@@ -1019,7 +1023,7 @@ function normalizeNarrativeForOralPlayback(
     sentences = splitIntoSentences(text)
   }
 
-  if (sentences.length > ORAL_NARRATION_MAX_SENTENCES) {
+  if (text.length > ORAL_NARRATION_MAX_CHARS && sentences.length > ORAL_NARRATION_MAX_SENTENCES) {
     text = sentences.slice(0, ORAL_NARRATION_MAX_SENTENCES).join(' ')
     reasons.add('sentence_limit_applied')
   }
@@ -1268,14 +1272,14 @@ function detectDirectiveGuidanceRequest(message: string): boolean {
 }
 
 function buildDebugStateNarrative(gameState: GameState): string {
-  const roomName = getCurrentRoomName(gameState) ?? 'une zone non identifiee'
+  const roomName = getCurrentRoomName(gameState) ?? 'une zone non identifiée'
   const position = gameState.player.position
   const aliveCount = countAliveMonsters(gameState)
   const monsterText = aliveCount > 0
-    ? `${aliveCount} ennemi${aliveCount > 1 ? 's' : ''} actif${aliveCount > 1 ? 's' : ''} existe${aliveCount > 1 ? 'nt' : ''} dans l'etat de jeu.`
-    : "Aucun ennemi actif n'existe dans l'etat de jeu."
+    ? `${aliveCount} ennemi${aliveCount > 1 ? 's' : ''} actif${aliveCount > 1 ? 's' : ''} existe${aliveCount > 1 ? 'nt' : ''} dans l'état de jeu.`
+    : "Aucun ennemi actif n'existe dans l'état de jeu."
 
-  return `Cote serveur, ton pion est dans ${roomName}, case x ${position.x}, y ${position.y}. ${monsterText} Si l'ecran montre autre chose, l'affichage client est en retard.`
+  return `Côté serveur, ton pion est dans ${roomName}, case x ${position.x}, y ${position.y}. ${monsterText} Si l'écran montre autre chose, l'affichage client est en retard.`
 }
 
 function parseCoordinateMove(message: string, gameState: GameState): { x: number; y: number } | null {
@@ -2010,7 +2014,7 @@ async function resolveNpcTurnsUntilPlayerTurn(
 }
 
 function formatCombatLogEntries(entries: CombatLogEntry[]): string {
-  if (entries.length === 0) return 'Aucun nouveau log mecanique.'
+  if (entries.length === 0) return 'Aucun nouveau log mécanique.'
   return entries.map(entry => {
     const detail = entry.mechanicalDetail ? ` | ${entry.mechanicalDetail}` : ''
     return `- Round ${entry.round}, ${entry.turn}: ${entry.action}${detail}`
@@ -2055,9 +2059,9 @@ async function generateFinalNarration(
 
   const finalPrompt = [
     `Action du joueur:\n${playerMessage}`,
-    draftNarrative ? `Brouillon narratif precedent, potentiellement incomplet:\n${draftNarrative}` : undefined,
-    `Resultats mecaniques faisant autorite:\n${formatCombatLogEntries(newCombatLogEntries)}`,
-    `Ecris la reponse finale au joueur en francais, au present, en 2-5 phrases courtes. Elle doit etre naturelle a l'oral et donner de l'elan: mouvement, replique, menace, opportunite ou information exploitable. Respecte strictement les resultats mecaniques. N'annonce aucune action future non resolue. Pas de Markdown, pas de liste, pas de parenthese, pas d'excuse, pas de meta, pas de menu, pas de mention du systeme, du moteur, des tools, de MCP ou de l'IA. Pas de coordonnees ni d'ID technique sauf demande explicite du joueur. Ne declare pas de fin de quete/campagne ni de conclusion alternative sauf demande explicite. Pas de time-skip: seulement la prochaine minute jouable. Si le joueur critique le style, la longueur, le systeme ou un bug, ne reponds pas a la critique: applique la correction silencieusement et reprends la scene en fiction.`,
+    draftNarrative ? `Brouillon narratif précédent, potentiellement incomplet:\n${draftNarrative}` : undefined,
+    `Résultats mécaniques faisant autorité:\n${formatCombatLogEntries(newCombatLogEntries)}`,
+    `Écris la réponse finale au joueur en français correct, au présent, en 2-5 phrases courtes. Elle doit être naturelle à l'oral et donner de l'élan: mouvement, réplique, menace, opportunité ou information exploitable. Respecte strictement les résultats mécaniques. N'annonce aucune action future non résolue. Pas de Markdown, pas de liste, pas de parenthèse, pas d'excuse, pas de méta, pas de menu, pas de mention du système, du moteur, des tools, de MCP ou de l'IA. Pas de coordonnées ni d'ID technique sauf demande explicite du joueur. Ne déclare pas de fin de quête/campagne ni de conclusion alternative sauf demande explicite. Pas de time-skip: seulement la prochaine minute jouable. Si le joueur critique le style, la longueur, le système ou un bug, ne réponds pas à la critique: applique la correction silencieusement et reprends la scène en fiction.`,
   ].filter(Boolean).join('\n\n')
 
   try {

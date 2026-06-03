@@ -30,13 +30,13 @@ export interface EncounterDefinition {
 }
 
 export const ADVENTURE_ROOMS: AdventureRoom[] = [
-  { id: '1', name: 'Entree exterieure', zone: { minX: 3, maxX: 16, minY: 13, maxY: 14 } },
-  { id: '2', name: 'Verger de Pommiers', zone: { minX: 3, maxX: 15, minY: 1, maxY: 2 } },
-  { id: '3', name: 'Tas de Dechets', zone: { minX: 12, maxX: 13, minY: 5, maxY: 7 } },
-  { id: '4', name: "L'entree", zone: { minX: 10, maxX: 13, minY: 9, maxY: 12 } },
+  { id: '1', name: 'Entrée extérieure', zone: { minX: 3, maxX: 16, minY: 13, maxY: 14 } },
+  { id: '2', name: 'Verger de pommiers', zone: { minX: 3, maxX: 15, minY: 1, maxY: 2 } },
+  { id: '3', name: 'Tas de déchets', zone: { minX: 12, maxX: 13, minY: 5, maxY: 7 } },
+  { id: '4', name: "L'entrée", zone: { minX: 10, maxX: 13, minY: 9, maxY: 12 } },
   { id: '5', name: 'Le Bureau', zone: { minX: 5, maxX: 6, minY: 8, maxY: 11 } },
-  { id: '7', name: 'Quai de Chargement', zone: { minX: 3, maxX: 5, minY: 5, maxY: 7 } },
-  { id: '8', name: 'Sol de la Boulangerie', zone: { minX: 6, maxX: 11, minY: 5, maxY: 8 } },
+  { id: '7', name: 'Quai de chargement', zone: { minX: 3, maxX: 5, minY: 5, maxY: 7 } },
+  { id: '8', name: 'Sol de la boulangerie', zone: { minX: 6, maxX: 11, minY: 5, maxY: 8 } },
   { id: '9', name: "Appartement de Grammy", zone: { minX: 7, maxX: 9, minY: 8, maxY: 11 } },
 ]
 
