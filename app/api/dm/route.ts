@@ -7,7 +7,7 @@ import { loadContextFiles } from '@/lib/context-loader'
 import { callMCPTool, listMCPTools } from '@/lib/mcp-client'
 import { loadSession, saveSession } from '@/lib/session-store'
 import { acquireSessionLock } from '@/lib/session-lock'
-import { inferAdventureRoomId as inferMappedAdventureRoomId } from '@/lib/adventure-map'
+import { ADVENTURE_ROOMS, inferAdventureRoomId as inferMappedAdventureRoomId } from '@/lib/adventure-map'
 import { DMRequest, DMResponse, GameState, ConversationTurn, CombatLogEntry, MonsterState } from '@/lib/types'
 import {
   logAnthropicUsage,
@@ -875,10 +875,13 @@ function detectRequiredMechanicalAction(message: string, gameState: GameState): 
   }
 
   const attackIntent = /\b(attaque|attaquer|frappe|frapper|tape|coup|assene|charge|tire|lance)\b/.test(text)
-  const baseMovementIntent = /\b(deplaces?|deplacer|avances?|avancer|bouges?|bouger|vais|aller|va |entres?|entrer|rentres?|traverses?|approches?|explores?|explorer|fuis|fuite|recules?|ouvres?|ouvrir|enfonces?|enfoncer|portes?|glisses?|glisser)\b/.test(text)
+  const baseMovementIntent = /\b(deplaces?|deplacer|avances?|avancer|bouges?|bouger|vais|aller|va |vers|entres?|entrer|rentres?|traverses?|approches?|explores?|explorer|fuis|fuite|recules?|ouvres?|ouvrir|enfonces?|enfoncer|portes?|glisses?|glisser)\b/.test(text)
   const followIntent = /\b(suis|suivre|poursuis|poursuivre)\b/.test(text) && /\b(gobelins?|ennemis?|monstres?|creatures?|silhouettes?|eux|traces?)\b/.test(text)
   const movementIntent = baseMovementIntent || followIntent
-  const encounterIntent = /\b(combat|ennemis?|gobelins?|monstres?|creatures?|silhouettes?|eclaireurs?|apparaitre|spawn|carte|initiative|debarques?|perissez|fuyez)\b/.test(text)
+  const mentionsCreature = /\b(ennemis?|gobelins?|monstres?|creatures?|silhouettes?|eclaireurs?)\b/.test(text)
+  const explicitEncounterIntent = /\b(combat|apparaitre|spawn|carte|initiative|debarques?|perissez|fuyez)\b/.test(text)
+  const hostileCreatureIntent = mentionsCreature && /\b(attaquent?|attaquer|hostiles?|menacent?|chargent?|surgissent?|arrivent?|debarquent?|foncent?|encerclent?)\b/.test(text)
+  const encounterIntent = explicitEncounterIntent || hostileCreatureIntent
 
   if (gameState.phase === 'combat' && gameState.currentTurn === 'player' && attackIntent) {
     return { reason: 'player-combat-attack-intent', suggestedTools: ['resolve_player_attack', 'move_token'] }
@@ -920,6 +923,39 @@ function parseCoordinateMove(message: string, gameState: GameState): { x: number
   if (x === gameState.player.position.x && y === gameState.player.position.y) return null
 
   return { x, y }
+}
+
+function centerCellForRoom(roomId: string): { x: number; y: number } | null {
+  const room = ADVENTURE_ROOMS.find(candidate => candidate.id === roomId)
+  if (!room) return null
+
+  return {
+    x: Math.round((room.zone.minX + room.zone.maxX) / 2),
+    y: Math.round((room.zone.minY + room.zone.maxY) / 2),
+  }
+}
+
+function parseNamedRoomMove(message: string, gameState: GameState): { x: number; y: number } | null {
+  const text = normalizeFrenchText(message)
+  if (!/\b(vers|vais|aller|va |deplace|rends|rejoint|entre|entrer|salle|piece|bureau|appartement|boulangerie|quai|verger)\b/.test(text)) {
+    return null
+  }
+
+  const roomAliases: Array<[string, RegExp]> = [
+    ['5', /\b(bureau|bureau de grammy)\b/],
+    ['9', /\b(appartement|appartement de grammy)\b/],
+    ['8', /\b(sol de la boulangerie|boulangerie|four|cuisine)\b/],
+    ['7', /\b(quai|chargement|dock)\b/],
+    ['2', /\b(verger|pommiers?|pommier|arbres?)\b/],
+    ['3', /\b(dechets?|tas|champignons?|fungus)\b/],
+    ['4', /\b(entree|hall)\b/],
+    ['1', /\b(exterieur|dehors|sortie)\b/],
+  ]
+
+  const targetRoomId = roomAliases.find(([, pattern]) => pattern.test(text))?.[0]
+  if (!targetRoomId || targetRoomId === gameState.currentRoomId) return null
+
+  return centerCellForRoom(targetRoomId)
 }
 
 function parseTargetHint(message: string): PlayerAttackTargetHint | null {
@@ -1018,7 +1054,7 @@ async function resolveServerFirstAction(
     toolName = 'pass_turn'
     input = { reason: 'Le joueur attend et passe son tour.' }
   } else {
-    const toCell = parseCoordinateMove(message, gameState)
+    const toCell = parseCoordinateMove(message, gameState) ?? parseNamedRoomMove(message, gameState)
     if (toCell) {
       toolName = 'move_token'
       input = { tokenId: 'player', toCell }
