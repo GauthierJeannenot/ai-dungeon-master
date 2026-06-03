@@ -1,3 +1,5 @@
+import { logEvent } from './server-logger'
+
 interface CacheCreationUsage {
   ephemeral_5m_input_tokens?: number | null
   ephemeral_1h_input_tokens?: number | null
@@ -110,7 +112,7 @@ export function logAnthropicUsage({
     metadata,
   }
 
-  console.info('[anthropic-usage]', JSON.stringify(entry))
+  logEvent('info', 'anthropic.usage', { ...entry })
   return entry
 }
 
@@ -142,10 +144,10 @@ export function logAnthropicUsageSummary(
     }
   )
 
-  console.info('[anthropic-usage-summary]', JSON.stringify({
+  logEvent('info', 'anthropic.usage_summary', {
     requestId,
     ...summary,
     estimatedCostUsd: roundUsd(summary.estimatedCostUsd),
     metadata,
-  }))
+  })
 }
