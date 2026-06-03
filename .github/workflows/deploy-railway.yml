@@ -24,6 +24,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          fetch-depth: 0
 
       - name: Skip Railway CLI deploy when token is missing
         if: env.RAILWAY_TOKEN == ''
@@ -35,6 +38,30 @@ jobs:
         if: env.RAILWAY_TOKEN != ''
         run: npm install -g @railway/cli
 
+      - name: Build Railway deployment message
+        id: deploy_meta
+        if: env.RAILWAY_TOKEN != ''
+        shell: bash
+        env:
+          DEPLOY_BRANCH: ${{ github.event.workflow_run.head_branch || github.ref_name }}
+        run: |
+          short_sha="$(git rev-parse --short HEAD)"
+          subject="$(git log -1 --pretty=%s)"
+          message="${short_sha} ${subject}"
+          if [ -n "$DEPLOY_BRANCH" ]; then
+            message="${DEPLOY_BRANCH}: ${message}"
+          fi
+
+          {
+            echo "message<<EOF"
+            echo "$message"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "Railway deployment: $message" >> "$GITHUB_STEP_SUMMARY"
+
       - name: Deploy to Railway
         if: env.RAILWAY_TOKEN != ''
-        run: railway up --detach --service ai-dungeon-master
+        env:
+          RAILWAY_DEPLOY_MESSAGE: ${{ steps.deploy_meta.outputs.message }}
+        run: railway up --detach --service ai-dungeon-master --message "$RAILWAY_DEPLOY_MESSAGE"
