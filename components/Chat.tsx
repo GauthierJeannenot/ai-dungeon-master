@@ -67,6 +67,9 @@ const VOICE_LANGUAGE = 'fr-FR'
 const MAX_SPOKEN_SENTENCES = 3
 const MAX_SPOKEN_CHARS = 360
 const MAX_SPEECH_SEGMENT_CHARS = 180
+const MAX_RECOGNITION_AUTO_RESTARTS = 20
+const MAX_RECOGNITION_SESSION_MS = 120_000
+const RECOGNITION_RESTART_DELAY_MS = 160
 
 const PLACEHOLDERS = {
   combat: [
@@ -305,6 +308,10 @@ export default function Chat({
   const recognitionEngineRef = useRef<string | undefined>(undefined)
   const lastSpokenMessageIdRef = useRef<string | null>(null)
   const speechRunIdRef = useRef(0)
+  const keepRecognitionAliveRef = useRef(false)
+  const manualStopRequestedRef = useRef(false)
+  const recognitionRestartCountRef = useRef(0)
+  const recognitionStartedAtRef = useRef(0)
 
   const [recognitionSupported, setRecognitionSupported] = useState(false)
   const [speechSynthesisSupported, setSpeechSynthesisSupported] = useState(false)
@@ -448,6 +455,8 @@ export default function Chat({
     })
 
     return () => {
+      keepRecognitionAliveRef.current = false
+      manualStopRequestedRef.current = true
       recognitionRef.current?.abort()
       if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
         window.speechSynthesis.removeEventListener('voiceschanged', refreshVoices)
@@ -551,9 +560,13 @@ export default function Chat({
 
   function handleMicClick() {
     if (isListening) {
+      keepRecognitionAliveRef.current = false
+      manualStopRequestedRef.current = true
       recognitionRef.current?.stop()
       logVoiceEvent('client.voice.recognition.stop_requested', {
-        reason: 'player_clicked_stop',
+        reason: 'player_clicked_send',
+        transcriptChars: finalTranscriptRef.current.length,
+        previewChars: speechPreviewRef.current.length,
       })
       return
     }
@@ -583,12 +596,16 @@ export default function Chat({
 
     const recognition = new RecognitionConstructor()
     recognition.lang = VOICE_LANGUAGE
-    recognition.continuous = false
+    recognition.continuous = true
     recognition.interimResults = true
     recognition.maxAlternatives = 1
 
     finalTranscriptRef.current = ''
     speechPreviewRef.current = ''
+    keepRecognitionAliveRef.current = true
+    manualStopRequestedRef.current = false
+    recognitionRestartCountRef.current = 0
+    recognitionStartedAtRef.current = Date.now()
     setSpeechPreview('')
     setVoiceError(null)
     recognitionRef.current = recognition
@@ -646,19 +663,64 @@ export default function Chat({
             ? 'Rien entendu.'
             : 'Micro interrompu.'
 
-      setVoiceError(message)
+      const canRecoverFromNoSpeech =
+        code === 'no-speech' &&
+        keepRecognitionAliveRef.current &&
+        !manualStopRequestedRef.current
+      if (!canRecoverFromNoSpeech) setVoiceError(message)
       logVoiceEvent('client.voice.recognition.error', {
         provider: 'browser-speech-recognition',
         error: code,
         message: event.message,
+        autoRestartPending: keepRecognitionAliveRef.current && !manualStopRequestedRef.current,
       })
     }
 
     recognition.onend = () => {
+      const transcript = finalTranscriptRef.current || speechPreviewRef.current
+      const sessionAgeMs = Date.now() - recognitionStartedAtRef.current
+      const shouldAutoRestart =
+        keepRecognitionAliveRef.current &&
+        !manualStopRequestedRef.current &&
+        !isLoading &&
+        recognitionRestartCountRef.current < MAX_RECOGNITION_AUTO_RESTARTS &&
+        sessionAgeMs < MAX_RECOGNITION_SESSION_MS
+
+      if (shouldAutoRestart) {
+        recognitionRestartCountRef.current += 1
+        logVoiceEvent('client.voice.recognition.auto_restart', {
+          provider: 'browser-speech-recognition',
+          restartCount: recognitionRestartCountRef.current,
+          transcriptChars: transcript.trim().length,
+          sessionAgeMs,
+        })
+
+        window.setTimeout(() => {
+          if (!keepRecognitionAliveRef.current || manualStopRequestedRef.current || isLoading) return
+
+          try {
+            recognition.start()
+          } catch (err) {
+            keepRecognitionAliveRef.current = false
+            recognitionRef.current = null
+            setIsListening(false)
+            const message = err instanceof Error ? err.message : 'Erreur micro.'
+            setVoiceError(message)
+            logVoiceEvent('client.voice.recognition.restart_failed', {
+              provider: 'browser-speech-recognition',
+              restartCount: recognitionRestartCountRef.current,
+              error: message,
+            })
+            completeVoiceTurn(transcript)
+          }
+        }, RECOGNITION_RESTART_DELAY_MS)
+        return
+      }
+
       setIsListening(false)
       recognitionRef.current = null
-
-      const transcript = finalTranscriptRef.current
+      keepRecognitionAliveRef.current = false
+      manualStopRequestedRef.current = false
       finalTranscriptRef.current = ''
       speechPreviewRef.current = ''
       setSpeechPreview('')
@@ -666,6 +728,9 @@ export default function Chat({
       logVoiceEvent('client.voice.recognition.ended', {
         provider: 'browser-speech-recognition',
         transcriptChars: transcript.trim().length,
+        restartCount: recognitionRestartCountRef.current,
+        sessionAgeMs,
+        reason: sessionAgeMs >= MAX_RECOGNITION_SESSION_MS ? 'session_limit' : 'player_sent',
       })
       completeVoiceTurn(transcript)
     }
@@ -687,7 +752,7 @@ export default function Chat({
   const voiceStatus = voiceError
     ? voiceError
     : isListening
-      ? speechPreview || "Je t'ecoute. Lance ton plan."
+      ? speechPreview || "Je t'ecoute. Clique Envoyer quand tu as fini."
       : speechPreview || "Osez le plan bancal. Les des adorent le chaos."
 
   return (
@@ -746,7 +811,7 @@ export default function Chat({
                 : 'border-blue-500/50 bg-blue-950/60 text-blue-100 hover:bg-blue-900/70'
             } disabled:opacity-40`}
           >
-            {isListening ? 'Stop' : 'Mic'}
+            {isListening ? 'Envoyer' : 'Mic'}
           </button>
         </div>
       </div>
