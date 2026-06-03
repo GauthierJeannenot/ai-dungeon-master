@@ -14,6 +14,7 @@ const MODEL = 'claude-haiku-4-5'
 const MAX_TOOL_ITERATIONS = 3
 const MAX_TOKENS = 400
 const COMBAT_LOG_TAIL = 6
+const INTERNAL_MCP_TOOLS = new Set(['replace_game_state'])
 
 // Nombre de messages récents conservés verbatim avant compression.
 // Au-delà, les plus anciens sont résumés en un paragraphe.
@@ -25,14 +26,16 @@ const HISTORY_COMPRESS_THRESHOLD_CHARS = 6000
 // ── Cache des tools MCP ───────────────────────────────────────────────────────
 let cachedMcpTools: Anthropic.Tool[] | null = null
 
-async function getMcpTools(): Promise<Anthropic.Tool[]> {
+async function getMcpTools(sessionId: string | undefined): Promise<Anthropic.Tool[]> {
   if (cachedMcpTools) return cachedMcpTools
-  const raw = await listMCPTools()
-  cachedMcpTools = raw.map(t => ({
-    name: t.name,
-    description: t.description,
-    input_schema: t.inputSchema as Anthropic.Tool['input_schema'],
-  }))
+  const raw = await listMCPTools(sessionId)
+  cachedMcpTools = raw
+    .filter(t => !INTERNAL_MCP_TOOLS.has(t.name))
+    .map(t => ({
+      name: t.name,
+      description: t.description,
+      input_schema: t.inputSchema as Anthropic.Tool['input_schema'],
+    }))
   return cachedMcpTools
 }
 
@@ -194,11 +197,35 @@ function buildSystemBlocks(
   ]
 }
 
+async function syncMCPState(gameState: GameState, sessionId: string | undefined): Promise<GameState> {
+  try {
+    return await callMCPTool('replace_game_state', { gameState }, sessionId) as GameState
+  } catch (err) {
+    console.error('Full MCP state sync failed, falling back to token positions:', err)
+  }
+
+  await callMCPTool('move_token', {
+    tokenId: 'player',
+    toCell: gameState.player.position,
+  }, sessionId)
+
+  for (const [id, monster] of Object.entries(gameState.monsters)) {
+    if (monster.isAlive) {
+      await callMCPTool('move_token', {
+        tokenId: id,
+        toCell: monster.position,
+      }, sessionId)
+    }
+  }
+
+  return gameState
+}
+
 // ── Handler principal ─────────────────────────────────────────────────────────
 export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
     const body: DMRequest = await req.json()
-    const { message, gameState, history = [], summaryContext } = body
+    const { message, gameState, history = [], summaryContext, sessionId } = body
 
     if (!message?.trim()) {
       return NextResponse.json({ error: 'Message requis' }, { status: 400 })
@@ -209,32 +236,24 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     let mcpTools: Anthropic.Tool[] = []
     try {
-      mcpTools = await getMcpTools()
+      mcpTools = await getMcpTools(sessionId)
     } catch (err) {
       console.error('Failed to load MCP tools:', err)
     }
 
-    if (!currentGameState) {
+    if (currentGameState) {
       try {
-        currentGameState = await callMCPTool('get_game_state', {}) as GameState
+        currentGameState = await syncMCPState(currentGameState, sessionId)
+      } catch {
+        return NextResponse.json({ error: 'Serveur MCP non disponible.' }, { status: 503 })
+      }
+    } else {
+      try {
+        currentGameState = await callMCPTool('get_game_state', {}, sessionId) as GameState
       } catch {
         return NextResponse.json({ error: 'Serveur MCP non disponible.' }, { status: 503 })
       }
     }
-
-    // Sync MCP server avec l'état frontend
-    try {
-      await callMCPTool('move_token', {
-        tokenId: 'player',
-        x: currentGameState.player.position.x,
-        y: currentGameState.player.position.y,
-      })
-      for (const [id, monster] of Object.entries(currentGameState.monsters)) {
-        if (monster.isAlive) {
-          await callMCPTool('move_token', { tokenId: id, x: monster.position.x, y: monster.position.y })
-        }
-      }
-    } catch { /* non bloquant */ }
 
     // ── Traitement de l'historique ──────────────────────────────────────────
     const { recent: recentHistory, newSummary } = await processHistory(history, summaryContext)
@@ -284,7 +303,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         for (const toolUse of toolUseBlocks) {
           toolsUsed.push(toolUse.name)
           try {
-            const result = await callMCPTool(toolUse.name, toolUse.input as Record<string, unknown>)
+            const result = await callMCPTool(toolUse.name, toolUse.input as Record<string, unknown>, sessionId)
             toolResults.push({
               type: 'tool_result',
               tool_use_id: toolUse.id,
@@ -327,7 +346,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     try {
-      currentGameState = await callMCPTool('get_game_state', {}) as GameState
+      currentGameState = await callMCPTool('get_game_state', {}, sessionId) as GameState
     } catch { /* garde l'état qu'on avait */ }
 
     const dmResponse: DMResponse = {

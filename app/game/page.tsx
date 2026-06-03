@@ -20,7 +20,7 @@ const INITIAL_GAME_STATE: GameState = {
     ac: 16,
     stats: { str: 16, dex: 12, con: 14, int: 10, wis: 12, cha: 10 },
     proficiencyBonus: 2,
-    position: { x: 10, y: 13 },  // Chemin d'entrée — à côté de Mac le Tréant (bas-gauche)
+    position: { x: 4, y: 13 },  // Chemin d'entrée — à côté de Mac le Tréant (bas-gauche)
     conditions: [],
     speed: 30,
     inventory: [
@@ -42,6 +42,60 @@ function generateId(): string {
   return `msg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
 }
 
+const SESSION_KEYS = {
+  sessionId: 'ai-dm-session-id',
+  gameState: 'ai-dm-game-state',
+  messages: 'ai-dm-messages',
+  summaryContext: 'ai-dm-summary-context',
+}
+
+const WELCOME_MESSAGE =
+  'Le vieux sorcier Tyndareus le Vert vous a confié une mission des plus… particulières. Sa carte en main, vous avez chevauché deux jours jusqu\'à cette bâtisse en pierre abandonnée au bout d\'un chemin de gravier envahi par les herbes folles. L\'odeur vous a frappé bien avant que le bâtiment n\'apparaisse : cannelle, muscade, pommes mûres — un parfum presque magique qui flotte dans l\'air chaud. Devant vous se dressent de grandes portes en bois doubles, à moitié vermoulues. Sur le chemin, un immense pommier aux branches noueuses vous observe… ou du moins, c\'est l\'impression que donne son écorce ridée. Bienvenue à la Boulangerie de Grammy. Que faites-vous ?'
+
+function createWelcomeMessage(): ChatMessage {
+  return {
+    id: generateId(),
+    role: 'dm',
+    content: WELCOME_MESSAGE,
+    timestamp: Date.now(),
+  }
+}
+
+function createSessionId(): string {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return crypto.randomUUID()
+  }
+  return `session-${Date.now()}-${Math.random().toString(36).slice(2)}`
+}
+
+function getOrCreateSessionId(): string {
+  try {
+    const existing = sessionStorage.getItem(SESSION_KEYS.sessionId)
+    if (existing) return existing
+
+    const next = createSessionId()
+    sessionStorage.setItem(SESSION_KEYS.sessionId, next)
+    return next
+  } catch {
+    return createSessionId()
+  }
+}
+
+function readSessionJson<T>(key: string): T | null {
+  try {
+    const raw = sessionStorage.getItem(key)
+    return raw ? JSON.parse(raw) as T : null
+  } catch {
+    return null
+  }
+}
+
+function writeSessionJson(key: string, value: unknown): void {
+  try {
+    sessionStorage.setItem(key, JSON.stringify(value))
+  } catch { /* storage unavailable */ }
+}
+
 function phaseLabel(phase: GameState['phase']): { label: string; color: string } {
   switch (phase) {
     case 'combat': return { label: 'COMBAT', color: 'text-red-400' }
@@ -56,24 +110,52 @@ export default function GamePage() {
   const [isLoading, setIsLoading] = useState(false)
   const [inputValue, setInputValue] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [sessionId, setSessionId] = useState<string | null>(null)
+  const [hasLoadedSession, setHasLoadedSession] = useState(false)
   // Résumé compressé des échanges anciens — stocké ici, renvoyé à chaque requête
   const [summaryContext, setSummaryContext] = useState<string | undefined>(undefined)
 
-  // Welcome message
+  // Restore the per-tab session after hydration. sessionStorage keeps refreshes coherent
+  // while still isolating separate browser tabs from one another.
   useEffect(() => {
-    setMessages([{
-      id: generateId(),
-      role: 'dm',
-      content: 'Le vieux sorcier Tyndareus le Vert vous a confié une mission des plus… particulières. Sa carte en main, vous avez chevauché deux jours jusqu\'à cette bâtisse en pierre abandonnée au bout d\'un chemin de gravier envahi par les herbes folles. L\'odeur vous a frappé bien avant que le bâtiment n\'apparaisse : cannelle, muscade, pommes mûres — un parfum presque magique qui flotte dans l\'air chaud. Devant vous se dressent de grandes portes en bois doubles, à moitié vermoulues. Sur le chemin, un immense pommier aux branches noueuses vous observe… ou du moins, c\'est l\'impression que donne son écorce ridée. Bienvenue à la Boulangerie de Grammy. Que faites-vous ?',
-      timestamp: Date.now(),
-    }])
+    const restoredSessionId = getOrCreateSessionId()
+    const restoredGameState = readSessionJson<GameState>(SESSION_KEYS.gameState)
+    const restoredMessages = readSessionJson<ChatMessage[]>(SESSION_KEYS.messages)
+
+    setSessionId(restoredSessionId)
+    if (restoredGameState) setGameState(restoredGameState)
+    setMessages(restoredMessages?.length ? restoredMessages : [createWelcomeMessage()])
+
+    try {
+      setSummaryContext(sessionStorage.getItem(SESSION_KEYS.summaryContext) ?? undefined)
+    } catch { /* storage unavailable */ }
+
+    setHasLoadedSession(true)
   }, [])
 
+  useEffect(() => {
+    if (!hasLoadedSession) return
+
+    writeSessionJson(SESSION_KEYS.gameState, gameState)
+    writeSessionJson(SESSION_KEYS.messages, messages)
+
+    try {
+      if (summaryContext) {
+        sessionStorage.setItem(SESSION_KEYS.summaryContext, summaryContext)
+      } else {
+        sessionStorage.removeItem(SESSION_KEYS.summaryContext)
+      }
+    } catch { /* storage unavailable */ }
+  }, [gameState, hasLoadedSession, messages, summaryContext])
+
   const sendMessage = useCallback(async (text: string) => {
-    if (isLoading) return
+    if (isLoading || !hasLoadedSession) return
     setError(null)
     setIsLoading(true)
     setInputValue('')
+
+    const activeSessionId = sessionId ?? getOrCreateSessionId()
+    if (!sessionId) setSessionId(activeSessionId)
 
     // Add player message immediately
     const playerMsg: ChatMessage = {
@@ -96,6 +178,7 @@ export default function GamePage() {
 
       const body: DMRequest = {
         message: text,
+        sessionId: activeSessionId,
         gameState,
         history,
         summaryContext,
@@ -164,7 +247,7 @@ export default function GamePage() {
     } finally {
       setIsLoading(false)
     }
-  }, [isLoading, gameState])
+  }, [gameState, hasLoadedSession, isLoading, messages, sessionId, summaryContext])
 
   const { label: phaseText, color: phaseColor } = phaseLabel(gameState.phase)
 
@@ -210,7 +293,7 @@ export default function GamePage() {
           <div className="flex-1 min-h-0">
             <Chat
               messages={messages}
-              isLoading={isLoading}
+              isLoading={isLoading || !hasLoadedSession}
               onSendMessage={sendMessage}
               inputValue={inputValue}
               onInputChange={setInputValue}

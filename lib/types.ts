@@ -129,6 +129,8 @@ export interface ConversationTurn {
 // API request/response types
 export interface DMRequest {
   message: string
+  // Per-tab browser session used to isolate MCP game state on the server.
+  sessionId?: string
   gameState?: GameState
   // Historique récent gardé verbatim (derniers N messages player/dm)
   history?: ConversationTurn[]

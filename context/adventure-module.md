@@ -48,7 +48,7 @@ Légende : QDC=Quai de chargement | BSF=Sol boulangerie | TAS=Tas déchets | Ver
 
 | Depuis → Vers | Coordonnée d'arrivée | Condition |
 |---------------|---------------------|-----------|
-| Départ (extérieur) | (9, 13) | Position initiale — à côté de Mac |
+| Départ (extérieur) | (4, 13) | Position initiale — chemin d'entrée, à côté de Mac |
 | Extérieur → Entrée | (11, 13) | double porte vers l'entrée |
 | Entrée → Sol boulangerie | (11, 9) | double porte au nord de l'entrée |
 | Entrée → Appartement Grammy | (10, 10) | porte à gauche de l'entrée |

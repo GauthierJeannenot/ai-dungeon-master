@@ -301,7 +301,7 @@ export function registerPhaseTools(server: McpServer): void {
     'spawn_monster',
     'Spawns a monster on the grid. Uses built-in stat blocks for known types.',
     {
-      monsterType: z.string().describe('Monster type key: goblin, goblin_minion, goblin_boss, hobgoblin, hobgoblin_captain, skeleton, zombie, violet_fungus, wolf, bandit, dryad, awakened_tree, orc'),
+      monsterType: z.string().describe('Monster type key: goblin, goblin_minion, goblin_boss, hobgoblin, hobgoblin_captain, skeleton, zombie, violet_fungus, wolf, bandit, dryad, awakened_tree'),
       cell: z.object({ x: z.number().int().min(0), y: z.number().int().min(0) }).describe('Grid position to spawn at'),
       name: z.string().optional().describe('Custom name override (e.g. "Gobelin Chef")'),
       hpOverride: z.number().int().positive().optional().describe('Override max HP'),

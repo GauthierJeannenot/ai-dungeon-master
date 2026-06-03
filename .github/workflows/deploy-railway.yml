@@ -1,9 +1,11 @@
 name: Deploy → Railway
 
 on:
-  push:
+  workflow_run:
+    workflows: [CI]
     branches: [main, master]
-  # Déclencher manuellement depuis l'onglet Actions
+    types: [completed]
+  # Déclencher manuellement depuis l'onglet Actions.
   workflow_dispatch:
 
 # N'autoriser qu'un seul déploiement simultané
@@ -15,8 +17,7 @@ jobs:
   deploy:
     name: Deploy to Railway
     runs-on: ubuntu-latest
-    # Ne déploie que si le CI passe (dépend du workflow ci.yml)
-    needs: []   # Retirer [] et ajouter "build" si tu veux chaîner avec ci.yml
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
 
     steps:
       - name: Checkout
