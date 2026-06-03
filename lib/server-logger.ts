@@ -1,3 +1,5 @@
+import fs from 'fs'
+import path from 'path'
 import { GameState } from './types'
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error'
@@ -36,9 +38,23 @@ const OBJECT_KEY_LIMIT = parsePositiveInt(process.env.APP_LOG_OBJECT_KEY_LIMIT, 
 const INCLUDE_TEXT = process.env.APP_LOG_INCLUDE_TEXT !== 'false'
 const BUFFER_ENABLED = process.env.APP_LOG_BUFFER_ENABLED !== 'false'
 const BUFFER_LIMIT = parseBoundedInt(process.env.APP_LOG_BUFFER_LIMIT, 1000, 0, 5000)
+const PERSIST_ENABLED = process.env.APP_LOG_PERSIST_ENABLED !== 'false'
+const PERSIST_MAX_BYTES = parseBoundedInt(process.env.APP_LOG_PERSIST_MAX_BYTES, 20_000_000, 100_000, 100_000_000)
 
 const SECRET_KEY_PATTERN = /api[_-]?key|authorization|bearer|cookie|password|secret|access[_-]?token|refresh[_-]?token|id[_-]?token/i
 const TEXT_KEY_PATTERN = /content|message|narrative|prompt|summary|text/i
+
+function defaultPersistDir(): string {
+  if (process.env.RAILWAY_ENVIRONMENT_NAME) {
+    return path.join('/data', 'ai-dungeon-master', 'logs')
+  }
+
+  return path.join(/* turbopackIgnore: true */ process.cwd(), '.data', 'logs')
+}
+
+const PERSIST_DIR = process.env.APP_LOG_PERSIST_DIR || defaultPersistDir()
+const PERSIST_FILE = path.join(/* turbopackIgnore: true */ PERSIST_DIR, process.env.APP_LOG_PERSIST_FILE || 'server.jsonl')
+const PERSIST_ROTATED_FILE = `${PERSIST_FILE}.1`
 
 function parseLogLevel(value: string | undefined): LogLevel | null {
   if (!value) return null
@@ -123,34 +139,149 @@ function sanitizeValue(value: unknown, key = '', depth = 0, seen = new WeakSet<o
 }
 
 const logBuffer: BufferedLogEntry[] = []
-let nextLogSequence = 1
+let persistWarningLogged = false
+let nextLogSequence: number | null = null
 
-function appendBufferedLog(entry: Omit<BufferedLogEntry, 'sequence'>): void {
+function takeNextLogSequence(): number {
+  if (nextLogSequence === null) {
+    nextLogSequence = readHighestPersistedSequence() + 1
+  }
+
+  return nextLogSequence++
+}
+
+function warnPersistFailure(action: string, err: unknown): void {
+  if (persistWarningLogged) return
+  persistWarningLogged = true
+
+  const payload = {
+    timestamp: new Date().toISOString(),
+    level: 'warn',
+    event: 'log_persist.failure',
+    service: 'ai-dungeon-master',
+    action,
+    persistFile: PERSIST_FILE,
+    err: sanitizeValue(err),
+  }
+  console.warn(`[ai-dm:log_persist.failure] ${JSON.stringify(payload)}`)
+}
+
+function ensurePersistDir(): void {
+  fs.mkdirSync(/* turbopackIgnore: true */ PERSIST_DIR, { recursive: true })
+}
+
+function readPersistedFiles(): string[] {
+  if (!PERSIST_ENABLED) return []
+
+  const files = [PERSIST_ROTATED_FILE, PERSIST_FILE]
+  return files.filter(file => {
+    try {
+      return fs.existsSync(/* turbopackIgnore: true */ file)
+    } catch {
+      return false
+    }
+  })
+}
+
+function parsePersistedLogLine(line: string): BufferedLogEntry | null {
+  try {
+    const parsed = JSON.parse(line) as Partial<BufferedLogEntry>
+    if (
+      typeof parsed.sequence !== 'number' ||
+      typeof parsed.timestamp !== 'string' ||
+      typeof parsed.level !== 'string' ||
+      !(parsed.level in LEVEL_ORDER) ||
+      typeof parsed.event !== 'string' ||
+      typeof parsed.line !== 'string' ||
+      !parsed.payload ||
+      typeof parsed.payload !== 'object'
+    ) {
+      return null
+    }
+
+    return parsed as BufferedLogEntry
+  } catch {
+    return null
+  }
+}
+
+function readPersistedLogEntries(): BufferedLogEntry[] {
+  if (!PERSIST_ENABLED) return []
+
+  try {
+    return readPersistedFiles().flatMap(file => {
+      const raw = fs.readFileSync(/* turbopackIgnore: true */ file, 'utf-8')
+      return raw
+        .split('\n')
+        .map(line => line.trim())
+        .filter(Boolean)
+        .map(parsePersistedLogLine)
+        .filter((entry): entry is BufferedLogEntry => Boolean(entry))
+    })
+  } catch (err) {
+    warnPersistFailure('read', err)
+    return []
+  }
+}
+
+function readHighestPersistedSequence(): number {
+  if (!PERSIST_ENABLED) return 0
+
+  try {
+    return readPersistedLogEntries().reduce(
+      (highest, entry) => Math.max(highest, entry.sequence),
+      0
+    )
+  } catch {
+    return 0
+  }
+}
+
+function rotatePersistedLogIfNeeded(nextLineBytes: number): void {
+  try {
+    if (!fs.existsSync(/* turbopackIgnore: true */ PERSIST_FILE)) return
+    const stat = fs.statSync(/* turbopackIgnore: true */ PERSIST_FILE)
+    if (stat.size + nextLineBytes <= PERSIST_MAX_BYTES) return
+
+    if (fs.existsSync(/* turbopackIgnore: true */ PERSIST_ROTATED_FILE)) {
+      fs.rmSync(/* turbopackIgnore: true */ PERSIST_ROTATED_FILE, { force: true })
+    }
+    fs.renameSync(/* turbopackIgnore: true */ PERSIST_FILE, PERSIST_ROTATED_FILE)
+  } catch (err) {
+    warnPersistFailure('rotate', err)
+  }
+}
+
+function appendPersistedLog(entry: BufferedLogEntry): void {
+  if (!PERSIST_ENABLED) return
+
+  try {
+    ensurePersistDir()
+    const line = `${JSON.stringify(entry)}\n`
+    rotatePersistedLogIfNeeded(Buffer.byteLength(line, 'utf-8'))
+    fs.appendFileSync(/* turbopackIgnore: true */ PERSIST_FILE, line, 'utf-8')
+  } catch (err) {
+    warnPersistFailure('append', err)
+  }
+}
+
+function appendBufferedLog(entry: BufferedLogEntry): void {
   if (!BUFFER_ENABLED || BUFFER_LIMIT <= 0) return
 
-  logBuffer.push({
-    sequence: nextLogSequence++,
-    ...entry,
-  })
+  logBuffer.push(entry)
 
   if (logBuffer.length > BUFFER_LIMIT) {
     logBuffer.splice(0, logBuffer.length - BUFFER_LIMIT)
   }
 }
 
-export function getBufferedLogEvents(query: BufferedLogQuery = {}): {
-  entries: BufferedLogEntry[]
-  totalBuffered: number
-  bufferLimit: number
-  nextAfter: number | null
-} {
-  const limit = Math.min(Math.max(query.limit ?? 100, 1), 500)
+function queryLogEntries(entriesToQuery: BufferedLogEntry[], query: BufferedLogQuery = {}): BufferedLogEntry[] {
   const eventFilter = query.event?.toLowerCase()
   const requestIdFilter = query.requestId?.toLowerCase()
   const sessionIdFilter = query.sessionId?.toLowerCase()
   const sinceTime = query.since?.getTime()
 
-  const entries = logBuffer.filter(entry => {
+  return entriesToQuery.filter(entry => {
     if (query.after !== undefined && entry.sequence <= query.after) return false
     if (query.level && entry.level !== query.level) return false
     if (eventFilter && !entry.event.toLowerCase().includes(eventFilter)) return false
@@ -163,6 +294,23 @@ export function getBufferedLogEvents(query: BufferedLogQuery = {}): {
     if (sinceTime !== undefined && Date.parse(entry.timestamp) < sinceTime) return false
     return true
   })
+}
+
+export function getLogEvents(query: BufferedLogQuery = {}): {
+  entries: BufferedLogEntry[]
+  totalBuffered: number
+  totalPersisted: number
+  bufferLimit: number
+  nextAfter: number | null
+  persistent: boolean
+  persistFile: string | null
+  source: 'persistent' | 'buffer'
+} {
+  const limit = Math.min(Math.max(query.limit ?? 100, 1), 500)
+  const persistedEntries = readPersistedLogEntries()
+  const sourceEntries = persistedEntries.length > 0 ? persistedEntries : logBuffer
+  const source = persistedEntries.length > 0 ? 'persistent' : 'buffer'
+  const entries = queryLogEntries(sourceEntries, query)
 
   const limitedEntries = entries.slice(-limit)
   const lastEntry = limitedEntries.at(-1)
@@ -170,8 +318,27 @@ export function getBufferedLogEvents(query: BufferedLogQuery = {}): {
   return {
     entries: limitedEntries,
     totalBuffered: logBuffer.length,
+    totalPersisted: persistedEntries.length,
     bufferLimit: BUFFER_LIMIT,
     nextAfter: lastEntry?.sequence ?? null,
+    persistent: PERSIST_ENABLED,
+    persistFile: PERSIST_ENABLED ? PERSIST_FILE : null,
+    source,
+  }
+}
+
+export function getBufferedLogEvents(query: BufferedLogQuery = {}): {
+  entries: BufferedLogEntry[]
+  totalBuffered: number
+  bufferLimit: number
+  nextAfter: number | null
+} {
+  const result = getLogEvents(query)
+  return {
+    entries: result.entries,
+    totalBuffered: result.totalBuffered,
+    bufferLimit: result.bufferLimit,
+    nextAfter: result.nextAfter,
   }
 }
 
@@ -179,6 +346,31 @@ export function clearBufferedLogEvents(): number {
   const cleared = logBuffer.length
   logBuffer.length = 0
   return cleared
+}
+
+export function clearLogEvents(): {
+  cleared: number
+  clearedBuffered: number
+  clearedPersisted: number
+} {
+  const clearedPersisted = readPersistedLogEntries().length
+  const clearedBuffered = clearBufferedLogEvents()
+
+  if (PERSIST_ENABLED) {
+    try {
+      for (const file of readPersistedFiles()) {
+        fs.rmSync(/* turbopackIgnore: true */ file, { force: true })
+      }
+    } catch (err) {
+      warnPersistFailure('clear', err)
+    }
+  }
+
+  return {
+    cleared: clearedBuffered + clearedPersisted,
+    clearedBuffered,
+    clearedPersisted,
+  }
 }
 
 export function summarizeGameState(gameState: GameState | undefined | null): Record<string, unknown> | null {
@@ -237,14 +429,17 @@ export function logEvent(
 
   const sanitizedPayload = sanitizeValue(payload) as Record<string, unknown>
   const line = `[ai-dm:${event}] ${JSON.stringify(sanitizedPayload)}`
-
-  appendBufferedLog({
+  const entry: BufferedLogEntry = {
+    sequence: takeNextLogSequence(),
     timestamp: sanitizedPayload.timestamp as string,
     level,
     event,
     line,
     payload: sanitizedPayload,
-  })
+  }
+
+  appendBufferedLog(entry)
+  appendPersistedLog(entry)
 
   if (level === 'error') console.error(line)
   else if (level === 'warn') console.warn(line)

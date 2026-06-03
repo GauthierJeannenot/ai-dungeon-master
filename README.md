@@ -247,10 +247,22 @@ APP_LOG_ARRAY_LIMIT=30
 APP_LOG_OBJECT_KEY_LIMIT=80
 APP_LOG_BUFFER_ENABLED=true
 APP_LOG_BUFFER_LIMIT=1000
+APP_LOG_PERSIST_ENABLED=true
+APP_LOG_PERSIST_MAX_BYTES=20000000
 APP_DEBUG_LOG_PUBLIC_READ=true
 ```
 
 En debug live, les textes narratifs/messages joueur sont inclus par defaut pour faciliter la correlation avec le chat. Remettez `APP_LOG_INCLUDE_TEXT=false` apres la session si vous voulez masquer les textes et ne garder que les longueurs.
+
+Les logs sont conserves a trois niveaux :
+
+- stdout/stderr Railway, avec le prefixe `[ai-dm:<event>]`
+- buffer memoire rapide, utile pendant que le process tourne
+- fichier JSONL local (`.data/logs/server.jsonl` en local, `/data/ai-dungeon-master/logs/server.jsonl` si un volume Railway est deja monte sur `/data`)
+
+Sans aucune configuration Railway/GitHub supplementaire, le navigateur garde aussi une boite noire de playtest dans `localStorage` et la republie au serveur via `/api/debug/client-logs`. Apres un redeploiement, il suffit de rafraichir ou de rejouer depuis le meme navigateur pour revoir les dernieres actions sous l'evenement `client.blackbox.entry` dans `/api/debug/logs`.
+
+Si vous avez deja un volume Railway monte ailleurs que `/data`, `APP_LOG_PERSIST_DIR=/chemin/du/volume` permet de forcer le repertoire. Ce n'est pas requis pour la boite noire navigateur.
 
 Lecture via Railway CLI :
 
@@ -276,6 +288,6 @@ curl -X DELETE -H "Authorization: Bearer un-token-long-aleatoire" \
   "https://votre-app.railway.app/api/debug/logs"
 ```
 
-L'endpoint `GET /api/debug/logs` retourne les logs recents gardes en memoire par le process Node. Pendant le debug live, la lecture est publique par defaut pour permettre une surveillance externe sans acces Railway; remettez `APP_DEBUG_LOG_PUBLIC_READ=false` ou retirez ce mode apres la session. `DELETE /api/debug/logs` reste protege par `APP_DEBUG_LOG_TOKEN`. Utilisez de preference le header `Authorization: Bearer ...`. Le parametre `?token=` est desactive par defaut; activez-le seulement pour depannage manuel avec `APP_DEBUG_LOG_TOKEN_QUERY_ENABLED=true`, car il peut fuiter dans des historiques navigateur/proxy.
+L'endpoint `GET /api/debug/logs` retourne les logs persistants si le fichier JSONL existe, sinon les logs recents gardes en memoire par le process Node. Pendant le debug live, la lecture est publique par defaut pour permettre une surveillance externe sans acces Railway; remettez `APP_DEBUG_LOG_PUBLIC_READ=false` ou retirez ce mode apres la session. `DELETE /api/debug/logs` reste protege par `APP_DEBUG_LOG_TOKEN` et efface a la fois le buffer memoire et le fichier JSONL local. Utilisez de preference le header `Authorization: Bearer ...`. Le parametre `?token=` est desactive par defaut; activez-le seulement pour depannage manuel avec `APP_DEBUG_LOG_TOKEN_QUERY_ENABLED=true`, car il peut fuiter dans des historiques navigateur/proxy.
 
 Les logs incluent notamment `requestId`, `sessionId`, appels Anthropic, usage tokens/cout estime, appels MCP, erreurs de regles, resume compact du `GameState`, persistance session et durees. Les valeurs ressemblant a des secrets/tokens sont masquees automatiquement.

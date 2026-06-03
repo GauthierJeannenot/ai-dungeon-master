@@ -1,8 +1,8 @@
 import { timingSafeEqual } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import {
-  clearBufferedLogEvents,
-  getBufferedLogEvents,
+  clearLogEvents,
+  getLogEvents,
   logEvent,
   type LogLevel,
 } from '@/lib/server-logger'
@@ -107,7 +107,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   }
 
   const limit = parseLimit(req)
-  const result = getBufferedLogEvents({
+  const result = getLogEvents({
     limit,
     after: parseAfter(req),
     since: parseSince(req),
@@ -122,7 +122,9 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     publicRead: PUBLIC_READ_ENABLED,
     returned: result.entries.length,
     totalBuffered: result.totalBuffered,
+    totalPersisted: result.totalPersisted,
     nextAfter: result.nextAfter,
+    source: result.source,
     filters: {
       limit,
       after: parseAfter(req),
@@ -138,9 +140,12 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     logs: result.entries,
     count: result.entries.length,
     totalBuffered: result.totalBuffered,
+    totalPersisted: result.totalPersisted,
     bufferLimit: result.bufferLimit,
     nextAfter: result.nextAfter,
     publicRead: PUBLIC_READ_ENABLED,
+    persistent: result.persistent,
+    source: result.source,
   })
 }
 
@@ -148,12 +153,12 @@ export async function DELETE(req: NextRequest): Promise<NextResponse> {
   const unauthorized = authorize(req)
   if (unauthorized) return unauthorized
 
-  const cleared = clearBufferedLogEvents()
+  const cleared = clearLogEvents()
 
   logEvent('warn', 'debug_logs.clear', {
     path: req.nextUrl.pathname,
-    cleared,
+    ...cleared,
   })
 
-  return jsonResponse({ cleared })
+  return jsonResponse(cleared)
 }

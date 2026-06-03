@@ -50,6 +50,17 @@ const SESSION_KEYS = {
   messages: 'ai-dm-messages',
   summaryContext: 'ai-dm-summary-context',
 }
+const CLIENT_DEBUG_LOG_KEY = 'ai-dm-client-debug-log-v1'
+const CLIENT_DEBUG_BROWSER_ID_KEY = 'ai-dm-client-debug-browser-id'
+const CLIENT_DEBUG_LOG_LIMIT = 200
+
+interface ClientDebugEntry {
+  id: string
+  timestamp: string
+  sessionId: string
+  event: string
+  payload: Record<string, unknown>
+}
 
 const WELCOME_MESSAGE =
   'Le vieux sorcier Tyndareus le Vert vous a confié une mission des plus… particulières. Sa carte en main, vous avez chevauché deux jours jusqu\'à cette bâtisse en pierre abandonnée au bout d\'un chemin de gravier envahi par les herbes folles. L\'odeur vous a frappé bien avant que le bâtiment n\'apparaisse : cannelle, muscade, pommes mûres — un parfum presque magique qui flotte dans l\'air chaud. Devant vous se dressent de grandes portes en bois doubles, à moitié vermoulues. Sur le chemin, un immense pommier aux branches noueuses vous observe… ou du moins, c\'est l\'impression que donne son écorce ridée. Bienvenue à la Boulangerie de Grammy. Que faites-vous ?'
@@ -83,6 +94,19 @@ function getOrCreateSessionId(): string {
   }
 }
 
+function getOrCreateBrowserLogId(): string {
+  try {
+    const existing = localStorage.getItem(CLIENT_DEBUG_BROWSER_ID_KEY)
+    if (existing) return existing
+
+    const next = createSessionId()
+    localStorage.setItem(CLIENT_DEBUG_BROWSER_ID_KEY, next)
+    return next
+  } catch {
+    return createSessionId()
+  }
+}
+
 function readSessionJson<T>(key: string): T | null {
   try {
     const raw = sessionStorage.getItem(key)
@@ -96,6 +120,86 @@ function writeSessionJson(key: string, value: unknown): void {
   try {
     sessionStorage.setItem(key, JSON.stringify(value))
   } catch { /* storage unavailable */ }
+}
+
+function truncateClientText(value: string, maxLength = 1200): string {
+  return value.length <= maxLength
+    ? value
+    : `${value.slice(0, maxLength)}...[truncated ${value.length - maxLength} chars]`
+}
+
+function summarizeClientGameState(state: GameState): Record<string, unknown> {
+  const monsters = Object.values(state.monsters)
+  const aliveMonsters = monsters.filter(monster => monster.isAlive)
+
+  return {
+    phase: state.phase,
+    round: state.round,
+    currentTurn: state.currentTurn,
+    player: {
+      hp: state.player.hp,
+      position: state.player.position,
+      conditions: state.player.conditions,
+    },
+    monsters: {
+      total: monsters.length,
+      alive: aliveMonsters.length,
+      aliveIds: aliveMonsters.map(monster => monster.id),
+    },
+    room: state.currentRoomId,
+    roomsVisitedCount: state.roomsVisited.length,
+    combatLogCount: state.combatLog.length,
+  }
+}
+
+function readClientDebugLog(): ClientDebugEntry[] {
+  try {
+    const raw = localStorage.getItem(CLIENT_DEBUG_LOG_KEY)
+    const parsed = raw ? JSON.parse(raw) : []
+    return Array.isArray(parsed) ? parsed as ClientDebugEntry[] : []
+  } catch {
+    return []
+  }
+}
+
+function writeClientDebugLog(entries: ClientDebugEntry[]): void {
+  try {
+    localStorage.setItem(
+      CLIENT_DEBUG_LOG_KEY,
+      JSON.stringify(entries.slice(-CLIENT_DEBUG_LOG_LIMIT))
+    )
+  } catch { /* storage unavailable */ }
+}
+
+function appendClientDebugLog(
+  sessionId: string,
+  event: string,
+  payload: Record<string, unknown>
+): void {
+  const entry: ClientDebugEntry = {
+    id: `${sessionId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    timestamp: new Date().toISOString(),
+    sessionId,
+    event,
+    payload,
+  }
+
+  writeClientDebugLog([...readClientDebugLog(), entry])
+}
+
+async function syncClientDebugLog(sessionId: string): Promise<void> {
+  const entries = readClientDebugLog()
+  if (entries.length === 0) return
+
+  await fetch('/api/debug/client-logs', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      browserLogId: getOrCreateBrowserLogId(),
+      sessionId,
+      entries,
+    }),
+  })
 }
 
 function phaseLabel(phase: GameState['phase']): { label: string; color: string } {
@@ -127,6 +231,14 @@ export default function GamePage() {
     setSessionId(restoredSessionId)
     if (restoredGameState) setGameState(restoredGameState)
     setMessages(restoredMessages?.length ? restoredMessages : [createWelcomeMessage()])
+    appendClientDebugLog(restoredSessionId, 'client.session.loaded', {
+      restoredGameState: Boolean(restoredGameState),
+      restoredMessages: restoredMessages?.length ?? 0,
+      gameState: summarizeClientGameState(restoredGameState ?? INITIAL_GAME_STATE),
+    })
+    syncClientDebugLog(restoredSessionId).catch(err => {
+      console.error('Failed to sync client debug log:', err)
+    })
 
     try {
       setSummaryContext(sessionStorage.getItem(SESSION_KEYS.summaryContext) ?? undefined)
@@ -185,6 +297,15 @@ export default function GamePage() {
         history,
         summaryContext,
       }
+      appendClientDebugLog(activeSessionId, 'client.dm.request', {
+        message: truncateClientText(text),
+        historyLength: history.length,
+        summaryContextLength: summaryContext?.length ?? 0,
+        gameState: summarizeClientGameState(gameState),
+      })
+      syncClientDebugLog(activeSessionId).catch(err => {
+        console.error('Failed to sync client debug log:', err)
+      })
 
       const res = await fetch('/api/dm', {
         method: 'POST',
@@ -198,6 +319,15 @@ export default function GamePage() {
       }
 
       const data: DMResponse = await res.json()
+      appendClientDebugLog(activeSessionId, 'client.dm.response', {
+        narrative: truncateClientText(data.narrative ?? ''),
+        toolsUsed: data.toolsUsed,
+        summaryContextLength: data.summaryContext?.length ?? 0,
+        gameState: data.newGameState ? summarizeClientGameState(data.newGameState) : null,
+      })
+      syncClientDebugLog(activeSessionId).catch(err => {
+        console.error('Failed to sync client debug log:', err)
+      })
 
       // Update game state
       if (data.newGameState) {
@@ -239,6 +369,14 @@ export default function GamePage() {
       setMessages(prev => [...prev, ...newMessages])
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Erreur inconnue'
+      appendClientDebugLog(activeSessionId, 'client.dm.error', {
+        message: truncateClientText(text),
+        error: msg,
+        gameState: summarizeClientGameState(gameState),
+      })
+      syncClientDebugLog(activeSessionId).catch(syncErr => {
+        console.error('Failed to sync client debug log:', syncErr)
+      })
       setError(msg)
       setMessages(prev => [...prev, {
         id: generateId(),
@@ -272,6 +410,15 @@ export default function GamePage() {
     setInputValue('')
 
     if (previousSessionId) {
+      appendClientDebugLog(previousSessionId, 'client.session.reset', {
+        nextSessionId,
+        gameState: summarizeClientGameState(gameState),
+        messageCount: messages.length,
+      })
+      syncClientDebugLog(previousSessionId).catch(err => {
+        console.error('Failed to sync client debug log:', err)
+      })
+
       fetch('/api/session', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
@@ -280,7 +427,7 @@ export default function GamePage() {
         console.error('Failed to delete previous game session:', err)
       })
     }
-  }, [isLoading, sessionId])
+  }, [gameState, isLoading, messages.length, sessionId])
 
   const { label: phaseText, color: phaseColor } = phaseLabel(gameState.phase)
 
