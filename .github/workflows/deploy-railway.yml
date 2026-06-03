@@ -1,14 +1,14 @@
-name: Deploy → Railway
+name: Deploy to Railway
 
 on:
   workflow_run:
     workflows: [CI]
     branches: [main, master]
     types: [completed]
-  # Déclencher manuellement depuis l'onglet Actions.
+  # Manual trigger from the Actions tab.
   workflow_dispatch:
 
-# N'autoriser qu'un seul déploiement simultané
+# Allow only one deployment at a time.
 concurrency:
   group: deploy-railway
   cancel-in-progress: true
@@ -18,15 +18,23 @@ jobs:
     name: Deploy to Railway
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Skip Railway CLI deploy when token is missing
+        if: env.RAILWAY_TOKEN == ''
+        run: |
+          echo "::notice::RAILWAY_TOKEN is not configured; skipping GitHub Actions Railway deploy."
+          echo "::notice::If Railway GitHub auto-deploy is enabled, production can still deploy from Railway directly."
+
       - name: Install Railway CLI
+        if: env.RAILWAY_TOKEN != ''
         run: npm install -g @railway/cli
 
       - name: Deploy to Railway
+        if: env.RAILWAY_TOKEN != ''
         run: railway up --detach
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
