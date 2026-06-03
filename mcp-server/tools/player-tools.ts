@@ -102,6 +102,7 @@ const GameStateSchema = z.object({
   combatLog: z.array(CombatLogEntrySchema),
   roomsVisited: z.array(z.string()),
   currentRoomId: z.string().nullable(),
+  encountersTriggered: z.array(z.string()).optional().default([]),
 }).superRefine((state, ctx) => {
   if (state.player.hp.current > state.player.hp.max) {
     ctx.addIssue({

@@ -62,6 +62,11 @@ export function isAlive(entity: Entity): boolean {
   return entity.hp.current > 0
 }
 
+export function occupiesSpace(entity: Entity): boolean {
+  if ('isAlive' in entity) return entity.isAlive
+  return !entity.deathSaves?.dead
+}
+
 function speedCells(entity: Entity): number {
   return Math.floor(entity.speed / 5)
 }
@@ -143,7 +148,7 @@ function assertActionAvailable(entityId: string): void {
 function occupiedByLivingEntity(cell: { x: number; y: number }, exceptId?: string): Entity | undefined {
   return gs.getAllEntities().find(entity =>
     entity.id !== exceptId &&
-    isAlive(entity) &&
+    occupiesSpace(entity) &&
     entity.position.x === cell.x &&
     entity.position.y === cell.y
   )

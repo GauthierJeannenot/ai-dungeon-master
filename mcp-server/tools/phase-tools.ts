@@ -287,7 +287,7 @@ function assertEncounterCanStart(playerCell: { x: number; y: number } | undefine
 
   const occupied = new Map<string, string>()
   for (const entity of gs.getAllEntities()) {
-    if (rules.isAlive(entity)) {
+    if (rules.occupiesSpace(entity)) {
       occupied.set(`${entity.position.x},${entity.position.y}`, entity.id)
     }
   }
@@ -402,6 +402,9 @@ export function registerPhaseTools(server: McpServer): void {
         if (encounterId && !preset) {
           throw new rules.RuleViolation('UNKNOWN_ENCOUNTER', `Unknown encounter: ${encounterId}`, { encounterId })
         }
+        if (encounterId && gs.hasEncounterTriggered(encounterId)) {
+          throw new rules.RuleViolation('ENCOUNTER_ALREADY_RESOLVED', `Encounter already triggered: ${encounterId}`, { encounterId })
+        }
 
         const encounterMonsters = monsters ?? preset?.monsters ?? []
         const resolvedPlayerCell = playerCell ?? preset?.playerCell
@@ -428,6 +431,9 @@ export function registerPhaseTools(server: McpServer): void {
         const combat = startCombat(['player', ...spawnedMonsters.map(monster => monster.id)], {
           playerActsFirst: true,
         })
+        if (encounterId) {
+          gs.markEncounterTriggered(encounterId)
+        }
         if (reason || preset) {
           gs.addLogEntry({
             round: gs.getState().round,

@@ -91,6 +91,7 @@ export interface GameState {
   combatLog: CombatLogEntry[]
   roomsVisited: string[]
   currentRoomId: string | null
+  encountersTriggered?: string[]
 }
 
 export interface DiceRollResult {

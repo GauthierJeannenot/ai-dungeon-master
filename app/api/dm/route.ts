@@ -2393,7 +2393,7 @@ function monsterAttackName(monster: MonsterState): string {
 
 function occupiedCells(gameState: GameState, exceptId: string): Set<string> {
   const occupied = new Set<string>()
-  if (exceptId !== 'player' && gameState.player.hp.current > 0) {
+  if (exceptId !== 'player' && !gameState.player.deathSaves?.dead) {
     occupied.add(cellKey(gameState.player.position))
   }
   for (const monster of Object.values(gameState.monsters)) {

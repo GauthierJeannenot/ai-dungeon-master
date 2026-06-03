@@ -38,13 +38,15 @@ function createInitialState(): GameState {
     combatLog: [],
     roomsVisited: initialRoomId ? [initialRoomId] : [],
     currentRoomId: initialRoomId,
+    encountersTriggered: [],
   }
 }
 
 function syncPlayerRoomFromPosition(): void {
   const roomId = inferAdventureRoomId(state.player.position)
-  if (roomId) {
-    visitRoom(roomId)
+  state.currentRoomId = roomId
+  if (roomId && !state.roomsVisited.includes(roomId)) {
+    state.roomsVisited.push(roomId)
   }
 }
 
@@ -85,6 +87,7 @@ export function replaceState(nextState: GameState): GameState {
     movementUsed: structuredClone(nextState.movementUsed ?? {}),
     actionUsed: structuredClone(nextState.actionUsed ?? {}),
     roomsVisited: structuredClone(nextState.roomsVisited ?? []),
+    encountersTriggered: structuredClone(nextState.encountersTriggered ?? []),
   }
   syncPlayerRoomFromPosition()
   syncDyingPlayerState()
@@ -356,4 +359,15 @@ export function visitRoom(roomId: string): void {
     state.roomsVisited.push(roomId)
   }
   state.currentRoomId = roomId
+}
+
+export function hasEncounterTriggered(encounterId: string): boolean {
+  return Boolean(state.encountersTriggered?.includes(encounterId))
+}
+
+export function markEncounterTriggered(encounterId: string): void {
+  state.encountersTriggered ??= []
+  if (!state.encountersTriggered.includes(encounterId)) {
+    state.encountersTriggered.push(encounterId)
+  }
 }

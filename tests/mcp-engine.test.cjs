@@ -239,6 +239,31 @@ test('MCP move_token tracks room transitions for the player', async () => {
   })
 })
 
+test('MCP move_token clears current room outside mapped adventure zones', async () => {
+  await withMcpClient(async client => {
+    const baseState = await callTool(client, 'get_game_state')
+    await callTool(client, 'replace_game_state', { gameState: baseState })
+
+    const move = await callTool(client, 'move_token', {
+      tokenId: 'player',
+      toCell: { x: 0, y: 0 },
+    })
+    assert.equal(move.success, true)
+    assert.equal(move.currentRoomId, null)
+
+    const blocked = await callTool(client, 'trigger_room_event', {
+      roomId: '1',
+      eventType: 'custom',
+      description: 'Un evenement dans une salle que le joueur a quittee.',
+    })
+    assert.equal(blocked.code, 'ROOM_EVENT_LOCATION_MISMATCH')
+
+    const stateAfter = await callTool(client, 'get_game_state')
+    assert.equal(stateAfter.currentRoomId, null)
+    assert.deepEqual(stateAfter.player.position, { x: 0, y: 0 })
+  })
+})
+
 test('MCP trigger_room_event cannot mutate a room outside the current player room', async () => {
   await withMcpClient(async client => {
     const baseState = await callTool(client, 'get_game_state')
@@ -531,6 +556,31 @@ test('MCP rules reject overlong combat movement and occupied cells', async () =>
 
     const stateAfter = await callTool(client, 'get_game_state')
     assert.deepEqual(stateAfter.player.position, { x: 0, y: 0 })
+  })
+})
+
+test('MCP rules treat a dying player as occupying their cell', async () => {
+  await withMcpClient(async client => {
+    const baseState = await callTool(client, 'get_game_state')
+    const state = makeCombatState(baseState, {
+      currentTurn: 'goblin_a',
+      playerPosition: { x: 0, y: 0 },
+      monsterPosition: { x: 2, y: 0 },
+    })
+    state.player.hp.current = 0
+    state.player.deathSaves = { successes: 0, failures: 0 }
+    state.player.conditions = ['unconscious']
+
+    await callTool(client, 'replace_game_state', { gameState: state })
+
+    const move = await callTool(client, 'move_token', {
+      tokenId: 'goblin_a',
+      toCell: { x: 0, y: 0 },
+    })
+    assert.equal(move.code, 'CELL_OCCUPIED')
+
+    const stateAfter = await callTool(client, 'get_game_state')
+    assert.deepEqual(stateAfter.monsters.goblin_a.position, { x: 2, y: 0 })
   })
 })
 
@@ -855,6 +905,11 @@ test('MCP roll_death_save tracks player death saves and consumes the turn action
       assert.equal(afterSave.actionUsed.player, true)
       assert.deepEqual(afterSave.player.deathSaves, { successes: 1, failures: 0 })
 
+      const secondDeathSave = await callTool(client, 'roll_death_save')
+      assert.equal(secondDeathSave.code, 'ACTION_ALREADY_USED')
+      const afterSecondAttempt = await callTool(client, 'get_game_state')
+      assert.deepEqual(afterSecondAttempt.player.deathSaves, { successes: 1, failures: 0 })
+
       const nextTurn = await callTool(client, 'next_turn', { actorId: 'player' })
       assert.equal(nextTurn.currentTurn, 'goblin_a')
     })
@@ -920,6 +975,39 @@ test('MCP start_encounter atomically moves player, spawns real IDs, and enters c
     assert.ok(stateAfter.roomsVisited.includes('8'))
     assert.deepEqual(stateAfter.player.position, { x: 9, y: 6 })
     assert.deepEqual(Object.keys(stateAfter.monsters).sort(), spawnedIds.sort())
+    assert.deepEqual(stateAfter.encountersTriggered, ['bakery_floor_goblins'])
+  })
+})
+
+test('MCP start_encounter rejects a preset encounter already triggered', async () => {
+  await withMcpClient(async client => {
+    const baseState = await callTool(client, 'get_game_state')
+    await callTool(client, 'replace_game_state', { gameState: baseState })
+
+    const encounter = await callTool(client, 'start_encounter', {
+      encounterId: 'bakery_floor_goblins',
+      reason: 'Premier declenchement.',
+    })
+    assert.equal(encounter.encounterId, 'bakery_floor_goblins')
+
+    const afterEncounter = await callTool(client, 'get_game_state')
+    for (const monster of Object.values(afterEncounter.monsters)) {
+      monster.hp.current = 0
+      monster.isAlive = false
+    }
+    await callTool(client, 'replace_game_state', { gameState: afterEncounter })
+    const ended = await callTool(client, 'end_combat')
+    assert.equal(ended.phase, 'exploration')
+
+    const duplicate = await callTool(client, 'start_encounter', {
+      encounterId: 'bakery_floor_goblins',
+      reason: 'Tentative de respawn.',
+    })
+    assert.equal(duplicate.code, 'ENCOUNTER_ALREADY_RESOLVED')
+
+    const finalState = await callTool(client, 'get_game_state')
+    assert.equal(Object.values(finalState.monsters).filter(monster => monster.isAlive).length, 0)
+    assert.deepEqual(finalState.encountersTriggered, ['bakery_floor_goblins'])
   })
 })
 

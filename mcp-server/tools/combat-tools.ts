@@ -498,6 +498,12 @@ export function registerCombatTools(server: McpServer): void {
             currentTurn: state.currentTurn,
           })
         }
+        if (gs.hasActionUsed('player')) {
+          throw new rules.RuleViolation('ACTION_ALREADY_USED', 'The player has already rolled a death save this turn.', {
+            entityId: 'player',
+            currentTurn: state.currentTurn,
+          })
+        }
         if (player.hp.current > 0) {
           throw new rules.RuleViolation('PLAYER_NOT_DYING', 'The player is conscious and does not need a death save.', {
             hp: player.hp,
