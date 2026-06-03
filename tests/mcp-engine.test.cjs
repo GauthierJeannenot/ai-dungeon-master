@@ -24,10 +24,45 @@ function makeMonster(id, hp = 7) {
   }
 }
 
+function makeCombatState(baseState, overrides = {}) {
+  const monster = makeMonster('goblin_a')
+  monster.position = overrides.monsterPosition ?? { x: 1, y: 0 }
+
+  return {
+    ...baseState,
+    phase: 'combat',
+    currentTurn: overrides.currentTurn ?? 'player',
+    round: 1,
+    initiativeOrder: ['player', 'goblin_a'],
+    movementUsed: {},
+    player: {
+      ...baseState.player,
+      position: overrides.playerPosition ?? { x: 0, y: 0 },
+    },
+    monsters: { goblin_a: monster },
+  }
+}
+
 async function callTool(client, name, args = {}) {
   const result = await client.callTool({ name, arguments: args })
   const text = result.content.find(c => c.type === 'text')?.text
   return text ? JSON.parse(text) : result
+}
+
+async function withMcpClient(fn) {
+  const transport = new StdioClientTransport({
+    command: 'node',
+    args: ['mcp-server/dist/mcp-server/index.js'],
+    env: process.env,
+  })
+  const client = new Client({ name: 'mcp-engine-test', version: '1.0.0' })
+
+  await client.connect(transport)
+  try {
+    return await fn(client)
+  } finally {
+    await client.close()
+  }
 }
 
 test.beforeEach(() => {
@@ -73,15 +108,7 @@ test('advanceTurn removes dead monsters from initiative', () => {
 })
 
 test('MCP server accepts replace_game_state and move_token toCell contracts', async () => {
-  const transport = new StdioClientTransport({
-    command: 'node',
-    args: ['mcp-server/dist/mcp-server/index.js'],
-    env: process.env,
-  })
-  const client = new Client({ name: 'mcp-engine-test', version: '1.0.0' })
-
-  await client.connect(transport)
-  try {
+  await withMcpClient(async client => {
     const state = await callTool(client, 'get_game_state')
     state.player.position = { x: 4, y: 13 }
 
@@ -95,7 +122,74 @@ test('MCP server accepts replace_game_state and move_token toCell contracts', as
     })
     const afterMove = await callTool(client, 'get_game_state')
     assert.deepEqual(afterMove.player.position, { x: 5, y: 13 })
-  } finally {
-    await client.close()
-  }
+  })
+})
+
+test('MCP rules reject attacks outside the active turn and range', async () => {
+  await withMcpClient(async client => {
+    const baseState = await callTool(client, 'get_game_state')
+
+    await callTool(client, 'replace_game_state', {
+      gameState: makeCombatState(baseState, { currentTurn: 'goblin_a' }),
+    })
+    const wrongTurn = await callTool(client, 'resolve_attack', {
+      attackerId: 'player',
+      targetId: 'goblin_a',
+      weaponOrSpell: 'longsword',
+    })
+    assert.equal(wrongTurn.code, 'NOT_CURRENT_TURN')
+
+    await callTool(client, 'replace_game_state', {
+      gameState: makeCombatState(baseState, { monsterPosition: { x: 3, y: 0 } }),
+    })
+    const outOfRange = await callTool(client, 'resolve_attack', {
+      attackerId: 'player',
+      targetId: 'goblin_a',
+      weaponOrSpell: 'longsword',
+    })
+    assert.equal(outOfRange.code, 'TARGET_OUT_OF_RANGE')
+  })
+})
+
+test('MCP rules reject overlong combat movement and occupied cells', async () => {
+  await withMcpClient(async client => {
+    const baseState = await callTool(client, 'get_game_state')
+
+    await callTool(client, 'replace_game_state', {
+      gameState: makeCombatState(baseState),
+    })
+    const occupied = await callTool(client, 'move_token', {
+      tokenId: 'player',
+      toCell: { x: 1, y: 0 },
+    })
+    assert.equal(occupied.code, 'CELL_OCCUPIED')
+
+    const tooFar = await callTool(client, 'move_token', {
+      tokenId: 'player',
+      toCell: { x: 7, y: 0 },
+    })
+    assert.equal(tooFar.code, 'MOVEMENT_EXCEEDED')
+
+    const stateAfter = await callTool(client, 'get_game_state')
+    assert.deepEqual(stateAfter.player.position, { x: 0, y: 0 })
+  })
+})
+
+test('MCP rules require force to end combat with active enemies', async () => {
+  await withMcpClient(async client => {
+    const baseState = await callTool(client, 'get_game_state')
+
+    await callTool(client, 'replace_game_state', {
+      gameState: makeCombatState(baseState),
+    })
+    const blocked = await callTool(client, 'end_combat')
+    assert.equal(blocked.code, 'COMBATANTS_STILL_ACTIVE')
+
+    const forced = await callTool(client, 'end_combat', {
+      force: true,
+      reason: 'Les gobelins fuient.',
+    })
+    assert.equal(forced.phase, 'exploration')
+    assert.equal(forced.reason, 'Les gobelins fuient.')
+  })
 })

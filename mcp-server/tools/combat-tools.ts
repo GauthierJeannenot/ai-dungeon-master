@@ -2,6 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 import { rollDice, getAbilityModifier } from '../dice'
 import * as gs from '../game-state'
+import * as rules from '../rules'
 import { EntityStats, AttackResult, SavingThrowResult, Condition } from '../../lib/types'
 
 // Weapon damage dice by weapon name (D&D 5e)
@@ -50,13 +51,19 @@ export function registerCombatTools(server: McpServer): void {
       advantage: z.boolean().optional().describe('Roll with advantage (roll twice, take higher)'),
       disadvantage: z.boolean().optional().describe('Roll with disadvantage (roll twice, take lower)'),
       customDamageDice: z.string().optional().describe('Override damage dice (e.g. "2d8+4")'),
+      rangeCells: z.number().int().positive().optional().describe('Optional attack range in grid cells; defaults to weapon range.'),
     },
-    async ({ attackerId, targetId, weaponOrSpell, advantage, disadvantage, customDamageDice }) => {
+    async ({ attackerId, targetId, weaponOrSpell, advantage, disadvantage, customDamageDice, rangeCells }) => {
       const attacker = gs.getEntity(attackerId)
       const target = gs.getEntity(targetId)
 
       if (!attacker) return { content: [{ type: 'text', text: JSON.stringify({ error: `Attacker not found: ${attackerId}` }) }], isError: true }
       if (!target) return { content: [{ type: 'text', text: JSON.stringify({ error: `Target not found: ${targetId}` }) }], isError: true }
+      try {
+        rules.validateAttack(attackerId, targetId, weaponOrSpell, rangeCells)
+      } catch (err) {
+        return rules.ruleErrorResult(err)
+      }
 
       // Determine attack bonus
       const strMod = getAbilityModifier(attacker.stats.str)
@@ -146,6 +153,11 @@ export function registerCombatTools(server: McpServer): void {
     async ({ entityId, ability, dc, onFailure }) => {
       const entity = gs.getEntity(entityId)
       if (!entity) return { content: [{ type: 'text', text: JSON.stringify({ error: `Entity not found: ${entityId}` }) }], isError: true }
+      try {
+        rules.validateSavingThrow(entityId)
+      } catch (err) {
+        return rules.ruleErrorResult(err)
+      }
 
       const abilityMod = getAbilityModifier(entity.stats[ability as keyof EntityStats])
       const roll = rollDice(`1d20+${abilityMod}`)
@@ -186,13 +198,18 @@ export function registerCombatTools(server: McpServer): void {
       ]).describe('Condition to apply'),
     },
     async ({ entityId, condition }) => {
-      gs.applyCondition(entityId, condition as Condition)
-      const entity = gs.getEntity(entityId)
-      return {
-        content: [{
-          type: 'text',
-          text: JSON.stringify({ success: true, entityId, condition, entityConditions: entity?.conditions }),
-        }],
+      try {
+        rules.validateConditionTarget(entityId)
+        gs.applyCondition(entityId, condition as Condition)
+        const entity = gs.getEntity(entityId)
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({ success: true, entityId, condition, entityConditions: entity?.conditions }),
+          }],
+        }
+      } catch (err) {
+        return rules.ruleErrorResult(err)
       }
     }
   )

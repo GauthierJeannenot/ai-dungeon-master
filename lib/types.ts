@@ -84,6 +84,7 @@ export interface GameState {
   initiativeOrder: string[]
   currentTurn: string | null
   round: number
+  movementUsed: Record<string, number>  // grid cells spent by entity during its current turn
   combatLog: CombatLogEntry[]
   roomsVisited: string[]
   currentRoomId: string | null

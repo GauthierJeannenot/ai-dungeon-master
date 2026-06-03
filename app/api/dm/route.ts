@@ -191,10 +191,12 @@ ${ctx.adventureModule}
 
 RÈGLES MÉCANIQUES:
 - Tout calcul (attaque, dégâts, déplacement, HP, sauvegarde) → tools MCP obligatoires.
+- Les tools MCP refusent les actions illégales (mauvais tour, cible morte, hors portée, déplacement trop long). Si un tool renvoie une erreur, narre sobrement pourquoi l'action échoue ou demande une action valide.
 - Déplacement explicite du joueur → move_token AVANT de narrer.
 - Début de combat → spawn_monster puis enter_combat (2 tools max), narre, STOP.
 - Tour joueur en combat → resolve_attack ou saving_throw, puis next_turn, STOP.
 - Tour monstre → resolve_attack du monstre, puis next_turn, STOP.
+- Fin de combat avec adversaires encore actifs → end_combat avec force=true seulement si fuite, reddition ou accord narratif crédible.
 - HP monstres : vigoureux / légèrement blessé / gravement blessé / à l'agonie.`
 }
 

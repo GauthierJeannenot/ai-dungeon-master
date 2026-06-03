@@ -33,6 +33,7 @@ const INITIAL_GAME_STATE: GameState = {
   initiativeOrder: [],
   currentTurn: null,
   round: 0,
+  movementUsed: {},
   combatLog: [],
   roomsVisited: [],
   currentRoomId: null,
