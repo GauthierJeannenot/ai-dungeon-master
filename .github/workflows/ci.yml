@@ -29,6 +29,10 @@ jobs:
       - name: Type-check MCP server
         run: npx tsc -p mcp-server/tsconfig.json --noEmit
 
+      # Unit/smoke tests for the deterministic MCP engine
+      - name: Test MCP engine
+        run: npm test
+
       # Compile MCP server (needed for next build to pass — API route imports it at runtime)
       - name: Build MCP server
         run: npm run build:mcp
