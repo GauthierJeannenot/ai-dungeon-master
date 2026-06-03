@@ -658,6 +658,7 @@ RÈGLES MÉCANIQUES:
 - Déplacement explicite du joueur → move_token AVANT de narrer.
 - Début de combat / rencontre de salle → start_encounter en un seul tool, narre, STOP. Ne jamais inventer d'IDs de monstres.
 - Rencontres connues: bakery_floor_goblins (salle 8), loading_dock_patrol (salle 7), grammy_apartment_guards (salle 9), violet_fungus_heap (salle 3).
+- Salle 2: les dryades du verger ne sont pas une rencontre de combat prédéfinie. Si elles sont offensées, elles esquivent, lancent des pommes pourries et mettent la pression; ne déclenche pas start_encounter pour elles.
 - Tour joueur en combat → resolve_player_attack ou saving_throw, puis STOP. Pour une cible spatiale ("a ma droite", "le plus proche"), utilise resolve_player_attack avec targetHint.
 - Si le joueur passe/attend son tour en combat → pass_turn, puis STOP.
 - Ne jamais appeler next_turn : outil interne réservé au serveur.
@@ -705,6 +706,7 @@ function buildNarrationStaticPrompt(): string {
 Narre uniquement la conséquence immédiate de l'action du joueur.
 Respecte strictement les résultats mécaniques fournis: jets, dégâts, morts, positions, tour courant.
 Ne lance aucun dé, n'invente aucun nouvel ennemi, ne résous aucun tour futur.
+Salle 2: les dryades du verger ne sont pas une rencontre de combat prédéfinie. Si elles sont offensées, elles esquivent, lancent des pommes pourries et mettent la pression; ne déclenche pas de combat contre un autre monstre.
 Réponse brève: 2-5 phrases courtes, au présent, style vivant mais clair.
 Français naturel et correct: accents, accords simples, phrases propres. Pas de franglais gratuit.
 Format vocal: pas de Markdown, pas de liste, pas de titre, pas de parenthèse, pas d'excuse, pas de commentaire méta, pas de mention du système, des prompts, du moteur, des tools, de MCP ou de l'IA.
@@ -1271,6 +1273,18 @@ function detectDirectiveGuidanceRequest(message: string): boolean {
   return /\b(quoi maintenant|je fais quoi|on fait quoi|que faire|quoi faire|quelle suite|prochaine action|tu proposes quoi|tu me proposes quoi|guide moi|aide moi|je suis perdu|on est perdu|quelle direction|ou aller|ou je vais|par ou|donne moi une piste)\b/.test(text)
 }
 
+function detectDryadOffense(message: string, gameState: GameState): boolean {
+  if (gameState.phase !== 'exploration' || gameState.currentRoomId !== '2') return false
+  const text = normalizeFrenchText(message)
+  const targetsDryads = /\b(dryades?|fees?|fées?|filles?|creatures?|elles|branche|branches)\b/.test(text)
+  const hostileOrRude = /\b(attaque|attaquer|frappe|frapper|menace|menacer|intimide|intimider|insulte|insulter|crie|crier|hurle|hurler|provoque|provoquer|lance|jette|menacant|hostile)\b/.test(text)
+  return targetsDryads && hostileOrRude
+}
+
+function buildDryadOffenseNarrative(): string {
+  return "La dryade visée disparaît derrière un rideau de feuilles avant que ton geste ne porte. Une pomme pourrie explose à tes pieds, puis deux autres sifflent depuis les branches; leurs rires ne sont plus joueurs du tout. Le verger entier semble se pencher vers toi."
+}
+
 function buildDebugStateNarrative(gameState: GameState): string {
   const roomName = getCurrentRoomName(gameState) ?? 'une zone non identifiée'
   const position = gameState.player.position
@@ -1409,6 +1423,51 @@ function parseContextualRoomMove(
   return targetRoomId ? centerCellForRoom(targetRoomId) : null
 }
 
+function cellFromToolInput(value: unknown): { x: number; y: number } | null {
+  if (!isObjectRecord(value)) return null
+  const { x, y } = value
+  if (!Number.isInteger(x) || !Number.isInteger(y)) return null
+  return { x: Number(x), y: Number(y) }
+}
+
+function validateStartEncounterToolInput(
+  input: unknown,
+  gameState: GameState
+): Record<string, unknown> | null {
+  if (!isObjectRecord(input)) {
+    return {
+      error: 'Invalid start_encounter input.',
+      code: 'INVALID_TOOL_INPUT',
+    }
+  }
+
+  const encounterId = typeof input.encounterId === 'string' ? input.encounterId : null
+  if (!encounterId) return null
+
+  const preset = ENCOUNTERS[encounterId]
+  if (!preset) return null
+
+  const playerCell = cellFromToolInput(input.playerCell)
+  const playerCellRoomId = playerCell ? inferMappedAdventureRoomId(playerCell) : null
+  const allowedRoomId = playerCellRoomId ?? gameState.currentRoomId
+
+  if (allowedRoomId && preset.roomId !== allowedRoomId) {
+    return {
+      error: `Encounter ${encounterId} belongs to room ${preset.roomId}, not current target room ${allowedRoomId}.`,
+      code: 'ENCOUNTER_ROOM_MISMATCH',
+      detail: {
+        encounterId,
+        encounterRoomId: preset.roomId,
+        currentRoomId: gameState.currentRoomId,
+        playerCell,
+        playerCellRoomId,
+      },
+    }
+  }
+
+  return null
+}
+
 function parseTargetHint(message: string): PlayerAttackTargetHint | null {
   const text = normalizeFrenchText(message)
   if (/\b(droite|a droite|sur ma droite)\b/.test(text)) return 'right'
@@ -1540,6 +1599,24 @@ async function resolveServerFirstAction(
   if (detectDirectiveGuidanceRequest(message)) {
     const draftNarrative = buildDirectiveSceneNarrative(gameState)
     logEvent('info', 'dm.cost.engine_first.directive_guidance', {
+      requestId,
+      sessionId,
+      durationMs: Date.now() - startedAt,
+      draftNarrative,
+      gameState: summarizeGameState(gameState),
+    })
+    return {
+      handled: true,
+      gameState,
+      toolsUsed: [],
+      draftNarrative,
+      sawMcpToolError: false,
+    }
+  }
+
+  if (detectDryadOffense(message, gameState)) {
+    const draftNarrative = buildDryadOffenseNarrative()
+    logEvent('info', 'dm.cost.engine_first.dryad_offense', {
       requestId,
       sessionId,
       durationMs: Date.now() - startedAt,
@@ -2506,6 +2583,30 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
               is_error: true,
             })
             continue
+          }
+
+          if (toolUse.name === 'start_encounter') {
+            const validationError = validateStartEncounterToolInput(toolUse.input, currentGameState)
+            if (validationError) {
+              sawMcpToolError = true
+              logEvent('warn', 'dm.tool_use.blocked_start_encounter_mismatch', {
+                requestId,
+                sessionId,
+                iteration: iterations,
+                toolUseId: toolUse.id,
+                toolName: toolUse.name,
+                input: toolUse.input,
+                result: validationError,
+                gameState: summarizeGameState(currentGameState),
+              })
+              toolResults.push({
+                type: 'tool_result',
+                tool_use_id: toolUse.id,
+                content: JSON.stringify(validationError),
+                is_error: true,
+              })
+              continue
+            }
           }
 
           toolsUsed.push(toolUse.name)
