@@ -99,11 +99,11 @@ const PLACEHOLDERS = {
 }
 
 function selectPlaceholder(gameState: GameState, messageCount: number): string {
-  if (gameState.phase === 'combat') {
-    if (gameState.player.hp.current <= 0) {
-      return PLACEHOLDERS.dying[messageCount % PLACEHOLDERS.dying.length]
-    }
+  if (gameState.player.hp.current <= 0) {
+    return PLACEHOLDERS.dying[messageCount % PLACEHOLDERS.dying.length]
+  }
 
+  if (gameState.phase === 'combat') {
     return PLACEHOLDERS.combat[messageCount % PLACEHOLDERS.combat.length]
   }
 

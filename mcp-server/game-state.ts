@@ -155,7 +155,7 @@ export function rollPlayerDeathSave(roll: number): {
   }
 
   if (player.hp.current <= 0 && player.deathSaves.successes >= 3) {
-    player.deathSaves.stable = true
+    player.deathSaves = { successes: 0, failures: 0, stable: true }
   }
   if (player.hp.current <= 0 && player.deathSaves.failures >= 3) {
     player.deathSaves.dead = true
@@ -267,10 +267,10 @@ export function advanceTurn(): string | null {
   const idx = state.initiativeOrder.indexOf(current ?? '')
   const nextIdx = (idx + 1) % state.initiativeOrder.length
 
-  // Remove dead monsters from initiative. Keep the player in the order at 0 HP:
+  // Remove dead monsters from initiative. Keep a dying player in the order:
   // in D&D 5e, an unconscious player still has turns for death saves.
   state.initiativeOrder = state.initiativeOrder.filter(id => {
-    if (id === 'player') return true
+    if (id === 'player') return !state.player.deathSaves?.dead && !state.player.deathSaves?.stable
     return state.monsters[id]?.isAlive ?? false
   })
 

@@ -20,8 +20,8 @@ const MONSTER_TEMPLATES: Record<string, Omit<MonsterState, 'id' | 'name' | 'posi
     stats: { str: 8, dex: 14, con: 10, int: 10, wis: 8, cha: 8 },
     conditions: [],
     xpValue: 25,
-    attackBonus: 4,
-    damageDice: '1d6+2',
+    attackBonus: 3,
+    damageDice: '1d4+1',
     speed: 30,
   },
 
@@ -226,7 +226,7 @@ function createMonster(monsterType: string, cell: { x: number; y: number }, name
   }
 }
 
-function startCombat(combatants: string[]): {
+function startCombat(combatants: string[], options?: { playerActsFirst?: boolean }): {
   phase: 'combat'
   initiativeOrder: string[]
   initiatives: Array<{ id: string; initiative: number; roll: string }>
@@ -247,7 +247,9 @@ function startCombat(combatants: string[]): {
   }
 
   initiatives.sort((a, b) => b.initiative - a.initiative)
-  const order = initiatives.map(i => i.id)
+  const order = options?.playerActsFirst
+    ? ['player', ...initiatives.filter(i => i.id !== 'player').map(i => i.id)]
+    : initiatives.map(i => i.id)
   gs.setInitiativeOrder(order)
 
   gs.addLogEntry({
@@ -418,7 +420,9 @@ export function registerPhaseTools(server: McpServer): void {
           spawnedMonsters.push(monster)
         }
 
-        const combat = startCombat(['player', ...spawnedMonsters.map(monster => monster.id)])
+        const combat = startCombat(['player', ...spawnedMonsters.map(monster => monster.id)], {
+          playerActsFirst: true,
+        })
         if (reason || preset) {
           gs.addLogEntry({
             round: gs.getState().round,

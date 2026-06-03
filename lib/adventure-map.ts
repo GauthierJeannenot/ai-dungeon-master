@@ -57,9 +57,9 @@ export const ENCOUNTERS: Record<string, EncounterDefinition> = {
     name: 'Gobelin Charpentier',
     playerCell: { x: 9, y: 6 },
     monsters: [
-      { monsterType: 'goblin', cell: { x: 10, y: 5 }, name: 'Gobelin Charpentier' },
-      { monsterType: 'goblin', cell: { x: 10, y: 8 }, name: 'Gobelin Charpentier' },
-      { monsterType: 'goblin', cell: { x: 7, y: 7 }, name: 'Gobelin Charpentier' },
+      { monsterType: 'goblin_minion', cell: { x: 10, y: 5 }, name: 'Gobelin Charpentier' },
+      { monsterType: 'goblin_minion', cell: { x: 10, y: 8 }, name: 'Gobelin Charpentier' },
+      { monsterType: 'goblin_minion', cell: { x: 7, y: 7 }, name: 'Gobelin Charpentier' },
     ],
   },
   grammy_apartment_guards: {

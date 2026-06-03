@@ -530,6 +530,33 @@ test('MCP roll_death_save tracks player death saves and consumes the turn action
   })
 })
 
+test('MCP roll_death_save stabilizes the player on three successes', async () => {
+  await withForcedDiceSequence('12', async () => {
+    await withMcpClient(async client => {
+      const baseState = await callTool(client, 'get_game_state')
+      const state = makeCombatState(baseState)
+      state.player.hp.current = 0
+      state.player.deathSaves = { successes: 2, failures: 0 }
+      state.player.conditions = ['unconscious']
+
+      await callTool(client, 'replace_game_state', { gameState: state })
+
+      const deathSave = await callTool(client, 'roll_death_save')
+      assert.equal(deathSave.stable, true)
+      assert.equal(deathSave.dead, false)
+      assert.equal(deathSave.successes, 0)
+      assert.equal(deathSave.failures, 0)
+
+      const afterSave = await callTool(client, 'get_game_state')
+      assert.deepEqual(afterSave.player.deathSaves, { successes: 0, failures: 0, stable: true })
+
+      const nextTurn = await callTool(client, 'next_turn', { actorId: 'player' })
+      assert.equal(nextTurn.currentTurn, 'goblin_a')
+      assert.deepEqual(nextTurn.initiativeOrder, ['goblin_a'])
+    })
+  })
+})
+
 test('MCP start_encounter atomically moves player, spawns real IDs, and enters combat', async () => {
   await withMcpClient(async client => {
     const baseState = await callTool(client, 'get_game_state')
@@ -547,6 +574,8 @@ test('MCP start_encounter atomically moves player, spawns real IDs, and enters c
     assert.ok(encounter.spawnedMonsters.every(monster => !['goblin1', 'goblin2', 'goblin3'].includes(monster.id)))
     assert.equal(encounter.combat.phase, 'combat')
     assert.equal(encounter.combat.initiativeOrder.length, 4)
+    assert.equal(encounter.combat.currentTurn, 'player')
+    assert.equal(encounter.combat.initiativeOrder[0], 'player')
     assert.ok(encounter.combat.initiativeOrder.includes('player'))
 
     const spawnedIds = encounter.spawnedMonsters.map(monster => monster.id)

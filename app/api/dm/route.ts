@@ -1167,7 +1167,7 @@ function detectNarrativeStateContractIssue(
 
   const triggerPatterns: Array<[string, RegExp]> = [
     ['enemy_visible_without_tokens', /\b(vois|voyez|apercois|apercevez|distingues?|detectes?|remarques?|visible|en vue|se montre|se tiennent?|au fond|pres de|devant toi|dans la salle|mouvement)\b/],
-    ['enemy_enters_or_moves', /\b(entrent?|rentrent?|arrivent?|approchent?|surgissent?|debarquent?|emergent?|emerge|apparai(?:t|ssent)|passent?|descendent|convergent|encerclent?|se rapprochent|suivent?|poursuivent?|trainent?|se deplacent?)\b/],
+    ['enemy_enters_or_moves', /\b(entrent?|rentrent?|arrivent?|approchent?|surgissent?|debarquent?|emergent?|emerge|apparai(?:t|ssent)|passent?|descendent|convergent|encerclent?|se rapprochent|suivent?|poursuivent?|trainent?|se deplacent?|fuient|fuit|fuir|se sauvent?|s[' ]?enfuient|disparaissent?|filent?|detalent?)\b/],
     ['enemy_takes_action', /\b(degainent?|attaquent?|frappent?|chargent?|scrutent?|fouillent?|poussent?|se retournent?|reperent?|repere|voient?|apercoivent?|crient?|grondent?)\b/],
     ['combat_state_without_engine', /\b(combat imminent|initiative|armes? degainees?|epees? degainees?|vous etes repere|intrus)\b/],
   ]
@@ -1285,7 +1285,7 @@ function detectPassTurnIntent(message: string, gameState: GameState): boolean {
 }
 
 function isPlayerAtZeroHp(gameState: GameState): boolean {
-  return gameState.phase === 'combat' && gameState.player.hp.current <= 0
+  return gameState.player.hp.current <= 0
 }
 
 function isPlayerDeathResolved(gameState: GameState): boolean {
@@ -1315,8 +1315,12 @@ function buildPlayerDownNarrative(gameState: GameState): string {
 
   const saveText = `${deathSaves.successes} succès, ${deathSaves.failures} échec${deathSaves.failures > 1 ? 's' : ''}`
 
-  if (gameState.currentTurn === 'player') {
+  if (gameState.phase === 'combat' && gameState.currentTurn === 'player') {
     return `Tu n'es pas mort, mais tu es à zéro PV et inconscient: pas d'attaque, pas de parade, pas de mouvement héroïque. Là, ton seul vrai levier est le jet de mort; pour l'instant tu as ${saveText}.`
+  }
+
+  if (gameState.phase !== 'combat') {
+    return `Tu es à zéro PV et hors combat pour l'instant: pas d'attaque, pas de parade, pas de mouvement héroïque. Ton corps tient encore, mais la suite appartient aux conséquences de la scène.`
   }
 
   return `Tu es à zéro PV et inconscient, donc tu ne peux pas agir pendant que l'initiative tourne encore. Dès que ton tour revient, le prochain vrai levier sera le jet de mort; pour l'instant tu as ${saveText}.`
@@ -1429,6 +1433,24 @@ function encounterIdForRoom(roomId: string | null | undefined): string | null {
 }
 
 function relativeRoomIdForExplorationMove(text: string, gameState: GameState): string | null {
+  const doorAction = /\b(ouvres?|ouvrir|pousses?|pousser|forces?|forcer|enfonces?|enfoncer|defonces?|defoncer|casses?|casser|exploses?|exploser|deboites?|deboiter|franchis|franchir|passes?|passer|entres?|entrer)\b(?=.{0,80}\b(portes?|entree|seuil|battants?|double porte|grande porte)\b)/.test(text) ||
+    /\b(portes?|entree|seuil|battants?|double porte|grande porte)\b(?=.{0,80}\b(ouvres?|ouvrir|pousses?|pousser|forces?|forcer|enfonces?|enfoncer|defonces?|defoncer|casses?|casser|exploses?|exploser|deboites?|deboiter|franchis|franchir|passes?|passer|entres?|entrer)\b)/.test(text)
+
+  if (doorAction) {
+    if (gameState.currentRoomId === '1') return '4'
+    if (gameState.currentRoomId === '7') return '8'
+    if (gameState.currentRoomId === '4') {
+      if (/\b(appartement|grammy|gauche|etage|haut|escalier)\b/.test(text)) return '9'
+      if (/\b(dehors|exterieur|sortie|arriere|retour)\b/.test(text)) return '1'
+      return '8'
+    }
+    if (gameState.currentRoomId === '8') {
+      if (/\b(appartement|grammy|etage|haut|escalier)\b/.test(text)) return '9'
+      if (/\b(bureau|paperasse|registres?)\b/.test(text)) return '5'
+      if (/\b(quai|chargement|laterale|dock)\b/.test(text)) return '7'
+    }
+  }
+
   const exploresForward = /\b(plus loin|continue|continuer|aventure|aventurer|avance|avancer|explore|explorer|nourriture|manger|reserve|reserves)\b/.test(text)
   const huntsEnemies = /\b(cherches?|chercher|trouves?|trouver|deniches?|denicher|traques?|traquer|pistes?|pister)\b(?=.{0,80}\b(gobelins?|ennemis?|mechants?|monstres?|creatures?|silhouettes?)\b)/.test(text)
   if (!exploresForward && !huntsEnemies) {
@@ -1479,11 +1501,11 @@ function contextualRoomIdFromRecentDm(
 
 function parseNamedRoomMove(message: string, gameState: GameState): { x: number; y: number } | null {
   const text = normalizeFrenchText(message)
-  const hasMovementVerb = /\b(vers|vais|aller|va |deplace|rends|rejoins?|rejoint|entre|entrer|retournes?|retourner|montes?|monter|grimpes?|grimpe|empruntes?|prends|suis|suivre|aventure|aventurer|continue|continuer|avances?|avancer|explores?|explorer|investig\w*|inspect\w*|examin\w*|fouill\w*|cherch\w*|trouv\w*|denich\w*|traqu\w*|pist\w*)\b/.test(text)
+  const hasMovementVerb = /\b(vers|vais|aller|va |deplace|rends|rejoins?|rejoint|entre|entrer|retournes?|retourner|montes?|monter|grimpes?|grimpe|empruntes?|prends|suis|suivre|aventure|aventurer|continue|continuer|avances?|avancer|explores?|explorer|ouvres?|ouvrir|pousses?|pousser|forces?|forcer|enfonces?|enfoncer|defonces?|defoncer|casses?|casser|exploses?|exploser|deboites?|deboiter|franchis|franchir|passes?|passer|investig\w*|inspect\w*|examin\w*|fouill\w*|cherch\w*|trouv\w*|denich\w*|traqu\w*|pist\w*)\b/.test(text)
   if (!hasMovementVerb) return null
 
   const relativeRoomId = relativeRoomIdForExplorationMove(text, gameState)
-  if (!relativeRoomId && !/\b(salle|piece|bureau|appartement|boulangerie|quai|verger|mac|treant|pommier|etage|haut|escalier|four|cuisine|reserve|reserves)\b/.test(text)) {
+  if (!relativeRoomId && !/\b(salle|piece|bureau|appartement|boulangerie|quai|verger|mac|treant|pommier|etage|haut|escalier|four|cuisine|reserve|reserves|portes?|entree|seuil|battants?)\b/.test(text)) {
     return null
   }
 
@@ -2054,6 +2076,56 @@ async function autoEndCombatIfWon(
 
   const nextGameState = await loadCurrentGameState(sessionId)
   logEvent('info', 'dm.combat.auto_end.ok', {
+    requestId,
+    sessionId,
+    durationMs: Date.now() - startedAt,
+    result,
+    gameState: summarizeGameState(nextGameState),
+  })
+  return { gameState: nextGameState, ended: true }
+}
+
+async function autoEndCombatIfPlayerResolved(
+  gameState: GameState,
+  sessionId: string | undefined,
+  requestId: string
+): Promise<{ gameState: GameState; ended: boolean }> {
+  if (
+    gameState.phase !== 'combat' ||
+    gameState.player.hp.current > 0 ||
+    !isPlayerDeathResolved(gameState)
+  ) {
+    return { gameState, ended: false }
+  }
+
+  const deathSaves = gameState.player.deathSaves
+  const reason = deathSaves?.dead
+    ? 'Le héros est mort; le combat se termine par une défaite.'
+    : 'Le héros est stable mais inconscient; les adversaires contrôlent la scène.'
+  const startedAt = Date.now()
+
+  logEvent('info', 'dm.combat.auto_end_player_resolved.start', {
+    requestId,
+    sessionId,
+    reason,
+    gameState: summarizeGameState(gameState),
+  })
+
+  const result = await callMCPTool('end_combat', {
+    force: true,
+    reason,
+  }, sessionId)
+  if (isMcpErrorResult(result)) {
+    logEvent('warn', 'dm.combat.auto_end_player_resolved.failed', {
+      requestId,
+      sessionId,
+      result,
+    })
+    return { gameState, ended: false }
+  }
+
+  const nextGameState = await loadCurrentGameState(sessionId)
+  logEvent('info', 'dm.combat.auto_end_player_resolved.ok', {
     requestId,
     sessionId,
     durationMs: Date.now() - startedAt,
@@ -2974,6 +3046,20 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       })
     }
 
+    try {
+      const autoEndPlayer = await autoEndCombatIfPlayerResolved(currentGameState, sessionId, requestId)
+      if (autoEndPlayer.ended) {
+        currentGameState = autoEndPlayer.gameState
+        toolsUsed.push('end_combat')
+      }
+    } catch (err) {
+      logEvent('error', 'dm.combat.auto_end_player_resolved.error', {
+        requestId,
+        sessionId,
+        err,
+      })
+    }
+
     if (!turnBoundaryReached) {
       try {
         const autoAdvance = await autoAdvanceCompletedTurn(currentGameState, sessionId, requestId)
@@ -2998,6 +3084,20 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       }
     } catch (err) {
       logEvent('error', 'dm.combat.auto_npc.error', {
+        requestId,
+        sessionId,
+        err,
+      })
+    }
+
+    try {
+      const autoEndPlayer = await autoEndCombatIfPlayerResolved(currentGameState, sessionId, requestId)
+      if (autoEndPlayer.ended) {
+        currentGameState = autoEndPlayer.gameState
+        toolsUsed.push('end_combat')
+      }
+    } catch (err) {
+      logEvent('error', 'dm.combat.auto_end_player_resolved_after_npc.error', {
         requestId,
         sessionId,
         err,

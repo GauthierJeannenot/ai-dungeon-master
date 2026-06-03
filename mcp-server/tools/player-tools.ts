@@ -29,6 +29,13 @@ const HpSchema = z.object({
   max: z.number().int().positive(),
 })
 
+const DeathSavesSchema = z.object({
+  successes: z.number().int().min(0).max(3),
+  failures: z.number().int().min(0).max(3),
+  stable: z.boolean().optional(),
+  dead: z.boolean().optional(),
+})
+
 const ItemSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -44,6 +51,7 @@ const PlayerStateSchema = z.object({
   class: z.string(),
   level: z.number().int().positive(),
   hp: HpSchema,
+  deathSaves: DeathSavesSchema.optional(),
   ac: z.number().int(),
   stats: EntityStatsSchema,
   proficiencyBonus: z.number().int(),
