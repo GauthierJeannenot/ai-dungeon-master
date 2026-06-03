@@ -561,7 +561,14 @@ export function registerPhaseTools(server: McpServer): void {
 
       // Calculate XP from defeated monsters
       const deadMonsters = Object.values(state.monsters).filter(m => !m.isAlive)
+      const disengagedMonsters = force
+        ? Object.values(state.monsters).filter(m => m.isAlive)
+        : []
       const totalXP = deadMonsters.reduce((sum, m) => sum + m.xpValue, 0)
+
+      for (const monster of disengagedMonsters) {
+        gs.removeMonster(monster.id)
+      }
 
       gs.setPhase('exploration')
       state.initiativeOrder = []
@@ -574,7 +581,7 @@ export function registerPhaseTools(server: McpServer): void {
         round: state.round,
         turn: 'system',
         action: 'COMBAT TERMINÉ',
-        mechanicalDetail: `XP gagné: ${totalXP} (${deadMonsters.map(m => m.name).join(', ')})`,
+        mechanicalDetail: `XP gagné: ${totalXP} (${deadMonsters.map(m => m.name).join(', ')})${disengagedMonsters.length > 0 ? ` | Désengagés: ${disengagedMonsters.map(m => m.name).join(', ')}` : ''}`,
       })
 
       return {
@@ -585,6 +592,7 @@ export function registerPhaseTools(server: McpServer): void {
             xpAwarded: totalXP,
             reason,
             defeatedMonsters: deadMonsters.map(m => ({ id: m.id, name: m.name, xp: m.xpValue })),
+            disengagedMonsters: disengagedMonsters.map(m => ({ id: m.id, name: m.name, type: m.type })),
           }),
         }],
       }

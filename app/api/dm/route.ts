@@ -415,9 +415,22 @@ async function processHistory(
 
   // Vérifie si la partie ancienne est suffisamment longue pour mériter la compression
   const oldText = oldTurns.map(t => t.content).join(' ')
-  const needsCompression = oldText.length > HISTORY_COMPRESS_THRESHOLD_CHARS || !!existingSummary
+  const needsCompression = oldText.length > HISTORY_COMPRESS_THRESHOLD_CHARS
 
   if (!needsCompression) {
+    if (existingSummary) {
+      logEvent('debug', 'dm.history.process.reuse_summary', {
+        requestId,
+        historyLength: history.length,
+        oldTurns: oldTurns.length,
+        recentTurns: recent.length,
+        oldTextLength: oldText.length,
+        thresholdChars: HISTORY_COMPRESS_THRESHOLD_CHARS,
+        existingSummaryLength: existingSummary.length,
+      })
+      return { recent: history, newSummary: undefined }
+    }
+
     // Pas encore au seuil : on renvoie tout sans compresser
     logEvent('debug', 'dm.history.process.no_compression', {
       requestId,
@@ -2133,7 +2146,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     const persistedHistory = [
-      ...(newSummary ? recentHistory : requestHistory),
+      ...(activeSummary ? recentHistory.slice(-HISTORY_KEEP_RECENT) : requestHistory),
       { role: 'player', content: message } satisfies ConversationTurn,
       { role: 'dm', content: narrative || 'Le Dungeon Master réfléchit...' } satisfies ConversationTurn,
     ]

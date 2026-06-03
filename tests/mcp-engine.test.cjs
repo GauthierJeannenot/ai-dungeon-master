@@ -457,6 +457,10 @@ test('MCP rules require force to end combat with active enemies', async () => {
     })
     assert.equal(forced.phase, 'exploration')
     assert.equal(forced.reason, 'Les gobelins fuient.')
+    assert.deepEqual(forced.disengagedMonsters, [{ id: 'goblin_a', name: 'goblin_a', type: 'goblin' }])
+
+    const stateAfter = await callTool(client, 'get_game_state')
+    assert.equal(Object.values(stateAfter.monsters).filter(monster => monster.isAlive).length, 0)
   })
 })
 
