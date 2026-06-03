@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { loadContextFiles, extractCurrentRoom } from '@/lib/context-loader'
+import { loadContextFiles } from '@/lib/context-loader'
 import { callMCPTool, listMCPTools } from '@/lib/mcp-client'
 import { DMRequest, DMResponse, GameState, ConversationTurn } from '@/lib/types'
 
@@ -93,11 +93,8 @@ async function ollamaChat(
     messages,
     tools: tools.length > 0 ? tools : undefined,
     stream: false,
-    tool_choice: tools.length > 0 ? 'auto' : undefined,
-    // num_ctx au niveau racine — Ollama /v1 respecte ce champ, pas options.num_ctx
-    num_ctx: 32768,          // 43GB modèle + ~20GB KV cache = ~63GB / 80GB VRAM A100
     options: {
-      temperature: 0.2,
+      temperature: 0.4,      // bas pour fiabiliser le tool calling
       num_predict: MAX_TOKENS,
     },
   }
@@ -128,71 +125,55 @@ function serializeGameState(gs: GameState): string {
   })
 }
 
-// ── System prompt optimisé pour llama3.3:70b ─────────────────────────────────
-// Principes d'optimisation :
-// 1. XML tags → llama3.3 suit mieux les sections structurées
-// 2. Stats joueur inlinées depuis game state → pas de duplication avec player-character.md
-// 3. Salle courante seulement → -80% de tokens sur le module (~3000 → ~400)
-// 4. Règles DM ultra-compressées → llama3.3 connaît D&D 5e, inutile de tout ré-expliquer
-// 5. Instructions tool calling en tête + très explicites
-// Résultat : ~6000 tokens → ~1200 tokens par requête
+// ── System prompt ─────────────────────────────────────────────────────────────
+// Tout en un seul message system (Ollama n'a pas de prompt caching)
 function buildSystemPrompt(gs: GameState, summaryContext: string | undefined): string {
   const ctx = loadContextFiles()
-  const p = gs.player
-  const aliveMonsters = Object.values(gs.monsters).filter(m => m.isAlive)
-  const activeConditions = p.conditions.length > 0 ? p.conditions.join(', ') : 'aucune'
+  const parts: string[] = []
 
-  // Module complet — le DM a connaissance de toutes les salles
-  const moduleContext = ctx.adventureModule
+  parts.push(`# CONTRAINTE ABSOLUE — LIS CECI EN PREMIER
 
-  return `<system>
-<rules>
-Tu es un Dungeon Master D&D 5e. Narre en français, au présent, 2-3 phrases max.
+Tu résous EXACTEMENT et UNIQUEMENT l'action écrite par le joueur dans CE message.
+PAS d'anticipation. PAS d'enchaînement. PAS de "et ensuite logiquement...".
 
-UNE ACTION PAR MESSAGE. Pas d'anticipation, pas d'enchaînement.
-Interdit : "un ami crie" → NE PAS le faire entrer. "j'avance vers X" → NE PAS entrer dans X.
+Exemples INTERDITS :
+- "un ami crie à la porte" → NE PAS le faire entrer, NE PAS explorer.
+- "j'avance vers la porte" → NE PAS ouvrir la porte, NE PAS entrer.
+- "j'attaque le gobelin" → NE PAS résoudre le tour du monstre ensuite.
 
-FUNCTION CALLING OBLIGATOIRE :
-Appelle les tools via l'API (function_call). JAMAIS dans le texte de ta réponse.
-- Déplacement → move_token PUIS narration.
-- Entrée salle → trigger_room_event.
-- Combat → spawn_monster + enter_combat, STOP.
-- Attaque joueur → resolve_attack + next_turn, STOP.
+Après ta réponse : STOP. Tu attends le prochain message.
+
+---
+
+Tu es un Dungeon Master de D&D 5e. Tu narre en français, au présent (1-3 phrases max).
+
+PERSONNAGE:
+${ctx.playerCharacter}
+
+RÈGLES JOUEUR:
+${ctx.playerRules}
+
+RÈGLES DM:
+${ctx.dmRules}
+
+MODULE:
+${ctx.adventureModule}
+
+RÈGLES MÉCANIQUES:
+- Tout calcul → tools MCP obligatoires. Ne jamais inventer de chiffres.
+- Déplacement → move_token AVANT de narrer.
+- Début combat → spawn_monster + enter_combat, narre, STOP.
+- Tour joueur → resolve_attack ou saving_throw + next_turn, STOP.
 - Tour monstre → resolve_attack + next_turn, STOP.
 - HP monstres : vigoureux / légèrement blessé / gravement blessé / à l'agonie.
-</rules>
 
-<player>
-${p.name} — Guerrier Niv.${p.level} | HP ${p.hp.current}/${p.hp.max} | CA ${p.ac} | Pos (${p.position.x},${p.position.y})
-Conditions : ${activeConditions} | Vitesse : ${p.speed} pieds
-Attaque : 1d20+5 | Épée longue : 1d8+3 (Sap) | Hache de main : 1d6+3 (Lent)
-Action bonus : Second Souffle 1d10+${p.level} PV (1×/repos court)
-Inventaire : ${p.inventory.map(i => i.name).join(', ')}
-Background : ex-mercenaire en quête de rédemption, méfiant envers la magie
-</player>
-${aliveMonsters.length > 0 ? `
-<combat>
-Phase : ${gs.phase} | Round : ${gs.round} | Tour : ${gs.currentTurn ?? '—'}
-Monstres : ${aliveMonsters.map(m => `${m.name}(${m.id}) HP${m.hp.current}/${m.hp.max} CA${m.ac}`).join(' | ')}
-Initiative : ${gs.initiativeOrder.join(' → ')}
-</combat>` : `<phase>${gs.phase}</phase>`}
+ÉTAT DU JEU: ${serializeGameState(gs)}`)
 
-<adventure>
-${moduleContext}
-</adventure>
+  if (summaryContext) {
+    parts.push(`RÉSUMÉ SESSION (échanges précédents):\n${summaryContext}`)
+  }
 
-<state>
-Salle : ${gs.currentRoomId ?? 'extérieur'} | Visitées : ${gs.roomsVisited.join(', ') || 'aucune'}
-${gs.combatLog.length > 0 ? `Dernières actions : ${gs.combatLog.slice(-2).map(e => e.mechanicalDetail ?? e.action).join(' | ')}` : ''}
-${summaryContext ? `Résumé session : ${summaryContext}` : ''}
-</state>
-
-<dm_rules>
-DCs : Facile 10, Moyen 15, Difficile 20. DC créature = 8+mod+maîtrise.
-Raté de 1-2 → offrir succès à un coût narratif.
-Tous les combats sont évitables : CHA/SAG DD 13 + plan crédible.
-</dm_rules>
-</system>`
+  return parts.join('\n\n')
 }
 
 // ── Compression de l'historique ───────────────────────────────────────────────
@@ -238,89 +219,6 @@ async function processHistory(
 
   const newSummary = await compressHistory(oldTurns, existingSummary)
   return { recent, newSummary }
-}
-
-// ── Parser de tool calls textuels ────────────────────────────────────────────
-// Fallback pour les modèles qui écrivent les tool calls dans le texte.
-// Utilise un parser de JSON imbriqué (bracket matching) pour gérer
-// des structures comme {"parameters": {"toCell": {"x": 7, "y": 14}}}.
-interface TextToolCall { name: string; args: Record<string, unknown> }
-
-// Extrait tous les blocs JSON valides d'un texte, quelle que soit la profondeur
-function extractJsonBlocks(text: string): string[] {
-  const blocks: string[] = []
-  let depth = 0
-  let start = -1
-  let inString = false
-  let escape = false
-
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i]
-    if (escape)          { escape = false; continue }
-    if (c === '\\' && inString) { escape = true;  continue }
-    if (c === '"')       { inString = !inString; continue }
-    if (inString)        { continue }
-
-    if (c === '{') {
-      if (depth === 0) start = i
-      depth++
-    } else if (c === '}') {
-      depth--
-      if (depth === 0 && start !== -1) {
-        blocks.push(text.slice(start, i + 1))
-        start = -1
-      }
-    }
-  }
-  return blocks
-}
-
-function isToolCallObject(obj: Record<string, unknown>): boolean {
-  // Format 1 : {"name":"X","parameters":{...}} ou {"name":"X","arguments":{...}}
-  if (typeof obj.name === 'string' && (obj.parameters || obj.arguments)) return true
-  // Format 2 : {"type":"function","name":"X",...}
-  if (obj.type === 'function' && typeof obj.name === 'string') return true
-  // Format 3 : {"function":{"name":"X","arguments":{...}}}
-  if (obj.function && typeof (obj.function as Record<string, unknown>).name === 'string') return true
-  return false
-}
-
-function toToolCall(obj: Record<string, unknown>): TextToolCall | null {
-  if (typeof obj.name === 'string' && obj.parameters && typeof obj.parameters === 'object')
-    return { name: obj.name, args: obj.parameters as Record<string, unknown> }
-  if (typeof obj.name === 'string' && obj.arguments && typeof obj.arguments === 'object')
-    return { name: obj.name, args: obj.arguments as Record<string, unknown> }
-  if (obj.function && typeof obj.function === 'object') {
-    const f = obj.function as Record<string, unknown>
-    if (typeof f.name === 'string' && f.arguments && typeof f.arguments === 'object')
-      return { name: f.name, args: f.arguments as Record<string, unknown> }
-  }
-  return null
-}
-
-function extractTextToolCalls(text: string): TextToolCall[] {
-  const calls: TextToolCall[] = []
-  for (const block of extractJsonBlocks(text)) {
-    try {
-      const obj = JSON.parse(block) as Record<string, unknown>
-      if (isToolCallObject(obj)) {
-        const tc = toToolCall(obj)
-        if (tc) calls.push(tc)
-      }
-    } catch { /* JSON invalide */ }
-  }
-  return calls
-}
-
-function stripToolCallsFromText(text: string): string {
-  let result = text
-  for (const block of extractJsonBlocks(text)) {
-    try {
-      const obj = JSON.parse(block) as Record<string, unknown>
-      if (isToolCallObject(obj)) result = result.replace(block, '')
-    } catch { /* skip */ }
-  }
-  return result.replace(/[ \t]{2,}/g, ' ').replace(/\n{3,}/g, '\n\n').trim()
 }
 
 // ── Conversion historique → messages OpenAI ──────────────────────────────────
@@ -420,62 +318,47 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
       const msg = choice.message
 
-      const responseText = msg.content ?? ''
+      // Accumule la narration textuelle
+      if (msg.content) {
+        narrative += (narrative ? '\n\n' : '') + msg.content
+      }
 
-      // ── Chemin A : API tool_calls (format OpenAI natif) ──────────────────
+      // Fin de la réponse — pas de tool call
+      if (choice.finish_reason === 'stop' || !msg.tool_calls?.length) break
+
+      // ── Traitement des tool calls ─────────────────────────────────────────
       if (msg.tool_calls?.length) {
+        // Ajoute le message assistant avec les tool calls à l'historique
         messages.push({
           role: 'assistant',
-          content: responseText || null,
+          content: msg.content ?? null,
           tool_calls: msg.tool_calls,
         })
 
+        // Exécute chaque tool call via le MCP server
         for (const tc of msg.tool_calls) {
-          toolsUsed.push(tc.function.name)
+          const toolName = tc.function.name
+          toolsUsed.push(toolName)
+
           let resultContent: string
           try {
             const args = JSON.parse(tc.function.arguments) as Record<string, unknown>
-            const result = await callMCPTool(tc.function.name, args)
+            const result = await callMCPTool(toolName, args)
             resultContent = JSON.stringify(result)
           } catch (err) {
             resultContent = JSON.stringify({ error: err instanceof Error ? err.message : 'Tool error' })
           }
-          messages.push({ role: 'tool', tool_call_id: tc.id, content: resultContent })
-        }
-        continue
-      }
 
-      // ── Chemin B : tool calls écrits dans le texte (fallback) ────────────
-      // Modèles comme llama3.3 qui ne supportent pas bien le function_call API
-      const textCalls = extractTextToolCalls(responseText)
-
-      if (textCalls.length > 0) {
-        // Retire les JSON de tool calls du texte, garde la narration propre
-        const cleanNarrative = stripToolCallsFromText(responseText)
-
-        // Exécute chaque tool call extrait du texte
-        const toolResultsSummary: string[] = []
-        for (const tc of textCalls) {
-          toolsUsed.push(tc.name)
-          try {
-            const result = await callMCPTool(tc.name, tc.args)
-            toolResultsSummary.push(`${tc.name}: ${JSON.stringify(result)}`)
-          } catch (err) {
-            toolResultsSummary.push(`${tc.name}: erreur — ${err instanceof Error ? err.message : 'unknown'}`)
-          }
+          messages.push({
+            role: 'tool',
+            tool_call_id: tc.id,
+            content: resultContent,
+          })
         }
 
-        // Ajoute l'échange dans l'historique pour que le LLM puisse narrer
-        messages.push({ role: 'assistant', content: cleanNarrative || responseText })
-        messages.push({
-          role: 'user',
-          content: `Résultats des actions mécaniques : ${toolResultsSummary.join(' | ')}. Narre maintenant le résultat en 2-3 phrases, sans JSON.`,
-        })
-        continue
+        continue // relance la boucle pour que le LLM traite les résultats
       }
 
-      // ── Chemin C : réponse narrative pure (pas de tool calls) ────────────
-      narrative += (narrative ? '\n\n' : '') + responseText
       break
     }
 
