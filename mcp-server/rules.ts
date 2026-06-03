@@ -4,6 +4,12 @@ import * as gs from './game-state'
 type Entity = PlayerState | MonsterState
 
 const DEFAULT_MELEE_RANGE_CELLS = 1
+const MAP_BOUNDS = {
+  minX: 0,
+  maxX: 16,
+  minY: 0,
+  maxY: 14,
+} as const
 
 const ATTACK_RANGE_CELLS: Record<string, number> = {
   longsword: 1,
@@ -97,6 +103,27 @@ function assertInInitiative(entityId: string): void {
   }
 }
 
+function assertValidMapCell(cell: { x: number; y: number }, fieldName: string): void {
+  const validCoordinates = Number.isFinite(cell.x) &&
+    Number.isFinite(cell.y) &&
+    Number.isInteger(cell.x) &&
+    Number.isInteger(cell.y)
+
+  const inBounds = validCoordinates &&
+    cell.x >= MAP_BOUNDS.minX &&
+    cell.x <= MAP_BOUNDS.maxX &&
+    cell.y >= MAP_BOUNDS.minY &&
+    cell.y <= MAP_BOUNDS.maxY
+
+  if (!inBounds) {
+    throw new RuleViolation('INVALID_GRID_CELL', `Cell (${cell.x}, ${cell.y}) is outside the battlemap bounds.`, {
+      field: fieldName,
+      cell,
+      bounds: MAP_BOUNDS,
+    })
+  }
+}
+
 function assertActionAvailable(entityId: string): void {
   if (gs.hasActionUsed(entityId)) {
     throw new RuleViolation('ACTION_ALREADY_USED', `${entityId} has already used their action this turn.`, {
@@ -124,6 +151,7 @@ function attackRangeCells(weaponOrSpell: string, rangeCells?: number): number {
 export function validateMove(tokenId: string, toCell: { x: number; y: number }): { distance: number; remaining: number | null } {
   const entity = assertEntity(tokenId)
   assertAlive(tokenId, entity)
+  assertValidMapCell(toCell, 'toCell')
 
   const blocker = occupiedByLivingEntity(toCell, tokenId)
   if (blocker) {

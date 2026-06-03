@@ -190,6 +190,30 @@ test('MCP move_token tracks room transitions for the player', async () => {
   })
 })
 
+test('MCP rules reject out-of-bounds movement destinations', async () => {
+  await withMcpClient(async client => {
+    const baseState = await callTool(client, 'get_game_state')
+    baseState.player.position = { x: 4, y: 13 }
+    await callTool(client, 'replace_game_state', { gameState: baseState })
+
+    const offRightEdge = await callTool(client, 'move_token', {
+      tokenId: 'player',
+      toCell: { x: 17, y: 13 },
+    })
+    assert.equal(offRightEdge.code, 'INVALID_GRID_CELL')
+    assert.deepEqual(offRightEdge.detail.bounds, { minX: 0, maxX: 16, minY: 0, maxY: 14 })
+
+    const offBottomEdge = await callTool(client, 'move_token', {
+      tokenId: 'player',
+      toCell: { x: 4, y: 15 },
+    })
+    assert.equal(offBottomEdge.code, 'INVALID_GRID_CELL')
+
+    const stateAfter = await callTool(client, 'get_game_state')
+    assert.deepEqual(stateAfter.player.position, { x: 4, y: 13 })
+  })
+})
+
 test('MCP rules reject attacks outside the active turn and range', async () => {
   await withMcpClient(async client => {
     const baseState = await callTool(client, 'get_game_state')
