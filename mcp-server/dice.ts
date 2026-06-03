@@ -2,6 +2,35 @@ import { DiceRollResult } from '../lib/types'
 
 // Parses notation like "2d6+3", "1d20", "1d4-1", "d20"
 const DICE_PATTERN = /^(\d*)d(\d+)([+-]\d+)?$/i
+const FORCED_DICE_ENV = 'AI_DM_TEST_DICE_SEQUENCE'
+
+let forcedDiceSource = ''
+let forcedDiceRolls: number[] = []
+
+function nextForcedRoll(sides: number): number | null {
+  const source = process.env[FORCED_DICE_ENV] ?? ''
+  if (!source) {
+    forcedDiceSource = ''
+    forcedDiceRolls = []
+    return null
+  }
+
+  if (source !== forcedDiceSource) {
+    forcedDiceSource = source
+    forcedDiceRolls = source
+      .split(',')
+      .map(part => Number.parseInt(part.trim(), 10))
+      .filter(Number.isFinite)
+  }
+
+  const next = forcedDiceRolls.shift()
+  if (next === undefined) return null
+  if (next < 1 || next > sides) {
+    throw new Error(`Forced dice roll ${next} is outside 1d${sides}`)
+  }
+
+  return next
+}
 
 export function rollDice(notation: string): DiceRollResult {
   const trimmed = notation.trim()
@@ -20,7 +49,7 @@ export function rollDice(notation: string): DiceRollResult {
 
   const rolls: number[] = []
   for (let i = 0; i < count; i++) {
-    rolls.push(Math.floor(Math.random() * sides) + 1)
+    rolls.push(nextForcedRoll(sides) ?? Math.floor(Math.random() * sides) + 1)
   }
 
   const rollsSum = rolls.reduce((a, b) => a + b, 0)

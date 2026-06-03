@@ -24,6 +24,13 @@ function getWeaponDamage(weaponOrSpell: string): string {
   return WEAPON_DAMAGE[key] ?? '1d6'
 }
 
+function doubleDiceNotation(notation: string): string {
+  return notation.replace(/^(\d*)d(\d+)/i, (_match, count, sides) => {
+    const diceCount = count === '' ? 1 : Number(count)
+    return `${diceCount * 2}d${sides}`
+  })
+}
+
 export function registerCombatTools(server: McpServer): void {
   // Pure dice roller — the DM can call this for any roll
   server.tool(
@@ -85,7 +92,10 @@ export function registerCombatTools(server: McpServer): void {
       }
 
       const targetAC = target.ac
-      const hit = attackRoll.total >= targetAC
+      const naturalRoll = attackRoll.rolls[0]
+      const criticalMiss = naturalRoll === 1
+      const criticalHit = naturalRoll === 20
+      const hit = criticalHit || (!criticalMiss && attackRoll.total >= targetAC)
 
       let damageRoll = undefined
       let damageDealt = undefined
@@ -96,7 +106,7 @@ export function registerCombatTools(server: McpServer): void {
         // Determine damage dice
         const strModDamage = getAbilityModifier(attacker.stats.str)
         const baseDamage = customDamageDice ?? ('damageDice' in attacker ? attacker.damageDice : `${getWeaponDamage(weaponOrSpell)}+${strModDamage}`)
-        damageRoll = rollDice(baseDamage)
+        damageRoll = rollDice(criticalHit ? doubleDiceNotation(baseDamage) : baseDamage)
         damageDealt = Math.max(1, damageRoll.total)
 
         // Apply damage
@@ -112,14 +122,17 @@ export function registerCombatTools(server: McpServer): void {
       }
 
       const mechanicalSummary = hit
-        ? `Attaque: ${attackRoll.detail} vs CA ${targetAC} → TOUCHÉ | Dégâts: ${damageRoll!.detail}${targetDied ? ' | MORT' : ''}`
-        : `Attaque: ${attackRoll.detail} vs CA ${targetAC} → RATÉ`
+        ? `Attaque: ${attackRoll.detail} vs CA ${targetAC} -> ${criticalHit ? 'CRITIQUE' : 'TOUCHE'} | Degats: ${damageRoll!.detail}${targetDied ? ' | MORT' : ''}`
+        : `Attaque: ${attackRoll.detail} vs CA ${targetAC} -> ${criticalMiss ? 'ECHEC CRITIQUE' : 'RATE'}`
 
       const result: AttackResult = {
         attackerId,
         targetId,
         weaponOrSpell,
         attackRoll,
+        naturalRoll,
+        criticalHit,
+        criticalMiss,
         targetAC,
         hit,
         damageRoll,

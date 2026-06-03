@@ -23,11 +23,14 @@ function tokenFromRequest(req: NextRequest): string {
     return auth.slice('bearer '.length).trim()
   }
 
-  return (
-    req.headers.get('x-debug-log-token')?.trim() ||
-    req.nextUrl.searchParams.get('token')?.trim() ||
-    ''
-  )
+  const headerToken = req.headers.get('x-debug-log-token')?.trim()
+  if (headerToken) return headerToken
+
+  if (process.env.APP_DEBUG_LOG_TOKEN_QUERY_ENABLED === 'true') {
+    return req.nextUrl.searchParams.get('token')?.trim() || ''
+  }
+
+  return ''
 }
 
 function safeEqual(actual: string, expected: string): boolean {

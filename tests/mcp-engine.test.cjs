@@ -66,6 +66,20 @@ async function withMcpClient(fn) {
   }
 }
 
+async function withForcedDiceSequence(sequence, fn) {
+  const previous = process.env.AI_DM_TEST_DICE_SEQUENCE
+  process.env.AI_DM_TEST_DICE_SEQUENCE = sequence
+  try {
+    return await fn()
+  } finally {
+    if (previous === undefined) {
+      delete process.env.AI_DM_TEST_DICE_SEQUENCE
+    } else {
+      process.env.AI_DM_TEST_DICE_SEQUENCE = previous
+    }
+  }
+}
+
 test.beforeEach(() => {
   gameState.resetState()
 })
@@ -83,6 +97,15 @@ test('rollDice parses notation and keeps totals in range', () => {
 test('rollDice rejects invalid notation', () => {
   assert.throws(() => dice.rollDice('2d1'), /Dice sides/)
   assert.throws(() => dice.rollDice('not-dice'), /Invalid dice notation/)
+})
+
+test('rollDice can consume a forced test sequence', async () => {
+  await withForcedDiceSequence('2,4', async () => {
+    const result = dice.rollDice('2d6')
+
+    assert.deepEqual(result.rolls, [2, 4])
+    assert.equal(result.total, 6)
+  })
 })
 
 test('d20WithModifier formats positive, zero, and negative modifiers', () => {
@@ -155,6 +178,61 @@ test('MCP rules reject attacks outside the active turn and range', async () => {
       weaponOrSpell: 'longsword',
     })
     assert.equal(outOfRange.code, 'TARGET_OUT_OF_RANGE')
+  })
+})
+
+test('MCP resolve_attack doubles damage dice on a natural 20', async () => {
+  await withForcedDiceSequence('20,5,5', async () => {
+    await withMcpClient(async client => {
+      const baseState = await callTool(client, 'get_game_state')
+      const combatState = makeCombatState(baseState)
+      combatState.monsters.goblin_a.hp = { current: 30, max: 30 }
+      combatState.monsters.goblin_a.ac = 99
+
+      await callTool(client, 'replace_game_state', { gameState: combatState })
+
+      const attack = await callTool(client, 'resolve_attack', {
+        attackerId: 'player',
+        targetId: 'goblin_a',
+        weaponOrSpell: 'longsword',
+        customDamageDice: '1d8+3',
+      })
+
+      assert.equal(attack.naturalRoll, 20)
+      assert.equal(attack.criticalHit, true)
+      assert.equal(attack.criticalMiss, false)
+      assert.equal(attack.hit, true)
+      assert.equal(attack.damageRoll.notation, '2d8+3')
+      assert.deepEqual(attack.damageRoll.rolls, [5, 5])
+      assert.equal(attack.damageDealt, 13)
+      assert.match(attack.mechanicalSummary, /CRITIQUE/)
+    })
+  })
+})
+
+test('MCP resolve_attack misses on a natural 1 even with a high bonus', async () => {
+  await withForcedDiceSequence('1', async () => {
+    await withMcpClient(async client => {
+      const baseState = await callTool(client, 'get_game_state')
+      const combatState = makeCombatState(baseState)
+      combatState.player.stats = { ...combatState.player.stats, str: 100 }
+      combatState.monsters.goblin_a.ac = 1
+
+      await callTool(client, 'replace_game_state', { gameState: combatState })
+
+      const attack = await callTool(client, 'resolve_attack', {
+        attackerId: 'player',
+        targetId: 'goblin_a',
+        weaponOrSpell: 'longsword',
+      })
+
+      assert.equal(attack.naturalRoll, 1)
+      assert.equal(attack.criticalHit, false)
+      assert.equal(attack.criticalMiss, true)
+      assert.equal(attack.hit, false)
+      assert.equal(attack.damageRoll, undefined)
+      assert.match(attack.mechanicalSummary, /ECHEC CRITIQUE/)
+    })
   })
 })
 

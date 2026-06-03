@@ -104,6 +104,9 @@ export interface AttackResult {
   targetId: string
   weaponOrSpell: string
   attackRoll: DiceRollResult
+  naturalRoll?: number
+  criticalHit?: boolean
+  criticalMiss?: boolean
   targetAC: number
   hit: boolean
   damageRoll?: DiceRollResult

@@ -28,12 +28,12 @@ const LEVEL_ORDER: Record<LogLevel, number> = {
   error: 40,
 }
 
-const DEFAULT_LOG_LEVEL: LogLevel = process.env.NODE_ENV === 'production' ? 'debug' : 'info'
+const DEFAULT_LOG_LEVEL: LogLevel = process.env.NODE_ENV === 'production' ? 'info' : 'debug'
 const LOG_LEVEL = parseLogLevel(process.env.APP_LOG_LEVEL) ?? DEFAULT_LOG_LEVEL
 const STRING_LIMIT = parsePositiveInt(process.env.APP_LOG_STRING_LIMIT, 800)
 const ARRAY_LIMIT = parsePositiveInt(process.env.APP_LOG_ARRAY_LIMIT, 30)
 const OBJECT_KEY_LIMIT = parsePositiveInt(process.env.APP_LOG_OBJECT_KEY_LIMIT, 80)
-const INCLUDE_TEXT = process.env.APP_LOG_INCLUDE_TEXT !== 'false'
+const INCLUDE_TEXT = process.env.APP_LOG_INCLUDE_TEXT === 'true' || process.env.NODE_ENV !== 'production'
 const BUFFER_ENABLED = process.env.APP_LOG_BUFFER_ENABLED !== 'false'
 const BUFFER_LIMIT = parseBoundedInt(process.env.APP_LOG_BUFFER_LIMIT, 1000, 0, 5000)
 

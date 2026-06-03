@@ -33,7 +33,29 @@ ANTHROPIC_API_KEY=sk-ant-...
 
 Placez votre image dans `/public/battlemap.jpg`. En l'absence du fichier, un fond sombre est affiché.
 
-### 3. Fichiers de contexte (optionnel)
+### 3. Cout LLM et tests sans appels payants
+
+Par defaut, l'application utilise le LLM en live. Pour tester les regles, les deplacements et la boucle de combat sans cout Anthropic :
+
+```env
+LLM_MODE=mock
+ALLOW_PAID_LLM=false
+```
+
+Modes disponibles :
+
+| Variable | Effet |
+|----------|-------|
+| `LLM_MODE=live` | Appels Anthropic normaux |
+| `LLM_MODE=mock` | Reponses deterministes locales, sans appel payant |
+| `LLM_MODE=record` | Appels live + sauvegarde des reponses dans `.data/llm-cassettes/` |
+| `LLM_MODE=replay` | Rejoue les cassettes, sans appel payant |
+| `LLM_REPLAY_FALLBACK_TO_MOCK=true` | En replay, bascule sur le mock si une cassette manque |
+| `LLM_MAX_CALLS_PER_REQUEST=10` | Coupe une requete trop bavarde |
+| `LLM_MAX_CALLS_PER_SESSION=0` | Budget live par session (`0` = illimite) |
+| `LLM_MODULE_CONTEXT_MAX_CHARS=6500` | Limite le contexte du module envoye au LLM |
+
+### 4. Fichiers de contexte (optionnel)
 
 Les quatre fichiers dans `/context/` sont pré-remplis avec une aventure complète :
 
@@ -226,7 +248,7 @@ APP_LOG_BUFFER_ENABLED=true
 APP_LOG_BUFFER_LIMIT=1000
 ```
 
-`APP_LOG_LEVEL=debug` est deja la valeur par defaut en `NODE_ENV=production`. Passez `APP_LOG_INCLUDE_TEXT=false` si vous voulez masquer les textes narratifs/messages joueur et ne garder que les longueurs.
+En `NODE_ENV=production`, `APP_LOG_LEVEL=info` et `APP_LOG_INCLUDE_TEXT=false` sont les valeurs par defaut. Passez temporairement `APP_LOG_LEVEL=debug` et `APP_LOG_INCLUDE_TEXT=true` si vous voulez diagnostiquer une partie en detail.
 
 Lecture via Railway CLI :
 
@@ -252,6 +274,6 @@ curl -X DELETE -H "Authorization: Bearer un-token-long-aleatoire" \
   "https://votre-app.railway.app/api/debug/logs"
 ```
 
-L'endpoint `/api/debug/logs` retourne les logs recents gardes en memoire par le process Node. Il reste desactive tant que `APP_DEBUG_LOG_TOKEN` n'est pas configure, et refuse les tokens de moins de 16 caracteres. Utilisez de preference le header `Authorization: Bearer ...`; le parametre `?token=` existe pour depannage manuel mais peut fuiter dans des historiques navigateur/proxy.
+L'endpoint `/api/debug/logs` retourne les logs recents gardes en memoire par le process Node. Il reste desactive tant que `APP_DEBUG_LOG_TOKEN` n'est pas configure, et refuse les tokens de moins de 16 caracteres. Utilisez de preference le header `Authorization: Bearer ...`. Le parametre `?token=` est desactive par defaut; activez-le seulement pour depannage manuel avec `APP_DEBUG_LOG_TOKEN_QUERY_ENABLED=true`, car il peut fuiter dans des historiques navigateur/proxy.
 
 Les logs incluent notamment `requestId`, `sessionId`, appels Anthropic, usage tokens/cout estime, appels MCP, erreurs de regles, resume compact du `GameState`, persistance session et durees. Les valeurs ressemblant a des secrets/tokens sont masquees automatiquement.

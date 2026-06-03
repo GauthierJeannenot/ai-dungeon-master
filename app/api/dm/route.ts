@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
+import crypto from 'crypto'
+import fs from 'fs/promises'
+import path from 'path'
 import { loadContextFiles } from '@/lib/context-loader'
 import { callMCPTool, listMCPTools } from '@/lib/mcp-client'
 import { loadSession, saveSession } from '@/lib/session-store'
+import { acquireSessionLock } from '@/lib/session-lock'
 import { DMRequest, DMResponse, GameState, ConversationTurn, CombatLogEntry, MonsterState } from '@/lib/types'
 import {
   logAnthropicUsage,
@@ -22,7 +26,14 @@ const MAX_TOOL_ITERATIONS = 3
 const MAX_TOKENS = 400
 const COMBAT_LOG_TAIL = 6
 const MAX_AUTO_NPC_TURNS = 8
-const INTERNAL_MCP_TOOLS = new Set(['replace_game_state', 'next_turn'])
+type LlmMode = 'live' | 'mock' | 'record' | 'replay'
+const INTERNAL_MCP_TOOLS = new Set(['replace_game_state', 'get_game_state', 'next_turn', 'update_hp', 'add_to_log'])
+const LLM_MODE = parseLlmMode(process.env.LLM_MODE)
+const ALLOW_PAID_LLM = process.env.ALLOW_PAID_LLM !== 'false'
+const LLM_REPLAY_FALLBACK_TO_MOCK = process.env.LLM_REPLAY_FALLBACK_TO_MOCK === 'true'
+const LLM_CASSETTE_DIR = process.env.LLM_CASSETTE_DIR || path.join(process.cwd(), '.data', 'llm-cassettes')
+const LLM_MAX_CALLS_PER_REQUEST = parsePositiveInt(process.env.LLM_MAX_CALLS_PER_REQUEST, 10)
+const LLM_MAX_CALLS_PER_SESSION = parsePositiveInt(process.env.LLM_MAX_CALLS_PER_SESSION, 0)
 
 // Nombre de messages récents conservés verbatim avant compression.
 // Au-delà, les plus anciens sont résumés en un paragraphe.
@@ -30,9 +41,232 @@ const HISTORY_KEEP_RECENT = 10  // 5 tours de jeu (player + dm par tour)
 // Seuil en caractères déclenchant la compression des messages "old"
 // (~4 chars = 1 token → 6000 chars ≈ 1500 tokens)
 const HISTORY_COMPRESS_THRESHOLD_CHARS = 6000
+const MODULE_CONTEXT_MAX_CHARS = parsePositiveInt(process.env.LLM_MODULE_CONTEXT_MAX_CHARS, 6500)
 
 // ── Cache des tools MCP ───────────────────────────────────────────────────────
 let cachedMcpTools: Anthropic.Tool[] | null = null
+const sessionLlmCalls = new Map<string, number>()
+
+type LlmOperation =
+  | 'history.compress'
+  | 'dm.iteration'
+  | 'dm.final_narration'
+  | 'dm.final_narration_fallback'
+
+type MessageCreateParams = Anthropic.MessageCreateParamsNonStreaming
+
+interface LlmCallContext {
+  requestId: string
+  sessionId?: string
+  operation: LlmOperation
+  requestCallCount: number
+  gameState?: GameState
+  playerMessage?: string
+  newCombatLogEntries?: CombatLogEntry[]
+  tools?: Anthropic.Tool[]
+}
+
+function parseLlmMode(value: string | undefined): LlmMode {
+  const mode = (value ?? 'live').toLowerCase()
+  if (mode === 'live' || mode === 'mock' || mode === 'record' || mode === 'replay') {
+    return mode
+  }
+  throw new Error(`LLM_MODE invalide: ${value}. Valeurs attendues: live, mock, record, replay.`)
+}
+
+function parsePositiveInt(value: string | undefined, fallback: number): number {
+  if (!value) return fallback
+  const parsed = Number.parseInt(value, 10)
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback
+}
+
+function normalizeBudgetSessionId(sessionId: string | undefined): string {
+  const normalized = sessionId?.trim().replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 128)
+  return normalized || 'default'
+}
+
+function stableStringify(value: unknown): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value)
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`
+
+  const entries = Object.entries(value as Record<string, unknown>)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, child]) => `${JSON.stringify(key)}:${stableStringify(child)}`)
+  return `{${entries.join(',')}}`
+}
+
+function cassetteKey(operation: LlmOperation, params: MessageCreateParams): string {
+  return crypto
+    .createHash('sha256')
+    .update(stableStringify({ operation, params }))
+    .digest('hex')
+}
+
+function lastUserText(messages: MessageCreateParams['messages']): string {
+  const last = [...messages].reverse().find(message => message.role === 'user')
+  if (!last) return ''
+  if (typeof last.content === 'string') return last.content
+  return last.content
+    .map(block => 'text' in block && typeof block.text === 'string' ? block.text : '')
+    .filter(Boolean)
+    .join('\n')
+}
+
+function toolAvailable(name: string, tools: Anthropic.Tool[] | undefined): boolean {
+  return Boolean(tools?.some(tool => tool.name === name))
+}
+
+function mockUsage() {
+  return {
+    input_tokens: 0,
+    output_tokens: 0,
+    cache_creation_input_tokens: 0,
+    cache_read_input_tokens: 0,
+  }
+}
+
+function mockTextMessage(text: string): Anthropic.Message {
+  return {
+    id: `msg_mock_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+    type: 'message',
+    role: 'assistant',
+    model: MODEL,
+    content: [{ type: 'text', text }],
+    stop_reason: 'end_turn',
+    stop_sequence: null,
+    usage: mockUsage(),
+  } as Anthropic.Message
+}
+
+function mockToolMessage(name: string, input: Record<string, unknown>): Anthropic.Message {
+  return {
+    id: `msg_mock_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+    type: 'message',
+    role: 'assistant',
+    model: MODEL,
+    content: [{
+      type: 'tool_use',
+      id: `toolu_mock_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      name,
+      input,
+    }],
+    stop_reason: 'tool_use',
+    stop_sequence: null,
+    usage: mockUsage(),
+  } as Anthropic.Message
+}
+
+function createMockLlmMessage(params: MessageCreateParams, context: LlmCallContext): Anthropic.Message {
+  if (context.operation === 'history.compress') {
+    return mockTextMessage('Résumé mock: les échanges précédents sont conservés sous forme condensée pour les tests.')
+  }
+
+  if (context.operation === 'dm.final_narration' || context.operation === 'dm.final_narration_fallback') {
+    const latestMechanical = context.newCombatLogEntries?.at(-1)?.mechanicalDetail
+    return mockTextMessage(latestMechanical
+      ? `[Mock] Action résolue. ${latestMechanical}`
+      : '[Mock] Action prise en compte. Que faites-vous ?')
+  }
+
+  const text = (context.playerMessage || lastUserText(params.messages)).toLowerCase()
+  const gameState = context.gameState
+
+  if (!gameState) return mockTextMessage('[Mock] Le Dungeon Master observe la situation.')
+
+  if (gameState.phase === 'combat' && gameState.currentTurn && gameState.currentTurn !== 'player') {
+    return mockTextMessage('[Mock] Les adversaires agissent avant que vous puissiez reprendre l’initiative.')
+  }
+
+  if (gameState.phase === 'combat' && /passe|attend|attends|patient|ne fais rien/.test(text) && toolAvailable('pass_turn', context.tools)) {
+    return mockToolMessage('pass_turn', { reason: 'Le joueur attend.' })
+  }
+
+  const coordinateMatch = text.match(/\(?\s*(\d{1,2})\s*[,;]\s*(\d{1,2})\s*\)?/)
+  if (coordinateMatch && /va|vais|avance|bouge|déplace|deplace|marche|case/.test(text) && toolAvailable('move_token', context.tools)) {
+    return mockToolMessage('move_token', {
+      tokenId: 'player',
+      toCell: { x: Number(coordinateMatch[1]), y: Number(coordinateMatch[2]) },
+    })
+  }
+
+  if (gameState.phase === 'combat' && gameState.currentTurn === 'player' && /attaque|frappe|tape|coup|charge/.test(text) && toolAvailable('resolve_attack', context.tools)) {
+    const target = Object.values(gameState.monsters).find(monster => monster.isAlive)
+    if (target) {
+      return mockToolMessage('resolve_attack', {
+        attackerId: 'player',
+        targetId: target.id,
+        weaponOrSpell: 'longsword',
+      })
+    }
+  }
+
+  return mockTextMessage('[Mock] La scène progresse sans appel payant au LLM.')
+}
+
+async function readCassette(key: string): Promise<Anthropic.Message | null> {
+  try {
+    const raw = await fs.readFile(path.join(LLM_CASSETTE_DIR, `${key}.json`), 'utf-8')
+    return JSON.parse(raw) as Anthropic.Message
+  } catch {
+    return null
+  }
+}
+
+async function writeCassette(key: string, message: Anthropic.Message): Promise<void> {
+  await fs.mkdir(LLM_CASSETTE_DIR, { recursive: true })
+  await fs.writeFile(path.join(LLM_CASSETTE_DIR, `${key}.json`), JSON.stringify(message, null, 2), 'utf-8')
+}
+
+async function createLlmMessage(params: MessageCreateParams, context: LlmCallContext): Promise<Anthropic.Message> {
+  if (context.requestCallCount > LLM_MAX_CALLS_PER_REQUEST) {
+    throw new Error(`Budget LLM dépassé pour cette requête (${LLM_MAX_CALLS_PER_REQUEST} appels max).`)
+  }
+
+  const budgetSessionId = normalizeBudgetSessionId(context.sessionId)
+  const nextSessionCalls = (sessionLlmCalls.get(budgetSessionId) ?? 0) + 1
+  if (LLM_MAX_CALLS_PER_SESSION > 0 && nextSessionCalls > LLM_MAX_CALLS_PER_SESSION) {
+    throw new Error(`Budget LLM dépassé pour cette session (${LLM_MAX_CALLS_PER_SESSION} appels max).`)
+  }
+
+  logEvent('info', 'llm.call.start', {
+    requestId: context.requestId,
+    sessionId: context.sessionId,
+    operation: context.operation,
+    mode: LLM_MODE,
+    requestCallCount: context.requestCallCount,
+    sessionCallCount: nextSessionCalls,
+  })
+
+  if (LLM_MODE === 'mock') {
+    return createMockLlmMessage(params, context)
+  }
+
+  const key = cassetteKey(context.operation, params)
+  if (LLM_MODE === 'replay') {
+    const replayed = await readCassette(key)
+    if (replayed) {
+      logEvent('info', 'llm.replay.hit', { requestId: context.requestId, sessionId: context.sessionId, operation: context.operation, key })
+      return replayed
+    }
+    logEvent('warn', 'llm.replay.miss', { requestId: context.requestId, sessionId: context.sessionId, operation: context.operation, key })
+    if (LLM_REPLAY_FALLBACK_TO_MOCK) return createMockLlmMessage(params, context)
+    throw new Error(`Cassette LLM introuvable pour ${context.operation}: ${key}`)
+  }
+
+  if (!ALLOW_PAID_LLM) {
+    throw new Error('Appels LLM payants désactivés (ALLOW_PAID_LLM=false). Utilise LLM_MODE=mock ou replay.')
+  }
+
+  sessionLlmCalls.set(budgetSessionId, nextSessionCalls)
+  const response = await anthropic.messages.create(params)
+
+  if (LLM_MODE === 'record') {
+    await writeCassette(key, response)
+    logEvent('info', 'llm.record.saved', { requestId: context.requestId, sessionId: context.sessionId, operation: context.operation, key })
+  }
+
+  return response
+}
 
 async function getMcpTools(sessionId: string | undefined): Promise<Anthropic.Tool[]> {
   if (cachedMcpTools) {
@@ -96,7 +330,8 @@ async function compressHistory(
   oldTurns: ConversationTurn[],
   existingSummary: string | undefined,
   usageLog: AnthropicUsageLogEntry[],
-  requestId: string
+  requestId: string,
+  sessionId: string | undefined
 ): Promise<string> {
   const startedAt = Date.now()
   const exchangeText = oldTurns
@@ -115,10 +350,15 @@ async function compressHistory(
     ? `Voici le résumé de la session jusqu'ici :\n${existingSummary}\n\nVoici les échanges suivants à intégrer au résumé :\n${exchangeText}\n\nÉcris un résumé mis à jour en 3-5 phrases : ce qui s'est passé, où en est le joueur, les éléments importants à retenir.`
     : `Résume ces échanges de jeu de rôle D&D en 3-5 phrases. Garde l'essentiel : actions, découvertes, état de la situation.\n\n${exchangeText}`
 
-  const response = await anthropic.messages.create({
+  const response = await createLlmMessage({
     model: MODEL,
     max_tokens: 300,
     messages: [{ role: 'user', content: prompt }],
+  }, {
+    requestId,
+    sessionId,
+    operation: 'history.compress',
+    requestCallCount: usageLog.length + 1,
   })
 
   usageLog.push(logAnthropicUsage({
@@ -152,7 +392,8 @@ async function processHistory(
   history: ConversationTurn[],
   existingSummary: string | undefined,
   usageLog: AnthropicUsageLogEntry[],
-  requestId: string
+  requestId: string,
+  sessionId: string | undefined
 ): Promise<{ recent: ConversationTurn[]; newSummary: string | undefined }> {
   // Pas assez de messages pour avoir une partie "ancienne"
   if (history.length <= HISTORY_KEEP_RECENT) {
@@ -184,7 +425,7 @@ async function processHistory(
     return { recent: history, newSummary: undefined }
   }
 
-  const newSummary = await compressHistory(oldTurns, existingSummary, usageLog, requestId)
+  const newSummary = await compressHistory(oldTurns, existingSummary, usageLog, requestId, sessionId)
   logEvent('info', 'dm.history.process.compressed', {
     requestId,
     historyLength: history.length,
@@ -223,6 +464,108 @@ function historyToAnthropicMessages(turns: ConversationTurn[]): Anthropic.Messag
 }
 
 // ── System prompts ────────────────────────────────────────────────────────────
+interface AdventureRoomSection {
+  id: string
+  text: string
+}
+
+function extractAdventureRoomSections(adventureModule: string): AdventureRoomSection[] {
+  const headingRegex = /^## Salle\s+(\d+)[^\n]*$/gim
+  const headings: Array<{ id: string; index: number }> = []
+  let match: RegExpExecArray | null
+
+  while ((match = headingRegex.exec(adventureModule)) !== null) {
+    headings.push({ id: match[1], index: match.index })
+  }
+
+  return headings.map((heading, index) => {
+    const nextHeading = headings[index + 1]?.index ?? adventureModule.length
+    return {
+      id: heading.id,
+      text: adventureModule.slice(heading.index, nextHeading).trim(),
+    }
+  })
+}
+
+function adventureOverview(adventureModule: string): string {
+  const firstRoomIndex = adventureModule.search(/^## Salle\s+\d+/im)
+  return (firstRoomIndex >= 0 ? adventureModule.slice(0, firstRoomIndex) : adventureModule).trim()
+}
+
+function roomContainsCell(section: AdventureRoomSection, cell: { x: number; y: number }): boolean {
+  const zone = section.text.match(/\*\*Zone\*\*\s*:\s*x:(\d+)-(\d+),?\s*y:(\d+)-(\d+)/i)
+  if (!zone) return false
+
+  const minX = Number(zone[1])
+  const maxX = Number(zone[2])
+  const minY = Number(zone[3])
+  const maxY = Number(zone[4])
+
+  return cell.x >= minX && cell.x <= maxX && cell.y >= minY && cell.y <= maxY
+}
+
+function inferAdventureRoomId(sections: AdventureRoomSection[], cell: { x: number; y: number }): string | null {
+  return sections.find(section => roomContainsCell(section, cell))?.id ?? null
+}
+
+function limitModuleContext(text: string): string {
+  if (MODULE_CONTEXT_MAX_CHARS <= 0 || text.length <= MODULE_CONTEXT_MAX_CHARS) {
+    return text
+  }
+
+  return `${text.slice(0, MODULE_CONTEXT_MAX_CHARS).trimEnd()}\n\n[contexte module tronque a ${MODULE_CONTEXT_MAX_CHARS} caracteres]`
+}
+
+function selectAdventureModuleContext(adventureModule: string, gameState: GameState): string {
+  const sections = extractAdventureRoomSections(adventureModule)
+  const sectionById = new Map(sections.map(section => [section.id, section]))
+  const inferredPlayerRoomId = inferAdventureRoomId(sections, gameState.player.position)
+  const selectedRoomIds = new Set<string>()
+
+  if (gameState.currentRoomId) selectedRoomIds.add(gameState.currentRoomId)
+  if (inferredPlayerRoomId) selectedRoomIds.add(inferredPlayerRoomId)
+
+  for (const roomId of gameState.roomsVisited.slice(-2)) {
+    selectedRoomIds.add(roomId)
+  }
+
+  for (const monster of Object.values(gameState.monsters)) {
+    if (!monster.isAlive) continue
+    const monsterRoomId = inferAdventureRoomId(sections, monster.position)
+    if (monsterRoomId) selectedRoomIds.add(monsterRoomId)
+  }
+
+  if (selectedRoomIds.size === 0 && sectionById.has('1')) {
+    selectedRoomIds.add('1')
+  }
+
+  const activeMonsters = Object.values(gameState.monsters)
+    .filter(monster => monster.isAlive)
+    .map(monster => `- ${monster.name} (${monster.type}) a (${monster.position.x},${monster.position.y})`)
+
+  const parts = [
+    adventureOverview(adventureModule),
+    [
+      'ETAT MODULE:',
+      `- salle actuelle serveur: ${gameState.currentRoomId ?? 'inconnue'}`,
+      `- salle inferree depuis la position joueur: ${inferredPlayerRoomId ?? 'inconnue'}`,
+      `- salles visitees recentes: ${gameState.roomsVisited.slice(-4).join(', ') || 'aucune'}`,
+      `- salles incluses ci-dessous: ${Array.from(selectedRoomIds).join(', ') || 'aucune'}`,
+    ].join('\n'),
+  ]
+
+  if (activeMonsters.length > 0) {
+    parts.push(`MONSTRES VIVANTS:\n${activeMonsters.join('\n')}`)
+  }
+
+  for (const roomId of selectedRoomIds) {
+    const section = sectionById.get(roomId)
+    if (section) parts.push(section.text)
+  }
+
+  return limitModuleContext(parts.join('\n\n---\n\n'))
+}
+
 function buildStaticPrompt(): string {
   const ctx = loadContextFiles()
 
@@ -252,7 +595,7 @@ RÈGLES DM:
 ${ctx.dmRules}
 
 MODULE:
-${ctx.adventureModule}
+Le contexte de module pertinent est fourni dans le bloc dynamique "CONTEXTE MODULE PERTINENT".
 
 RÈGLES MÉCANIQUES:
 - Tout calcul (attaque, dégâts, déplacement, HP, sauvegarde) → tools MCP obligatoires.
@@ -269,6 +612,9 @@ RÈGLES MÉCANIQUES:
 
 function buildDynamicPrompt(gameState: GameState, summaryContext: string | undefined): string {
   const parts: string[] = [`ÉTAT DU JEU: ${serializeGameState(gameState)}`]
+  const ctx = loadContextFiles()
+  parts.push(`CONTEXTE MODULE PERTINENT:\n${selectAdventureModuleContext(ctx.adventureModule, gameState)}`)
+
   if (summaryContext) {
     parts.push(`RÉSUMÉ DE LA SESSION (échanges précédents compressés):\n${summaryContext}`)
   }
@@ -759,7 +1105,7 @@ async function generateFinalNarration(
   ].filter(Boolean).join('\n\n')
 
   try {
-    const response = await anthropic.messages.create({
+    const response = await createLlmMessage({
       model: MODEL,
       max_tokens: MAX_TOKENS,
       system: [
@@ -771,6 +1117,14 @@ async function generateFinalNarration(
         { type: 'text', text: buildDynamicPrompt(gameState, summaryContext) },
       ],
       messages: [{ role: 'user', content: finalPrompt }],
+    }, {
+      requestId,
+      sessionId,
+      operation: 'dm.final_narration',
+      requestCallCount: usageLog.length + 1,
+      gameState,
+      playerMessage,
+      newCombatLogEntries,
     })
 
     logEvent('info', 'dm.final_narration.response', {
@@ -818,6 +1172,7 @@ async function generateFinalNarration(
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const requestStartedAt = Date.now()
   const requestId = generateRequestId()
+  let releaseSessionLock: (() => void) | null = null
   try {
     const usageLog: AnthropicUsageLogEntry[] = []
     logEvent('info', 'dm.request.start', {
@@ -852,17 +1207,20 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: 'Message requis' }, { status: 400 })
     }
 
+    releaseSessionLock = await acquireSessionLock(sessionId)
+    logEvent('debug', 'dm.session_lock.acquired', { requestId, sessionId })
+
     const storedSession = await loadSession(sessionId)
 
-    let currentGameState = gameState ?? storedSession?.gameState
-    let requestHistory = history.length > 0 ? history : storedSession?.history ?? []
-    let requestSummaryContext = summaryContext ?? storedSession?.summaryContext
+    let currentGameState = storedSession?.gameState ?? gameState
+    let requestHistory = storedSession?.history ?? history
+    let requestSummaryContext = storedSession?.summaryContext ?? summaryContext
     const toolsUsed: string[] = []
     logEvent('info', 'dm.state.resolved', {
       requestId,
       sessionId,
-      stateSource: gameState ? 'client' : storedSession?.gameState ? 'stored-session' : 'mcp-default',
-      historySource: history.length > 0 ? 'client' : storedSession?.history ? 'stored-session' : 'empty',
+      stateSource: storedSession?.gameState ? 'stored-session' : gameState ? 'client-bootstrap' : 'mcp-default',
+      historySource: storedSession?.history ? 'stored-session' : history.length > 0 ? 'client-bootstrap' : 'empty',
       historyLength: requestHistory.length,
       hasSummary: Boolean(requestSummaryContext),
       gameState: summarizeGameState(currentGameState),
@@ -913,7 +1271,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       requestHistory,
       requestSummaryContext,
       usageLog,
-      requestId
+      requestId,
+      sessionId
     )
     const activeSummary = newSummary ?? requestSummaryContext
     logEvent('debug', 'dm.history.ready', {
@@ -961,12 +1320,20 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         toolsAvailable: mcpTools.length,
       })
 
-      const response = await anthropic.messages.create({
+      const response = await createLlmMessage({
         model: MODEL,
         max_tokens: MAX_TOKENS,
         system: systemBlocks,
         tools: mcpTools.length > 0 ? mcpTools : undefined,
         messages,
+      }, {
+        requestId,
+        sessionId,
+        operation: 'dm.iteration',
+        requestCallCount: usageLog.length + 1,
+        gameState: currentGameState,
+        playerMessage: message,
+        tools: mcpTools,
       })
       logEvent('info', 'dm.anthropic.iteration.response', {
         requestId,
@@ -1128,7 +1495,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         sessionId,
         iterations,
       })
-      const finalResponse = await anthropic.messages.create({
+      const finalResponse = await createLlmMessage({
         model: MODEL,
         max_tokens: 300,
         system: [
@@ -1140,6 +1507,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           { type: 'text', text: buildDynamicPrompt(currentGameState!, activeSummary) },
         ],
         messages: [{ role: 'user', content: message }],
+      }, {
+        requestId,
+        sessionId,
+        operation: 'dm.final_narration_fallback',
+        requestCallCount: usageLog.length + 1,
+        gameState: currentGameState!,
+        playerMessage: message,
       })
       logEvent('warn', 'dm.final_fallback.response', {
         requestId,
@@ -1308,5 +1682,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     })
     const message = err instanceof Error ? err.message : 'Erreur interne du serveur'
     return NextResponse.json({ error: message }, { status: 500 })
+  } finally {
+    if (releaseSessionLock) {
+      releaseSessionLock()
+      logEvent('debug', 'dm.session_lock.released', { requestId })
+    }
   }
 }
