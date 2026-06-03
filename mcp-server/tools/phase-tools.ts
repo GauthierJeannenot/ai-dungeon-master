@@ -2,6 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 import { rollDice, getAbilityModifier } from '../dice'
 import * as gs from '../game-state'
+import * as rules from '../rules'
 import { MonsterState } from '../../lib/types'
 
 // Monster stat blocks — Monster Manual 2025 (XMM)
@@ -197,6 +198,12 @@ export function registerPhaseTools(server: McpServer): void {
       combatants: z.array(z.string()).describe('Array of entity IDs entering combat (include "player")'),
     },
     async ({ combatants }) => {
+      try {
+        rules.validateEnterCombat(combatants)
+      } catch (err) {
+        return rules.ruleErrorResult(err)
+      }
+
       gs.setPhase('combat')
 
       // Roll initiative for each combatant
@@ -244,6 +251,12 @@ export function registerPhaseTools(server: McpServer): void {
     'Advances to the next combatant in initiative order. Returns who is now acting.',
     {},
     async () => {
+      try {
+        rules.validateNextTurn()
+      } catch (err) {
+        return rules.ruleErrorResult(err)
+      }
+
       const nextTurn = gs.advanceTurn()
       const state = gs.getState()
       return {
@@ -262,9 +275,18 @@ export function registerPhaseTools(server: McpServer): void {
   // Ends combat, awards XP, resets combat state
   server.tool(
     'end_combat',
-    'Ends combat phase, awards XP for defeated monsters, returns to exploration.',
-    {},
-    async () => {
+    'Ends combat phase, awards XP for defeated monsters, returns to exploration. Set force=true only when combat ends by surrender, negotiation, or flight.',
+    {
+      force: z.boolean().optional().describe('Allow ending combat while non-player combatants are still active.'),
+      reason: z.string().optional().describe('Narrative reason for ending combat, e.g. surrender, negotiation, or flight.'),
+    },
+    async ({ force, reason }) => {
+      try {
+        rules.validateEndCombat(force)
+      } catch (err) {
+        return rules.ruleErrorResult(err)
+      }
+
       const state = gs.getState()
 
       // Calculate XP from defeated monsters
@@ -275,6 +297,7 @@ export function registerPhaseTools(server: McpServer): void {
       state.initiativeOrder = []
       state.currentTurn = null
       state.round = 0
+      state.movementUsed = {}
 
       gs.addLogEntry({
         round: state.round,
@@ -289,6 +312,7 @@ export function registerPhaseTools(server: McpServer): void {
           text: JSON.stringify({
             phase: 'exploration',
             xpAwarded: totalXP,
+            reason,
             defeatedMonsters: deadMonsters.map(m => ({ id: m.id, name: m.name, xp: m.xpValue })),
           }),
         }],
@@ -307,6 +331,12 @@ export function registerPhaseTools(server: McpServer): void {
       hpOverride: z.number().int().positive().optional().describe('Override max HP'),
     },
     async ({ monsterType, cell, name, hpOverride }) => {
+      try {
+        rules.validateSpawn(cell)
+      } catch (err) {
+        return rules.ruleErrorResult(err)
+      }
+
       const template = MONSTER_TEMPLATES[monsterType.toLowerCase()]
       if (!template) {
         // Unknown monster type — create a generic one

@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 import * as gs from '../game-state'
+import * as rules from '../rules'
 import { GameState } from '../../lib/types'
 
 const ConditionSchema = z.enum([
@@ -86,6 +87,7 @@ const GameStateSchema = z.object({
   initiativeOrder: z.array(z.string()),
   currentTurn: z.string().nullable(),
   round: z.number().int().min(0),
+  movementUsed: z.record(z.string(), z.number().min(0)).optional().default({}),
   combatLog: z.array(CombatLogEntrySchema),
   roomsVisited: z.array(z.string()),
   currentRoomId: z.string().nullable(),
@@ -133,19 +135,28 @@ export function registerPlayerTools(server: McpServer): void {
       }).describe('Target grid coordinates'),
     },
     async ({ tokenId, toCell }) => {
-      gs.moveToken(tokenId, toCell.x, toCell.y)
-      const entity = gs.getEntity(tokenId)
-      const name = entity ? ('name' in entity ? entity.name : 'Player') : tokenId
-      return {
-        content: [{
-          type: 'text',
-          text: JSON.stringify({
-            success: true,
-            tokenId,
-            name,
-            newPosition: toCell,
-          }),
-        }],
+      try {
+        const movement = rules.validateMove(tokenId, toCell)
+        gs.moveToken(tokenId, toCell.x, toCell.y)
+        rules.recordMove(tokenId, movement.distance)
+
+        const entity = gs.getEntity(tokenId)
+        const name = entity ? ('name' in entity ? entity.name : 'Player') : tokenId
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              success: true,
+              tokenId,
+              name,
+              newPosition: toCell,
+              distanceMoved: movement.distance,
+              remainingMovement: movement.remaining,
+            }),
+          }],
+        }
+      } catch (err) {
+        return rules.ruleErrorResult(err)
       }
     }
   )
@@ -160,34 +171,40 @@ export function registerPlayerTools(server: McpServer): void {
       reason: z.string().describe('Reason for HP change (e.g. "longsword hit", "fireball")'),
     },
     async ({ entityId, delta, reason }) => {
-      let entity
-      if (entityId === 'player') {
-        entity = gs.updatePlayerHP(delta)
-      } else {
-        entity = gs.updateMonsterHP(entityId, delta)
-      }
+      try {
+        rules.validateHPUpdate(entityId, delta)
 
-      const died = 'isAlive' in entity ? !entity.isAlive : entity.hp.current === 0
-      gs.addLogEntry({
-        round: gs.getState().round,
-        turn: gs.getState().currentTurn ?? 'N/A',
-        action: `${entity.name}: ${delta > 0 ? '+' : ''}${delta} HP (${reason})`,
-        mechanicalDetail: `HP: ${entity.hp.current}/${entity.hp.max}${died ? ' — MORT' : ''}`,
-      })
+        let entity
+        if (entityId === 'player') {
+          entity = gs.updatePlayerHP(delta)
+        } else {
+          entity = gs.updateMonsterHP(entityId, delta)
+        }
 
-      return {
-        content: [{
-          type: 'text',
-          text: JSON.stringify({
-            entityId,
-            name: entity.name,
-            hpBefore: entity.hp.current - delta,
-            hpAfter: entity.hp.current,
-            hpMax: entity.hp.max,
-            died,
-            reason,
-          }),
-        }],
+        const died = 'isAlive' in entity ? !entity.isAlive : entity.hp.current === 0
+        gs.addLogEntry({
+          round: gs.getState().round,
+          turn: gs.getState().currentTurn ?? 'N/A',
+          action: `${entity.name}: ${delta > 0 ? '+' : ''}${delta} HP (${reason})`,
+          mechanicalDetail: `HP: ${entity.hp.current}/${entity.hp.max}${died ? ' — MORT' : ''}`,
+        })
+
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              entityId,
+              name: entity.name,
+              hpBefore: entity.hp.current - delta,
+              hpAfter: entity.hp.current,
+              hpMax: entity.hp.max,
+              died,
+              reason,
+            }),
+          }],
+        }
+      } catch (err) {
+        return rules.ruleErrorResult(err)
       }
     }
   )

@@ -53,6 +53,8 @@ Ouvrez http://localhost:3000
 
 ## Tools MCP disponibles
 
+Le serveur MCP valide les règles critiques avant de muter l'état : tour courant en combat, entités vivantes, portée d'attaque, occupation des cases, budget de déplacement par tour et conditions de fin de combat.
+
 | Tool | Description |
 |------|-------------|
 | `get_game_state` | État complet du jeu |
