@@ -141,8 +141,8 @@ function buildSystemPrompt(gs: GameState, summaryContext: string | undefined): s
   const aliveMonsters = Object.values(gs.monsters).filter(m => m.isAlive)
   const activeConditions = p.conditions.length > 0 ? p.conditions.join(', ') : 'aucune'
 
-  // Extrait uniquement la salle courante + synopsis (pas tout le module)
-  const moduleContext = extractCurrentRoom(ctx.adventureModule, gs.currentRoomId)
+  // Module complet — le DM a connaissance de toutes les salles
+  const moduleContext = ctx.adventureModule
 
   return `<system>
 <rules>
