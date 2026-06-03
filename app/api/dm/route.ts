@@ -3,6 +3,11 @@ import Anthropic from '@anthropic-ai/sdk'
 import { loadContextFiles } from '@/lib/context-loader'
 import { callMCPTool, listMCPTools } from '@/lib/mcp-client'
 import { DMRequest, DMResponse, GameState, ConversationTurn } from '@/lib/types'
+import {
+  logAnthropicUsage,
+  logAnthropicUsageSummary,
+  type AnthropicUsageLogEntry,
+} from '@/lib/anthropic-usage'
 
 export const maxDuration = 60
 
@@ -36,6 +41,10 @@ async function getMcpTools(): Promise<Anthropic.Tool[]> {
   return cachedMcpTools
 }
 
+function generateRequestId(): string {
+  return `dm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+}
+
 // ── Sérialisation compacte du game state ─────────────────────────────────────
 function serializeGameState(gameState: GameState): string {
   const compact = {
@@ -53,7 +62,9 @@ function serializeGameState(gameState: GameState): string {
 // Le résumé est renvoyé au client qui le stocke et le renvoie à chaque requête.
 async function compressHistory(
   oldTurns: ConversationTurn[],
-  existingSummary: string | undefined
+  existingSummary: string | undefined,
+  usageLog: AnthropicUsageLogEntry[],
+  requestId: string
 ): Promise<string> {
   const exchangeText = oldTurns
     .map(t => `${t.role === 'player' ? 'Joueur' : 'DM'}: ${t.content}`)
@@ -69,6 +80,18 @@ async function compressHistory(
     messages: [{ role: 'user', content: prompt }],
   })
 
+  usageLog.push(logAnthropicUsage({
+    requestId,
+    operation: 'history.compress',
+    model: MODEL,
+    usage: response.usage,
+    stopReason: response.stop_reason,
+    metadata: {
+      oldTurns: oldTurns.length,
+      hasExistingSummary: Boolean(existingSummary),
+    },
+  }))
+
   const text = response.content.find(b => b.type === 'text')
   return text && 'text' in text ? text.text : existingSummary ?? ''
 }
@@ -79,7 +102,9 @@ async function compressHistory(
 // HISTORY_KEEP_RECENT) dépassent HISTORY_COMPRESS_THRESHOLD_CHARS.
 async function processHistory(
   history: ConversationTurn[],
-  existingSummary: string | undefined
+  existingSummary: string | undefined,
+  usageLog: AnthropicUsageLogEntry[],
+  requestId: string
 ): Promise<{ recent: ConversationTurn[]; newSummary: string | undefined }> {
   // Pas assez de messages pour avoir une partie "ancienne"
   if (history.length <= HISTORY_KEEP_RECENT) {
@@ -98,7 +123,7 @@ async function processHistory(
     return { recent: history, newSummary: undefined }
   }
 
-  const newSummary = await compressHistory(oldTurns, existingSummary)
+  const newSummary = await compressHistory(oldTurns, existingSummary, usageLog, requestId)
   return { recent, newSummary }
 }
 
@@ -197,6 +222,8 @@ function buildSystemBlocks(
 // ── Handler principal ─────────────────────────────────────────────────────────
 export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
+    const requestId = generateRequestId()
+    const usageLog: AnthropicUsageLogEntry[] = []
     const body: DMRequest = await req.json()
     const { message, gameState, history = [], summaryContext } = body
 
@@ -237,7 +264,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     } catch { /* non bloquant */ }
 
     // ── Traitement de l'historique ──────────────────────────────────────────
-    const { recent: recentHistory, newSummary } = await processHistory(history, summaryContext)
+    const { recent: recentHistory, newSummary } = await processHistory(
+      history,
+      summaryContext,
+      usageLog,
+      requestId
+    )
     const activeSummary = newSummary ?? summaryContext
 
     // Convertit l'historique récent en messages Anthropic (alternance user/assistant)
@@ -263,6 +295,18 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         tools: mcpTools.length > 0 ? mcpTools : undefined,
         messages,
       })
+
+      usageLog.push(logAnthropicUsage({
+        requestId,
+        operation: 'dm.iteration',
+        model: MODEL,
+        usage: response.usage,
+        stopReason: response.stop_reason,
+        metadata: {
+          iteration: iterations,
+          toolsAvailable: mcpTools.length,
+        },
+      }))
 
       for (const block of response.content) {
         if (block.type === 'text') {
@@ -321,6 +365,18 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         ],
         messages: [{ role: 'user', content: message }],
       })
+
+      usageLog.push(logAnthropicUsage({
+        requestId,
+        operation: 'dm.final_narration_fallback',
+        model: MODEL,
+        usage: finalResponse.usage,
+        stopReason: finalResponse.stop_reason,
+        metadata: {
+          iterations,
+        },
+      }))
+
       for (const block of finalResponse.content) {
         if (block.type === 'text') narrative += block.text
       }
@@ -337,6 +393,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       // Renvoie le nouveau résumé au client seulement si une compression a eu lieu
       summaryContext: newSummary,
     }
+
+    logAnthropicUsageSummary(requestId, usageLog, {
+      iterations,
+      toolsUsed: [...new Set(toolsUsed)],
+      compressedHistory: Boolean(newSummary),
+    })
 
     return NextResponse.json(dmResponse)
   } catch (err) {
