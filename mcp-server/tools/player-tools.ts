@@ -143,6 +143,7 @@ export function registerPlayerTools(server: McpServer): void {
 
         const entity = gs.getEntity(tokenId)
         const name = entity ? ('name' in entity ? entity.name : 'Player') : tokenId
+        const state = gs.getState()
         return {
           content: [{
             type: 'text',
@@ -153,6 +154,8 @@ export function registerPlayerTools(server: McpServer): void {
               newPosition: toCell,
               distanceMoved: movement.distance,
               remainingMovement: movement.remaining,
+              currentRoomId: state.currentRoomId,
+              roomsVisited: state.roomsVisited,
             }),
           }],
         }

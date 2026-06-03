@@ -7,6 +7,7 @@ import { loadContextFiles } from '@/lib/context-loader'
 import { callMCPTool, listMCPTools } from '@/lib/mcp-client'
 import { loadSession, saveSession } from '@/lib/session-store'
 import { acquireSessionLock } from '@/lib/session-lock'
+import { inferAdventureRoomId as inferMappedAdventureRoomId } from '@/lib/adventure-map'
 import { DMRequest, DMResponse, GameState, ConversationTurn, CombatLogEntry, MonsterState } from '@/lib/types'
 import {
   logAnthropicUsage,
@@ -27,7 +28,7 @@ const MAX_TOKENS = 400
 const COMBAT_LOG_TAIL = 6
 const MAX_AUTO_NPC_TURNS = 8
 type LlmMode = 'live' | 'mock' | 'record' | 'replay'
-const INTERNAL_MCP_TOOLS = new Set(['replace_game_state', 'get_game_state', 'next_turn', 'update_hp', 'add_to_log'])
+const INTERNAL_MCP_TOOLS = new Set(['replace_game_state', 'get_game_state', 'next_turn', 'update_hp', 'add_to_log', 'enter_combat'])
 const LLM_MODE = parseLlmMode(process.env.LLM_MODE)
 const ALLOW_PAID_LLM = process.env.ALLOW_PAID_LLM !== 'false'
 const LLM_REPLAY_FALLBACK_TO_MOCK = process.env.LLM_REPLAY_FALLBACK_TO_MOCK === 'true'
@@ -179,6 +180,13 @@ function createMockLlmMessage(params: MessageCreateParams, context: LlmCallConte
 
   if (gameState.phase === 'combat' && /passe|attend|attends|patient|ne fais rien/.test(text) && toolAvailable('pass_turn', context.tools)) {
     return mockToolMessage('pass_turn', { reason: 'Le joueur attend.' })
+  }
+
+  if (gameState.phase === 'exploration' && /gobelin|combat|debarque|perisse|fuyez|attaque/.test(text) && toolAvailable('start_encounter', context.tools)) {
+    return mockToolMessage('start_encounter', {
+      encounterId: 'bakery_floor_goblins',
+      reason: 'Le joueur provoque bruyamment les gobelins du sol de la boulangerie.',
+    })
   }
 
   const coordinateMatch = text.match(/\(?\s*(\d{1,2})\s*[,;]\s*(\d{1,2})\s*\)?/)
@@ -601,7 +609,8 @@ RÈGLES MÉCANIQUES:
 - Tout calcul (attaque, dégâts, déplacement, HP, sauvegarde) → tools MCP obligatoires.
 - Les tools MCP refusent les actions illégales (mauvais tour, cible morte, hors portée, déplacement trop long). Si un tool renvoie une erreur, narre sobrement pourquoi l'action échoue ou demande une action valide.
 - Déplacement explicite du joueur → move_token AVANT de narrer.
-- Début de combat → spawn_monster puis enter_combat (2 tools max), narre, STOP.
+- Début de combat / rencontre de salle → start_encounter en un seul tool, narre, STOP. Ne jamais inventer d'IDs de monstres.
+- Rencontres connues: bakery_floor_goblins (salle 8), loading_dock_patrol (salle 7), grammy_apartment_guards (salle 9), violet_fungus_heap (salle 3).
 - Tour joueur en combat → resolve_attack ou saving_throw, puis STOP. Le serveur avance les tours automatiquement.
 - Si le joueur passe/attend son tour en combat → pass_turn, puis STOP.
 - Ne jamais appeler next_turn : outil interne réservé au serveur.
@@ -694,6 +703,60 @@ function isMcpErrorResult(result: unknown): boolean {
 function hasCompletedCurrentAction(gameState: GameState | undefined | null): boolean {
   if (!gameState || gameState.phase !== 'combat' || !gameState.currentTurn) return false
   return Boolean(gameState.actionUsed?.[gameState.currentTurn])
+}
+
+function normalizeFrenchText(value: string): string {
+  return value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+}
+
+function detectRequiredMechanicalAction(message: string, gameState: GameState): { reason: string; suggestedTools: string[] } | null {
+  const text = normalizeFrenchText(message)
+  const asksOnlyForDescription = /\b(observe|regarde|inspecte|ecoute|vois|voir|decris|decrit|quoi|qu'est-ce|est-ce tout)\b/.test(text)
+  if (asksOnlyForDescription && !/\b(deplace|attaque|frappe|spawn|apparaitre|carte|combat)\b/.test(text)) {
+    return null
+  }
+
+  const attackIntent = /\b(attaque|attaquer|frappe|frapper|tape|coup|assene|charge|tire|lance)\b/.test(text)
+  const movementIntent = /\b(deplace|deplacer|avance|avancer|bouge|bouger|vais|aller|va |entre|entrer|rentre|traverse|approche|explore|explorer|fuis|fuite|recule)\b/.test(text)
+  const encounterIntent = /\b(combat|ennemi|gobelin|monstre|apparaitre|spawn|carte|initiative|debarque|perissez|fuyez)\b/.test(text)
+
+  if (gameState.phase === 'combat' && gameState.currentTurn === 'player' && attackIntent) {
+    return { reason: 'player-combat-attack-intent', suggestedTools: ['resolve_attack', 'move_token'] }
+  }
+
+  if (gameState.phase === 'combat' && gameState.currentTurn === 'player' && movementIntent) {
+    return { reason: 'player-combat-movement-intent', suggestedTools: ['move_token', 'resolve_attack'] }
+  }
+
+  if (movementIntent) {
+    return { reason: 'exploration-movement-intent', suggestedTools: ['move_token', 'trigger_room_event', 'start_encounter'] }
+  }
+
+  if (attackIntent || encounterIntent) {
+    return { reason: 'encounter-or-attack-intent', suggestedTools: ['start_encounter', 'resolve_attack'] }
+  }
+
+  return null
+}
+
+function logRoomStateAnomaly(gameState: GameState, requestId: string, sessionId: string | undefined, stage: string): void {
+  const inferredRoomId = inferMappedAdventureRoomId(gameState.player.position)
+  if (!inferredRoomId) return
+
+  if (gameState.currentRoomId !== inferredRoomId || !gameState.roomsVisited.includes(inferredRoomId)) {
+    logEvent('warn', 'anomaly.room_state_mismatch', {
+      requestId,
+      sessionId,
+      stage,
+      inferredRoomId,
+      currentRoomId: gameState.currentRoomId,
+      roomsVisited: gameState.roomsVisited,
+      playerPosition: gameState.player.position,
+    })
+  }
 }
 
 async function autoAdvanceCompletedTurn(
@@ -1264,6 +1327,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       }
     }
 
+    logRoomStateAnomaly(currentGameState, requestId, sessionId, 'after-mcp-sync')
     const combatLogStartLength = currentGameState.combatLog.length
 
     // ── Traitement de l'historique ──────────────────────────────────────────
@@ -1306,6 +1370,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     let narrative = ''
     let iterations = 0
     let turnBoundaryReached = false
+    let mechanicalRetryInjected = false
+    let maxTokensRetryInjected = false
+    let sawMcpToolError = false
+    let lastStopReason: Anthropic.Message['stop_reason'] | null = null
+    let lastEndTurnNarrative = ''
+    const requiredMechanicalAction = detectRequiredMechanicalAction(message, currentGameState)
 
     while (iterations < MAX_TOOL_ITERATIONS) {
       iterations++
@@ -1343,6 +1413,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         stopReason: response.stop_reason,
         content: summarizeContentBlocks(response.content),
       })
+      lastStopReason = response.stop_reason
 
       usageLog.push(logAnthropicUsage({
         requestId,
@@ -1356,10 +1427,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         },
       }))
 
-      for (const block of response.content) {
-        if (block.type === 'text') {
-          narrative += (narrative ? '\n\n' : '') + block.text
-        }
+      const responseText = response.content
+        .filter((block): block is Anthropic.TextBlock => block.type === 'text')
+        .map(block => block.text)
+        .join('\n\n')
+      if (responseText) {
+        narrative += (narrative ? '\n\n' : '') + responseText
       }
       logEvent('debug', 'dm.narrative.updated', {
         requestId,
@@ -1370,6 +1443,31 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       })
 
       if (response.stop_reason === 'end_turn') {
+        lastEndTurnNarrative = responseText
+        if (
+          requiredMechanicalAction &&
+          toolsUsed.length === 0 &&
+          !mechanicalRetryInjected &&
+          iterations < MAX_TOOL_ITERATIONS
+        ) {
+          mechanicalRetryInjected = true
+          logEvent('warn', 'anomaly.intent_without_tool', {
+            requestId,
+            sessionId,
+            iteration: iterations,
+            reason: requiredMechanicalAction.reason,
+            suggestedTools: requiredMechanicalAction.suggestedTools,
+            message,
+            gameState: summarizeGameState(currentGameState),
+          })
+          messages.push({ role: 'assistant', content: response.content })
+          messages.push({
+            role: 'user',
+            content: `SYSTEM: Le dernier message du joueur demande une action mecanique (${requiredMechanicalAction.reason}). Tu dois appeler au moins un tool MCP adapte (${requiredMechanicalAction.suggestedTools.join(', ')}) ou expliquer explicitement pourquoi aucune mutation de l'etat n'est legale. Ne narre pas une action mecanique sans tool.`,
+          })
+          continue
+        }
+
         logEvent('info', 'dm.anthropic.end_turn', {
           requestId,
           sessionId,
@@ -1426,6 +1524,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           })
           try {
             const result = await callMCPTool(toolUse.name, toolUse.input as Record<string, unknown>, sessionId)
+            const mcpResultIsError = isMcpErrorResult(result)
             logEvent('info', 'dm.tool_use.ok', {
               requestId,
               sessionId,
@@ -1434,7 +1533,18 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
               toolName: toolUse.name,
               result,
             })
-            if (toolUse.name === 'next_turn' && !isMcpErrorResult(result)) {
+            if (mcpResultIsError) {
+              sawMcpToolError = true
+              logEvent('warn', 'dm.tool_use.rule_error', {
+                requestId,
+                sessionId,
+                iteration: iterations,
+                toolUseId: toolUse.id,
+                toolName: toolUse.name,
+                result,
+              })
+            }
+            if (toolUse.name === 'next_turn' && !mcpResultIsError) {
               turnBoundaryReached = true
               logEvent('info', 'dm.turn.boundary_reached', {
                 requestId,
@@ -1448,6 +1558,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
               type: 'tool_result',
               tool_use_id: toolUse.id,
               content: JSON.stringify(result),
+              is_error: mcpResultIsError,
             })
           } catch (err) {
             const errMsg = err instanceof Error ? err.message : 'Unknown error'
@@ -1476,6 +1587,22 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           turnBoundaryReached,
         })
         if (turnBoundaryReached) break
+        continue
+      }
+
+      if (response.stop_reason === 'max_tokens' && !maxTokensRetryInjected && iterations < MAX_TOOL_ITERATIONS) {
+        maxTokensRetryInjected = true
+        logEvent('warn', 'dm.anthropic.max_tokens_retry', {
+          requestId,
+          sessionId,
+          iteration: iterations,
+          narrativeLength: narrative.length,
+        })
+        messages.push({ role: 'assistant', content: response.content })
+        messages.push({
+          role: 'user',
+          content: 'SYSTEM: Ta reponse a ete tronquee. Reponds en 1-2 phrases maximum, ou appelle exactement un tool MCP si une mutation mecanique est necessaire. Ne repete pas le brouillon tronque.',
+        })
         continue
       }
 
@@ -1547,12 +1674,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     try {
       currentGameState = await callMCPTool('get_game_state', {}, sessionId) as GameState
+      logRoomStateAnomaly(currentGameState, requestId, sessionId, 'after-llm-tools')
       logEvent('debug', 'dm.final_state.loaded', {
         requestId,
         sessionId,
         gameState: summarizeGameState(currentGameState),
       })
     } catch { /* garde l'état qu'on avait */ }
+
+    const llmToolCountAfterLoop = toolsUsed.length
 
     try {
       const autoEnd = await autoEndCombatIfWon(currentGameState, sessionId, requestId)
@@ -1612,7 +1742,22 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       })
     }
 
-    if (toolsUsed.length > 0) {
+    const canReuseLlmNarration =
+      toolsUsed.length > 0 &&
+      toolsUsed.length === llmToolCountAfterLoop &&
+      lastStopReason === 'end_turn' &&
+      lastEndTurnNarrative.trim().length > 0 &&
+      !sawMcpToolError
+
+    if (canReuseLlmNarration) {
+      narrative = lastEndTurnNarrative.trim()
+      logEvent('info', 'dm.final_narration.skipped_reuse_llm', {
+        requestId,
+        sessionId,
+        toolsUsed: [...new Set(toolsUsed)],
+        narrativeLength: narrative.length,
+      })
+    } else if (toolsUsed.length > 0) {
       const finalNarrative = await generateFinalNarration({
         requestId,
         sessionId,

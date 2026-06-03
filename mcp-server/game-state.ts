@@ -1,4 +1,5 @@
 import { GameState, MonsterState, Condition, PlayerState } from '../lib/types'
+import { inferAdventureRoomId } from '../lib/adventure-map'
 
 // Initial player template — overridable via context files
 const DEFAULT_PLAYER: PlayerState = {
@@ -23,6 +24,7 @@ const DEFAULT_PLAYER: PlayerState = {
 let state: GameState = createInitialState()
 
 function createInitialState(): GameState {
+  const initialRoomId = inferAdventureRoomId(DEFAULT_PLAYER.position)
   return {
     phase: 'exploration',
     player: structuredClone(DEFAULT_PLAYER),
@@ -33,8 +35,15 @@ function createInitialState(): GameState {
     movementUsed: {},
     actionUsed: {},
     combatLog: [],
-    roomsVisited: [],
-    currentRoomId: null,
+    roomsVisited: initialRoomId ? [initialRoomId] : [],
+    currentRoomId: initialRoomId,
+  }
+}
+
+function syncPlayerRoomFromPosition(): void {
+  const roomId = inferAdventureRoomId(state.player.position)
+  if (roomId) {
+    visitRoom(roomId)
   }
 }
 
@@ -52,7 +61,9 @@ export function replaceState(nextState: GameState): GameState {
     ...structuredClone(nextState),
     movementUsed: structuredClone(nextState.movementUsed ?? {}),
     actionUsed: structuredClone(nextState.actionUsed ?? {}),
+    roomsVisited: structuredClone(nextState.roomsVisited ?? []),
   }
+  syncPlayerRoomFromPosition()
   return state
 }
 
@@ -90,6 +101,7 @@ export function updateMonsterHP(id: string, delta: number): MonsterState {
 export function moveToken(tokenId: string, x: number, y: number): void {
   if (tokenId === 'player') {
     state.player.position = { x, y }
+    syncPlayerRoomFromPosition()
   } else {
     const monster = state.monsters[tokenId]
     if (!monster) throw new Error(`Token not found: ${tokenId}`)

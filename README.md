@@ -88,6 +88,7 @@ Le serveur MCP valide les règles critiques avant de muter l'état : tour couran
 | `resolve_saving_throw` | Jet de sauvegarde |
 | `apply_condition` | Applique une condition D&D 5e |
 | `enter_combat` | Lance le combat avec initiative |
+| `start_encounter` | Déplace le joueur si besoin, spawn les monstres et lance le combat en une seule opération |
 | `next_turn` | Passe au combattant suivant |
 | `end_combat` | Termine le combat, distribue XP |
 | `spawn_monster` | Fait apparaître un monstre |

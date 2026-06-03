@@ -124,6 +124,19 @@ test('replaceState deep-copies incoming state', () => {
   assert.deepEqual(gameState.getState().player.position, { x: 2, y: 3 })
 })
 
+test('replaceState infers current room from player position', () => {
+  const source = JSON.parse(JSON.stringify(gameState.getState()))
+  source.player.position = { x: 10, y: 10 }
+  source.currentRoomId = null
+  source.roomsVisited = []
+
+  gameState.replaceState(source)
+  const state = gameState.getState()
+
+  assert.equal(state.currentRoomId, '4')
+  assert.deepEqual(state.roomsVisited, ['4'])
+})
+
 test('advanceTurn removes dead monsters from initiative', () => {
   gameState.spawnMonster(makeMonster('goblin_a'))
   gameState.spawnMonster(makeMonster('goblin_b'))
@@ -152,6 +165,28 @@ test('MCP server accepts replace_game_state and move_token toCell contracts', as
     })
     const afterMove = await callTool(client, 'get_game_state')
     assert.deepEqual(afterMove.player.position, { x: 5, y: 13 })
+    assert.equal(afterMove.currentRoomId, '1')
+    assert.deepEqual(afterMove.roomsVisited, ['1'])
+  })
+})
+
+test('MCP move_token tracks room transitions for the player', async () => {
+  await withMcpClient(async client => {
+    const baseState = await callTool(client, 'get_game_state')
+    await callTool(client, 'replace_game_state', { gameState: baseState })
+
+    const move = await callTool(client, 'move_token', {
+      tokenId: 'player',
+      toCell: { x: 10, y: 10 },
+    })
+
+    assert.equal(move.success, true)
+    assert.equal(move.currentRoomId, '4')
+    assert.deepEqual(move.roomsVisited, ['1', '4'])
+
+    const stateAfter = await callTool(client, 'get_game_state')
+    assert.equal(stateAfter.currentRoomId, '4')
+    assert.deepEqual(stateAfter.roomsVisited, ['1', '4'])
   })
 })
 
@@ -375,6 +410,39 @@ test('MCP rules require force to end combat with active enemies', async () => {
     })
     assert.equal(forced.phase, 'exploration')
     assert.equal(forced.reason, 'Les gobelins fuient.')
+  })
+})
+
+test('MCP start_encounter atomically moves player, spawns real IDs, and enters combat', async () => {
+  await withMcpClient(async client => {
+    const baseState = await callTool(client, 'get_game_state')
+    await callTool(client, 'replace_game_state', { gameState: baseState })
+
+    const encounter = await callTool(client, 'start_encounter', {
+      encounterId: 'bakery_floor_goblins',
+      reason: 'Le joueur provoque les gobelins du sol de la boulangerie.',
+    })
+
+    assert.equal(encounter.roomId, '8')
+    assert.deepEqual(encounter.movedPlayer.to, { x: 9, y: 6 })
+    assert.equal(encounter.spawnedMonsters.length, 3)
+    assert.ok(encounter.spawnedMonsters.every(monster => monster.id.startsWith('goblin_')))
+    assert.ok(encounter.spawnedMonsters.every(monster => !['goblin1', 'goblin2', 'goblin3'].includes(monster.id)))
+    assert.equal(encounter.combat.phase, 'combat')
+    assert.equal(encounter.combat.initiativeOrder.length, 4)
+    assert.ok(encounter.combat.initiativeOrder.includes('player'))
+
+    const spawnedIds = encounter.spawnedMonsters.map(monster => monster.id)
+    for (const id of spawnedIds) {
+      assert.ok(encounter.combat.initiativeOrder.includes(id))
+    }
+
+    const stateAfter = await callTool(client, 'get_game_state')
+    assert.equal(stateAfter.phase, 'combat')
+    assert.equal(stateAfter.currentRoomId, '8')
+    assert.ok(stateAfter.roomsVisited.includes('8'))
+    assert.deepEqual(stateAfter.player.position, { x: 9, y: 6 })
+    assert.deepEqual(Object.keys(stateAfter.monsters).sort(), spawnedIds.sort())
   })
 })
 

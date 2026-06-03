@@ -4,6 +4,7 @@ import { rollDice, getAbilityModifier, d20WithModifier } from '../dice'
 import * as gs from '../game-state'
 import * as rules from '../rules'
 import { MonsterState } from '../../lib/types'
+import { EncounterMonsterSpec, ENCOUNTERS, getEncounter } from '../../lib/adventure-map'
 
 // Monster stat blocks — Monster Manual 2025 (XMM)
 // Source: CR list verified from MM 2025 appendix
@@ -189,6 +190,129 @@ const MONSTER_TEMPLATES: Record<string, Omit<MonsterState, 'id' | 'name' | 'posi
   },
 }
 
+let monsterIdCounter = 0
+
+function createMonster(monsterType: string, cell: { x: number; y: number }, name?: string, hpOverride?: number): MonsterState {
+  const normalizedType = monsterType.toLowerCase()
+  const id = `${normalizedType}_${Date.now()}_${monsterIdCounter++}`
+  const template = MONSTER_TEMPLATES[normalizedType]
+
+  if (!template) {
+    return {
+      id,
+      name: name ?? monsterType,
+      type: monsterType,
+      hp: { current: hpOverride ?? 10, max: hpOverride ?? 10 },
+      ac: 12,
+      stats: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 },
+      position: cell,
+      conditions: [],
+      xpValue: 50,
+      attackBonus: 2,
+      damageDice: '1d6',
+      speed: 30,
+      isAlive: true,
+    }
+  }
+
+  const maxHp = hpOverride ?? template.hp.max
+  return {
+    ...template,
+    id,
+    name: name ?? `${normalizedType.charAt(0).toUpperCase()}${normalizedType.slice(1)}`,
+    hp: { current: maxHp, max: maxHp },
+    position: cell,
+    isAlive: true,
+  }
+}
+
+function startCombat(combatants: string[]): {
+  phase: 'combat'
+  initiativeOrder: string[]
+  initiatives: Array<{ id: string; initiative: number; roll: string }>
+  currentTurn: string | null
+  round: number
+} {
+  rules.validateEnterCombat(combatants)
+  gs.setPhase('combat')
+
+  const initiatives: Array<{ id: string; initiative: number; roll: string }> = []
+  for (const id of combatants) {
+    const entity = gs.getEntity(id)
+    if (!entity) continue
+    const dexMod = getAbilityModifier(entity.stats.dex)
+    const roll = rollDice(d20WithModifier(dexMod))
+    entity.initiative = roll.total
+    initiatives.push({ id, initiative: roll.total, roll: roll.detail })
+  }
+
+  initiatives.sort((a, b) => b.initiative - a.initiative)
+  const order = initiatives.map(i => i.id)
+  gs.setInitiativeOrder(order)
+
+  gs.addLogEntry({
+    round: 1,
+    turn: 'system',
+    action: 'COMBAT ENGAGE',
+    mechanicalDetail: initiatives.map(i => `${i.id}: ${i.roll}`).join(' | '),
+  })
+
+  return {
+    phase: 'combat',
+    initiativeOrder: order,
+    initiatives,
+    currentTurn: gs.getState().currentTurn,
+    round: 1,
+  }
+}
+
+function assertEncounterCanStart(playerCell: { x: number; y: number } | undefined, monsters: EncounterMonsterSpec[]): void {
+  const state = gs.getState()
+  if (state.phase === 'combat') {
+    throw new rules.RuleViolation('COMBAT_ALREADY_ACTIVE', 'Cannot start an encounter while combat is already active.', {
+      currentTurn: state.currentTurn,
+      initiativeOrder: state.initiativeOrder,
+    })
+  }
+
+  if (monsters.length === 0) {
+    throw new rules.RuleViolation('ENCOUNTER_EMPTY', 'An encounter requires at least one monster.')
+  }
+
+  const occupied = new Map<string, string>()
+  for (const entity of gs.getAllEntities()) {
+    if (rules.isAlive(entity)) {
+      occupied.set(`${entity.position.x},${entity.position.y}`, entity.id)
+    }
+  }
+
+  if (playerCell) {
+    const playerTarget = `${playerCell.x},${playerCell.y}`
+    const blockerId = occupied.get(playerTarget)
+    if (blockerId && blockerId !== 'player') {
+      throw new rules.RuleViolation('CELL_OCCUPIED', `Player destination (${playerCell.x}, ${playerCell.y}) is occupied.`, {
+        blockerId,
+        cell: playerCell,
+      })
+    }
+    occupied.delete(`${state.player.position.x},${state.player.position.y}`)
+    occupied.set(playerTarget, 'player')
+  }
+
+  for (const monster of monsters) {
+    const key = `${monster.cell.x},${monster.cell.y}`
+    const blockerId = occupied.get(key)
+    if (blockerId) {
+      throw new rules.RuleViolation('CELL_OCCUPIED', `Encounter spawn cell (${monster.cell.x}, ${monster.cell.y}) is occupied.`, {
+        blockerId,
+        cell: monster.cell,
+        monsterType: monster.monsterType,
+      })
+    }
+    occupied.set(key, monster.monsterType)
+  }
+}
+
 export function registerPhaseTools(server: McpServer): void {
   // Transitions to combat: rolls initiative for all combatants
   server.tool(
@@ -199,7 +323,13 @@ export function registerPhaseTools(server: McpServer): void {
     },
     async ({ combatants }) => {
       try {
-        rules.validateEnterCombat(combatants)
+        const result = startCombat(combatants)
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify(result),
+          }],
+        }
       } catch (err) {
         return rules.ruleErrorResult(err)
       }
@@ -210,7 +340,7 @@ export function registerPhaseTools(server: McpServer): void {
       const initiatives: Array<{ id: string; initiative: number; roll: string }> = []
 
       for (const id of combatants) {
-        const entity = gs.getEntity(id)
+        const entity = gs.getEntity(id)!
         if (!entity) continue
         const dexMod = getAbilityModifier(entity.stats.dex)
         const roll = rollDice(d20WithModifier(dexMod))
@@ -241,6 +371,80 @@ export function registerPhaseTools(server: McpServer): void {
             round: 1,
           }),
         }],
+      }
+    }
+  )
+
+  server.tool(
+    'start_encounter',
+    'Atomically moves the player if needed, spawns monsters, and enters combat with the real spawned monster IDs. Prefer this over separate spawn_monster + enter_combat for room encounters.',
+    {
+      encounterId: z.enum(Object.keys(ENCOUNTERS) as [string, ...string[]]).optional().describe('Preset encounter id from the adventure, e.g. bakery_floor_goblins.'),
+      playerCell: z.object({ x: z.number().int().min(0), y: z.number().int().min(0) }).optional().describe('Optional player destination before combat starts.'),
+      monsters: z.array(z.object({
+        monsterType: z.string().describe('Monster type key'),
+        cell: z.object({ x: z.number().int().min(0), y: z.number().int().min(0) }),
+        name: z.string().optional(),
+        hpOverride: z.number().int().positive().optional(),
+      })).optional().describe('Custom monster list when no preset encounterId is used.'),
+      reason: z.string().optional().describe('Short narrative/mechanical reason for starting the encounter.'),
+    },
+    async ({ encounterId, playerCell, monsters, reason }) => {
+      try {
+        const preset = encounterId ? getEncounter(encounterId) : null
+        if (encounterId && !preset) {
+          throw new rules.RuleViolation('UNKNOWN_ENCOUNTER', `Unknown encounter: ${encounterId}`, { encounterId })
+        }
+
+        const encounterMonsters = monsters ?? preset?.monsters ?? []
+        const resolvedPlayerCell = playerCell ?? preset?.playerCell
+        assertEncounterCanStart(resolvedPlayerCell, encounterMonsters)
+
+        if (preset?.roomId) {
+          gs.visitRoom(preset.roomId)
+        }
+
+        let movedPlayer: { from: { x: number; y: number }; to: { x: number; y: number } } | null = null
+        if (resolvedPlayerCell) {
+          const from = { ...gs.getState().player.position }
+          gs.moveToken('player', resolvedPlayerCell.x, resolvedPlayerCell.y)
+          movedPlayer = { from, to: resolvedPlayerCell }
+        }
+
+        const spawnedMonsters: MonsterState[] = []
+        for (const spec of encounterMonsters) {
+          const monster = createMonster(spec.monsterType, spec.cell, spec.name, spec.hpOverride)
+          gs.spawnMonster(monster)
+          spawnedMonsters.push(monster)
+        }
+
+        const combat = startCombat(['player', ...spawnedMonsters.map(monster => monster.id)])
+        if (reason || preset) {
+          gs.addLogEntry({
+            round: gs.getState().round,
+            turn: 'system',
+            action: `RENCONTRE: ${preset?.name ?? 'custom'}`,
+            mechanicalDetail: reason,
+          })
+        }
+
+        const state = gs.getState()
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              encounterId,
+              encounterName: preset?.name,
+              roomId: state.currentRoomId,
+              movedPlayer,
+              spawnedMonsters,
+              combat,
+              gameState: state,
+            }),
+          }],
+        }
+      } catch (err) {
+        return rules.ruleErrorResult(err)
       }
     }
   )
@@ -402,6 +606,12 @@ export function registerPhaseTools(server: McpServer): void {
         rules.validateSpawn(cell)
       } catch (err) {
         return rules.ruleErrorResult(err)
+      }
+
+      const createdMonster = createMonster(monsterType, cell, name, hpOverride)
+      gs.spawnMonster(createdMonster)
+      return {
+        content: [{ type: 'text', text: JSON.stringify(createdMonster) }],
       }
 
       const template = MONSTER_TEMPLATES[monsterType.toLowerCase()]
