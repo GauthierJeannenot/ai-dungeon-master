@@ -661,12 +661,15 @@ Le contexte de module pertinent est fourni dans le bloc dynamique "CONTEXTE MODU
 
 RÈGLES MÉCANIQUES:
 - Tout calcul (attaque, dégâts, déplacement, HP, sauvegarde) → tools MCP obligatoires.
+- Test de caractéristique ou compétence (Persuasion, Intimidation, Athlétisme, Perception, forcer une porte, chercher, mentir, négocier) → roll_ability_check. N'utilise resolve_saving_throw que pour résister à un danger, sort, poison, piège ou effet subi.
+- Ouvrir/fouiller un tiroir, coffre, armoire, livre ou objet local ne déplace jamais le pion. move_token sert seulement à changer de case/salle ou franchir une porte/seuil.
 - Les tools MCP refusent les actions illégales (mauvais tour, cible morte, hors portée, déplacement trop long). Si un tool renvoie une erreur, narre sobrement pourquoi l'action échoue ou demande une action valide.
 - Déplacement explicite du joueur → move_token AVANT de narrer.
 - Début de combat / rencontre de salle → start_encounter en un seul tool, narre, STOP. Ne jamais inventer d'IDs de monstres.
 - Rencontres connues: bakery_floor_goblins (salle 8), loading_dock_patrol (salle 7), grammy_apartment_guards (salle 9), violet_fungus_heap (salle 3).
 - Salle 2: les dryades du verger ne sont pas une rencontre de combat prédéfinie. Si elles sont offensées, elles esquivent, lancent des pommes pourries et mettent la pression; ne déclenche pas start_encounter pour elles.
 - Tour joueur en combat → resolve_player_attack ou saving_throw, puis STOP. Pour une cible spatiale ("a ma droite", "le plus proche"), utilise resolve_player_attack avec targetHint.
+- Si le joueur nomme une cible ("Grukk", "Chef Grukk", "hobgobelin"), resolve_player_attack doit recevoir targetName ou targetId. Ne remplace jamais une cible nommée par "nearest".
 - Joueur à 0 PV en combat → il est inconscient: pas d'attaque, pas de mouvement, pas de défense active. S'il tente/attend/continue au tour joueur, utilise roll_death_save, puis STOP.
 - Si le joueur passe/attend son tour en combat → pass_turn, puis STOP.
 - Ne jamais appeler next_turn : outil interne réservé au serveur.
@@ -810,6 +813,7 @@ function normalizeFrenchText(value: string): string {
     .toLowerCase()
     .normalize('NFD')
     .replace(/\p{Diacritic}/gu, '')
+    .replace(/[’‘`´]/g, "'")
 }
 
 type OralNarrativeGuardResult = {
@@ -828,6 +832,23 @@ function getCurrentRoomName(gameState: GameState): string | null {
 
 function buildDirectiveSceneNarrative(gameState: GameState): string {
   if (gameState.phase === 'combat') {
+    const alive = aliveMonsters(gameState)
+    const aliveNames = alive.map(monster => monster.name)
+    const namedThreats = aliveNames.length === 0
+      ? "l'ennemi"
+      : aliveNames.length === 1
+        ? aliveNames[0]
+        : `${aliveNames.slice(0, -1).join(', ')} et ${aliveNames[aliveNames.length - 1]}`
+    const lastKill = [...gameState.combatLog].reverse().find(entry =>
+      /\bMORT\b/.test(entry.mechanicalDetail ?? '') &&
+      /\battaque\b/i.test(entry.action)
+    )
+    const killedName = lastKill?.action.match(/attaque (.+?) avec/i)?.[1]
+    const killSentence = killedName ? `${killedName} tombe pour de bon. ` : ''
+
+    return gameState.currentTurn === 'player'
+      ? `${killSentence}${namedThreats} reste${aliveNames.length > 1 ? 'nt' : ''} dans le combat, armes sorties; l'ouverture est a toi maintenant.`
+      : `${killSentence}${namedThreats} garde${aliveNames.length > 1 ? 'nt' : ''} la pression, et l'air se charge d'une menace immediate.`
     return gameState.currentTurn === 'player'
       ? "Le combat se resserre autour de toi. L'ennemi le plus proche baisse sa garde une fraction de seconde, tandis qu'une échappée s'ouvre près du décor."
       : "Le combat continue sans pause. Quelque chose heurte le sol derrière toi, et l'air se charge d'une menace immédiate."
@@ -950,7 +971,7 @@ function lineLooksLikeMetaCommentary(line: string): boolean {
     /\b(excuse-moi|desole|erreur de ma part|j'aurais du|j aurais du|je vais corriger|merci de cette correction)\b/,
     /\b(je dois clarifier|non, ce message n'est pas|ce message n'est pas|on continue|laissez-moi recommencer|plus de substance)\b/,
     /\b(que fais-tu|que faites-vous|qu[' ]?allez-vous faire|qu[' ]?en est-il|ou veux-tu aller ensuite|vous allez ou|tu vas ou|ou allez-vous|qu[' ]?est-ce que tu fais|deplacement,\s*attaque|attaque,\s*test|roleplay pur)\b/,
-    /\b(c'est ton tour|c est ton tour|a toi de jouer|aucun ennemi visible|tu restes dans|quelque chose semble)\b|\bchoisis\s*:|\bchoisissez\s*:/,
+    /\b(c'est ton tour|c est ton tour|c'est a toi|c est a toi|a toi de jouer|aucun ennemi visible|tu restes dans|quelque chose semble)\b|\bchoisis\s*:|\bchoisissez\s*:/,
     /\b(appeler\s+\w+|move_token|start_encounter|resolve_player_attack|pass_turn|roll_dice)\b/,
     /\b(fin de quete|fin de campagne|quete alternative|objectif accompli|mission accomplie)\b/,
     /\b(heures suivantes|jours suivants|semaines suivantes|premiere fournee|faire fortune)\b/,
@@ -1071,20 +1092,29 @@ const TOOL_INTENT_SATISFIERS: Record<string, string[]> = {
   'player-combat-attack-intent': ['resolve_player_attack', 'move_token'],
   'player-combat-movement-intent': ['move_token', 'resolve_player_attack'],
   'player-death-save-intent': ['roll_death_save'],
+  'ability-check-intent': ['roll_ability_check'],
   'exploration-movement-intent': ['move_token', 'trigger_room_event', 'start_encounter', 'end_combat'],
   'encounter-or-attack-intent': ['start_encounter', 'resolve_player_attack'],
 }
 
 const LLM_TOOL_SETS = {
-  explorationDefault: ['roll_dice', 'trigger_room_event', 'get_entity_stats'],
-  explorationMovement: ['move_token', 'trigger_room_event', 'start_encounter', 'roll_dice', 'get_entity_stats'],
-  explorationEncounter: ['start_encounter', 'move_token', 'trigger_room_event', 'roll_dice', 'get_entity_stats'],
-  combatPlayer: ['resolve_player_attack', 'move_token', 'pass_turn', 'end_combat', 'roll_death_save', 'roll_dice', 'get_entity_stats', 'resolve_saving_throw'],
-  combatNonPlayer: ['roll_dice', 'get_entity_stats'],
-  dialogue: ['roll_dice', 'get_entity_stats', 'apply_condition'],
+  explorationDefault: ['roll_ability_check', 'roll_dice', 'trigger_room_event', 'get_entity_stats'],
+  explorationMovement: ['move_token', 'trigger_room_event', 'start_encounter', 'roll_ability_check', 'roll_dice', 'get_entity_stats'],
+  explorationEncounter: ['start_encounter', 'move_token', 'trigger_room_event', 'roll_ability_check', 'roll_dice', 'get_entity_stats'],
+  combatPlayer: ['resolve_player_attack', 'move_token', 'pass_turn', 'end_combat', 'roll_death_save', 'roll_ability_check', 'roll_dice', 'get_entity_stats', 'resolve_saving_throw'],
+  combatNonPlayer: ['roll_ability_check', 'roll_dice', 'get_entity_stats'],
+  dialogue: ['roll_ability_check', 'roll_dice', 'get_entity_stats', 'apply_condition'],
 } as const
 
 type PlayerAttackTargetHint = 'nearest' | 'right' | 'left' | 'front' | 'back' | 'wounded'
+type AbilityKey = 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha'
+type PendingAbilityCheck = {
+  ability: AbilityKey
+  dc?: number
+  label: string
+  proficient?: boolean
+  social?: boolean
+}
 
 function hasToolSatisfyingMechanicalAction(
   requiredAction: RequiredMechanicalAction,
@@ -1147,15 +1177,82 @@ function countAliveMonsters(gameState: GameState): number {
   return Object.values(gameState.monsters).filter(monster => monster.isAlive).length
 }
 
+function isDoorTraversalIntent(text: string): boolean {
+  return /\b(ouvres?|ouvrir|pousses?|pousser|forces?|forcer|enfonces?|enfoncer|defonces?|defoncer|casses?|casser|exploses?|exploser|deboites?|deboiter|franchis|franchir|passes?|passer|entres?|entrer)\b(?=.{0,80}\b(portes?|entree|seuil|battants?|double porte|grande porte)\b)/.test(text) ||
+    /\b(portes?|entree|seuil|battants?|double porte|grande porte)\b(?=.{0,80}\b(ouvres?|ouvrir|pousses?|pousser|forces?|forcer|enfonces?|enfoncer|defonces?|defoncer|casses?|casser|exploses?|exploser|deboites?|deboiter|franchis|franchir|passes?|passer|entres?|entrer)\b)/.test(text)
+}
+
+function referencesLocalObjectInsteadOfRoom(text: string): boolean {
+  return /\b(tiroirs?|coffres?|armoires?|placards?|malles?|carnets?|livres?|grimoires?|parchemins?|papiers?|documents?|registre|registres|bureau couvert|lit|trophees?)\b/.test(text) ||
+    /\b(ouvres?|ouvrir|fouilles?|fouiller|cherches?|chercher|inspectes?|inspecter|regardes?|regarder|examines?|examiner)\b(?=.{0,80}\b(bureau|tiroirs?|coffres?|armoires?|placards?|carnets?|livres?|grimoires?|parchemins?|papiers?|documents?|lit)\b)/.test(text)
+}
+
+function textMentionsSpecificMonster(text: string, monster: MonsterState, gameState: GameState): boolean {
+  const normalizedName = normalizeFrenchText(monster.name)
+  const genericTerms = new Set(['le', 'la', 'les', 'un', 'une', 'des', 'du', 'de', 'gobelin', 'gobelins', 'garde', 'gardes', 'chef'])
+  const specificNameTerms = normalizedName
+    .split(/[^a-z0-9']+/)
+    .filter(term => term.length >= 4 && !genericTerms.has(term))
+
+  if (specificNameTerms.some(term => new RegExp(`\\b${term}\\b`).test(text))) return true
+
+  const normalizedType = normalizeFrenchText(monster.type).replace(/_/g, ' ')
+  const typeAliases: string[] = []
+  if (normalizedType.includes('hobgoblin')) typeAliases.push('hobgobelin', 'hobgoblin')
+  if (normalizedType.includes('violet fungus')) typeAliases.push('champignon violet')
+
+  return typeAliases.some(alias => {
+    const sameTypeCount = Object.values(gameState.monsters)
+      .filter(candidate => normalizeFrenchText(candidate.type).replace(/_/g, ' ') === normalizedType)
+      .length
+    return sameTypeCount === 1 && new RegExp(`\\b${alias}\\b`).test(text)
+  })
+}
+
 function detectNarrativeStateContractIssue(
   responseText: string,
-  gameState: GameState
+  gameState: GameState,
+  toolsUsed: string[] = []
 ): NarrativeStateContractIssue | null {
-  if (!responseText || gameState.phase !== 'exploration' || countAliveMonsters(gameState) > 0) {
+  if (!responseText) {
     return null
   }
 
   const text = normalizeFrenchText(responseText)
+  const aliveCount = countAliveMonsters(gameState)
+
+  if (gameState.phase === 'combat' && aliveCount > 0 && !toolsUsed.includes('end_combat')) {
+    const mentionsEnemies = /\b(gobelins?|ennemis?|monstres?|creatures?|adversaires?|gardes?|hobgobelins?|grukk|chef grukk)\b/.test(text)
+    const narratesSurrenderOrEscape = /\b(se rendent?|se rend|rendent les armes|se soumettent?|soumis|soumission|s'agenouillent?|agenouille|lache(?:nt)?\s+(?:son|leur|leurs)\s+(?:arme|armes|cimeterre|cimeterres)|baissent les armes|baisse son arme|fuit|fuient|s'enfuit|s'enfuient|se sauvent?|disparaissent?|renegat|serment)\b/.test(text)
+    const narratesCombatAsOver = /\b(combat cesse|combat est termine|retrouve un silence|silence lourd|plus aucun danger|plus personne ne menace|armes redescendent)\b/.test(text)
+    if (mentionsEnemies && (narratesSurrenderOrEscape || narratesCombatAsOver)) {
+      return {
+        reason: 'enemy_resolution_without_engine_state',
+        matchedTriggers: [
+          ...(narratesSurrenderOrEscape ? ['enemy_surrender_or_escape_without_tool'] : []),
+          ...(narratesCombatAsOver ? ['combat_over_tone_without_end_combat'] : []),
+        ],
+        suggestedTools: ['roll_ability_check', 'end_combat'],
+      }
+    }
+
+    const aliveNamedContradictions = aliveMonsters(gameState).filter(monster =>
+      textMentionsSpecificMonster(text, monster, gameState) &&
+      /\b(meurt|mort|morte|tue|tues|tuer|abats?|abattu|s'effondre|s'ecroule|ne bouge plus|corps inerte|inerte|agonise)\b/.test(text)
+    )
+    if (aliveNamedContradictions.length > 0) {
+      return {
+        reason: 'named_alive_enemy_narrated_dead',
+        matchedTriggers: aliveNamedContradictions.map(monster => `alive_${monster.id}_narrated_dead`),
+        suggestedTools: ['resolve_player_attack', 'end_combat'],
+      }
+    }
+  }
+
+  if (gameState.phase !== 'exploration' || aliveCount > 0) {
+    return null
+  }
+
   const mentionsEnemies = /\b(gobelins?|ennemis?|monstres?|creatures?|silhouettes?|eclaireurs?|grukk|chef grukk)\b/.test(text) ||
     /\b(silhouettes?|formes?)\s+vertes?\b/.test(text)
   if (!mentionsEnemies) return null
@@ -1248,9 +1345,10 @@ function detectRequiredMechanicalAction(message: string, gameState: GameState): 
   }
 
   const attackIntent = /\b(attaque|attaquer|frappe|frapper|tape|coup|assene|charge|tire|lance)\b/.test(text)
-  const directMovementIntent = /\b(deplaces?|deplacer|avances?|avancer|bouges?|bouger|aller|vers|entres?|entrer|rentres?|retournes?|retourner|rejoins?|rejoindre|retrouves?|retrouver|rends|traverses?|approches?|explores?|explorer|aventures?|aventurer|continues?|continuer|plus loin|montes?|monter|grimpes?|grimpe|empruntes?|prends|fuis|fuite|recules?|ouvres?|ouvrir|enfonces?|enfoncer|portes?|glisses?|glisser)\b/.test(text)
+  const directMovementIntent = /\b(deplaces?|deplacer|avances?|avancer|bouges?|bouger|aller|vers|entres?|entrer|rentres?|retournes?|retourner|rejoins?|rejoindre|retrouves?|retrouver|rends|traverses?|approches?|explores?|explorer|aventures?|aventurer|continues?|continuer|plus loin|montes?|monter|grimpes?|grimpe|empruntes?|prends|fuis|fuite|recules?|glisses?|glisser)\b/.test(text)
+  const doorMovementIntent = isDoorTraversalIntent(text)
   const goToMovementIntent = /\b(vais|va)\b(?=.{0,80}\b(vers|au|aux|a la|a l|dans|voir|parler|rejoindre|retrouver|retourner|salle|piece|bureau|appartement|boulangerie|quai|verger|pommier)\b)/.test(text)
-  const baseMovementIntent = directMovementIntent || goToMovementIntent
+  const baseMovementIntent = directMovementIntent || doorMovementIntent || goToMovementIntent
   const followIntent = /\b(suis|suivre|poursuis|poursuivre)\b/.test(text) && /\b(gobelins?|ennemis?|monstres?|creatures?|silhouettes?|eux|traces?)\b/.test(text)
   const searchEnemyIntent = /\b(cherches?|chercher|trouves?|trouver|deniches?|denicher|traques?|traquer|pistes?|pister)\b(?=.{0,80}\b(gobelins?|ennemis?|mechants?|monstres?|creatures?|silhouettes?)\b)/.test(text)
   const movementIntent = baseMovementIntent || followIntent || searchEnemyIntent
@@ -1258,6 +1356,7 @@ function detectRequiredMechanicalAction(message: string, gameState: GameState): 
   const explicitEncounterIntent = /\b(combat|apparaitre|spawn|carte|initiative|debarques?|perissez|fuyez)\b/.test(text)
   const hostileCreatureIntent = mentionsCreature && /\b(attaquent?|attaquer|hostiles?|menacent?|chargent?|surgissent?|arrivent?|debarquent?|foncent?|encerclent?)\b/.test(text)
   const encounterIntent = explicitEncounterIntent || hostileCreatureIntent
+  const abilityCheckIntent = /\b(test|jet|persuasion|intimidation|athletisme|athletics|perception|discretion|stealth|convain|convaincre|negoci|negocier|mentir|mensonge|baratin|crocheter|fouiller|chercher|intimider|forcer|soulever|pousser|soumet|soumission|reddition|rends toi|rendez vous|rejoignez|rejoins moi|parlemente|capitule)\b/.test(text)
 
   if (gameState.phase === 'combat' && gameState.currentTurn === 'player' && attackIntent) {
     return { reason: 'player-combat-attack-intent', suggestedTools: ['resolve_player_attack', 'move_token'] }
@@ -1269,6 +1368,10 @@ function detectRequiredMechanicalAction(message: string, gameState: GameState): 
 
   if (movementIntent) {
     return { reason: 'exploration-movement-intent', suggestedTools: ['move_token', 'trigger_room_event', 'start_encounter'] }
+  }
+
+  if (abilityCheckIntent) {
+    return { reason: 'ability-check-intent', suggestedTools: ['roll_ability_check'] }
   }
 
   if (attackIntent || encounterIntent) {
@@ -1433,8 +1536,7 @@ function encounterIdForRoom(roomId: string | null | undefined): string | null {
 }
 
 function relativeRoomIdForExplorationMove(text: string, gameState: GameState): string | null {
-  const doorAction = /\b(ouvres?|ouvrir|pousses?|pousser|forces?|forcer|enfonces?|enfoncer|defonces?|defoncer|casses?|casser|exploses?|exploser|deboites?|deboiter|franchis|franchir|passes?|passer|entres?|entrer)\b(?=.{0,80}\b(portes?|entree|seuil|battants?|double porte|grande porte)\b)/.test(text) ||
-    /\b(portes?|entree|seuil|battants?|double porte|grande porte)\b(?=.{0,80}\b(ouvres?|ouvrir|pousses?|pousser|forces?|forcer|enfonces?|enfoncer|defonces?|defoncer|casses?|casser|exploses?|exploser|deboites?|deboiter|franchis|franchir|passes?|passer|entres?|entrer)\b)/.test(text)
+  const doorAction = isDoorTraversalIntent(text)
 
   if (doorAction) {
     if (gameState.currentRoomId === '1') return '4'
@@ -1470,6 +1572,8 @@ function contextualRoomIdFromRecentDm(
   recentHistory: ConversationTurn[]
 ): string | null {
   const text = normalizeFrenchText(message)
+  if (referencesLocalObjectInsteadOfRoom(text) && !isDoorTraversalIntent(text)) return null
+
   const anaphoricAction = /\b(investig\w*|inspect\w*|examin\w*|fouill\w*|regard\w*|ouvr\w*|entr\w*|avanc\w*|j[' ]?y vais|vas y)\b/.test(text)
   if (!anaphoricAction) return null
 
@@ -1501,6 +1605,8 @@ function contextualRoomIdFromRecentDm(
 
 function parseNamedRoomMove(message: string, gameState: GameState): { x: number; y: number } | null {
   const text = normalizeFrenchText(message)
+  if (referencesLocalObjectInsteadOfRoom(text) && !isDoorTraversalIntent(text)) return null
+
   const hasMovementVerb = /\b(vers|vais|aller|va |deplace|rends|rejoins?|rejoint|entre|entrer|retournes?|retourner|montes?|monter|grimpes?|grimpe|empruntes?|prends|suis|suivre|aventure|aventurer|continue|continuer|avances?|avancer|explores?|explorer|ouvres?|ouvrir|pousses?|pousser|forces?|forcer|enfonces?|enfoncer|defonces?|defoncer|casses?|casser|exploses?|exploser|deboites?|deboiter|franchis|franchir|passes?|passer|investig\w*|inspect\w*|examin\w*|fouill\w*|cherch\w*|trouv\w*|denich\w*|traqu\w*|pist\w*)\b/.test(text)
   if (!hasMovementVerb) return null
 
@@ -1620,6 +1726,15 @@ function parseWeaponOrSpell(message: string): string {
   return 'longsword'
 }
 
+function parseNamedAttackTarget(message: string, gameState: GameState): string | null {
+  const text = normalizeFrenchText(message)
+  if (/\bgrukk\b/.test(text)) return 'Grukk'
+  if (/\bchef\b/.test(text) && Object.values(gameState.monsters).some(monster => normalizeFrenchText(monster.name).includes('chef'))) return 'chef'
+  if (/\bhobgobelins?\b/.test(text)) return 'hobgobelin'
+  if (/\bchampignons?\b/.test(text)) return 'champignon'
+  return null
+}
+
 function parsePlayerAttackInput(
   message: string,
   gameState: GameState
@@ -1639,17 +1754,81 @@ function parsePlayerAttackInput(
       : null
 
   const targetHint = parseTargetHint(message) ?? (targetId ? null : 'nearest')
+  const targetName = targetId ? null : parseNamedAttackTarget(message, gameState)
   const input: Record<string, unknown> = {
     weaponOrSpell: parseWeaponOrSpell(message),
   }
 
   if (targetId) input.targetId = targetId
+  else if (targetName) input.targetName = targetName
   else if (targetHint) input.targetHint = targetHint
 
   if (/\b(avantage|advantage)\b/.test(text)) input.advantage = true
   if (/\b(desavantage|désavantage|disadvantage)\b/.test(text)) input.disadvantage = true
 
   return input
+}
+
+function detectAbilityCheckAcceptance(message: string): boolean {
+  const text = normalizeFrenchText(message)
+  return /\b(je le tente|je tente|je tente le coup|tente|tentons|ok|oui|d'accord|d accord|vas-y|vas y|je le fais|je lance|lance|allons-y|allons y)\b/.test(text)
+}
+
+function pendingAbilityCheckFromRecentDm(recentHistory: ConversationTurn[]): PendingAbilityCheck | null {
+  const lastDm = [...recentHistory].reverse().find(turn => turn.role === 'dm')?.content
+  if (!lastDm) return null
+
+  const text = normalizeFrenchText(lastDm)
+  const asksForCheck = /\b(test|jet)\b/.test(text) && /\b(tentes-tu|tentes tu|tu tentes|tenter|tente)\b/.test(text)
+  if (!asksForCheck) return null
+
+  const dcMatch = text.match(/\b(?:dd|dc)\s*(\d{1,2})\b/)
+  const dc = dcMatch ? Number(dcMatch[1]) : undefined
+  const hasIntimidation = /\b(intimidation|intimider|menacer|menace)\b/.test(text)
+  const hasPersuasion = /\b(persuasion|convain|convaincre|negoci|negocier|rallier|joindre|rejoindre|parlementer)\b/.test(text)
+  if (hasIntimidation || hasPersuasion) {
+    return {
+      ability: 'cha',
+      dc,
+      label: hasIntimidation ? 'Intimidation' : 'Persuasion',
+      proficient: true,
+      social: true,
+    }
+  }
+
+  const hasAthletics = /\b(athletisme|athletics|forcer|enfoncer|defoncer|soulever|pousser|briser)\b/.test(text)
+  if (hasAthletics) {
+    return { ability: 'str', dc, label: 'Athletisme', proficient: true }
+  }
+
+  const hasPerception = /\b(perception|observer|inspecter|chercher|fouiller|trouver|ecouter)\b/.test(text)
+  if (hasPerception) {
+    return { ability: 'wis', dc, label: 'Perception', proficient: true }
+  }
+
+  const hasStealth = /\b(discretion|stealth|furtivite|furtif|se cacher|cachette)\b/.test(text)
+  if (hasStealth) {
+    return { ability: 'dex', dc, label: 'Discretion', proficient: true }
+  }
+
+  return null
+}
+
+function directSocialAbilityCheckFromMessage(message: string, gameState: GameState): PendingAbilityCheck | null {
+  if (gameState.phase !== 'combat' || gameState.currentTurn !== 'player' || countAliveMonsters(gameState) === 0) return null
+
+  const text = normalizeFrenchText(message)
+  const socialCombatIntent = /\b(soumet|soumission|rends toi|rendez vous|rendez-vous|reddition|je suis ton chef|votre chef|baissez les armes|baisse ton arme|rejoignez|rejoins moi|rejoins-moi|rallie|ralliez|parlemente|parlementer|negocie|negocier|convain|convaincre|intimide|intimider|menace|menacer|capitule|capitulez)\b/.test(text)
+  if (!socialCombatIntent) return null
+
+  const intimidation = /\b(soumet|rends toi|rendez vous|rendez-vous|je suis ton chef|votre chef|baissez les armes|baisse ton arme|intimide|intimider|menace|menacer|capitule|capitulez|mort|tuer|tue)\b/.test(text)
+  return {
+    ability: 'cha',
+    dc: 14,
+    label: intimidation ? 'Intimidation' : 'Persuasion',
+    proficient: true,
+    social: true,
+  }
 }
 
 function parseEncounterRepairInput(
@@ -1797,6 +1976,73 @@ async function resolveServerFirstAction(
       toolsUsed: [],
       draftNarrative,
       sawMcpToolError: false,
+    }
+  }
+
+  const directAbilityCheck = directSocialAbilityCheckFromMessage(message, gameState)
+  const pendingAbilityCheck = pendingAbilityCheckFromRecentDm(recentHistory)
+  const abilityCheckToResolve = directAbilityCheck ?? (
+    pendingAbilityCheck && detectAbilityCheckAcceptance(message) ? pendingAbilityCheck : null
+  )
+  if (!toolName && abilityCheckToResolve) {
+    const abilityInput: Record<string, unknown> = {
+      ability: abilityCheckToResolve.ability,
+      label: abilityCheckToResolve.label,
+      proficient: abilityCheckToResolve.proficient ?? false,
+    }
+    if (typeof abilityCheckToResolve.dc === 'number') abilityInput.dc = abilityCheckToResolve.dc
+
+    logEvent('info', 'dm.cost.engine_first.ability_check.start', {
+      requestId,
+      sessionId,
+      input: abilityInput,
+      pendingAbilityCheck: abilityCheckToResolve,
+      gameState: summarizeGameState(gameState),
+    })
+
+    const abilityResult = await callMCPTool('roll_ability_check', abilityInput, sessionId)
+    let sawMcpToolError = isMcpErrorResult(abilityResult)
+    let nextGameState = await callMCPTool('get_game_state', {}, sessionId) as GameState
+    const toolsUsed = ['roll_ability_check']
+    let draftNarrative = summarizeMcpResultForNarration('roll_ability_check', abilityResult)
+
+    if (
+      !sawMcpToolError &&
+      abilityCheckToResolve.social &&
+      isObjectRecord(abilityResult) &&
+      abilityResult.success === true &&
+      nextGameState.phase === 'combat'
+    ) {
+      const endCombatResult = await callMCPTool('end_combat', {
+        force: true,
+        reason: `${abilityCheckToResolve.label} reussie: les adversaires acceptent de parlementer.`,
+      }, sessionId)
+      toolsUsed.push('end_combat')
+      const endCombatError = isMcpErrorResult(endCombatResult)
+      sawMcpToolError = sawMcpToolError || endCombatError
+      if (!endCombatError) {
+        nextGameState = await callMCPTool('get_game_state', {}, sessionId) as GameState
+        draftNarrative = `${draftNarrative}\nLes armes redescendent: la scene bascule vers la negociation.`
+      }
+    }
+
+    logEvent(sawMcpToolError ? 'warn' : 'info', 'dm.cost.engine_first.ability_check.complete', {
+      requestId,
+      sessionId,
+      durationMs: Date.now() - startedAt,
+      input: abilityInput,
+      result: abilityResult,
+      draftNarrative,
+      toolsUsed,
+      gameState: summarizeGameState(nextGameState),
+    })
+
+    return {
+      handled: true,
+      gameState: nextGameState,
+      toolsUsed,
+      draftNarrative,
+      sawMcpToolError,
     }
   }
 
@@ -2770,7 +3016,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         }
 
         const narrativeStateIssue =
-          detectNarrativeStateContractIssue(responseText, currentGameState) ??
+          detectNarrativeStateContractIssue(responseText, currentGameState, toolsUsed) ??
           detectNarrativeRoomContractIssue(responseText, currentGameState, toolsUsed)
         if (narrativeStateIssue) {
           narrative = narrativeBeforeResponse
@@ -3184,7 +3430,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     const finalNarrativeStateIssue =
-      detectNarrativeStateContractIssue(narrative, currentGameState) ??
+      detectNarrativeStateContractIssue(narrative, currentGameState, toolsUsed) ??
       detectNarrativeRoomContractIssue(narrative, currentGameState, toolsUsed)
     if (finalNarrativeStateIssue) {
       const serverCorrection = buildNarrativeStateCorrection(currentGameState)

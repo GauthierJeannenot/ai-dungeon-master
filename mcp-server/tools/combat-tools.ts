@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { rollDice, getAbilityModifier, d20WithModifier } from '../dice'
 import * as gs from '../game-state'
 import * as rules from '../rules'
-import { EntityStats, AttackResult, SavingThrowResult, Condition } from '../../lib/types'
+import { EntityStats, AttackResult, SavingThrowResult, AbilityCheckResult, Condition } from '../../lib/types'
 
 // Weapon damage dice by weapon name (D&D 5e)
 const WEAPON_DAMAGE: Record<string, string> = {
@@ -33,15 +33,69 @@ function doubleDiceNotation(notation: string): string {
 
 type TargetHint = 'nearest' | 'right' | 'left' | 'front' | 'back' | 'wounded'
 
+function normalizeTargetText(value: string): string {
+  return value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .replace(/[’‘`´]/g, "'")
+}
+
 function distanceCells(a: { x: number; y: number }, b: { x: number; y: number }): number {
   return Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y))
 }
 
-function selectPlayerTarget(targetId: string | undefined, targetHint: TargetHint | undefined): string {
+function monsterMatchesTargetName(monster: { name: string; type: string }, targetName: string): boolean {
+  const query = normalizeTargetText(targetName).trim()
+  if (!query) return false
+
+  const normalizedName = normalizeTargetText(monster.name)
+  const normalizedType = normalizeTargetText(monster.type)
+  const translatedType = normalizedType
+    .replace(/hobgoblin/g, 'hobgobelin')
+    .replace(/goblin/g, 'gobelin')
+    .replace(/violet_fungus/g, 'champignon violet')
+    .replace(/_/g, ' ')
+
+  if (normalizedName === query || normalizedName.includes(query) || query.includes(normalizedName)) return true
+  if (translatedType === query || translatedType.includes(query) || query.includes(translatedType)) return true
+
+  const genericTerms = new Set(['le', 'la', 'les', 'un', 'une', 'des', 'du', 'de', 'gobelin', 'gobelins', 'garde', 'gardes', 'chef'])
+  const terms = query
+    .split(/[^a-z0-9']+/)
+    .filter(term => term.length >= 4 && !genericTerms.has(term))
+
+  return terms.some(term => normalizedName.includes(term) || translatedType.includes(term))
+}
+
+function selectPlayerTarget(
+  targetId: string | undefined,
+  targetName: string | undefined,
+  targetHint: TargetHint | undefined
+): string {
   if (targetId) return targetId
 
   const state = gs.getState()
   const player = state.player
+  if (targetName) {
+    const namedCandidates = Object.values(state.monsters).filter(monster => monsterMatchesTargetName(monster, targetName))
+    const livingNamedCandidates = namedCandidates.filter(monster => monster.isAlive)
+
+    if (livingNamedCandidates.length === 1) return livingNamedCandidates[0].id
+    if (namedCandidates.length === 1) return namedCandidates[0].id
+    if (livingNamedCandidates.length > 1 || namedCandidates.length > 1) {
+      throw new rules.RuleViolation('TARGET_AMBIGUOUS', 'More than one monster matches the player attack target name.', {
+        targetName,
+        candidateIds: (livingNamedCandidates.length > 1 ? livingNamedCandidates : namedCandidates).map(monster => monster.id),
+      })
+    }
+
+    throw new rules.RuleViolation('TARGET_NOT_FOUND', 'No monster matches the player attack target name.', {
+      targetName,
+      livingMonsterIds: Object.values(state.monsters).filter(monster => monster.isAlive).map(monster => monster.id),
+    })
+  }
+
   let candidates = Object.values(state.monsters).filter(monster => monster.isAlive)
 
   if (targetHint === 'right') candidates = candidates.filter(monster => monster.position.x > player.position.x)
@@ -293,6 +347,7 @@ export function registerCombatTools(server: McpServer): void {
     'Resolves the player attack. Use this for natural-language targets such as nearest, right, left, front, back, or wounded; the tool selects the real monster ID before applying attack rules.',
     {
       targetId: z.string().optional().describe('Exact monster ID if already known.'),
+      targetName: z.string().optional().describe('Natural-language monster name from the player, e.g. "Grukk", "Chef Grukk", or "hobgoblin". Prefer this when the player names a creature.'),
       targetHint: z.enum(['nearest', 'right', 'left', 'front', 'back', 'wounded']).optional().describe('Spatial/semantic target hint when the player did not name an exact monster ID.'),
       weaponOrSpell: z.string().optional().describe('Weapon or spell name; defaults to longsword.'),
       advantage: z.boolean().optional().describe('Roll with advantage.'),
@@ -300,9 +355,9 @@ export function registerCombatTools(server: McpServer): void {
       customDamageDice: z.string().optional().describe('Override damage dice.'),
       rangeCells: z.number().int().positive().optional().describe('Optional attack range in grid cells; defaults to weapon range.'),
     },
-    async ({ targetId, targetHint, weaponOrSpell, advantage, disadvantage, customDamageDice, rangeCells }) => {
+    async ({ targetId, targetName, targetHint, weaponOrSpell, advantage, disadvantage, customDamageDice, rangeCells }) => {
       try {
-        const resolvedTargetId = selectPlayerTarget(targetId, targetHint ?? 'nearest')
+        const resolvedTargetId = selectPlayerTarget(targetId, targetName, targetHint ?? 'nearest')
         return resolveAttack('player', resolvedTargetId, weaponOrSpell ?? 'longsword', advantage, disadvantage, customDamageDice, rangeCells)
       } catch (err) {
         return rules.ruleErrorResult(err)
@@ -310,7 +365,63 @@ export function registerCombatTools(server: McpServer): void {
     }
   )
 
-  // Saving throw resolution
+  // Ability checks and saving throw resolution
+  server.tool(
+    'roll_ability_check',
+    'Rolls a D&D ability or skill check for an entity against an optional DC. Use this for Persuasion, Intimidation, Athletics, Perception, forcing doors, searching, and other checks. Do not use resolve_saving_throw for skill checks.',
+    {
+      entityId: z.string().optional().describe('Entity making the check; defaults to player.'),
+      ability: z.enum(['str', 'dex', 'con', 'int', 'wis', 'cha']).describe('Ability used for the check.'),
+      dc: z.number().int().optional().describe('Optional Difficulty Class to determine success.'),
+      proficient: z.boolean().optional().describe('Whether to add proficiency bonus. Defaults false.'),
+      expertise: z.boolean().optional().describe('Whether to add double proficiency bonus. Defaults false.'),
+      label: z.string().optional().describe('Short label such as Persuasion, Intimidation, Athletics, or Perception.'),
+    },
+    async ({ entityId, ability, dc, proficient, expertise, label }) => {
+      const resolvedEntityId = entityId ?? 'player'
+      const entity = gs.getEntity(resolvedEntityId)
+      if (!entity) return { content: [{ type: 'text', text: JSON.stringify({ error: `Entity not found: ${resolvedEntityId}` }) }], isError: true }
+      try {
+        rules.validateAbilityCheck(resolvedEntityId)
+      } catch (err) {
+        return rules.ruleErrorResult(err)
+      }
+
+      const abilityMod = getAbilityModifier(entity.stats[ability as keyof EntityStats])
+      const proficiencyBonus = 'proficiencyBonus' in entity ? entity.proficiencyBonus : 2
+      const proficiencyMod = expertise ? proficiencyBonus * 2 : proficient ? proficiencyBonus : 0
+      const totalMod = abilityMod + proficiencyMod
+      const roll = rollDice(d20WithModifier(totalMod))
+      const success = typeof dc === 'number' ? roll.total >= dc : undefined
+      const checkLabel = label?.trim() || `Test ${ability.toUpperCase()}`
+      const mechanicalSummary = `${checkLabel}: ${roll.detail}${typeof dc === 'number' ? ` vs DD ${dc} -> ${success ? 'SUCCES' : 'ECHEC'}` : ''}`
+
+      const result: AbilityCheckResult = {
+        entityId: resolvedEntityId,
+        ability: ability as keyof EntityStats,
+        label: checkLabel,
+        dc,
+        proficient: Boolean(proficient),
+        expertise: Boolean(expertise),
+        roll,
+        success,
+        mechanicalSummary,
+      }
+
+      gs.addLogEntry({
+        round: gs.getState().round,
+        turn: gs.getState().currentTurn ?? resolvedEntityId,
+        action: `${entity.name} - ${checkLabel}`,
+        mechanicalDetail: mechanicalSummary,
+      })
+      if (gs.getState().phase === 'combat' && gs.getState().currentTurn === resolvedEntityId) {
+        rules.recordAction(resolvedEntityId)
+      }
+
+      return { content: [{ type: 'text', text: JSON.stringify(result) }] }
+    }
+  )
+
   server.tool(
     'resolve_saving_throw',
     'Resolves a D&D 5e saving throw for an entity against a DC.',

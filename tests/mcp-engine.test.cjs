@@ -356,6 +356,54 @@ test('MCP resolve_player_attack resolves a spatial target hint', async () => {
   })
 })
 
+test('MCP resolve_player_attack resolves a named target before nearest fallback', async () => {
+  await withForcedDiceSequence('20,1,1', async () => {
+    await withMcpClient(async client => {
+      const baseState = await callTool(client, 'get_game_state')
+      const guard = makeMonster('goblin_guard', 20)
+      guard.name = 'Gobelin Garde'
+      guard.position = { x: 1, y: 0 }
+      const grukk = makeMonster('chef_grukk', 20)
+      grukk.name = 'Chef Grukk'
+      grukk.type = 'hobgoblin'
+      grukk.position = { x: 1, y: 1 }
+
+      await callTool(client, 'replace_game_state', {
+        gameState: {
+          ...baseState,
+          phase: 'combat',
+          currentTurn: 'player',
+          round: 1,
+          initiativeOrder: ['player', guard.id, grukk.id],
+          movementUsed: {},
+          actionUsed: {},
+          player: {
+            ...baseState.player,
+            position: { x: 0, y: 0 },
+          },
+          monsters: {
+            [guard.id]: guard,
+            [grukk.id]: grukk,
+          },
+        },
+      })
+
+      const attack = await callTool(client, 'resolve_player_attack', {
+        targetName: 'Grukk',
+        weaponOrSpell: 'longsword',
+        customDamageDice: '1d2',
+      })
+
+      assert.equal(attack.targetId, grukk.id)
+      assert.equal(attack.hit, true)
+
+      const stateAfter = await callTool(client, 'get_game_state')
+      assert.equal(stateAfter.monsters[grukk.id].hp.current, attack.targetHpAfter)
+      assert.equal(stateAfter.monsters[guard.id].hp.current, 20)
+    })
+  })
+})
+
 test('MCP rules reject overlong combat movement and occupied cells', async () => {
   await withMcpClient(async client => {
     const baseState = await callTool(client, 'get_game_state')
@@ -431,6 +479,59 @@ test('MCP pass_turn is limited to the player turn', async () => {
       reason: 'Le gobelin attend.',
     })
     assert.equal(blocked.code, 'PLAYER_TURN_REQUIRED')
+  })
+})
+
+test('MCP roll_ability_check resolves skill checks and consumes a combat action', async () => {
+  await withForcedDiceSequence('10', async () => {
+    await withMcpClient(async client => {
+      const baseState = await callTool(client, 'get_game_state')
+      const state = makeCombatState(baseState)
+      state.player.stats = { ...state.player.stats, cha: 16 }
+      state.player.proficiencyBonus = 2
+
+      await callTool(client, 'replace_game_state', { gameState: state })
+
+      const check = await callTool(client, 'roll_ability_check', {
+        ability: 'cha',
+        dc: 14,
+        proficient: true,
+        label: 'Persuasion',
+      })
+
+      assert.equal(check.entityId, 'player')
+      assert.equal(check.ability, 'cha')
+      assert.equal(check.label, 'Persuasion')
+      assert.equal(check.success, true)
+      assert.equal(check.roll.total, 15)
+      assert.match(check.mechanicalSummary, /Persuasion/)
+      assert.match(check.mechanicalSummary, /DD 14/)
+
+      const stateAfter = await callTool(client, 'get_game_state')
+      assert.equal(stateAfter.actionUsed.player, true)
+
+      const nextTurn = await callTool(client, 'next_turn', { actorId: 'player' })
+      assert.equal(nextTurn.currentTurn, 'goblin_a')
+    })
+  })
+})
+
+test('MCP roll_ability_check is limited to the actor turn in combat', async () => {
+  await withMcpClient(async client => {
+    const baseState = await callTool(client, 'get_game_state')
+
+    await callTool(client, 'replace_game_state', {
+      gameState: makeCombatState(baseState, { currentTurn: 'goblin_a' }),
+    })
+
+    const wrongTurn = await callTool(client, 'roll_ability_check', {
+      ability: 'cha',
+      dc: 14,
+      label: 'Persuasion',
+      proficient: true,
+    })
+
+    assert.equal(wrongTurn.code, 'NOT_CURRENT_TURN')
   })
 })
 

@@ -126,6 +126,18 @@ export interface SavingThrowResult {
   mechanicalSummary: string
 }
 
+export interface AbilityCheckResult {
+  entityId: string
+  ability: keyof EntityStats
+  label?: string
+  dc?: number
+  proficient: boolean
+  expertise: boolean
+  roll: DiceRollResult
+  success?: boolean
+  mechanicalSummary: string
+}
+
 // Un tour de conversation envoyé au LLM (player/dm uniquement — pas mechanical)
 export interface ConversationTurn {
   role: 'player' | 'dm'
