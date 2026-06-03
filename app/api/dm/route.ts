@@ -708,15 +708,36 @@ function normalizeFrenchText(value: string): string {
     .replace(/\p{Diacritic}/gu, '')
 }
 
-function detectRequiredMechanicalAction(message: string, gameState: GameState): { reason: string; suggestedTools: string[] } | null {
+type RequiredMechanicalAction = {
+  reason: string
+  suggestedTools: string[]
+}
+
+const TOOL_INTENT_SATISFIERS: Record<string, string[]> = {
+  'player-combat-attack-intent': ['resolve_player_attack', 'move_token'],
+  'player-combat-movement-intent': ['move_token', 'resolve_player_attack'],
+  'exploration-movement-intent': ['move_token', 'trigger_room_event', 'start_encounter', 'end_combat'],
+  'encounter-or-attack-intent': ['start_encounter', 'resolve_player_attack'],
+}
+
+function hasToolSatisfyingMechanicalAction(
+  requiredAction: RequiredMechanicalAction,
+  toolsUsed: string[]
+): boolean {
+  const satisfiers = TOOL_INTENT_SATISFIERS[requiredAction.reason] ?? requiredAction.suggestedTools
+  const satisfierSet = new Set(satisfiers)
+  return toolsUsed.some(toolName => satisfierSet.has(toolName))
+}
+
+function detectRequiredMechanicalAction(message: string, gameState: GameState): RequiredMechanicalAction | null {
   const text = normalizeFrenchText(message)
   const asksOnlyForDescription = /\b(observe|regarde|inspecte|ecoute|vois|voir|decris|decrit|quoi|qu'est-ce|est-ce tout)\b/.test(text)
-  if (asksOnlyForDescription && !/\b(deplace|attaque|frappe|spawn|apparaitre|carte|combat)\b/.test(text)) {
+  if (asksOnlyForDescription && !/\b(deplace|attaque|frappe|spawn|apparaitre|carte|combat|ouvre|ouvrir|enfonce|enfoncer|porte)\b/.test(text)) {
     return null
   }
 
   const attackIntent = /\b(attaque|attaquer|frappe|frapper|tape|coup|assene|charge|tire|lance)\b/.test(text)
-  const movementIntent = /\b(deplace|deplacer|avance|avancer|bouge|bouger|vais|aller|va |entre|entrer|rentre|traverse|approche|explore|explorer|fuis|fuite|recule)\b/.test(text)
+  const movementIntent = /\b(deplace|deplacer|avance|avancer|bouge|bouger|vais|aller|va |entre|entrer|rentre|traverse|approche|explore|explorer|fuis|fuite|recule|ouvre|ouvrir|enfonce|enfoncer|porte)\b/.test(text)
   const encounterIntent = /\b(combat|ennemi|gobelin|monstre|apparaitre|spawn|carte|initiative|debarque|perissez|fuyez)\b/.test(text)
 
   if (gameState.phase === 'combat' && gameState.currentTurn === 'player' && attackIntent) {
@@ -1471,24 +1492,25 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         lastEndTurnNarrative = responseText
         if (
           requiredMechanicalAction &&
-          toolsUsed.length === 0 &&
+          !hasToolSatisfyingMechanicalAction(requiredMechanicalAction, toolsUsed) &&
           !mechanicalRetryInjected &&
           iterations < MAX_TOOL_ITERATIONS
         ) {
           mechanicalRetryInjected = true
-          logEvent('warn', 'anomaly.intent_without_tool', {
+          logEvent('warn', 'anomaly.intent_without_required_tool', {
             requestId,
             sessionId,
             iteration: iterations,
             reason: requiredMechanicalAction.reason,
             suggestedTools: requiredMechanicalAction.suggestedTools,
+            toolsUsed,
             message,
             gameState: summarizeGameState(currentGameState),
           })
           messages.push({ role: 'assistant', content: response.content })
           messages.push({
             role: 'user',
-            content: `SYSTEM: Le dernier message du joueur demande une action mecanique (${requiredMechanicalAction.reason}). Tu dois appeler au moins un tool MCP adapte (${requiredMechanicalAction.suggestedTools.join(', ')}) ou expliquer explicitement pourquoi aucune mutation de l'etat n'est legale. Ne narre pas une action mecanique sans tool.`,
+            content: `SYSTEM: Le dernier message du joueur demande une action mecanique (${requiredMechanicalAction.reason}). Les tools deja utilises (${toolsUsed.length > 0 ? toolsUsed.join(', ') : 'aucun'}) ne mutent pas l'etat attendu. Tu dois appeler au moins un tool MCP adapte (${requiredMechanicalAction.suggestedTools.join(', ')}) ou expliquer explicitement pourquoi aucune mutation de l'etat n'est legale. Un simple roll_dice ne suffit pas pour un deplacement, une entree de salle ou une attaque. Ne narre pas une action mecanique sans tool pertinent.`,
           })
           continue
         }
