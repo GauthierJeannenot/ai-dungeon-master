@@ -1905,10 +1905,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     })
 
     const body: DMRequest = await req.json()
-    const { message, gameState, history = [], summaryContext, sessionId } = body
+    const { message, gameState, history = [], summaryContext, sessionId, clientMeta } = body
     logEvent('info', 'dm.request.received', {
       requestId,
       sessionId,
+      inputMode: clientMeta?.inputMode ?? 'text',
+      clientMeta,
       messageLength: message?.length ?? 0,
       message,
       historyLength: history.length,
@@ -1925,6 +1927,20 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         durationMs: Date.now() - requestStartedAt,
       })
       return NextResponse.json({ error: 'Message requis' }, { status: 400 })
+    }
+
+    if (clientMeta?.inputMode === 'voice') {
+      logEvent('info', 'dm.voice.cost_guard', {
+        requestId,
+        sessionId,
+        inputMode: clientMeta.inputMode,
+        transcriptChars: clientMeta.voice?.transcriptChars,
+        inputProvider: clientMeta.voice?.inputProvider,
+        outputProvider: clientMeta.voice?.outputProvider,
+        finalTranscriptOnly: clientMeta.voice?.finalTranscriptOnly,
+        noServerAudioUpload: clientMeta.voice?.noServerAudioUpload === true,
+        extraLlmCallsFromVoice: 0,
+      })
     }
 
     releaseSessionLock = await acquireSessionLock(sessionId)
@@ -2557,6 +2573,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     logAnthropicUsageSummary(requestId, usageLog, {
+      inputMode: clientMeta?.inputMode ?? 'text',
+      voice: clientMeta?.voice,
       iterations,
       toolsUsed: [...new Set(toolsUsed)],
       compressedHistory: Boolean(newSummary),
@@ -2566,6 +2584,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       requestId,
       sessionId,
       durationMs: Date.now() - requestStartedAt,
+      inputMode: clientMeta?.inputMode ?? 'text',
+      voice: clientMeta?.voice,
       iterations,
       toolsUsed: [...new Set(toolsUsed)],
       narrativeLength: dmResponse.narrative.length,

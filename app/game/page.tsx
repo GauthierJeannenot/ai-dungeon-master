@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import Chat from '@/components/Chat'
 import CombatTracker from '@/components/CombatTracker'
-import { GameState, ChatMessage, DMResponse, DMRequest, ConversationTurn } from '@/lib/types'
+import { GameState, ChatMessage, DMResponse, DMRequest, ConversationTurn, DMClientMeta } from '@/lib/types'
 
 // Battlemap uses browser APIs — load client-only
 const Battlemap = dynamic(() => import('@/components/Battlemap'), { ssr: false })
@@ -262,7 +262,19 @@ export default function GamePage() {
     } catch { /* storage unavailable */ }
   }, [gameState, hasLoadedSession, messages, summaryContext])
 
-  const sendMessage = useCallback(async (text: string) => {
+  const logClientEvent = useCallback((event: string, payload: Record<string, unknown>) => {
+    if (!hasLoadedSession) return
+
+    const activeSessionId = sessionId ?? getOrCreateSessionId()
+    if (!sessionId) setSessionId(activeSessionId)
+
+    appendClientDebugLog(activeSessionId, event, payload)
+    syncClientDebugLog(activeSessionId).catch(err => {
+      console.error('Failed to sync client debug log:', err)
+    })
+  }, [hasLoadedSession, sessionId])
+
+  const sendMessage = useCallback(async (text: string, clientMeta: DMClientMeta = { inputMode: 'text' }) => {
     if (isLoading || !hasLoadedSession) return
     setError(null)
     setIsLoading(true)
@@ -296,9 +308,12 @@ export default function GamePage() {
         gameState,
         history,
         summaryContext,
+        clientMeta,
       }
       appendClientDebugLog(activeSessionId, 'client.dm.request', {
         message: truncateClientText(text),
+        inputMode: clientMeta.inputMode ?? 'text',
+        voice: clientMeta.voice,
         historyLength: history.length,
         summaryContextLength: summaryContext?.length ?? 0,
         gameState: summarizeClientGameState(gameState),
@@ -320,6 +335,7 @@ export default function GamePage() {
 
       const data: DMResponse = await res.json()
       appendClientDebugLog(activeSessionId, 'client.dm.response', {
+        inputMode: clientMeta.inputMode ?? 'text',
         narrative: truncateClientText(data.narrative ?? ''),
         toolsUsed: data.toolsUsed,
         summaryContextLength: data.summaryContext?.length ?? 0,
@@ -371,6 +387,7 @@ export default function GamePage() {
       const msg = err instanceof Error ? err.message : 'Erreur inconnue'
       appendClientDebugLog(activeSessionId, 'client.dm.error', {
         message: truncateClientText(text),
+        inputMode: clientMeta.inputMode ?? 'text',
         error: msg,
         gameState: summarizeClientGameState(gameState),
       })
@@ -482,9 +499,11 @@ export default function GamePage() {
             <Chat
               messages={messages}
               isLoading={isLoading || !hasLoadedSession}
+              gameState={gameState}
               onSendMessage={sendMessage}
               inputValue={inputValue}
               onInputChange={setInputValue}
+              onClientEvent={logClientEvent}
             />
           </div>
         </div>

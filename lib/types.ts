@@ -131,6 +131,19 @@ export interface ConversationTurn {
   content: string
 }
 
+export interface DMClientMeta {
+  inputMode?: 'text' | 'voice'
+  voice?: {
+    inputProvider?: 'browser-speech-recognition'
+    outputProvider?: 'browser-speech-synthesis'
+    transcriptChars?: number
+    finalTranscriptOnly?: boolean
+    noServerAudioUpload?: boolean
+    language?: string
+    recognitionEngine?: string
+  }
+}
+
 // API request/response types
 export interface DMRequest {
   message: string
@@ -141,6 +154,8 @@ export interface DMRequest {
   history?: ConversationTurn[]
   // Résumé compressé des échanges plus anciens (généré par le LLM quand l'historique est trop long)
   summaryContext?: string
+  // Small client-side hints for observability/cost analysis. Never contains audio.
+  clientMeta?: DMClientMeta
 }
 
 export interface DMResponse {
