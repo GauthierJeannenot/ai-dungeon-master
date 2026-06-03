@@ -94,10 +94,11 @@ async function ollamaChat(
     tools: tools.length > 0 ? tools : undefined,
     stream: false,
     tool_choice: tools.length > 0 ? 'auto' : undefined,
+    // num_ctx au niveau racine — Ollama /v1 respecte ce champ, pas options.num_ctx
+    num_ctx: 32768,          // 43GB modèle + ~20GB KV cache = ~63GB / 80GB VRAM A100
     options: {
-      temperature: 0.2,      // très bas pour forcer le tool calling
+      temperature: 0.2,
       num_predict: MAX_TOKENS,
-      num_ctx: 32768,        // ~20GB KV cache + 43GB modèle = ~63GB / 80GB VRAM A100
     },
   }
 
