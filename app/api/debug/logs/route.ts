@@ -12,6 +12,17 @@ export const dynamic = 'force-dynamic'
 
 const VALID_LEVELS = new Set<LogLevel>(['debug', 'info', 'warn', 'error'])
 const PUBLIC_READ_ENABLED = process.env.APP_DEBUG_LOG_PUBLIC_READ !== 'false'
+const JSON_UTF8_HEADERS = { 'Content-Type': 'application/json; charset=utf-8' }
+
+function jsonResponse(body: unknown, init?: ResponseInit): NextResponse {
+  const headers = new Headers(init?.headers)
+  headers.set('Content-Type', JSON_UTF8_HEADERS['Content-Type'])
+
+  return NextResponse.json(body, {
+    ...init,
+    headers,
+  })
+}
 
 function configuredToken(): string | null {
   const token = process.env.APP_DEBUG_LOG_TOKEN?.trim()
@@ -44,7 +55,7 @@ function safeEqual(actual: string, expected: string): boolean {
 function authorize(req: NextRequest): NextResponse | null {
   const expectedToken = configuredToken()
   if (!expectedToken) {
-    return NextResponse.json({ error: 'debug logs disabled' }, { status: 404 })
+    return jsonResponse({ error: 'debug logs disabled' }, { status: 404 })
   }
 
   if (!safeEqual(tokenFromRequest(req), expectedToken)) {
@@ -53,7 +64,7 @@ function authorize(req: NextRequest): NextResponse | null {
       forwardedFor: req.headers.get('x-forwarded-for'),
       userAgent: req.headers.get('user-agent'),
     })
-    return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+    return jsonResponse({ error: 'unauthorized' }, { status: 401 })
   }
 
   return null
@@ -123,7 +134,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     },
   })
 
-  return NextResponse.json({
+  return jsonResponse({
     logs: result.entries,
     count: result.entries.length,
     totalBuffered: result.totalBuffered,
@@ -144,5 +155,5 @@ export async function DELETE(req: NextRequest): Promise<NextResponse> {
     cleared,
   })
 
-  return NextResponse.json({ cleared })
+  return jsonResponse({ cleared })
 }
