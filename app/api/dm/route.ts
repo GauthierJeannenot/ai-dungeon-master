@@ -612,7 +612,13 @@ RÈGLES MÉCANIQUES:
 - Ne jamais appeler next_turn : outil interne réservé au serveur.
 - Tour monstre → ne résous pas toi-même. Le serveur joue les monstres automatiquement, puis tu narres le résultat.
 - Fin de combat avec adversaires encore actifs → end_combat avec force=true seulement si fuite, reddition ou accord narratif crédible.
-- HP monstres : vigoureux / légèrement blessé / gravement blessé / à l'agonie.`
+- HP monstres : vigoureux / légèrement blessé / gravement blessé / à l'agonie.
+
+CONTRAT ETAT/NARRATION:
+- Si l'etat indique exploration avec 0 monstre vivant, tu ne peux pas narrer des ennemis presents dans la salle, qui entrent, attaquent, degainent, reperent le heros ou bloquent son chemin.
+- Pour faire apparaitre une rencontre reelle, appelle start_encounter avant de narrer sa presence.
+- Si ce sont seulement des bruits, rumeurs ou mouvements hors champ, dis-le explicitement: aucun ennemi n'est encore sur la carte et le combat n'est pas engage.
+- Si tu detectes que ta narration contredirait l'etat moteur, dis directement dans le chat "Debug moteur: ..." puis corrige la narration.`
 }
 
 function buildDynamicPrompt(gameState: GameState, summaryContext: string | undefined): string {
@@ -729,16 +735,58 @@ function hasToolSatisfyingMechanicalAction(
   return toolsUsed.some(toolName => satisfierSet.has(toolName))
 }
 
+type NarrativeStateContractIssue = {
+  reason: string
+  matchedTriggers: string[]
+  suggestedTools: string[]
+}
+
+function countAliveMonsters(gameState: GameState): number {
+  return Object.values(gameState.monsters).filter(monster => monster.isAlive).length
+}
+
+function detectNarrativeStateContractIssue(
+  responseText: string,
+  gameState: GameState
+): NarrativeStateContractIssue | null {
+  if (!responseText || gameState.phase !== 'exploration' || countAliveMonsters(gameState) > 0) {
+    return null
+  }
+
+  const text = normalizeFrenchText(responseText)
+  const mentionsEnemies = /\b(gobelins?|ennemis?|monstres?|creatures?|silhouettes?|eclaireurs?)\b/.test(text)
+  if (!mentionsEnemies) return null
+
+  const triggerPatterns: Array<[string, RegExp]> = [
+    ['enemy_enters_or_moves', /\b(entrent?|rentrent?|arrivent?|approchent?|surgissent?|debarquent?|passent?|descendent|convergent|encerclent?|se rapprochent|suivent?|poursuivent?)\b/],
+    ['enemy_takes_action', /\b(degainent?|attaquent?|frappent?|chargent?|scrutent?|fouillent?|poussent?|se retournent?|reperent?|repere|voient?|apercoivent?|crient?)\b/],
+    ['combat_state_without_engine', /\b(combat imminent|initiative|armes? degainees?|epees? degainees?|vous etes repere|intrus)\b/],
+  ]
+  const matchedTriggers = triggerPatterns
+    .filter(([, pattern]) => pattern.test(text))
+    .map(([name]) => name)
+
+  if (matchedTriggers.length === 0) return null
+
+  return {
+    reason: 'enemy_presence_without_engine_state',
+    matchedTriggers,
+    suggestedTools: ['start_encounter'],
+  }
+}
+
 function detectRequiredMechanicalAction(message: string, gameState: GameState): RequiredMechanicalAction | null {
   const text = normalizeFrenchText(message)
   const asksOnlyForDescription = /\b(observe|regarde|inspecte|ecoute|vois|voir|decris|decrit|quoi|qu'est-ce|est-ce tout)\b/.test(text)
-  if (asksOnlyForDescription && !/\b(deplace|attaque|frappe|spawn|apparaitre|carte|combat|ouvre|ouvrir|enfonce|enfoncer|porte)\b/.test(text)) {
+  if (asksOnlyForDescription && !/\b(deplace|attaque|frappe|spawn|apparaitre|carte|combat|ouvres?|ouvrir|enfonces?|enfoncer|portes?|gobelins?|ennemis?|monstres?)\b/.test(text)) {
     return null
   }
 
   const attackIntent = /\b(attaque|attaquer|frappe|frapper|tape|coup|assene|charge|tire|lance)\b/.test(text)
-  const movementIntent = /\b(deplace|deplacer|avance|avancer|bouge|bouger|vais|aller|va |entre|entrer|rentre|traverse|approche|explore|explorer|fuis|fuite|recule|ouvre|ouvrir|enfonce|enfoncer|porte)\b/.test(text)
-  const encounterIntent = /\b(combat|ennemi|gobelin|monstre|apparaitre|spawn|carte|initiative|debarque|perissez|fuyez)\b/.test(text)
+  const baseMovementIntent = /\b(deplaces?|deplacer|avances?|avancer|bouges?|bouger|vais|aller|va |entres?|entrer|rentres?|traverses?|approches?|explores?|explorer|fuis|fuite|recules?|ouvres?|ouvrir|enfonces?|enfoncer|portes?|glisses?|glisser)\b/.test(text)
+  const followIntent = /\b(suis|suivre|poursuis|poursuivre)\b/.test(text) && /\b(gobelins?|ennemis?|monstres?|creatures?|silhouettes?|eux|traces?)\b/.test(text)
+  const movementIntent = baseMovementIntent || followIntent
+  const encounterIntent = /\b(combat|ennemis?|gobelins?|monstres?|creatures?|silhouettes?|eclaireurs?|apparaitre|spawn|carte|initiative|debarques?|perissez|fuyez)\b/.test(text)
 
   if (gameState.phase === 'combat' && gameState.currentTurn === 'player' && attackIntent) {
     return { reason: 'player-combat-attack-intent', suggestedTools: ['resolve_player_attack', 'move_token'] }
@@ -1417,6 +1465,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     let iterations = 0
     let turnBoundaryReached = false
     let mechanicalRetryInjected = false
+    let narrativeContractRetryInjected = false
     let maxTokensRetryInjected = false
     let sawMcpToolError = false
     let lastStopReason: Anthropic.Message['stop_reason'] | null = null
@@ -1477,6 +1526,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         .filter((block): block is Anthropic.TextBlock => block.type === 'text')
         .map(block => block.text)
         .join('\n\n')
+      const narrativeBeforeResponse = narrative
       if (responseText) {
         narrative += (narrative ? '\n\n' : '') + responseText
       }
@@ -1497,6 +1547,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           iterations < MAX_TOOL_ITERATIONS
         ) {
           mechanicalRetryInjected = true
+          narrative = narrativeBeforeResponse
+          lastEndTurnNarrative = ''
           logEvent('warn', 'anomaly.intent_without_required_tool', {
             requestId,
             sessionId,
@@ -1511,6 +1563,33 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           messages.push({
             role: 'user',
             content: `SYSTEM: Le dernier message du joueur demande une action mecanique (${requiredMechanicalAction.reason}). Les tools deja utilises (${toolsUsed.length > 0 ? toolsUsed.join(', ') : 'aucun'}) ne mutent pas l'etat attendu. Tu dois appeler au moins un tool MCP adapte (${requiredMechanicalAction.suggestedTools.join(', ')}) ou expliquer explicitement pourquoi aucune mutation de l'etat n'est legale. Un simple roll_dice ne suffit pas pour un deplacement, une entree de salle ou une attaque. Ne narre pas une action mecanique sans tool pertinent.`,
+          })
+          continue
+        }
+
+        const narrativeStateIssue = detectNarrativeStateContractIssue(responseText, currentGameState)
+        if (
+          narrativeStateIssue &&
+          !narrativeContractRetryInjected &&
+          iterations < MAX_TOOL_ITERATIONS
+        ) {
+          narrativeContractRetryInjected = true
+          narrative = narrativeBeforeResponse
+          lastEndTurnNarrative = ''
+          logEvent('warn', 'anomaly.narrative_state_contract', {
+            requestId,
+            sessionId,
+            iteration: iterations,
+            issue: narrativeStateIssue,
+            toolsUsed,
+            message,
+            responseText,
+            gameState: summarizeGameState(currentGameState),
+          })
+          messages.push({ role: 'assistant', content: response.content })
+          messages.push({
+            role: 'user',
+            content: `SYSTEM: Ta narration vient de faire exister des ennemis physiquement presents ou un combat imminent alors que l'etat moteur indique exploration avec 0 monstre vivant (${narrativeStateIssue.reason}, triggers: ${narrativeStateIssue.matchedTriggers.join(', ')}). Corrige maintenant. Si les ennemis sont reels et presents, appelle start_encounter. Sinon, reponds avec une correction explicite qui commence par "Debug moteur:" et precise que ce sont seulement des bruits/mouvements hors champ, sans ennemi sur la carte ni combat engage.`,
           })
           continue
         }
