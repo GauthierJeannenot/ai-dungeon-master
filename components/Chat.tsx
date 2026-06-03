@@ -96,7 +96,7 @@ export default function Chat({ messages, isLoading, onSendMessage, inputValue, o
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3 scrollbar-thin scrollbar-thumb-stone-700">
         {messages.length === 0 && (
           <div className="text-center text-stone-600 text-sm italic mt-8 px-4">
-            L&apos;aventure commence... Décrivez votre action.
+            La table est prête. Tentez quelque chose de brillant, douteux, ou les deux.
           </div>
         )}
 
@@ -117,7 +117,7 @@ export default function Chat({ messages, isLoading, onSendMessage, inputValue, o
             value={inputValue}
             onChange={e => onInputChange(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Décrivez votre action... (Entrée pour envoyer)"
+            placeholder="Votre coup: amadouer l'arbre, forcer la porte, flairer l'embrouille..."
             disabled={isLoading}
             rows={2}
             className="flex-1 bg-stone-800/80 border border-stone-600/50 rounded-lg px-3 py-2 text-stone-200 placeholder-stone-600 text-sm resize-none focus:outline-none focus:border-amber-700/60 disabled:opacity-50 leading-relaxed"
@@ -130,12 +130,12 @@ export default function Chat({ messages, isLoading, onSendMessage, inputValue, o
             {isLoading ? (
               <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
             ) : (
-              'Envoyer'
+              'Jouer'
             )}
           </button>
         </div>
         <div className="text-[10px] text-stone-600 mt-1 pl-1">
-          Shift+Entrée pour nouvelle ligne
+          Osez le plan bancal. Les dés adorent le chaos.
         </div>
       </div>
     </div>

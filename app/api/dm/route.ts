@@ -26,7 +26,7 @@ const MODEL = 'claude-haiku-4-5'
 const MAX_TOOL_ITERATIONS = 3
 const MAX_TOKENS = 400
 const FINAL_NARRATION_MAX_TOKENS = parsePositiveInt(process.env.LLM_FINAL_NARRATION_MAX_TOKENS, 180)
-const ORAL_NARRATION_MAX_SENTENCES = parsePositiveInt(process.env.ORAL_NARRATION_MAX_SENTENCES, 2)
+const ORAL_NARRATION_MAX_SENTENCES = parsePositiveInt(process.env.ORAL_NARRATION_MAX_SENTENCES, 4)
 const COMBAT_LOG_TAIL = 6
 const MAX_AUTO_NPC_TURNS = 8
 type LlmMode = 'live' | 'mock' | 'record' | 'replay'
@@ -614,6 +614,13 @@ FORMAT ORAL:
 - Ne declare jamais "fin de quete", "fin de campagne", "objectif accompli" ou une conclusion alternative sauf si le joueur demande explicitement d'arreter.
 - Si le joueur annonce un plan long, accepte l'intention mais ne saute pas des heures ou des jours: narre seulement la prochaine minute jouable.
 
+RYTHME DE TABLE:
+- Court ne veut pas dire sec: vise 2-4 phrases courtes avec un mouvement, une reaction ou une information utile.
+- Evite les reponses purement atmospheriques. Chaque reponse doit faire avancer la scene, meme legerement.
+- Si un PNJ repond, donne une replique savoureuse ou une decision visible, pas seulement une description.
+- Termine sur une situation qui appelle naturellement l'action du joueur, sans menu ni formule froide.
+- Si le joueur critique le style, la longueur, le systeme ou un bug, ne reponds pas a la critique et ne t'excuse pas: applique la correction silencieusement puis reprends la scene en fiction.
+
 PERSONNAGE:
 ${ctx.playerCharacter}
 
@@ -679,11 +686,13 @@ function buildNarrationStaticPrompt(): string {
 Narre uniquement la consequence immediate de l'action du joueur.
 Respecte strictement les resultats mecaniques fournis: jets, degats, morts, positions, tour courant.
 Ne lance aucun de, n'invente aucun nouvel ennemi, ne resous aucun tour futur.
-Reponse breve: 1-2 phrases, present, style vivant mais clair.
+Reponse breve: 2-4 phrases courtes, present, style vivant mais clair.
 Format vocal: pas de Markdown, pas de liste, pas de titre, pas de parenthese, pas d'excuse, pas de commentaire meta, pas de mention du systeme, des prompts, du moteur, des tools, de MCP ou de l'IA.
 Ne donne pas de coordonnees ni d'ID technique sauf si le joueur les demande explicitement.
 Ne termine pas par un menu d'options. Une question courte et naturelle est permise seulement si elle sert vraiment la scene.
-Ne declare pas de fin de quete/campagne ni de conclusion alternative sauf demande explicite. Pas de time-skip: seulement la prochaine minute jouable.`
+Ne declare pas de fin de quete/campagne ni de conclusion alternative sauf demande explicite. Pas de time-skip: seulement la prochaine minute jouable.
+Donne de l'elan: un mouvement, une replique, une menace, une opportunite ou une information exploitable. Evite les sorties qui ne font que decrire une ambiance.
+Si le joueur critique le style, la longueur, le systeme ou un bug, ne reponds pas a la critique: applique la correction silencieusement et reprends la scene en fiction.`
 }
 
 function buildNarrationSystemBlocks(
@@ -804,9 +813,22 @@ function splitIntoSentences(text: string): string[] {
   const sentences: string[] = []
   let start = 0
   let index = 0
+  let inQuote = false
 
   while (index < text.length) {
     const char = text[index]
+    if (char === '"' || char === '«' || char === '“') {
+      inQuote = char === '"' ? !inQuote : true
+      index++
+      continue
+    }
+
+    if (char === '»' || char === '”') {
+      inQuote = false
+      index++
+      continue
+    }
+
     if (!'.!?'.includes(char)) {
       index++
       continue
@@ -814,7 +836,16 @@ function splitIntoSentences(text: string): string[] {
 
     let end = index + 1
     while (end < text.length && '.!?'.includes(text[end])) end++
-    while (end < text.length && /["'»”’]/.test(text[end])) end++
+    let closesQuote = false
+    while (end < text.length && /["»”]/.test(text[end])) {
+      closesQuote = true
+      end++
+    }
+    if (inQuote && !closesQuote) {
+      index = end
+      continue
+    }
+    if (closesQuote) inQuote = false
 
     const whitespaceMatch = text.slice(end).match(/^\s+/)
     const nextIndex = end + (whitespaceMatch?.[0].length ?? 0)
@@ -850,10 +881,10 @@ function lineLooksLikeMetaCommentary(line: string): boolean {
   return [
     /\b(debug|moteur|mcp|tool|tools|outil|llm|prompt|systeme|etat moteur|contrat)\b/,
     /\b(action mecanique|resultats? mecaniques?|mutation de l'etat|etat attendu|dernier message du joueur)\b/,
-    /\b(je comprends le systeme|en attente de ton action|tu as entierement raison|tu as raison)\b/,
+    /\b(je comprends le systeme|en attente de ton action|tu as entierement raison|tu as raison|vous avez raison)\b/,
     /\b(tu es actuellement|tu es a\s+(?:en\s+)?salle\s+\d+|salle\s+\d+\s+[-:])\b/,
     /\b(excuse-moi|desole|erreur de ma part|j'aurais du|j aurais du|je vais corriger|merci de cette correction)\b/,
-    /\b(je dois clarifier|non, ce message n'est pas|ce message n'est pas|on continue)\b/,
+    /\b(je dois clarifier|non, ce message n'est pas|ce message n'est pas|on continue|laissez-moi recommencer|plus de substance)\b/,
     /\b(que fais-tu|ou veux-tu aller ensuite|deplacement,\s*attaque|attaque,\s*test|roleplay pur)\b/,
     /\b(appeler\s+\w+|move_token|start_encounter|resolve_player_attack|pass_turn|roll_dice)\b/,
     /\b(fin de quete|fin de campagne|quete alternative|objectif accompli|mission accomplie)\b/,
@@ -1735,7 +1766,7 @@ async function generateFinalNarration(
     `Action du joueur:\n${playerMessage}`,
     draftNarrative ? `Brouillon narratif precedent, potentiellement incomplet:\n${draftNarrative}` : undefined,
     `Resultats mecaniques faisant autorite:\n${formatCombatLogEntries(newCombatLogEntries)}`,
-    `Ecris la reponse finale au joueur en francais, au present, en 1-2 phrases. Elle doit etre naturelle a l'oral. Respecte strictement les resultats mecaniques. N'annonce aucune action future non resolue. Pas de Markdown, pas de liste, pas de parenthese, pas d'excuse, pas de meta, pas de menu, pas de mention du systeme, du moteur, des tools, de MCP ou de l'IA. Pas de coordonnees ni d'ID technique sauf demande explicite du joueur. Ne declare pas de fin de quete/campagne ni de conclusion alternative sauf demande explicite. Pas de time-skip: seulement la prochaine minute jouable.`,
+    `Ecris la reponse finale au joueur en francais, au present, en 2-4 phrases courtes. Elle doit etre naturelle a l'oral et donner de l'elan: mouvement, replique, menace, opportunite ou information exploitable. Respecte strictement les resultats mecaniques. N'annonce aucune action future non resolue. Pas de Markdown, pas de liste, pas de parenthese, pas d'excuse, pas de meta, pas de menu, pas de mention du systeme, du moteur, des tools, de MCP ou de l'IA. Pas de coordonnees ni d'ID technique sauf demande explicite du joueur. Ne declare pas de fin de quete/campagne ni de conclusion alternative sauf demande explicite. Pas de time-skip: seulement la prochaine minute jouable. Si le joueur critique le style, la longueur, le systeme ou un bug, ne reponds pas a la critique: applique la correction silencieusement et reprends la scene en fiction.`,
   ].filter(Boolean).join('\n\n')
 
   try {
