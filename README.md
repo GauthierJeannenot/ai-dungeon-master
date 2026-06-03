@@ -208,4 +208,31 @@ Chaque onglet de navigateur possède son propre `sessionId`. L'état de jeu, l'h
 GAME_SESSION_STORE_DIR=/chemin/vers/sessions
 ```
 
-Cette persistance fichier permet de reprendre une partie après redémarrage du processus Node tant que le stockage local est conservé. Sur un déploiement multi-instance ou avec disque éphémère, migrez cette interface vers Redis, Postgres ou un stockage équivalent.
+Cette persistance fichier permet de reprendre une partie apres redemarrage du processus Node tant que le stockage local est conserve. Sur un deploiement multi-instance ou avec disque ephemere, migrez cette interface vers Redis, Postgres ou un stockage equivalent.
+
+### Logs de production Railway
+
+L'application emet des logs structures JSON sur stdout/stderr avec le prefixe `[ai-dm:<event>]`. Railway les capture automatiquement dans les logs runtime du service.
+
+Variables utiles :
+
+```env
+APP_LOG_LEVEL=debug
+APP_LOG_INCLUDE_TEXT=true
+APP_LOG_STRING_LIMIT=800
+APP_LOG_ARRAY_LIMIT=30
+APP_LOG_OBJECT_KEY_LIMIT=80
+```
+
+`APP_LOG_LEVEL=debug` est deja la valeur par defaut en `NODE_ENV=production`. Passez `APP_LOG_INCLUDE_TEXT=false` si vous voulez masquer les textes narratifs/messages joueur et ne garder que les longueurs.
+
+Lecture via Railway CLI :
+
+```bash
+railway logs
+railway logs | grep 'ai-dm:dm.request'
+railway logs | grep 'dm-'
+railway logs | grep 'mcp.tool'
+```
+
+Les logs incluent notamment `requestId`, `sessionId`, appels Anthropic, usage tokens/cout estime, appels MCP, erreurs de regles, resume compact du `GameState`, persistance session et durees. Les valeurs ressemblant a des secrets/tokens sont masquees automatiquement.

@@ -1,6 +1,7 @@
 import fs from 'fs/promises'
 import path from 'path'
 import { ConversationTurn, GameState } from './types'
+import { logEvent, summarizeGameState } from './server-logger'
 
 export interface StoredGameSession {
   sessionId: string
@@ -25,16 +26,28 @@ function sessionPath(sessionId: string): string {
 }
 
 export async function loadSession(sessionId: string | undefined): Promise<StoredGameSession | null> {
-  if (!sessionId?.trim()) return null
+  if (!sessionId?.trim()) {
+    logEvent('debug', 'session.load.skipped', { reason: 'missing-session-id' })
+    return null
+  }
 
   try {
     const raw = await fs.readFile(sessionPath(sessionId), 'utf-8')
-    return JSON.parse(raw) as StoredGameSession
+    const session = JSON.parse(raw) as StoredGameSession
+    logEvent('debug', 'session.load.hit', {
+      sessionId: safeSessionId(sessionId),
+      updatedAt: session.updatedAt,
+      historyLength: session.history.length,
+      hasSummary: Boolean(session.summaryContext),
+      gameState: summarizeGameState(session.gameState),
+    })
+    return session
   } catch (err) {
     if (err instanceof Error && 'code' in err && err.code === 'ENOENT') {
+      logEvent('debug', 'session.load.miss', { sessionId: safeSessionId(sessionId) })
       return null
     }
-    console.error(`[session-store] Failed to load session ${sessionId}:`, err)
+    logEvent('error', 'session.load.error', { sessionId: safeSessionId(sessionId), err })
     return null
   }
 }
@@ -43,7 +56,10 @@ export async function saveSession(
   sessionId: string | undefined,
   data: Omit<StoredGameSession, 'sessionId' | 'updatedAt'>
 ): Promise<void> {
-  if (!sessionId?.trim()) return
+  if (!sessionId?.trim()) {
+    logEvent('debug', 'session.save.skipped', { reason: 'missing-session-id' })
+    return
+  }
 
   const dir = getSessionDir()
   await fs.mkdir(dir, { recursive: true })
@@ -55,16 +71,29 @@ export async function saveSession(
   }
 
   await fs.writeFile(sessionPath(sessionId), JSON.stringify(payload, null, 2), 'utf-8')
+  logEvent('debug', 'session.save.ok', {
+    sessionId: safeSessionId(sessionId),
+    dir,
+    historyLength: payload.history.length,
+    hasSummary: Boolean(payload.summaryContext),
+    gameState: summarizeGameState(payload.gameState),
+  })
 }
 
 export async function deleteSession(sessionId: string | undefined): Promise<void> {
-  if (!sessionId?.trim()) return
+  if (!sessionId?.trim()) {
+    logEvent('debug', 'session.delete.skipped', { reason: 'missing-session-id' })
+    return
+  }
 
   try {
     await fs.unlink(sessionPath(sessionId))
+    logEvent('info', 'session.delete.ok', { sessionId: safeSessionId(sessionId) })
   } catch (err) {
     if (!(err instanceof Error && 'code' in err && err.code === 'ENOENT')) {
+      logEvent('error', 'session.delete.error', { sessionId: safeSessionId(sessionId), err })
       throw err
     }
+    logEvent('debug', 'session.delete.miss', { sessionId: safeSessionId(sessionId) })
   }
 }

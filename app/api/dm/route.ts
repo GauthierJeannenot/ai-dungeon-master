@@ -9,6 +9,7 @@ import {
   logAnthropicUsageSummary,
   type AnthropicUsageLogEntry,
 } from '@/lib/anthropic-usage'
+import { logEvent, summarizeGameState } from '@/lib/server-logger'
 
 export const maxDuration = 60
 
@@ -33,7 +34,15 @@ const HISTORY_COMPRESS_THRESHOLD_CHARS = 6000
 let cachedMcpTools: Anthropic.Tool[] | null = null
 
 async function getMcpTools(sessionId: string | undefined): Promise<Anthropic.Tool[]> {
-  if (cachedMcpTools) return cachedMcpTools
+  if (cachedMcpTools) {
+    logEvent('debug', 'dm.mcp_tools.cache_hit', {
+      sessionId,
+      toolCount: cachedMcpTools.length,
+      toolNames: cachedMcpTools.map(tool => tool.name),
+    })
+    return cachedMcpTools
+  }
+  logEvent('debug', 'dm.mcp_tools.load.start', { sessionId })
   const raw = await listMCPTools(sessionId)
   cachedMcpTools = raw
     .filter(t => !INTERNAL_MCP_TOOLS.has(t.name))
@@ -42,11 +51,29 @@ async function getMcpTools(sessionId: string | undefined): Promise<Anthropic.Too
       description: t.description,
       input_schema: t.inputSchema as Anthropic.Tool['input_schema'],
     }))
+  logEvent('info', 'dm.mcp_tools.load.ok', {
+    sessionId,
+    rawToolCount: raw.length,
+    exposedToolCount: cachedMcpTools.length,
+    exposedToolNames: cachedMcpTools.map(tool => tool.name),
+  })
   return cachedMcpTools
 }
 
 function generateRequestId(): string {
   return `dm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+}
+
+function summarizeContentBlocks(blocks: Anthropic.ContentBlock[]): Array<Record<string, unknown>> {
+  return blocks.map(block => {
+    if (block.type === 'text') {
+      return { type: 'text', textLength: block.text.length, text: block.text }
+    }
+    if (block.type === 'tool_use') {
+      return { type: 'tool_use', id: block.id, name: block.name, input: block.input }
+    }
+    return { type: block.type }
+  })
 }
 
 // ── Sérialisation compacte du game state ─────────────────────────────────────
@@ -70,9 +97,18 @@ async function compressHistory(
   usageLog: AnthropicUsageLogEntry[],
   requestId: string
 ): Promise<string> {
+  const startedAt = Date.now()
   const exchangeText = oldTurns
     .map(t => `${t.role === 'player' ? 'Joueur' : 'DM'}: ${t.content}`)
     .join('\n')
+
+  logEvent('info', 'dm.history.compress.start', {
+    requestId,
+    oldTurns: oldTurns.length,
+    exchangeTextLength: exchangeText.length,
+    hasExistingSummary: Boolean(existingSummary),
+    existingSummaryLength: existingSummary?.length ?? 0,
+  })
 
   const prompt = existingSummary
     ? `Voici le résumé de la session jusqu'ici :\n${existingSummary}\n\nVoici les échanges suivants à intégrer au résumé :\n${exchangeText}\n\nÉcris un résumé mis à jour en 3-5 phrases : ce qui s'est passé, où en est le joueur, les éléments importants à retenir.`
@@ -97,7 +133,14 @@ async function compressHistory(
   }))
 
   const text = response.content.find(b => b.type === 'text')
-  return text && 'text' in text ? text.text : existingSummary ?? ''
+  const summary = text && 'text' in text ? text.text : existingSummary ?? ''
+  logEvent('info', 'dm.history.compress.ok', {
+    requestId,
+    durationMs: Date.now() - startedAt,
+    summaryLength: summary.length,
+    summary,
+  })
+  return summary
 }
 
 // ── Gestion de l'historique ───────────────────────────────────────────────────
@@ -112,6 +155,11 @@ async function processHistory(
 ): Promise<{ recent: ConversationTurn[]; newSummary: string | undefined }> {
   // Pas assez de messages pour avoir une partie "ancienne"
   if (history.length <= HISTORY_KEEP_RECENT) {
+    logEvent('debug', 'dm.history.process.keep_all', {
+      requestId,
+      historyLength: history.length,
+      keepRecent: HISTORY_KEEP_RECENT,
+    })
     return { recent: history, newSummary: undefined }
   }
 
@@ -124,10 +172,26 @@ async function processHistory(
 
   if (!needsCompression) {
     // Pas encore au seuil : on renvoie tout sans compresser
+    logEvent('debug', 'dm.history.process.no_compression', {
+      requestId,
+      historyLength: history.length,
+      oldTurns: oldTurns.length,
+      recentTurns: recent.length,
+      oldTextLength: oldText.length,
+      thresholdChars: HISTORY_COMPRESS_THRESHOLD_CHARS,
+    })
     return { recent: history, newSummary: undefined }
   }
 
   const newSummary = await compressHistory(oldTurns, existingSummary, usageLog, requestId)
+  logEvent('info', 'dm.history.process.compressed', {
+    requestId,
+    historyLength: history.length,
+    oldTurns: oldTurns.length,
+    recentTurns: recent.length,
+    oldTextLength: oldText.length,
+    newSummaryLength: newSummary.length,
+  })
   return { recent, newSummary }
 }
 
@@ -226,10 +290,26 @@ function buildSystemBlocks(
 }
 
 async function syncMCPState(gameState: GameState, sessionId: string | undefined): Promise<GameState> {
+  const startedAt = Date.now()
+  logEvent('debug', 'dm.mcp_sync.start', {
+    sessionId,
+    gameState: summarizeGameState(gameState),
+  })
+
   try {
-    return await callMCPTool('replace_game_state', { gameState }, sessionId) as GameState
+    const synced = await callMCPTool('replace_game_state', { gameState }, sessionId) as GameState
+    logEvent('debug', 'dm.mcp_sync.replace_ok', {
+      sessionId,
+      durationMs: Date.now() - startedAt,
+      gameState: summarizeGameState(synced),
+    })
+    return synced
   } catch (err) {
-    console.error('Full MCP state sync failed, falling back to token positions:', err)
+    logEvent('warn', 'dm.mcp_sync.replace_failed', {
+      sessionId,
+      durationMs: Date.now() - startedAt,
+      err,
+    })
   }
 
   await callMCPTool('move_token', {
@@ -246,18 +326,49 @@ async function syncMCPState(gameState: GameState, sessionId: string | undefined)
     }
   }
 
+  logEvent('warn', 'dm.mcp_sync.token_fallback_ok', {
+    sessionId,
+    durationMs: Date.now() - startedAt,
+    monsterCount: Object.values(gameState.monsters).filter(monster => monster.isAlive).length,
+  })
   return gameState
 }
 
 // ── Handler principal ─────────────────────────────────────────────────────────
 export async function POST(req: NextRequest): Promise<NextResponse> {
+  const requestStartedAt = Date.now()
+  const requestId = generateRequestId()
   try {
-    const requestId = generateRequestId()
     const usageLog: AnthropicUsageLogEntry[] = []
+    logEvent('info', 'dm.request.start', {
+      requestId,
+      method: req.method,
+      url: req.url,
+      userAgent: req.headers.get('user-agent'),
+      referer: req.headers.get('referer'),
+      forwardedFor: req.headers.get('x-forwarded-for'),
+    })
+
     const body: DMRequest = await req.json()
     const { message, gameState, history = [], summaryContext, sessionId } = body
+    logEvent('info', 'dm.request.received', {
+      requestId,
+      sessionId,
+      messageLength: message?.length ?? 0,
+      message,
+      historyLength: history.length,
+      summaryContextLength: summaryContext?.length ?? 0,
+      hasClientGameState: Boolean(gameState),
+      clientGameState: summarizeGameState(gameState),
+    })
 
     if (!message?.trim()) {
+      logEvent('warn', 'dm.request.invalid', {
+        requestId,
+        sessionId,
+        reason: 'missing-message',
+        durationMs: Date.now() - requestStartedAt,
+      })
       return NextResponse.json({ error: 'Message requis' }, { status: 400 })
     }
 
@@ -267,24 +378,50 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     let requestHistory = history.length > 0 ? history : storedSession?.history ?? []
     let requestSummaryContext = summaryContext ?? storedSession?.summaryContext
     const toolsUsed: string[] = []
+    logEvent('info', 'dm.state.resolved', {
+      requestId,
+      sessionId,
+      stateSource: gameState ? 'client' : storedSession?.gameState ? 'stored-session' : 'mcp-default',
+      historySource: history.length > 0 ? 'client' : storedSession?.history ? 'stored-session' : 'empty',
+      historyLength: requestHistory.length,
+      hasSummary: Boolean(requestSummaryContext),
+      gameState: summarizeGameState(currentGameState),
+    })
 
     let mcpTools: Anthropic.Tool[] = []
     try {
       mcpTools = await getMcpTools(sessionId)
     } catch (err) {
-      console.error('Failed to load MCP tools:', err)
+      logEvent('error', 'dm.mcp_tools.load.error', { requestId, sessionId, err })
     }
 
     if (currentGameState) {
       try {
         currentGameState = await syncMCPState(currentGameState, sessionId)
-      } catch {
+      } catch (err) {
+        logEvent('error', 'dm.mcp_sync.unavailable', {
+          requestId,
+          sessionId,
+          durationMs: Date.now() - requestStartedAt,
+          err,
+        })
         return NextResponse.json({ error: 'Serveur MCP non disponible.' }, { status: 503 })
       }
     } else {
       try {
         currentGameState = await callMCPTool('get_game_state', {}, sessionId) as GameState
-      } catch {
+        logEvent('debug', 'dm.state.loaded_from_mcp', {
+          requestId,
+          sessionId,
+          gameState: summarizeGameState(currentGameState),
+        })
+      } catch (err) {
+        logEvent('error', 'dm.mcp_default_state.unavailable', {
+          requestId,
+          sessionId,
+          durationMs: Date.now() - requestStartedAt,
+          err,
+        })
         return NextResponse.json({ error: 'Serveur MCP non disponible.' }, { status: 503 })
       }
     }
@@ -297,6 +434,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       requestId
     )
     const activeSummary = newSummary ?? requestSummaryContext
+    logEvent('debug', 'dm.history.ready', {
+      requestId,
+      sessionId,
+      recentHistoryLength: recentHistory.length,
+      activeSummaryLength: activeSummary?.length ?? 0,
+      compressedThisRequest: Boolean(newSummary),
+    })
 
     // Convertit l'historique récent en messages Anthropic (alternance user/assistant)
     const historyMessages = historyToAnthropicMessages(recentHistory)
@@ -307,12 +451,32 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       ...historyMessages,
       { role: 'user', content: message },
     ]
+    logEvent('debug', 'dm.anthropic.messages.ready', {
+      requestId,
+      sessionId,
+      messageCount: messages.length,
+      historyMessageCount: historyMessages.length,
+      systemBlockCount: systemBlocks.length,
+      toolsAvailable: mcpTools.length,
+      toolNames: mcpTools.map(tool => tool.name),
+      gameState: summarizeGameState(currentGameState),
+    })
 
     let narrative = ''
     let iterations = 0
 
     while (iterations < MAX_TOOL_ITERATIONS) {
       iterations++
+      const iterationStartedAt = Date.now()
+      logEvent('info', 'dm.anthropic.iteration.start', {
+        requestId,
+        sessionId,
+        iteration: iterations,
+        model: MODEL,
+        maxTokens: MAX_TOKENS,
+        messageCount: messages.length,
+        toolsAvailable: mcpTools.length,
+      })
 
       const response = await anthropic.messages.create({
         model: MODEL,
@@ -320,6 +484,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         system: systemBlocks,
         tools: mcpTools.length > 0 ? mcpTools : undefined,
         messages,
+      })
+      logEvent('info', 'dm.anthropic.iteration.response', {
+        requestId,
+        sessionId,
+        iteration: iterations,
+        durationMs: Date.now() - iterationStartedAt,
+        stopReason: response.stop_reason,
+        content: summarizeContentBlocks(response.content),
       })
 
       usageLog.push(logAnthropicUsage({
@@ -339,22 +511,56 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           narrative += (narrative ? '\n\n' : '') + block.text
         }
       }
+      logEvent('debug', 'dm.narrative.updated', {
+        requestId,
+        sessionId,
+        iteration: iterations,
+        narrativeLength: narrative.length,
+        narrative,
+      })
 
-      if (response.stop_reason === 'end_turn') break
+      if (response.stop_reason === 'end_turn') {
+        logEvent('info', 'dm.anthropic.end_turn', {
+          requestId,
+          sessionId,
+          iteration: iterations,
+          narrativeLength: narrative.length,
+        })
+        break
+      }
 
       if (response.stop_reason === 'tool_use') {
         const toolUseBlocks = response.content.filter(
           (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use'
         )
-        if (toolUseBlocks.length === 0) break
+        if (toolUseBlocks.length === 0) {
+          logEvent('warn', 'dm.tool_use.empty', { requestId, sessionId, iteration: iterations })
+          break
+        }
 
         messages.push({ role: 'assistant', content: response.content })
 
         const toolResults: Anthropic.ToolResultBlockParam[] = []
         for (const toolUse of toolUseBlocks) {
           toolsUsed.push(toolUse.name)
+          logEvent('info', 'dm.tool_use.start', {
+            requestId,
+            sessionId,
+            iteration: iterations,
+            toolUseId: toolUse.id,
+            toolName: toolUse.name,
+            input: toolUse.input,
+          })
           try {
             const result = await callMCPTool(toolUse.name, toolUse.input as Record<string, unknown>, sessionId)
+            logEvent('info', 'dm.tool_use.ok', {
+              requestId,
+              sessionId,
+              iteration: iterations,
+              toolUseId: toolUse.id,
+              toolName: toolUse.name,
+              result,
+            })
             toolResults.push({
               type: 'tool_result',
               tool_use_id: toolUse.id,
@@ -362,6 +568,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             })
           } catch (err) {
             const errMsg = err instanceof Error ? err.message : 'Unknown error'
+            logEvent('error', 'dm.tool_use.error', {
+              requestId,
+              sessionId,
+              iteration: iterations,
+              toolUseId: toolUse.id,
+              toolName: toolUse.name,
+              err,
+            })
             toolResults.push({
               type: 'tool_result',
               tool_use_id: toolUse.id,
@@ -371,13 +585,31 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           }
         }
         messages.push({ role: 'user', content: toolResults })
+        logEvent('debug', 'dm.tool_results.queued', {
+          requestId,
+          sessionId,
+          iteration: iterations,
+          toolResultCount: toolResults.length,
+        })
         continue
       }
 
+      logEvent('warn', 'dm.anthropic.unhandled_stop_reason', {
+        requestId,
+        sessionId,
+        iteration: iterations,
+        stopReason: response.stop_reason,
+      })
       break
     }
 
     if (!narrative && iterations >= MAX_TOOL_ITERATIONS) {
+      const fallbackStartedAt = Date.now()
+      logEvent('warn', 'dm.final_fallback.start', {
+        requestId,
+        sessionId,
+        iterations,
+      })
       const finalResponse = await anthropic.messages.create({
         model: MODEL,
         max_tokens: 300,
@@ -390,6 +622,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           { type: 'text', text: buildDynamicPrompt(currentGameState!, activeSummary) },
         ],
         messages: [{ role: 'user', content: message }],
+      })
+      logEvent('warn', 'dm.final_fallback.response', {
+        requestId,
+        sessionId,
+        durationMs: Date.now() - fallbackStartedAt,
+        stopReason: finalResponse.stop_reason,
+        content: summarizeContentBlocks(finalResponse.content),
       })
 
       usageLog.push(logAnthropicUsage({
@@ -406,10 +645,21 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       for (const block of finalResponse.content) {
         if (block.type === 'text') narrative += block.text
       }
+      logEvent('warn', 'dm.final_fallback.narrative_ready', {
+        requestId,
+        sessionId,
+        narrativeLength: narrative.length,
+        narrative,
+      })
     }
 
     try {
       currentGameState = await callMCPTool('get_game_state', {}, sessionId) as GameState
+      logEvent('debug', 'dm.final_state.loaded', {
+        requestId,
+        sessionId,
+        gameState: summarizeGameState(currentGameState),
+      })
     } catch { /* garde l'état qu'on avait */ }
 
     const persistedHistory = [
@@ -425,7 +675,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         summaryContext: activeSummary,
       })
     } catch (err) {
-      console.error('Failed to persist game session:', err)
+      logEvent('error', 'dm.session.persist.error', {
+        requestId,
+        sessionId,
+        historyLength: persistedHistory.length,
+        err,
+      })
     }
 
     const dmResponse: DMResponse = {
@@ -442,9 +697,25 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       compressedHistory: Boolean(newSummary),
     })
 
+    logEvent('info', 'dm.request.complete', {
+      requestId,
+      sessionId,
+      durationMs: Date.now() - requestStartedAt,
+      iterations,
+      toolsUsed: [...new Set(toolsUsed)],
+      narrativeLength: dmResponse.narrative.length,
+      narrative: dmResponse.narrative,
+      compressedHistory: Boolean(newSummary),
+      newGameState: summarizeGameState(dmResponse.newGameState),
+    })
+
     return NextResponse.json(dmResponse)
   } catch (err) {
-    console.error('DM API error:', err)
+    logEvent('error', 'dm.request.error', {
+      requestId,
+      durationMs: Date.now() - requestStartedAt,
+      err,
+    })
     const message = err instanceof Error ? err.message : 'Erreur interne du serveur'
     return NextResponse.json({ error: message }, { status: 500 })
   }
