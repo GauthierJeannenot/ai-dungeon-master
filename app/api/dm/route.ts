@@ -241,63 +241,86 @@ async function processHistory(
 }
 
 // ── Parser de tool calls textuels ────────────────────────────────────────────
-// Fallback pour les modèles (llama3.3, mistral-nemo...) qui écrivent les tool calls
-// dans leur texte au lieu d'utiliser l'API function_call.
-// Supporte les formats :
-//   {"type":"function","name":"X","parameters":{...}}
-//   {"name":"X","parameters":{...}}
-//   {"function":{"name":"X","arguments":{...}}}
+// Fallback pour les modèles qui écrivent les tool calls dans le texte.
+// Utilise un parser de JSON imbriqué (bracket matching) pour gérer
+// des structures comme {"parameters": {"toCell": {"x": 7, "y": 14}}}.
 interface TextToolCall { name: string; args: Record<string, unknown> }
+
+// Extrait tous les blocs JSON valides d'un texte, quelle que soit la profondeur
+function extractJsonBlocks(text: string): string[] {
+  const blocks: string[] = []
+  let depth = 0
+  let start = -1
+  let inString = false
+  let escape = false
+
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i]
+    if (escape)          { escape = false; continue }
+    if (c === '\\' && inString) { escape = true;  continue }
+    if (c === '"')       { inString = !inString; continue }
+    if (inString)        { continue }
+
+    if (c === '{') {
+      if (depth === 0) start = i
+      depth++
+    } else if (c === '}') {
+      depth--
+      if (depth === 0 && start !== -1) {
+        blocks.push(text.slice(start, i + 1))
+        start = -1
+      }
+    }
+  }
+  return blocks
+}
+
+function isToolCallObject(obj: Record<string, unknown>): boolean {
+  // Format 1 : {"name":"X","parameters":{...}} ou {"name":"X","arguments":{...}}
+  if (typeof obj.name === 'string' && (obj.parameters || obj.arguments)) return true
+  // Format 2 : {"type":"function","name":"X",...}
+  if (obj.type === 'function' && typeof obj.name === 'string') return true
+  // Format 3 : {"function":{"name":"X","arguments":{...}}}
+  if (obj.function && typeof (obj.function as Record<string, unknown>).name === 'string') return true
+  return false
+}
+
+function toToolCall(obj: Record<string, unknown>): TextToolCall | null {
+  if (typeof obj.name === 'string' && obj.parameters && typeof obj.parameters === 'object')
+    return { name: obj.name, args: obj.parameters as Record<string, unknown> }
+  if (typeof obj.name === 'string' && obj.arguments && typeof obj.arguments === 'object')
+    return { name: obj.name, args: obj.arguments as Record<string, unknown> }
+  if (obj.function && typeof obj.function === 'object') {
+    const f = obj.function as Record<string, unknown>
+    if (typeof f.name === 'string' && f.arguments && typeof f.arguments === 'object')
+      return { name: f.name, args: f.arguments as Record<string, unknown> }
+  }
+  return null
+}
 
 function extractTextToolCalls(text: string): TextToolCall[] {
   const calls: TextToolCall[] = []
-  // Trouve tous les blocs JSON (y compris imbriqués sur 1 niveau)
-  const jsonRegex = /\{[^{}]*(?:\{[^{}]*\}[^{}]*)?\}/g
-  let match: RegExpExecArray | null
-
-  while ((match = jsonRegex.exec(text)) !== null) {
+  for (const block of extractJsonBlocks(text)) {
     try {
-      const obj = JSON.parse(match[0]) as Record<string, unknown>
-
-      // Format 1 : {"type":"function","name":"X","parameters":{...}}
-      if (typeof obj.name === 'string' && obj.parameters && typeof obj.parameters === 'object') {
-        calls.push({ name: obj.name, args: obj.parameters as Record<string, unknown> })
-        continue
+      const obj = JSON.parse(block) as Record<string, unknown>
+      if (isToolCallObject(obj)) {
+        const tc = toToolCall(obj)
+        if (tc) calls.push(tc)
       }
-      // Format 2 : {"name":"X","arguments":{...}}
-      if (typeof obj.name === 'string' && obj.arguments && typeof obj.arguments === 'object') {
-        calls.push({ name: obj.name, args: obj.arguments as Record<string, unknown> })
-        continue
-      }
-      // Format 3 : {"function":{"name":"X","arguments":{...}}}
-      const fn = obj.function
-      if (fn && typeof fn === 'object' && !Array.isArray(fn)) {
-        const f = fn as Record<string, unknown>
-        if (typeof f.name === 'string' && f.arguments && typeof f.arguments === 'object') {
-          calls.push({ name: f.name, args: f.arguments as Record<string, unknown> })
-        }
-      }
-    } catch { /* JSON invalide, on ignore */ }
+    } catch { /* JSON invalide */ }
   }
-
   return calls
 }
 
 function stripToolCallsFromText(text: string): string {
-  // Retire les blocs JSON qui ressemblent à des tool calls
-  return text
-    .replace(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)?\}/g, (block) => {
-      try {
-        const obj = JSON.parse(block) as Record<string, unknown>
-        if (
-          (typeof obj.name === 'string' && (obj.parameters || obj.arguments)) ||
-          (obj.function && typeof (obj.function as Record<string, unknown>).name === 'string')
-        ) return ''
-      } catch { /* pas du JSON ou pas un tool call */ }
-      return block
-    })
-    .replace(/\s{2,}/g, ' ')
-    .trim()
+  let result = text
+  for (const block of extractJsonBlocks(text)) {
+    try {
+      const obj = JSON.parse(block) as Record<string, unknown>
+      if (isToolCallObject(obj)) result = result.replace(block, '')
+    } catch { /* skip */ }
+  }
+  return result.replace(/[ \t]{2,}/g, ' ').replace(/\n{3,}/g, '\n\n').trim()
 }
 
 // ── Conversion historique → messages OpenAI ──────────────────────────────────
