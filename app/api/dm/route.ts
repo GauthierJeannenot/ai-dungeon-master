@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { loadContextFiles } from '@/lib/context-loader'
 import { callMCPTool, listMCPTools } from '@/lib/mcp-client'
+import { loadSession, saveSession } from '@/lib/session-store'
 import { DMRequest, DMResponse, GameState, ConversationTurn } from '@/lib/types'
 import {
   logAnthropicUsage,
@@ -258,7 +259,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: 'Message requis' }, { status: 400 })
     }
 
-    let currentGameState = gameState
+    const storedSession = await loadSession(sessionId)
+
+    let currentGameState = gameState ?? storedSession?.gameState
+    let requestHistory = history.length > 0 ? history : storedSession?.history ?? []
+    let requestSummaryContext = summaryContext ?? storedSession?.summaryContext
     const toolsUsed: string[] = []
 
     let mcpTools: Anthropic.Tool[] = []
@@ -284,12 +289,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     // ── Traitement de l'historique ──────────────────────────────────────────
     const { recent: recentHistory, newSummary } = await processHistory(
-      history,
-      summaryContext,
+      requestHistory,
+      requestSummaryContext,
       usageLog,
       requestId
     )
-    const activeSummary = newSummary ?? summaryContext
+    const activeSummary = newSummary ?? requestSummaryContext
 
     // Convertit l'historique récent en messages Anthropic (alternance user/assistant)
     const historyMessages = historyToAnthropicMessages(recentHistory)
@@ -404,6 +409,22 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     try {
       currentGameState = await callMCPTool('get_game_state', {}, sessionId) as GameState
     } catch { /* garde l'état qu'on avait */ }
+
+    const persistedHistory = [
+      ...(newSummary ? recentHistory : requestHistory),
+      { role: 'player', content: message } satisfies ConversationTurn,
+      { role: 'dm', content: narrative || 'Le Dungeon Master réfléchit...' } satisfies ConversationTurn,
+    ]
+
+    try {
+      await saveSession(sessionId, {
+        gameState: currentGameState,
+        history: persistedHistory,
+        summaryContext: activeSummary,
+      })
+    } catch (err) {
+      console.error('Failed to persist game session:', err)
+    }
 
     const dmResponse: DMResponse = {
       narrative: narrative || 'Le Dungeon Master réfléchit...',

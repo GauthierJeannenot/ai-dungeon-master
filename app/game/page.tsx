@@ -249,6 +249,37 @@ export default function GamePage() {
     }
   }, [gameState, hasLoadedSession, isLoading, messages, sessionId, summaryContext])
 
+  const resetGame = useCallback(() => {
+    if (isLoading) return
+
+    const previousSessionId = sessionId
+    const nextSessionId = createSessionId()
+
+    try {
+      sessionStorage.setItem(SESSION_KEYS.sessionId, nextSessionId)
+      sessionStorage.removeItem(SESSION_KEYS.gameState)
+      sessionStorage.removeItem(SESSION_KEYS.messages)
+      sessionStorage.removeItem(SESSION_KEYS.summaryContext)
+    } catch { /* storage unavailable */ }
+
+    setSessionId(nextSessionId)
+    setGameState(INITIAL_GAME_STATE)
+    setMessages([createWelcomeMessage()])
+    setSummaryContext(undefined)
+    setError(null)
+    setInputValue('')
+
+    if (previousSessionId) {
+      fetch('/api/session', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: previousSessionId }),
+      }).catch(err => {
+        console.error('Failed to delete previous game session:', err)
+      })
+    }
+  }, [isLoading, sessionId])
+
   const { label: phaseText, color: phaseColor } = phaseLabel(gameState.phase)
 
   return (
@@ -268,8 +299,16 @@ export default function GamePage() {
           </span>/{gameState.player.hp.max}
         </span>
         <span className="text-xs text-stone-500">CA: {gameState.player.ac}</span>
+        <button
+          type="button"
+          onClick={resetGame}
+          disabled={isLoading || !hasLoadedSession}
+          className="ml-auto text-xs text-amber-200 bg-stone-800 hover:bg-stone-700 disabled:opacity-40 border border-amber-900/40 px-2 py-1 rounded transition-colors"
+        >
+          Nouvelle partie
+        </button>
         {error && (
-          <span className="ml-auto text-xs text-red-400 bg-red-900/20 px-2 py-0.5 rounded">
+          <span className="text-xs text-red-400 bg-red-900/20 px-2 py-0.5 rounded">
             {error}
           </span>
         )}

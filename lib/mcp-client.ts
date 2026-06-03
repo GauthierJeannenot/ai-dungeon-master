@@ -137,6 +137,17 @@ export async function getMCPClient(sessionId?: string): Promise<Client> {
   return entry.connectingPromise
 }
 
+export async function closeMCPClient(sessionId?: string): Promise<void> {
+  const key = normalizeSessionId(sessionId)
+  const entry = clients.get(key)
+  clients.delete(key)
+
+  if (!entry) return
+
+  const clientToClose = entry.client ?? await entry.connectingPromise?.catch(() => null)
+  await clientToClose?.close()
+}
+
 export async function callMCPTool(
   toolName: string,
   args: Record<string, unknown>,

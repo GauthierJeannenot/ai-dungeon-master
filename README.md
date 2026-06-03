@@ -200,4 +200,10 @@ Aucune clé Anthropic réelle n'est nécessaire pour le CI — une clé placehol
 
 ### Note sur la persistance d'état
 
-Le game state est stocké **en mémoire** dans le processus MCP. Un redéploiement ou un redémarrage efface la partie en cours. C'est acceptable pour un projet démo. Pour une persistance entre sessions, il faudrait migrer vers Redis ou une base de données.
+Chaque onglet de navigateur possède son propre `sessionId`. L'état de jeu, l'historique et le résumé de session sont persistés côté serveur dans `.data/sessions/` par défaut, avec possibilité de changer l'emplacement via :
+
+```
+GAME_SESSION_STORE_DIR=/chemin/vers/sessions
+```
+
+Cette persistance fichier permet de reprendre une partie après redémarrage du processus Node tant que le stockage local est conservé. Sur un déploiement multi-instance ou avec disque éphémère, migrez cette interface vers Redis, Postgres ou un stockage équivalent.
