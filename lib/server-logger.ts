@@ -1,6 +1,6 @@
 import fs from 'fs'
 import path from 'path'
-import { GameState } from './types'
+import type { GameState } from './types'
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error'
 
@@ -19,6 +19,7 @@ export interface BufferedLogQuery {
   level?: LogLevel
   event?: string
   requestId?: string
+  clientRequestId?: string
   sessionId?: string
   limit?: number
 }
@@ -278,6 +279,7 @@ function appendBufferedLog(entry: BufferedLogEntry): void {
 function queryLogEntries(entriesToQuery: BufferedLogEntry[], query: BufferedLogQuery = {}): BufferedLogEntry[] {
   const eventFilter = query.event?.toLowerCase()
   const requestIdFilter = query.requestId?.toLowerCase()
+  const clientRequestIdFilter = query.clientRequestId?.toLowerCase()
   const sessionIdFilter = query.sessionId?.toLowerCase()
   const sinceTime = query.since?.getTime()
 
@@ -288,11 +290,25 @@ function queryLogEntries(entriesToQuery: BufferedLogEntry[], query: BufferedLogQ
     if (requestIdFilter && String(entry.payload.requestId ?? '').toLowerCase() !== requestIdFilter) {
       return false
     }
+    if (clientRequestIdFilter && String(entry.payload.clientRequestId ?? '').toLowerCase() !== clientRequestIdFilter) {
+      return false
+    }
     if (sessionIdFilter && String(entry.payload.sessionId ?? '').toLowerCase() !== sessionIdFilter) {
       return false
     }
     if (sinceTime !== undefined && Date.parse(entry.timestamp) < sinceTime) return false
     return true
+  })
+}
+
+function mergeLogEntries(persistedEntries: BufferedLogEntry[], bufferedEntries: BufferedLogEntry[]): BufferedLogEntry[] {
+  const bySequence = new Map<number, BufferedLogEntry>()
+  for (const entry of persistedEntries) bySequence.set(entry.sequence, entry)
+  for (const entry of bufferedEntries) bySequence.set(entry.sequence, entry)
+
+  return [...bySequence.values()].sort((a, b) => {
+    if (a.sequence !== b.sequence) return a.sequence - b.sequence
+    return Date.parse(a.timestamp) - Date.parse(b.timestamp)
   })
 }
 
@@ -304,12 +320,16 @@ export function getLogEvents(query: BufferedLogQuery = {}): {
   nextAfter: number | null
   persistent: boolean
   persistFile: string | null
-  source: 'persistent' | 'buffer'
+  source: 'persistent' | 'buffer' | 'combined'
 } {
   const limit = Math.min(Math.max(query.limit ?? 100, 1), 500)
   const persistedEntries = readPersistedLogEntries()
-  const sourceEntries = persistedEntries.length > 0 ? persistedEntries : logBuffer
-  const source = persistedEntries.length > 0 ? 'persistent' : 'buffer'
+  const sourceEntries = mergeLogEntries(persistedEntries, logBuffer)
+  const source = persistedEntries.length > 0 && logBuffer.length > 0
+    ? 'combined'
+    : persistedEntries.length > 0
+      ? 'persistent'
+      : 'buffer'
   const entries = queryLogEntries(sourceEntries, query)
 
   const limitedEntries = entries.slice(-limit)

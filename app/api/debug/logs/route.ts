@@ -114,6 +114,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     level: parseLevel(req),
     event: req.nextUrl.searchParams.get('event') ?? undefined,
     requestId: req.nextUrl.searchParams.get('requestId') ?? undefined,
+    clientRequestId: req.nextUrl.searchParams.get('clientRequestId') ?? undefined,
     sessionId: req.nextUrl.searchParams.get('sessionId') ?? undefined,
   })
 
@@ -132,6 +133,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       level: parseLevel(req),
       event: req.nextUrl.searchParams.get('event') ?? undefined,
       requestId: req.nextUrl.searchParams.get('requestId') ?? undefined,
+      clientRequestId: req.nextUrl.searchParams.get('clientRequestId') ?? undefined,
       sessionId: req.nextUrl.searchParams.get('sessionId') ?? undefined,
     },
   })
