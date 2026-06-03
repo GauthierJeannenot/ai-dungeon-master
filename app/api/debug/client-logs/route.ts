@@ -92,6 +92,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     accepted++
+    const clientPayload = entryRecord.payload && typeof entryRecord.payload === 'object'
+      ? entryRecord.payload as Record<string, unknown>
+      : {}
     logEvent('info', 'client.blackbox.entry', {
       source: 'browser-localStorage',
       browserLogId,
@@ -99,6 +102,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       clientEntryId,
       clientTimestamp: entryRecord.timestamp,
       clientEvent: safeString(entryRecord.event, 120),
+      clientRequestId: safeString(entryRecord.clientRequestId, 128) ?? safeString(clientPayload.clientRequestId, 128),
+      inputMode: safeString(entryRecord.inputMode, 40) ?? safeString(clientPayload.inputMode, 40),
+      voiceTurnId: safeString(entryRecord.voiceTurnId, 128) ?? safeString(clientPayload.voiceTurnId, 128),
       clientPayload: entryRecord.payload,
     })
   }

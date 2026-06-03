@@ -107,6 +107,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   }
 
   const limit = parseLimit(req)
+  const logRead = req.nextUrl.searchParams.get('logRead') === 'true'
   const result = getLogEvents({
     limit,
     after: parseAfter(req),
@@ -118,7 +119,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     sessionId: req.nextUrl.searchParams.get('sessionId') ?? undefined,
   })
 
-  logEvent('info', 'debug_logs.read', {
+  logEvent(logRead ? 'info' : 'debug', 'debug_logs.read', {
     path: req.nextUrl.pathname,
     publicRead: PUBLIC_READ_ENABLED,
     returned: result.entries.length,
@@ -135,6 +136,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       requestId: req.nextUrl.searchParams.get('requestId') ?? undefined,
       clientRequestId: req.nextUrl.searchParams.get('clientRequestId') ?? undefined,
       sessionId: req.nextUrl.searchParams.get('sessionId') ?? undefined,
+      logRead,
     },
   })
 
@@ -148,6 +150,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     publicRead: PUBLIC_READ_ENABLED,
     persistent: result.persistent,
     source: result.source,
+    logRead,
   })
 }
 
