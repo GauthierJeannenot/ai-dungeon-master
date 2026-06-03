@@ -28,7 +28,7 @@ const MAX_TOKENS = 400
 const COMBAT_LOG_TAIL = 6
 const MAX_AUTO_NPC_TURNS = 8
 type LlmMode = 'live' | 'mock' | 'record' | 'replay'
-const INTERNAL_MCP_TOOLS = new Set(['replace_game_state', 'get_game_state', 'next_turn', 'update_hp', 'add_to_log', 'enter_combat'])
+const INTERNAL_MCP_TOOLS = new Set(['replace_game_state', 'get_game_state', 'next_turn', 'update_hp', 'add_to_log', 'enter_combat', 'resolve_attack'])
 const LLM_MODE = parseLlmMode(process.env.LLM_MODE)
 const ALLOW_PAID_LLM = process.env.ALLOW_PAID_LLM !== 'false'
 const LLM_REPLAY_FALLBACK_TO_MOCK = process.env.LLM_REPLAY_FALLBACK_TO_MOCK === 'true'
@@ -197,15 +197,11 @@ function createMockLlmMessage(params: MessageCreateParams, context: LlmCallConte
     })
   }
 
-  if (gameState.phase === 'combat' && gameState.currentTurn === 'player' && /attaque|frappe|tape|coup|charge/.test(text) && toolAvailable('resolve_attack', context.tools)) {
-    const target = Object.values(gameState.monsters).find(monster => monster.isAlive)
-    if (target) {
-      return mockToolMessage('resolve_attack', {
-        attackerId: 'player',
-        targetId: target.id,
-        weaponOrSpell: 'longsword',
-      })
-    }
+  if (gameState.phase === 'combat' && gameState.currentTurn === 'player' && /attaque|frappe|tape|coup|charge/.test(text) && toolAvailable('resolve_player_attack', context.tools)) {
+    return mockToolMessage('resolve_player_attack', {
+      targetHint: 'nearest',
+      weaponOrSpell: 'longsword',
+    })
   }
 
   return mockTextMessage('[Mock] La scène progresse sans appel payant au LLM.')
@@ -611,7 +607,7 @@ RÈGLES MÉCANIQUES:
 - Déplacement explicite du joueur → move_token AVANT de narrer.
 - Début de combat / rencontre de salle → start_encounter en un seul tool, narre, STOP. Ne jamais inventer d'IDs de monstres.
 - Rencontres connues: bakery_floor_goblins (salle 8), loading_dock_patrol (salle 7), grammy_apartment_guards (salle 9), violet_fungus_heap (salle 3).
-- Tour joueur en combat → resolve_attack ou saving_throw, puis STOP. Le serveur avance les tours automatiquement.
+- Tour joueur en combat → resolve_player_attack ou saving_throw, puis STOP. Pour une cible spatiale ("a ma droite", "le plus proche"), utilise resolve_player_attack avec targetHint.
 - Si le joueur passe/attend son tour en combat → pass_turn, puis STOP.
 - Ne jamais appeler next_turn : outil interne réservé au serveur.
 - Tour monstre → ne résous pas toi-même. Le serveur joue les monstres automatiquement, puis tu narres le résultat.
@@ -724,11 +720,11 @@ function detectRequiredMechanicalAction(message: string, gameState: GameState): 
   const encounterIntent = /\b(combat|ennemi|gobelin|monstre|apparaitre|spawn|carte|initiative|debarque|perissez|fuyez)\b/.test(text)
 
   if (gameState.phase === 'combat' && gameState.currentTurn === 'player' && attackIntent) {
-    return { reason: 'player-combat-attack-intent', suggestedTools: ['resolve_attack', 'move_token'] }
+    return { reason: 'player-combat-attack-intent', suggestedTools: ['resolve_player_attack', 'move_token'] }
   }
 
   if (gameState.phase === 'combat' && gameState.currentTurn === 'player' && movementIntent) {
-    return { reason: 'player-combat-movement-intent', suggestedTools: ['move_token', 'resolve_attack'] }
+    return { reason: 'player-combat-movement-intent', suggestedTools: ['move_token', 'resolve_player_attack'] }
   }
 
   if (movementIntent) {
@@ -736,7 +732,7 @@ function detectRequiredMechanicalAction(message: string, gameState: GameState): 
   }
 
   if (attackIntent || encounterIntent) {
-    return { reason: 'encounter-or-attack-intent', suggestedTools: ['start_encounter', 'resolve_attack'] }
+    return { reason: 'encounter-or-attack-intent', suggestedTools: ['start_encounter', 'resolve_player_attack'] }
   }
 
   return null
@@ -1329,6 +1325,35 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     logRoomStateAnomaly(currentGameState, requestId, sessionId, 'after-mcp-sync')
     const combatLogStartLength = currentGameState.combatLog.length
+
+    if (currentGameState.phase === 'combat' && currentGameState.currentTurn && currentGameState.currentTurn !== 'player') {
+      try {
+        logEvent('info', 'dm.combat.pre_llm_auto_npc.start', {
+          requestId,
+          sessionId,
+          currentTurn: currentGameState.currentTurn,
+          gameState: summarizeGameState(currentGameState),
+        })
+        const npcTurns = await resolveNpcTurnsUntilPlayerTurn(currentGameState, sessionId, requestId)
+        if (npcTurns.resolvedTurns > 0) {
+          currentGameState = npcTurns.gameState
+          toolsUsed.push(...npcTurns.toolsUsed)
+        }
+        logEvent('info', 'dm.combat.pre_llm_auto_npc.complete', {
+          requestId,
+          sessionId,
+          resolvedTurns: npcTurns.resolvedTurns,
+          toolsUsed: npcTurns.toolsUsed,
+          gameState: summarizeGameState(currentGameState),
+        })
+      } catch (err) {
+        logEvent('error', 'dm.combat.pre_llm_auto_npc.error', {
+          requestId,
+          sessionId,
+          err,
+        })
+      }
+    }
 
     // ── Traitement de l'historique ──────────────────────────────────────────
     const { recent: recentHistory, newSummary } = await processHistory(

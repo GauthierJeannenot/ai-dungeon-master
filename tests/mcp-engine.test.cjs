@@ -271,6 +271,53 @@ test('MCP resolve_attack misses on a natural 1 even with a high bonus', async ()
   })
 })
 
+test('MCP resolve_player_attack resolves a spatial target hint', async () => {
+  await withForcedDiceSequence('20,1,1', async () => {
+    await withMcpClient(async client => {
+      const baseState = await callTool(client, 'get_game_state')
+      const right = makeMonster('goblin_right', 20)
+      right.position = { x: 2, y: 1 }
+      const left = makeMonster('goblin_left', 20)
+      left.position = { x: 0, y: 1 }
+
+      await callTool(client, 'replace_game_state', {
+        gameState: {
+          ...baseState,
+          phase: 'combat',
+          currentTurn: 'player',
+          round: 1,
+          initiativeOrder: ['player', 'goblin_right', 'goblin_left'],
+          movementUsed: {},
+          actionUsed: {},
+          player: {
+            ...baseState.player,
+            position: { x: 1, y: 1 },
+          },
+          monsters: {
+            goblin_right: right,
+            goblin_left: left,
+          },
+        },
+      })
+
+      const attack = await callTool(client, 'resolve_player_attack', {
+        targetHint: 'right',
+        weaponOrSpell: 'longsword',
+        customDamageDice: '1d2',
+      })
+
+      assert.equal(attack.targetId, 'goblin_right')
+      assert.equal(attack.criticalHit, true)
+      assert.equal(attack.hit, true)
+      assert.ok(attack.targetHpAfter < 20)
+
+      const stateAfter = await callTool(client, 'get_game_state')
+      assert.equal(stateAfter.monsters.goblin_right.hp.current, attack.targetHpAfter)
+      assert.equal(stateAfter.monsters.goblin_left.hp.current, 20)
+    })
+  })
+})
+
 test('MCP rules reject overlong combat movement and occupied cells', async () => {
   await withMcpClient(async client => {
     const baseState = await callTool(client, 'get_game_state')
@@ -447,7 +494,8 @@ test('MCP start_encounter atomically moves player, spawns real IDs, and enters c
 })
 
 test('MCP combat scenario resolves movement, attacks, turn order, and combat end', async () => {
-  await withMcpClient(async client => {
+  await withForcedDiceSequence('10,10,10,1,10,1,10', async () => {
+    await withMcpClient(async client => {
     const baseState = await callTool(client, 'get_game_state')
     baseState.player.position = { x: 0, y: 0 }
     baseState.player.stats = { ...baseState.player.stats, str: 100, dex: 100 }
@@ -534,5 +582,6 @@ test('MCP combat scenario resolves movement, attacks, turn order, and combat end
     assert.deepEqual(finalState.actionUsed, {})
     assert.equal(finalState.monsters[monster.id].isAlive, false)
     assert.ok(finalState.combatLog.length >= 5)
+    })
   })
 })

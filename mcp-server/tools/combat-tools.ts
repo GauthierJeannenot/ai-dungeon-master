@@ -31,6 +31,138 @@ function doubleDiceNotation(notation: string): string {
   })
 }
 
+type TargetHint = 'nearest' | 'right' | 'left' | 'front' | 'back' | 'wounded'
+
+function distanceCells(a: { x: number; y: number }, b: { x: number; y: number }): number {
+  return Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y))
+}
+
+function selectPlayerTarget(targetId: string | undefined, targetHint: TargetHint | undefined): string {
+  if (targetId) return targetId
+
+  const state = gs.getState()
+  const player = state.player
+  let candidates = Object.values(state.monsters).filter(monster => monster.isAlive)
+
+  if (targetHint === 'right') candidates = candidates.filter(monster => monster.position.x > player.position.x)
+  if (targetHint === 'left') candidates = candidates.filter(monster => monster.position.x < player.position.x)
+  if (targetHint === 'front') candidates = candidates.filter(monster => monster.position.y < player.position.y)
+  if (targetHint === 'back') candidates = candidates.filter(monster => monster.position.y > player.position.y)
+  if (targetHint === 'wounded') candidates = candidates.filter(monster => monster.hp.current < monster.hp.max)
+
+  if (candidates.length === 0) {
+    throw new rules.RuleViolation('TARGET_NOT_FOUND', 'No living monster matches the player attack target hint.', {
+      targetHint,
+      playerPosition: player.position,
+    })
+  }
+
+  candidates.sort((a, b) => {
+    const distanceDelta = distanceCells(a.position, player.position) - distanceCells(b.position, player.position)
+    if (distanceDelta !== 0) return distanceDelta
+    return a.id.localeCompare(b.id)
+  })
+
+  return candidates[0].id
+}
+
+function resolveAttack(
+  attackerId: string,
+  targetId: string,
+  weaponOrSpell: string,
+  advantage?: boolean,
+  disadvantage?: boolean,
+  customDamageDice?: string,
+  rangeCells?: number
+) {
+  const attacker = gs.getEntity(attackerId)
+  const target = gs.getEntity(targetId)
+
+  if (!attacker) return { content: [{ type: 'text' as const, text: JSON.stringify({ error: `Attacker not found: ${attackerId}` }) }], isError: true }
+  if (!target) return { content: [{ type: 'text' as const, text: JSON.stringify({ error: `Target not found: ${targetId}` }) }], isError: true }
+  try {
+    rules.validateAttack(attackerId, targetId, weaponOrSpell, rangeCells)
+  } catch (err) {
+    return rules.ruleErrorResult(err)
+  }
+
+  const strMod = getAbilityModifier(attacker.stats.str)
+  const profBonus = 'proficiencyBonus' in attacker ? attacker.proficiencyBonus : 2
+  const attackBonus = 'attackBonus' in attacker ? attacker.attackBonus : (strMod + profBonus)
+
+  const roll1 = rollDice(d20WithModifier(attackBonus))
+  let attackRoll = roll1
+
+  if (advantage && !disadvantage) {
+    const roll2 = rollDice(d20WithModifier(attackBonus))
+    attackRoll = roll1.total >= roll2.total ? roll1 : roll2
+    attackRoll = { ...attackRoll, detail: `ADV: ${roll1.detail} / ${roll2.detail} -> kept ${attackRoll.total}` }
+  } else if (disadvantage && !advantage) {
+    const roll2 = rollDice(d20WithModifier(attackBonus))
+    attackRoll = roll1.total <= roll2.total ? roll1 : roll2
+    attackRoll = { ...attackRoll, detail: `DIS: ${roll1.detail} / ${roll2.detail} -> kept ${attackRoll.total}` }
+  }
+
+  const targetAC = target.ac
+  const naturalRoll = attackRoll.rolls[0]
+  const criticalMiss = naturalRoll === 1
+  const criticalHit = naturalRoll === 20
+  const hit = criticalHit || (!criticalMiss && attackRoll.total >= targetAC)
+
+  let damageRoll = undefined
+  let damageDealt = undefined
+  let targetHpAfter = undefined
+  let targetDied = false
+
+  if (hit) {
+    const strModDamage = getAbilityModifier(attacker.stats.str)
+    const baseDamage = customDamageDice ?? ('damageDice' in attacker ? attacker.damageDice : `${getWeaponDamage(weaponOrSpell)}+${strModDamage}`)
+    damageRoll = rollDice(criticalHit ? doubleDiceNotation(baseDamage) : baseDamage)
+    damageDealt = Math.max(1, damageRoll.total)
+
+    if (targetId === 'player') {
+      const updated = gs.updatePlayerHP(-damageDealt)
+      targetHpAfter = updated.hp.current
+      targetDied = updated.hp.current === 0
+    } else {
+      const updated = gs.updateMonsterHP(targetId, -damageDealt)
+      targetHpAfter = updated.hp.current
+      targetDied = !updated.isAlive
+    }
+  }
+
+  const mechanicalSummary = hit
+    ? `Attaque: ${attackRoll.detail} vs CA ${targetAC} -> ${criticalHit ? 'CRITIQUE' : 'TOUCHE'} | Degats: ${damageRoll!.detail}${targetDied ? ' | MORT' : ''}`
+    : `Attaque: ${attackRoll.detail} vs CA ${targetAC} -> ${criticalMiss ? 'ECHEC CRITIQUE' : 'RATE'}`
+
+  const result: AttackResult = {
+    attackerId,
+    targetId,
+    weaponOrSpell,
+    attackRoll,
+    naturalRoll,
+    criticalHit,
+    criticalMiss,
+    targetAC,
+    hit,
+    damageRoll,
+    damageDealt,
+    targetHpAfter,
+    targetDied,
+    mechanicalSummary,
+  }
+
+  gs.addLogEntry({
+    round: gs.getState().round,
+    turn: attackerId,
+    action: `${attacker.name} attaque ${target.name} avec ${weaponOrSpell}`,
+    mechanicalDetail: mechanicalSummary,
+  })
+  rules.recordAction(attackerId)
+
+  return { content: [{ type: 'text' as const, text: JSON.stringify(result) }] }
+}
+
 export function registerCombatTools(server: McpServer): void {
   // Pure dice roller — the DM can call this for any roll
   server.tool(
@@ -61,8 +193,10 @@ export function registerCombatTools(server: McpServer): void {
       rangeCells: z.number().int().positive().optional().describe('Optional attack range in grid cells; defaults to weapon range.'),
     },
     async ({ attackerId, targetId, weaponOrSpell, advantage, disadvantage, customDamageDice, rangeCells }) => {
-      const attacker = gs.getEntity(attackerId)
-      const target = gs.getEntity(targetId)
+      return resolveAttack(attackerId, targetId, weaponOrSpell, advantage, disadvantage, customDamageDice, rangeCells)
+
+      const attacker = gs.getEntity(attackerId)!
+      const target = gs.getEntity(targetId)!
 
       if (!attacker) return { content: [{ type: 'text', text: JSON.stringify({ error: `Attacker not found: ${attackerId}` }) }], isError: true }
       if (!target) return { content: [{ type: 'text', text: JSON.stringify({ error: `Target not found: ${targetId}` }) }], isError: true }
@@ -74,8 +208,8 @@ export function registerCombatTools(server: McpServer): void {
 
       // Determine attack bonus
       const strMod = getAbilityModifier(attacker.stats.str)
-      const profBonus = 'proficiencyBonus' in attacker ? attacker.proficiencyBonus : 2
-      const attackBonus = 'attackBonus' in attacker ? attacker.attackBonus : (strMod + profBonus)
+      const profBonus = 'proficiencyBonus' in attacker ? Number((attacker as { proficiencyBonus: number }).proficiencyBonus) : 2
+      const attackBonus = 'attackBonus' in attacker ? Number((attacker as { attackBonus: number }).attackBonus) : (strMod + profBonus)
 
       // Roll to-hit (with advantage/disadvantage)
       const roll1 = rollDice(d20WithModifier(attackBonus))
@@ -105,7 +239,7 @@ export function registerCombatTools(server: McpServer): void {
       if (hit) {
         // Determine damage dice
         const strModDamage = getAbilityModifier(attacker.stats.str)
-        const baseDamage = customDamageDice ?? ('damageDice' in attacker ? attacker.damageDice : `${getWeaponDamage(weaponOrSpell)}+${strModDamage}`)
+        const baseDamage = customDamageDice ?? ('damageDice' in attacker ? (attacker as { damageDice: string }).damageDice : `${getWeaponDamage(weaponOrSpell)}+${strModDamage}`)
         damageRoll = rollDice(criticalHit ? doubleDiceNotation(baseDamage) : baseDamage)
         damageDealt = Math.max(1, damageRoll.total)
 
@@ -151,6 +285,28 @@ export function registerCombatTools(server: McpServer): void {
       rules.recordAction(attackerId)
 
       return { content: [{ type: 'text', text: JSON.stringify(result) }] }
+    }
+  )
+
+  server.tool(
+    'resolve_player_attack',
+    'Resolves the player attack. Use this for natural-language targets such as nearest, right, left, front, back, or wounded; the tool selects the real monster ID before applying attack rules.',
+    {
+      targetId: z.string().optional().describe('Exact monster ID if already known.'),
+      targetHint: z.enum(['nearest', 'right', 'left', 'front', 'back', 'wounded']).optional().describe('Spatial/semantic target hint when the player did not name an exact monster ID.'),
+      weaponOrSpell: z.string().optional().describe('Weapon or spell name; defaults to longsword.'),
+      advantage: z.boolean().optional().describe('Roll with advantage.'),
+      disadvantage: z.boolean().optional().describe('Roll with disadvantage.'),
+      customDamageDice: z.string().optional().describe('Override damage dice.'),
+      rangeCells: z.number().int().positive().optional().describe('Optional attack range in grid cells; defaults to weapon range.'),
+    },
+    async ({ targetId, targetHint, weaponOrSpell, advantage, disadvantage, customDamageDice, rangeCells }) => {
+      try {
+        const resolvedTargetId = selectPlayerTarget(targetId, targetHint ?? 'nearest')
+        return resolveAttack('player', resolvedTargetId, weaponOrSpell ?? 'longsword', advantage, disadvantage, customDamageDice, rangeCells)
+      } catch (err) {
+        return rules.ruleErrorResult(err)
+      }
     }
   )
 
