@@ -64,6 +64,9 @@ interface SpeechWindow extends Window {
 }
 
 const VOICE_LANGUAGE = 'fr-FR'
+const MAX_SPOKEN_SENTENCES = 3
+const MAX_SPOKEN_CHARS = 360
+const MAX_SPEECH_SEGMENT_CHARS = 180
 
 const PLACEHOLDERS = {
   combat: [
@@ -137,22 +140,96 @@ function findLastDmMessage(messages: ChatMessage[]): ChatMessage | null {
 }
 
 function textForSpeech(text: string): string {
-  return text
+  const cleaned = text
     .replace(/\[[^\]]+\]/g, '')
     .replace(/[*_`#>]/g, '')
+    .replace(/\bHP\b/gi, 'points de vie')
+    .replace(/\bPV\b/gi, 'points de vie')
+    .replace(/\bCA\b/g, "classe d'armure")
+    .replace(/\bDD\b/g, 'degre de difficulte')
+    .replace(/\b(\d+)d(\d+)\b/gi, (_, count: string, sides: string) =>
+      `${count} de ${sides}`
+    )
+    .replace(/\b\d{2,}\b/g, match => match.split('').join(' '))
     .replace(/\s+/g, ' ')
     .trim()
+
+  const sentences = cleaned.match(/[^.!?]+[.!?]+|[^.!?]+$/g)
+    ?.map(sentence => sentence.trim())
+    .filter(Boolean) ?? []
+
+  const selectedSentences = sentences.slice(0, MAX_SPOKEN_SENTENCES)
+  let spokenText = selectedSentences.join(' ')
+  if (!spokenText) return ''
+
+  if (spokenText.length > MAX_SPOKEN_CHARS) {
+    const clipped = spokenText.slice(0, MAX_SPOKEN_CHARS)
+    spokenText = clipped.slice(0, Math.max(0, clipped.lastIndexOf(' '))).trim()
+  }
+
+  return spokenText
 }
 
-function pickFrenchVoice(): SpeechSynthesisVoice | null {
-  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return null
+function voiceScore(voice: SpeechSynthesisVoice): number {
+  const name = voice.name.toLowerCase()
+  const lang = voice.lang.toLowerCase()
+  let score = 0
 
-  const voices = window.speechSynthesis.getVoices()
-  return (
-    voices.find(voice => voice.lang.toLowerCase() === 'fr-fr') ??
-    voices.find(voice => voice.lang.toLowerCase().startsWith('fr')) ??
-    null
-  )
+  if (lang === 'fr-fr') score += 100
+  else if (lang.startsWith('fr')) score += 70
+  if (voice.localService === false) score += 8
+  if (/natural|neural|online|premium|cloud/.test(name)) score += 45
+  if (/google|apple|siri/.test(name)) score += 25
+  if (/denise|henri|vivienne|thomas|paul|julie/.test(name)) score += 15
+  if (/hortense/.test(name)) score -= 45
+
+  return score
+}
+
+function getSortedFrenchVoices(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice[] {
+  return voices
+    .filter(voice => voice.lang.toLowerCase().startsWith('fr'))
+    .sort((a, b) => voiceScore(b) - voiceScore(a))
+}
+
+function pickFrenchVoice(voices: SpeechSynthesisVoice[], selectedVoiceURI?: string): SpeechSynthesisVoice | null {
+  if (selectedVoiceURI) {
+    const selected = voices.find(voice => voice.voiceURI === selectedVoiceURI)
+    if (selected) return selected
+  }
+
+  return getSortedFrenchVoices(voices)[0] ?? null
+}
+
+function splitSpeechSegments(text: string): string[] {
+  const sentences = text.match(/[^.!?]+[.!?]+|[^.!?]+$/g)
+    ?.map(sentence => sentence.trim())
+    .filter(Boolean) ?? [text]
+  const segments: string[] = []
+
+  for (const sentence of sentences) {
+    if (sentence.length <= MAX_SPEECH_SEGMENT_CHARS) {
+      segments.push(sentence)
+      continue
+    }
+
+    const parts = sentence.split(/([,;:])/)
+    let current = ''
+    for (let index = 0; index < parts.length; index += 2) {
+      const clause = `${parts[index] ?? ''}${parts[index + 1] ?? ''}`.trim()
+      if (!clause) continue
+
+      if (`${current} ${clause}`.trim().length > MAX_SPEECH_SEGMENT_CHARS && current) {
+        segments.push(current.trim())
+        current = clause
+      } else {
+        current = `${current} ${clause}`.trim()
+      }
+    }
+    if (current) segments.push(current)
+  }
+
+  return segments
 }
 
 function truncateVoiceLogText(value: string, maxLength = 260): string {
@@ -227,6 +304,7 @@ export default function Chat({
   const speechPreviewRef = useRef('')
   const recognitionEngineRef = useRef<string | undefined>(undefined)
   const lastSpokenMessageIdRef = useRef<string | null>(null)
+  const speechRunIdRef = useRef(0)
 
   const [recognitionSupported, setRecognitionSupported] = useState(false)
   const [speechSynthesisSupported, setSpeechSynthesisSupported] = useState(false)
@@ -234,6 +312,8 @@ export default function Chat({
   const [speechPreview, setSpeechPreview] = useState('')
   const [voiceError, setVoiceError] = useState<string | null>(null)
   const [speakerEnabled, setSpeakerEnabled] = useState(false)
+  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([])
+  const [selectedVoiceURI, setSelectedVoiceURI] = useState<string | undefined>(undefined)
 
   const placeholder = selectPlaceholder(gameState, messages.length)
 
@@ -250,6 +330,7 @@ export default function Chat({
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) return
     if (!window.speechSynthesis.speaking && !window.speechSynthesis.pending) return
 
+    speechRunIdRef.current += 1
     window.speechSynthesis.cancel()
     logVoiceEvent('client.voice.tts.cancelled', { reason })
   }, [logVoiceEvent])
@@ -264,41 +345,62 @@ export default function Chat({
 
     stopSpeaking('new_dm_message')
 
-    const utterance = new SpeechSynthesisUtterance(spokenText)
-    utterance.lang = VOICE_LANGUAGE
-    utterance.rate = 1.02
-    utterance.pitch = 0.95
-    const voice = pickFrenchVoice()
-    if (voice) utterance.voice = voice
+    const voice = pickFrenchVoice(availableVoices, selectedVoiceURI)
+    const segments = splitSpeechSegments(spokenText)
+    const runId = speechRunIdRef.current + 1
+    speechRunIdRef.current = runId
 
-    utterance.onstart = () => {
-      logVoiceEvent('client.voice.tts.started', {
-        provider: 'browser-speech-synthesis',
-        language: utterance.lang,
-        voiceName: utterance.voice?.name,
-        messageId: msg.id,
-        textChars: spokenText.length,
-      })
+    logVoiceEvent('client.voice.tts.started', {
+      provider: 'browser-speech-synthesis',
+      language: VOICE_LANGUAGE,
+      voiceName: voice?.name,
+      voiceURI: voice?.voiceURI,
+      voiceScore: voice ? voiceScore(voice) : null,
+      messageId: msg.id,
+      textChars: spokenText.length,
+      originalTextChars: msg.content.length,
+      segmentCount: segments.length,
+      shortenedForSpeech: spokenText.length < msg.content.length,
+    })
+
+    const speakSegment = (index: number) => {
+      if (speechRunIdRef.current !== runId) return
+      const segment = segments[index]
+      if (!segment) {
+        logVoiceEvent('client.voice.tts.ended', {
+          provider: 'browser-speech-synthesis',
+          messageId: msg.id,
+          textChars: spokenText.length,
+          segmentCount: segments.length,
+        })
+        return
+      }
+
+      const utterance = new SpeechSynthesisUtterance(segment)
+      utterance.lang = voice?.lang ?? VOICE_LANGUAGE
+      utterance.rate = 0.94
+      utterance.pitch = 1
+      utterance.volume = 1
+      if (voice) utterance.voice = voice
+
+      utterance.onend = () => {
+        window.setTimeout(() => speakSegment(index + 1), 120)
+      }
+
+      utterance.onerror = event => {
+        logVoiceEvent('client.voice.tts.error', {
+          provider: 'browser-speech-synthesis',
+          messageId: msg.id,
+          segmentIndex: index,
+          error: event.error,
+        })
+      }
+
+      window.speechSynthesis.speak(utterance)
     }
 
-    utterance.onend = () => {
-      logVoiceEvent('client.voice.tts.ended', {
-        provider: 'browser-speech-synthesis',
-        messageId: msg.id,
-        textChars: spokenText.length,
-      })
-    }
-
-    utterance.onerror = event => {
-      logVoiceEvent('client.voice.tts.error', {
-        provider: 'browser-speech-synthesis',
-        messageId: msg.id,
-        error: event.error,
-      })
-    }
-
-    window.speechSynthesis.speak(utterance)
-  }, [logVoiceEvent, stopSpeaking])
+    speakSegment(0)
+  }, [availableVoices, logVoiceEvent, selectedVoiceURI, stopSpeaking])
 
   useEffect(() => {
     const recognitionConstructor = getSpeechRecognitionConstructor()
@@ -307,9 +409,36 @@ export default function Chat({
       'speechSynthesis' in window &&
       'SpeechSynthesisUtterance' in window
 
+    function refreshVoices() {
+      if (!synthesisSupported) return
+
+      const frenchVoices = getSortedFrenchVoices(window.speechSynthesis.getVoices())
+      setAvailableVoices(frenchVoices)
+      setSelectedVoiceURI(current => {
+        if (current && frenchVoices.some(voice => voice.voiceURI === current)) return current
+        return frenchVoices[0]?.voiceURI
+      })
+
+      logVoiceEvent('client.voice.tts.voices_loaded', {
+        provider: 'browser-speech-synthesis',
+        voiceCount: frenchVoices.length,
+        voices: frenchVoices.slice(0, 8).map(voice => ({
+          name: voice.name,
+          lang: voice.lang,
+          localService: voice.localService,
+          score: voiceScore(voice),
+        })),
+      })
+    }
+
     setRecognitionSupported(Boolean(recognitionConstructor))
     setSpeechSynthesisSupported(synthesisSupported)
     recognitionEngineRef.current = recognitionConstructor?.name
+    refreshVoices()
+
+    if (synthesisSupported) {
+      window.speechSynthesis.addEventListener('voiceschanged', refreshVoices)
+    }
 
     logVoiceEvent('client.voice.support.detected', {
       recognitionSupported: Boolean(recognitionConstructor),
@@ -321,6 +450,7 @@ export default function Chat({
     return () => {
       recognitionRef.current?.abort()
       if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.removeEventListener('voiceschanged', refreshVoices)
         window.speechSynthesis.cancel()
       }
     }
@@ -566,6 +696,30 @@ export default function Chat({
         <div className="w-2 h-2 bg-amber-600 rounded-full" />
         <span className="text-amber-500 font-semibold text-sm tracking-wide">Journal de l&apos;Aventure</span>
         <div className="ml-auto flex items-center gap-1">
+          {availableVoices.length > 1 && (
+            <select
+              value={selectedVoiceURI ?? ''}
+              onChange={event => {
+                setSelectedVoiceURI(event.target.value || undefined)
+                const voice = availableVoices.find(item => item.voiceURI === event.target.value)
+                logVoiceEvent('client.voice.tts.voice_selected', {
+                  provider: 'browser-speech-synthesis',
+                  voiceName: voice?.name,
+                  voiceURI: voice?.voiceURI,
+                  voiceScore: voice ? voiceScore(voice) : null,
+                })
+              }}
+              title="Choisir la voix du narrateur"
+              aria-label="Choisir la voix du narrateur"
+              className="h-7 max-w-32 rounded border border-stone-700 bg-stone-800 px-1.5 text-[11px] text-stone-200"
+            >
+              {availableVoices.slice(0, 8).map(voice => (
+                <option key={voice.voiceURI} value={voice.voiceURI}>
+                  {voice.name.replace(/\s*-\s*French.*$/i, '')}
+                </option>
+              ))}
+            </select>
+          )}
           <button
             type="button"
             onClick={handleToggleSpeaker}
