@@ -290,6 +290,54 @@ export function registerPhaseTools(server: McpServer): void {
     }
   )
 
+  server.tool(
+    'pass_turn',
+    'Passes or holds the player combat turn. Only valid when it is currently the player turn.',
+    {
+      reason: z.string().optional().describe('Short reason, e.g. "holds position" or "waits".'),
+    },
+    async ({ reason }) => {
+      const state = gs.getState()
+      if (state.currentTurn !== 'player') {
+        return rules.ruleErrorResult(new rules.RuleViolation(
+          'PLAYER_TURN_REQUIRED',
+          'Only the player turn can be passed through this tool.',
+          { currentTurn: state.currentTurn }
+        ))
+      }
+
+      let endingActorId: string
+      try {
+        endingActorId = rules.validateNextTurn('player', true)
+      } catch (err) {
+        return rules.ruleErrorResult(err)
+      }
+
+      gs.addLogEntry({
+        round: gs.getState().round,
+        turn: endingActorId,
+        action: 'Le joueur passe son tour',
+        mechanicalDetail: reason,
+      })
+
+      const nextTurn = gs.advanceTurn()
+      const nextState = gs.getState()
+      return {
+        content: [{
+          type: 'text',
+          text: JSON.stringify({
+            endedTurn: endingActorId,
+            currentTurn: nextTurn,
+            round: nextState.round,
+            initiativeOrder: nextState.initiativeOrder,
+            skippedAction: true,
+            reason,
+          }),
+        }],
+      }
+    }
+  )
+
   // Ends combat, awards XP, resets combat state
   server.tool(
     'end_combat',

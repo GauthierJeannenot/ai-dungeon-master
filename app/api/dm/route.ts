@@ -3,7 +3,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { loadContextFiles } from '@/lib/context-loader'
 import { callMCPTool, listMCPTools } from '@/lib/mcp-client'
 import { loadSession, saveSession } from '@/lib/session-store'
-import { DMRequest, DMResponse, GameState, ConversationTurn } from '@/lib/types'
+import { DMRequest, DMResponse, GameState, ConversationTurn, CombatLogEntry, MonsterState } from '@/lib/types'
 import {
   logAnthropicUsage,
   logAnthropicUsageSummary,
@@ -21,7 +21,8 @@ const MODEL = 'claude-haiku-4-5'
 const MAX_TOOL_ITERATIONS = 3
 const MAX_TOKENS = 400
 const COMBAT_LOG_TAIL = 6
-const INTERNAL_MCP_TOOLS = new Set(['replace_game_state'])
+const MAX_AUTO_NPC_TURNS = 8
+const INTERNAL_MCP_TOOLS = new Set(['replace_game_state', 'next_turn'])
 
 // Nombre de messages récents conservés verbatim avant compression.
 // Au-delà, les plus anciens sont résumés en un paragraphe.
@@ -258,8 +259,10 @@ RÈGLES MÉCANIQUES:
 - Les tools MCP refusent les actions illégales (mauvais tour, cible morte, hors portée, déplacement trop long). Si un tool renvoie une erreur, narre sobrement pourquoi l'action échoue ou demande une action valide.
 - Déplacement explicite du joueur → move_token AVANT de narrer.
 - Début de combat → spawn_monster puis enter_combat (2 tools max), narre, STOP.
-- Tour joueur en combat → resolve_attack ou saving_throw, puis next_turn, STOP.
-- Tour monstre → resolve_attack du monstre, puis next_turn, STOP.
+- Tour joueur en combat → resolve_attack ou saving_throw, puis STOP. Le serveur avance les tours automatiquement.
+- Si le joueur passe/attend son tour en combat → pass_turn, puis STOP.
+- Ne jamais appeler next_turn : outil interne réservé au serveur.
+- Tour monstre → ne résous pas toi-même. Le serveur joue les monstres automatiquement, puis tu narres le résultat.
 - Fin de combat avec adversaires encore actifs → end_combat avec force=true seulement si fuite, reddition ou accord narratif crédible.
 - HP monstres : vigoureux / légèrement blessé / gravement blessé / à l'agonie.`
 }
@@ -389,6 +392,429 @@ async function autoAdvanceCompletedTurn(
 }
 
 // ── Handler principal ─────────────────────────────────────────────────────────
+type GridCell = { x: number; y: number }
+
+interface AutoNpcTurnSummary {
+  actorId: string
+  actorName: string
+  moved?: { from: GridCell; to: GridCell }
+  moveError?: unknown
+  attack?: unknown
+  skipped?: string
+  advanceError?: unknown
+  advancedTo?: string | null
+}
+
+function distanceCells(a: GridCell, b: GridCell): number {
+  return Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y))
+}
+
+function speedCells(entity: { speed: number }): number {
+  return Math.floor(entity.speed / 5)
+}
+
+function cellKey(cell: GridCell): string {
+  return `${cell.x},${cell.y}`
+}
+
+function copyCell(cell: GridCell): GridCell {
+  return { x: cell.x, y: cell.y }
+}
+
+function hasLivingEnemies(gameState: GameState): boolean {
+  return Object.values(gameState.monsters).some(monster => monster.isAlive)
+}
+
+function monsterAttackName(monster: MonsterState): string {
+  switch (monster.type) {
+    case 'goblin':
+    case 'goblin_minion':
+    case 'goblin_boss':
+    case 'bandit':
+      return 'cimeterre'
+    case 'hobgoblin':
+    case 'hobgoblin_captain':
+      return 'epee longue'
+    case 'skeleton':
+      return 'epee courte'
+    case 'zombie':
+    case 'awakened_tree':
+      return 'coup'
+    case 'wolf':
+      return 'morsure'
+    case 'violet_fungus':
+      return 'touche pourrie'
+    default:
+      return 'attaque'
+  }
+}
+
+function occupiedCells(gameState: GameState, exceptId: string): Set<string> {
+  const occupied = new Set<string>()
+  if (exceptId !== 'player' && gameState.player.hp.current > 0) {
+    occupied.add(cellKey(gameState.player.position))
+  }
+  for (const monster of Object.values(gameState.monsters)) {
+    if (monster.id !== exceptId && monster.isAlive) {
+      occupied.add(cellKey(monster.position))
+    }
+  }
+  return occupied
+}
+
+function chooseMonsterMove(gameState: GameState, monster: MonsterState): GridCell | null {
+  const remainingMovement = Math.max(0, speedCells(monster) - (gameState.movementUsed?.[monster.id] ?? 0))
+  if (remainingMovement <= 0) return null
+
+  const occupied = occupiedCells(gameState, monster.id)
+  const currentDistance = distanceCells(monster.position, gameState.player.position)
+  let best: { cell: GridCell; distanceToPlayer: number; movement: number } | null = null
+
+  for (let x = Math.max(0, monster.position.x - remainingMovement); x <= monster.position.x + remainingMovement; x++) {
+    for (let y = Math.max(0, monster.position.y - remainingMovement); y <= monster.position.y + remainingMovement; y++) {
+      const cell = { x, y }
+      const movement = distanceCells(monster.position, cell)
+      if (movement === 0 || movement > remainingMovement) continue
+      if (occupied.has(cellKey(cell))) continue
+
+      const distanceToPlayer = distanceCells(cell, gameState.player.position)
+      if (distanceToPlayer >= currentDistance) continue
+
+      if (
+        !best ||
+        distanceToPlayer < best.distanceToPlayer ||
+        (distanceToPlayer === best.distanceToPlayer && movement < best.movement)
+      ) {
+        best = { cell, distanceToPlayer, movement }
+      }
+    }
+  }
+
+  return best?.cell ?? null
+}
+
+async function loadCurrentGameState(sessionId: string | undefined): Promise<GameState> {
+  return await callMCPTool('get_game_state', {}, sessionId) as GameState
+}
+
+async function autoEndCombatIfWon(
+  gameState: GameState,
+  sessionId: string | undefined,
+  requestId: string
+): Promise<{ gameState: GameState; ended: boolean }> {
+  if (gameState.phase !== 'combat' || hasLivingEnemies(gameState)) {
+    return { gameState, ended: false }
+  }
+
+  const startedAt = Date.now()
+  logEvent('info', 'dm.combat.auto_end.start', {
+    requestId,
+    sessionId,
+    gameState: summarizeGameState(gameState),
+  })
+
+  const result = await callMCPTool('end_combat', {
+    reason: 'Tous les adversaires sont vaincus.',
+  }, sessionId)
+  if (isMcpErrorResult(result)) {
+    logEvent('warn', 'dm.combat.auto_end.failed', {
+      requestId,
+      sessionId,
+      result,
+    })
+    return { gameState, ended: false }
+  }
+
+  const nextGameState = await loadCurrentGameState(sessionId)
+  logEvent('info', 'dm.combat.auto_end.ok', {
+    requestId,
+    sessionId,
+    durationMs: Date.now() - startedAt,
+    result,
+    gameState: summarizeGameState(nextGameState),
+  })
+  return { gameState: nextGameState, ended: true }
+}
+
+async function resolveNpcTurnsUntilPlayerTurn(
+  gameState: GameState,
+  sessionId: string | undefined,
+  requestId: string
+): Promise<{ gameState: GameState; resolvedTurns: number; toolsUsed: string[]; summaries: AutoNpcTurnSummary[] }> {
+  let state = gameState
+  let resolvedTurns = 0
+  const toolsUsed: string[] = []
+  const summaries: AutoNpcTurnSummary[] = []
+
+  if (state.phase !== 'combat' || !state.currentTurn || state.currentTurn === 'player') {
+    return { gameState: state, resolvedTurns, toolsUsed, summaries }
+  }
+
+  logEvent('info', 'dm.combat.auto_npc.start', {
+    requestId,
+    sessionId,
+    currentTurn: state.currentTurn,
+    gameState: summarizeGameState(state),
+  })
+
+  while (
+    state.phase === 'combat' &&
+    state.currentTurn &&
+    state.currentTurn !== 'player' &&
+    state.player.hp.current > 0 &&
+    resolvedTurns < MAX_AUTO_NPC_TURNS
+  ) {
+    const actorId = state.currentTurn
+    let monster = state.monsters[actorId]
+    const summary: AutoNpcTurnSummary = {
+      actorId,
+      actorName: monster?.name ?? actorId,
+    }
+
+    logEvent('info', 'dm.combat.auto_npc.turn_start', {
+      requestId,
+      sessionId,
+      actorId,
+      monster,
+      gameState: summarizeGameState(state),
+    })
+
+    if (!monster || !monster.isAlive) {
+      summary.skipped = 'Actor is not an active monster.'
+      const advance = await callMCPTool('next_turn', {
+        actorId,
+        skipAction: true,
+        reason: summary.skipped,
+      }, sessionId)
+      toolsUsed.push('next_turn')
+      if (isMcpErrorResult(advance)) {
+        summary.advanceError = advance
+        summaries.push(summary)
+        logEvent('warn', 'dm.combat.auto_npc.advance_failed', {
+          requestId,
+          sessionId,
+          actorId,
+          result: advance,
+        })
+        break
+      }
+      state = await loadCurrentGameState(sessionId)
+      summary.advancedTo = state.currentTurn
+      summaries.push(summary)
+      resolvedTurns++
+      continue
+    }
+
+    let distanceToPlayer = distanceCells(monster.position, state.player.position)
+    if (distanceToPlayer > 1) {
+      const destination = chooseMonsterMove(state, monster)
+      if (destination) {
+        const from = copyCell(monster.position)
+        const move = await callMCPTool('move_token', {
+          tokenId: actorId,
+          toCell: destination,
+        }, sessionId)
+        toolsUsed.push('move_token')
+        if (isMcpErrorResult(move)) {
+          summary.moveError = move
+          logEvent('warn', 'dm.combat.auto_npc.move_failed', {
+            requestId,
+            sessionId,
+            actorId,
+            destination,
+            result: move,
+          })
+        } else {
+          state = await loadCurrentGameState(sessionId)
+          monster = state.monsters[actorId] ?? monster
+          distanceToPlayer = distanceCells(monster.position, state.player.position)
+          summary.moved = { from, to: copyCell(monster.position) }
+          logEvent('info', 'dm.combat.auto_npc.move_ok', {
+            requestId,
+            sessionId,
+            actorId,
+            from,
+            to: monster.position,
+            distanceToPlayer,
+          })
+        }
+      }
+    }
+
+    if (distanceToPlayer <= 1) {
+      const attack = await callMCPTool('resolve_attack', {
+        attackerId: actorId,
+        targetId: 'player',
+        weaponOrSpell: monsterAttackName(monster),
+      }, sessionId)
+      toolsUsed.push('resolve_attack')
+      summary.attack = attack
+      logEvent(isMcpErrorResult(attack) ? 'warn' : 'info', 'dm.combat.auto_npc.attack_result', {
+        requestId,
+        sessionId,
+        actorId,
+        result: attack,
+      })
+    } else {
+      summary.skipped = 'Cannot reach the player this turn.'
+    }
+
+    const advanceArgs = summary.attack && !isMcpErrorResult(summary.attack)
+      ? { actorId }
+      : { actorId, skipAction: true, reason: summary.skipped ?? 'No legal attack available.' }
+
+    const advance = await callMCPTool('next_turn', advanceArgs, sessionId)
+    toolsUsed.push('next_turn')
+    if (isMcpErrorResult(advance)) {
+      summary.advanceError = advance
+      summaries.push(summary)
+      logEvent('warn', 'dm.combat.auto_npc.advance_failed', {
+        requestId,
+        sessionId,
+        actorId,
+        result: advance,
+      })
+      break
+    }
+
+    state = await loadCurrentGameState(sessionId)
+    summary.advancedTo = state.currentTurn
+    summaries.push(summary)
+    resolvedTurns++
+    logEvent('info', 'dm.combat.auto_npc.turn_complete', {
+      requestId,
+      sessionId,
+      actorId,
+      advancedTo: state.currentTurn,
+      gameState: summarizeGameState(state),
+    })
+  }
+
+  if (resolvedTurns >= MAX_AUTO_NPC_TURNS && state.currentTurn !== 'player') {
+    logEvent('warn', 'dm.combat.auto_npc.guard_exhausted', {
+      requestId,
+      sessionId,
+      maxAutoNpcTurns: MAX_AUTO_NPC_TURNS,
+      gameState: summarizeGameState(state),
+    })
+  }
+
+  logEvent('info', 'dm.combat.auto_npc.complete', {
+    requestId,
+    sessionId,
+    resolvedTurns,
+    toolsUsed,
+    summaries,
+    gameState: summarizeGameState(state),
+  })
+
+  return { gameState: state, resolvedTurns, toolsUsed, summaries }
+}
+
+function formatCombatLogEntries(entries: CombatLogEntry[]): string {
+  if (entries.length === 0) return 'Aucun nouveau log mecanique.'
+  return entries.map(entry => {
+    const detail = entry.mechanicalDetail ? ` | ${entry.mechanicalDetail}` : ''
+    return `- Round ${entry.round}, ${entry.turn}: ${entry.action}${detail}`
+  }).join('\n')
+}
+
+async function generateFinalNarration(
+  params: {
+    requestId: string
+    sessionId: string | undefined
+    playerMessage: string
+    draftNarrative: string
+    gameState: GameState
+    newCombatLogEntries: CombatLogEntry[]
+    summaryContext: string | undefined
+    usageLog: AnthropicUsageLogEntry[]
+  }
+): Promise<string | null> {
+  const startedAt = Date.now()
+  const {
+    requestId,
+    sessionId,
+    playerMessage,
+    draftNarrative,
+    gameState,
+    newCombatLogEntries,
+    summaryContext,
+    usageLog,
+  } = params
+
+  logEvent('info', 'dm.final_narration.start', {
+    requestId,
+    sessionId,
+    draftNarrativeLength: draftNarrative.length,
+    newCombatLogCount: newCombatLogEntries.length,
+    gameState: summarizeGameState(gameState),
+  })
+
+  const finalPrompt = [
+    `Action du joueur:\n${playerMessage}`,
+    draftNarrative ? `Brouillon narratif precedent, potentiellement incomplet:\n${draftNarrative}` : undefined,
+    `Resultats mecaniques faisant autorite:\n${formatCombatLogEntries(newCombatLogEntries)}`,
+    `Ecris la reponse finale au joueur en francais, au present, en 1-3 phrases. Respecte strictement les resultats mecaniques. N'annonce aucune action future non resolue.`,
+  ].filter(Boolean).join('\n\n')
+
+  try {
+    const response = await anthropic.messages.create({
+      model: MODEL,
+      max_tokens: MAX_TOKENS,
+      system: [
+        {
+          type: 'text',
+          text: buildStaticPrompt() + '\n\nMODE NARRATION FINALE: narre uniquement. Aucun tool. Les resultats mecaniques fournis font autorite.',
+          cache_control: { type: 'ephemeral' },
+        },
+        { type: 'text', text: buildDynamicPrompt(gameState, summaryContext) },
+      ],
+      messages: [{ role: 'user', content: finalPrompt }],
+    })
+
+    logEvent('info', 'dm.final_narration.response', {
+      requestId,
+      sessionId,
+      durationMs: Date.now() - startedAt,
+      stopReason: response.stop_reason,
+      content: summarizeContentBlocks(response.content),
+    })
+
+    usageLog.push(logAnthropicUsage({
+      requestId,
+      operation: 'dm.final_narration',
+      model: MODEL,
+      usage: response.usage,
+      stopReason: response.stop_reason,
+      metadata: {
+        newCombatLogCount: newCombatLogEntries.length,
+        draftNarrativeLength: draftNarrative.length,
+      },
+    }))
+
+    const text = response.content.find(block => block.type === 'text')
+    const finalNarrative = text && 'text' in text ? text.text.trim() : ''
+    if (!finalNarrative) return null
+
+    logEvent('info', 'dm.final_narration.ok', {
+      requestId,
+      sessionId,
+      narrativeLength: finalNarrative.length,
+      narrative: finalNarrative,
+    })
+    return finalNarrative
+  } catch (err) {
+    logEvent('error', 'dm.final_narration.error', {
+      requestId,
+      sessionId,
+      durationMs: Date.now() - startedAt,
+      err,
+    })
+    return null
+  }
+}
+
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const requestStartedAt = Date.now()
   const requestId = generateRequestId()
@@ -479,6 +905,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         return NextResponse.json({ error: 'Serveur MCP non disponible.' }, { status: 503 })
       }
     }
+
+    const combatLogStartLength = currentGameState.combatLog.length
 
     // ── Traitement de l'historique ──────────────────────────────────────────
     const { recent: recentHistory, newSummary } = await processHistory(
@@ -752,6 +1180,20 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       })
     } catch { /* garde l'état qu'on avait */ }
 
+    try {
+      const autoEnd = await autoEndCombatIfWon(currentGameState, sessionId, requestId)
+      if (autoEnd.ended) {
+        currentGameState = autoEnd.gameState
+        toolsUsed.push('end_combat')
+      }
+    } catch (err) {
+      logEvent('error', 'dm.combat.auto_end.error', {
+        requestId,
+        sessionId,
+        err,
+      })
+    }
+
     if (!turnBoundaryReached) {
       try {
         const autoAdvance = await autoAdvanceCompletedTurn(currentGameState, sessionId, requestId)
@@ -766,6 +1208,48 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           err,
         })
       }
+    }
+
+    try {
+      const npcTurns = await resolveNpcTurnsUntilPlayerTurn(currentGameState, sessionId, requestId)
+      if (npcTurns.resolvedTurns > 0) {
+        currentGameState = npcTurns.gameState
+        toolsUsed.push(...npcTurns.toolsUsed)
+      }
+    } catch (err) {
+      logEvent('error', 'dm.combat.auto_npc.error', {
+        requestId,
+        sessionId,
+        err,
+      })
+    }
+
+    try {
+      const autoEnd = await autoEndCombatIfWon(currentGameState, sessionId, requestId)
+      if (autoEnd.ended) {
+        currentGameState = autoEnd.gameState
+        toolsUsed.push('end_combat')
+      }
+    } catch (err) {
+      logEvent('error', 'dm.combat.auto_end_after_npc.error', {
+        requestId,
+        sessionId,
+        err,
+      })
+    }
+
+    if (toolsUsed.length > 0) {
+      const finalNarrative = await generateFinalNarration({
+        requestId,
+        sessionId,
+        playerMessage: message,
+        draftNarrative: narrative,
+        gameState: currentGameState,
+        newCombatLogEntries: currentGameState.combatLog.slice(combatLogStartLength),
+        summaryContext: activeSummary,
+        usageLog,
+      })
+      if (finalNarrative) narrative = finalNarrative
     }
 
     const persistedHistory = [
