@@ -76,6 +76,10 @@ const PLACEHOLDERS = {
     'Frapper le plus proche, reculer vers la porte, tenter une intimidation...',
     'Lever le bouclier, viser le chef, renverser une table...',
   ],
+  dying: [
+    'Lancer le jet de mort, souffler un dernier mot, espérer un miracle...',
+    'Tenir bon, compter les battements, défier le noir...',
+  ],
   dialogue: [
     'Mentir avec aplomb, proposer un marché, demander le détail qui fâche...',
     'Sourire trop fort, négocier la recette, accuser une odeur suspecte...',
@@ -96,6 +100,10 @@ const PLACEHOLDERS = {
 
 function selectPlaceholder(gameState: GameState, messageCount: number): string {
   if (gameState.phase === 'combat') {
+    if (gameState.player.hp.current <= 0) {
+      return PLACEHOLDERS.dying[messageCount % PLACEHOLDERS.dying.length]
+    }
+
     return PLACEHOLDERS.combat[messageCount % PLACEHOLDERS.combat.length]
   }
 

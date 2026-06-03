@@ -8,6 +8,7 @@ const DEFAULT_PLAYER: PlayerState = {
   class: 'Guerrier',
   level: 1,
   hp: { current: 20, max: 20 },
+  deathSaves: { successes: 0, failures: 0 },
   ac: 16,
   stats: { str: 16, dex: 12, con: 14, int: 10, wis: 12, cha: 10 },
   proficiencyBonus: 2,
@@ -47,6 +48,28 @@ function syncPlayerRoomFromPosition(): void {
   }
 }
 
+function syncDyingPlayerState(): void {
+  state.player.deathSaves ??= { successes: 0, failures: 0 }
+
+  if (state.player.hp.current > 0) {
+    state.player.deathSaves = { successes: 0, failures: 0 }
+    state.player.conditions = state.player.conditions.filter(condition => condition !== 'unconscious')
+    return
+  }
+
+  state.player.hp.current = 0
+  if (!state.player.conditions.includes('unconscious') && !state.player.deathSaves.dead) {
+    state.player.conditions.push('unconscious')
+  }
+
+  if (state.phase === 'combat') {
+    if (!state.initiativeOrder.includes('player')) {
+      state.initiativeOrder.push('player')
+    }
+    state.currentTurn ??= 'player'
+  }
+}
+
 export function getState(): GameState {
   return state
 }
@@ -64,6 +87,7 @@ export function replaceState(nextState: GameState): GameState {
     roomsVisited: structuredClone(nextState.roomsVisited ?? []),
   }
   syncPlayerRoomFromPosition()
+  syncDyingPlayerState()
   return state
 }
 
@@ -87,7 +111,71 @@ export function getEntity(id: string): PlayerState | MonsterState | undefined {
 export function updatePlayerHP(delta: number): PlayerState {
   const player = state.player
   player.hp.current = Math.max(0, Math.min(player.hp.max, player.hp.current + delta))
+  player.deathSaves ??= { successes: 0, failures: 0 }
+
+  if (player.hp.current <= 0) {
+    player.hp.current = 0
+    if (!player.deathSaves.dead && !player.deathSaves.stable && !player.conditions.includes('unconscious')) {
+      player.conditions.push('unconscious')
+    }
+  } else {
+    player.deathSaves = { successes: 0, failures: 0 }
+    player.conditions = player.conditions.filter(condition => condition !== 'unconscious')
+  }
+
   return player
+}
+
+export function rollPlayerDeathSave(roll: number): {
+  roll: number
+  success: boolean
+  criticalSuccess: boolean
+  criticalFailure: boolean
+  successes: number
+  failures: number
+  stable: boolean
+  dead: boolean
+  hpAfter: number
+} {
+  const player = state.player
+  player.deathSaves ??= { successes: 0, failures: 0 }
+
+  if (player.hp.current > 0) {
+    player.deathSaves = { successes: 0, failures: 0 }
+  } else if (roll === 20) {
+    player.hp.current = 1
+    player.deathSaves = { successes: 0, failures: 0 }
+    player.conditions = player.conditions.filter(condition => condition !== 'unconscious')
+  } else if (roll === 1) {
+    player.deathSaves.failures = Math.min(3, player.deathSaves.failures + 2)
+  } else if (roll >= 10) {
+    player.deathSaves.successes = Math.min(3, player.deathSaves.successes + 1)
+  } else {
+    player.deathSaves.failures = Math.min(3, player.deathSaves.failures + 1)
+  }
+
+  if (player.hp.current <= 0 && player.deathSaves.successes >= 3) {
+    player.deathSaves.stable = true
+  }
+  if (player.hp.current <= 0 && player.deathSaves.failures >= 3) {
+    player.deathSaves.dead = true
+  }
+
+  if (player.hp.current <= 0 && !player.conditions.includes('unconscious')) {
+    player.conditions.push('unconscious')
+  }
+
+  return {
+    roll,
+    success: roll >= 10,
+    criticalSuccess: roll === 20,
+    criticalFailure: roll === 1,
+    successes: player.deathSaves.successes,
+    failures: player.deathSaves.failures,
+    stable: Boolean(player.deathSaves.stable),
+    dead: Boolean(player.deathSaves.dead),
+    hpAfter: player.hp.current,
+  }
 }
 
 export function updateMonsterHP(id: string, delta: number): MonsterState {
@@ -179,9 +267,10 @@ export function advanceTurn(): string | null {
   const idx = state.initiativeOrder.indexOf(current ?? '')
   const nextIdx = (idx + 1) % state.initiativeOrder.length
 
-  // Remove dead monsters from initiative
+  // Remove dead monsters from initiative. Keep the player in the order at 0 HP:
+  // in D&D 5e, an unconscious player still has turns for death saves.
   state.initiativeOrder = state.initiativeOrder.filter(id => {
-    if (id === 'player') return state.player.hp.current > 0
+    if (id === 'player') return true
     return state.monsters[id]?.isAlive ?? false
   })
 

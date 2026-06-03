@@ -640,6 +640,13 @@ RYTHME DE TABLE:
 - Termine sur une tension jouable, pas sur une formule froide. Évite "que fais-tu ?" et "vous allez où ?".
 - Si le joueur critique le style, la longueur, le système ou un bug, ne réponds pas à la critique et ne t'excuse pas: applique la correction silencieusement puis reprends la scène en fiction.
 
+VOIX ET STYLE:
+- Écris comme un conteur de table vif: concret, oral, légèrement malicieux, jamais administratif.
+- Le joueur doit comprendre ce qui est intéressant maintenant: danger, objectif, piste ou conséquence.
+- Les PNJ veulent quelque chose. Fais-les interrompre, marchander, provoquer ou révéler une information exploitable.
+- Bannis les phrases molles: "tu restes dans...", "aucun ennemi visible...", "c'est ton tour", "à toi de jouer", "choisis:", "quelque chose semble...".
+- Si la scène se tasse, injecte un fait nouveau plutôt qu'une description immobile.
+
 PERSONNAGE:
 ${ctx.playerCharacter}
 
@@ -660,6 +667,7 @@ RÈGLES MÉCANIQUES:
 - Rencontres connues: bakery_floor_goblins (salle 8), loading_dock_patrol (salle 7), grammy_apartment_guards (salle 9), violet_fungus_heap (salle 3).
 - Salle 2: les dryades du verger ne sont pas une rencontre de combat prédéfinie. Si elles sont offensées, elles esquivent, lancent des pommes pourries et mettent la pression; ne déclenche pas start_encounter pour elles.
 - Tour joueur en combat → resolve_player_attack ou saving_throw, puis STOP. Pour une cible spatiale ("a ma droite", "le plus proche"), utilise resolve_player_attack avec targetHint.
+- Joueur à 0 PV en combat → il est inconscient: pas d'attaque, pas de mouvement, pas de défense active. S'il tente/attend/continue au tour joueur, utilise roll_death_save, puis STOP.
 - Si le joueur passe/attend son tour en combat → pass_turn, puis STOP.
 - Ne jamais appeler next_turn : outil interne réservé au serveur.
 - Tour monstre → ne résous pas toi-même. Le serveur joue les monstres automatiquement, puis tu narres le résultat.
@@ -707,6 +715,7 @@ Narre uniquement la conséquence immédiate de l'action du joueur.
 Respecte strictement les résultats mécaniques fournis: jets, dégâts, morts, positions, tour courant.
 Ne lance aucun dé, n'invente aucun nouvel ennemi, ne résous aucun tour futur.
 Salle 2: les dryades du verger ne sont pas une rencontre de combat prédéfinie. Si elles sont offensées, elles esquivent, lancent des pommes pourries et mettent la pression; ne déclenche pas de combat contre un autre monstre.
+Joueur à 0 PV: il est inconscient. Ne lui propose pas d'attaque ou de mouvement; un tour joueur inconscient sert à lancer roll_death_save.
 Réponse brève: 2-5 phrases courtes, au présent, style vivant mais clair.
 Français naturel et correct: accents, accords simples, phrases propres. Pas de franglais gratuit.
 Format vocal: pas de Markdown, pas de liste, pas de titre, pas de parenthèse, pas d'excuse, pas de commentaire méta, pas de mention du système, des prompts, du moteur, des tools, de MCP ou de l'IA.
@@ -714,6 +723,9 @@ Ne donne pas de coordonnées ni d'ID technique sauf si le joueur les demande exp
 Ne termine pas par un menu d'options. Évite "que fais-tu ?" et "vous allez où ?"; préfère une tension concrète ou une piste en fiction.
 Ne déclare pas de fin de quête/campagne ni de conclusion alternative sauf demande explicite. Pas de time-skip: seulement la prochaine minute jouable.
 Donne de l'élan: un mouvement, une réplique, une menace, une opportunité ou une information exploitable. Évite les sorties qui ne font que décrire une ambiance.
+Écris comme un conteur de table vif: concret, oral, légèrement malicieux, jamais administratif.
+Bannis les phrases molles: "tu restes dans...", "aucun ennemi visible...", "c'est ton tour", "à toi de jouer", "choisis:", "quelque chose semble...".
+Les PNJ veulent quelque chose. Fais-les interrompre, marchander, provoquer ou révéler une information exploitable.
 Si le joueur semble perdu, relance par un événement de scène ou une piste évidente, sans lui donner d'ordre.
 Si le joueur critique le style, la longueur, le système ou un bug, ne réponds pas à la critique: applique la correction silencieusement et reprends la scène en fiction.`
 }
@@ -938,6 +950,7 @@ function lineLooksLikeMetaCommentary(line: string): boolean {
     /\b(excuse-moi|desole|erreur de ma part|j'aurais du|j aurais du|je vais corriger|merci de cette correction)\b/,
     /\b(je dois clarifier|non, ce message n'est pas|ce message n'est pas|on continue|laissez-moi recommencer|plus de substance)\b/,
     /\b(que fais-tu|que faites-vous|qu[' ]?allez-vous faire|qu[' ]?en est-il|ou veux-tu aller ensuite|vous allez ou|tu vas ou|ou allez-vous|qu[' ]?est-ce que tu fais|deplacement,\s*attaque|attaque,\s*test|roleplay pur)\b/,
+    /\b(c'est ton tour|c est ton tour|a toi de jouer|aucun ennemi visible|tu restes dans|quelque chose semble)\b|\bchoisis\s*:|\bchoisissez\s*:/,
     /\b(appeler\s+\w+|move_token|start_encounter|resolve_player_attack|pass_turn|roll_dice)\b/,
     /\b(fin de quete|fin de campagne|quete alternative|objectif accompli|mission accomplie)\b/,
     /\b(heures suivantes|jours suivants|semaines suivantes|premiere fournee|faire fortune)\b/,
@@ -1057,6 +1070,7 @@ type RequiredMechanicalAction = {
 const TOOL_INTENT_SATISFIERS: Record<string, string[]> = {
   'player-combat-attack-intent': ['resolve_player_attack', 'move_token'],
   'player-combat-movement-intent': ['move_token', 'resolve_player_attack'],
+  'player-death-save-intent': ['roll_death_save'],
   'exploration-movement-intent': ['move_token', 'trigger_room_event', 'start_encounter', 'end_combat'],
   'encounter-or-attack-intent': ['start_encounter', 'resolve_player_attack'],
 }
@@ -1065,7 +1079,7 @@ const LLM_TOOL_SETS = {
   explorationDefault: ['roll_dice', 'trigger_room_event', 'get_entity_stats'],
   explorationMovement: ['move_token', 'trigger_room_event', 'start_encounter', 'roll_dice', 'get_entity_stats'],
   explorationEncounter: ['start_encounter', 'move_token', 'trigger_room_event', 'roll_dice', 'get_entity_stats'],
-  combatPlayer: ['resolve_player_attack', 'move_token', 'pass_turn', 'end_combat', 'roll_dice', 'get_entity_stats', 'resolve_saving_throw'],
+  combatPlayer: ['resolve_player_attack', 'move_token', 'pass_turn', 'end_combat', 'roll_death_save', 'roll_dice', 'get_entity_stats', 'resolve_saving_throw'],
   combatNonPlayer: ['roll_dice', 'get_entity_stats'],
   dialogue: ['roll_dice', 'get_entity_stats', 'apply_condition'],
 } as const
@@ -1219,6 +1233,15 @@ function buildNarrativeStateCorrection(gameState: GameState): string {
 
 function detectRequiredMechanicalAction(message: string, gameState: GameState): RequiredMechanicalAction | null {
   const text = normalizeFrenchText(message)
+  if (
+    isPlayerAtZeroHp(gameState) &&
+    gameState.currentTurn === 'player' &&
+    !isPlayerDeathResolved(gameState) &&
+    detectDeathSaveIntent(message)
+  ) {
+    return { reason: 'player-death-save-intent', suggestedTools: ['roll_death_save'] }
+  }
+
   const asksOnlyForDescription = /\b(observe|regarde|inspecte|ecoute|vois|voir|decris|decrit|quoi|qu'est-ce|est-ce tout)\b/.test(text)
   if (asksOnlyForDescription && !/\b(deplace|attaque|frappe|spawn|apparaitre|carte|combat|ouvres?|ouvrir|enfonces?|enfoncer|portes?|gobelins?|ennemis?|monstres?)\b/.test(text)) {
     return null
@@ -1261,6 +1284,44 @@ function detectPassTurnIntent(message: string, gameState: GameState): boolean {
   return /\b(passe|passer|attends?|attendre|patient|patiente|ne fais rien|reste sur place)\b/.test(text)
 }
 
+function isPlayerAtZeroHp(gameState: GameState): boolean {
+  return gameState.phase === 'combat' && gameState.player.hp.current <= 0
+}
+
+function isPlayerDeathResolved(gameState: GameState): boolean {
+  return Boolean(gameState.player.deathSaves?.stable || gameState.player.deathSaves?.dead)
+}
+
+function detectDeathSaveIntent(message: string): boolean {
+  const text = normalizeFrenchText(message)
+  return /\b(jet de mort|jets de mort|sauvegarde contre la mort|death save|je tente|tente le jet|tenter le jet|je le fais|je lance|lance le|vas y|vas-y|continue|continuer|on attend|j'attends|j attends|attends|attendre|d'accord|d accord|ok)\b/.test(text)
+}
+
+function detectPlayerDownStatusQuestion(message: string): boolean {
+  const text = normalizeFrenchText(message)
+  return /\b(mort|mort en fait|inconscient|zero pv|0 pv|peux rien faire|peux pas|me defendre|attaquer|taper|frapper|redonner la main|rendre la main|bloque|bloquee|bloques|aucun sens|quel combat|comprends pas|comprends rien|pas clair)\b/.test(text)
+}
+
+function buildPlayerDownNarrative(gameState: GameState): string {
+  const deathSaves = gameState.player.deathSaves ?? { successes: 0, failures: 0 }
+
+  if (deathSaves.dead) {
+    return "Cette fois, oui: le dernier souffle quitte ta poitrine. Les gobelins reculent d'un pas, surpris par le silence soudain, et la boulangerie retombe dans une chaleur noire."
+  }
+
+  if (deathSaves.stable) {
+    return "Tu n'es pas mort, mais tu ne peux plus agir: ta respiration s'accroche à un fil stable. Les gobelins te traînent hors du passage, persuadés que tu ne leur poseras plus de problème tout de suite."
+  }
+
+  const saveText = `${deathSaves.successes} succès, ${deathSaves.failures} échec${deathSaves.failures > 1 ? 's' : ''}`
+
+  if (gameState.currentTurn === 'player') {
+    return `Tu n'es pas mort, mais tu es à zéro PV et inconscient: pas d'attaque, pas de parade, pas de mouvement héroïque. Là, ton seul vrai levier est le jet de mort; pour l'instant tu as ${saveText}.`
+  }
+
+  return `Tu es à zéro PV et inconscient, donc tu ne peux pas agir pendant que l'initiative tourne encore. Dès que ton tour revient, le prochain vrai levier sera le jet de mort; pour l'instant tu as ${saveText}.`
+}
+
 function detectDebugStateQuestion(message: string): boolean {
   const text = normalizeFrenchText(message)
   const mentionsDebugSurface = /\b(client|javascript|js|serveur|pion|token|jeton|carte|battlemap|affichage|desynchro|desynchronise|bug|bonne salle|bonne piece)\b/.test(text)
@@ -1270,7 +1331,46 @@ function detectDebugStateQuestion(message: string): boolean {
 
 function detectDirectiveGuidanceRequest(message: string): boolean {
   const text = normalizeFrenchText(message)
-  return /\b(quoi maintenant|je fais quoi|on fait quoi|que faire|quoi faire|quelle suite|prochaine action|tu proposes quoi|tu me proposes quoi|guide moi|aide moi|je suis perdu|on est perdu|quelle direction|ou aller|ou je vais|par ou|donne moi une piste)\b/.test(text)
+  return /\b(quoi maintenant|je fais quoi|on fait quoi|que faire|quoi faire|quelle suite|prochaine action|tu proposes quoi|tu me proposes quoi|guide moi|aide moi|je suis perdu|on est perdu|quelle direction|ou aller|ou je vais|par ou|donne moi une piste|je comprends pas|je comprends rien|comprends pas|comprends rien|pas compris|j'ai pas compris|j ai pas compris|j'y comprends rien|j y comprends rien|pas clair|objectif|c'est quoi le but|c est quoi le but|c'est quoi l'action|c est quoi l action)\b/.test(text)
+}
+
+function buildQuestGuidanceNarrative(gameState: GameState): string {
+  if (gameState.phase === 'combat') {
+    return gameState.currentTurn === 'player'
+      ? "Là, tout se joue dans les deux prochaines secondes: une ouverture apparaît sur le flanc de l'ennemi, mais elle ne restera pas longtemps."
+      : "L'ennemi a l'initiative de l'instant. Le sol craque sous ses appuis, et tu sens venir le prochain mouvement."
+  }
+
+  switch (gameState.currentRoomId) {
+    case '1':
+      return "La mission reste simple dans son absurdité: retrouver la recette de Grammy. Mac bruisse au bord du chemin; le verger peut parler, mais la bâtisse garde la vraie prise."
+    case '2':
+      return "La dryade fait tourner une pomme entre ses doigts. \"La recette est coupée en deux, soldat: une moitié dort dans le bureau, l'autre dans l'appartement de Grammy. Et si tu veux éviter de tomber nez à nez avec les gobelins, le quai de chargement mord moins fort que l'entrée.\""
+    case '4':
+      return "Dans l'entrée, les traces gobelines filent vers les fours, mais les vrais papiers de Grammy ne sentent pas la farine: le bureau et l'appartement gardent de meilleurs secrets."
+    case '5':
+      return "Le bureau est exactement le genre d'endroit où Grammy aurait caché une moitié de recette. Un tiroir résiste sous les papiers, et la poussière autour de la poignée a été dérangée récemment."
+    case '7':
+      return "Le quai de chargement donne un angle discret sur le sol de la boulangerie. De là, tu peux entrer sans annoncer ta présence à tout ce qui traîne près des fours."
+    case '8':
+      return "Le sol de la boulangerie est le cœur dangereux du bâtiment. Les gobelins cherchent la même recette que toi, et les portes vers le bureau et l'appartement deviennent soudain beaucoup plus importantes."
+    case '9':
+      return "L'appartement de Grammy a tout d'une tanière occupée, mais c'est aussi là qu'une moitié de recette peut encore survivre. Quelqu'un a remué les affaires anciennes, récemment."
+    default:
+      return "La piste principale tient toujours: deux moitiés de recette, l'une côté papiers, l'autre côté appartement. Le bâtiment grince comme s'il n'aimait pas qu'on s'en souvienne."
+  }
+}
+
+function detectDryadInformationRequest(message: string, gameState: GameState): boolean {
+  if (gameState.phase !== 'exploration' || gameState.currentRoomId !== '2') return false
+  const text = normalizeFrenchText(message)
+  const talksToDryads = /\b(dryades?|fees?|elles|vous|renseigne\w*|renseignement\w*|aide[rz]?|aider|parle|demande)\b/.test(text)
+  const asksQuest = /\b(recette|tarte|grammy|chercher|trouver|ou aller|ou je vais|direction|renseignement\w*|info\w*|indice\w*|aide[rz]?|sauriez|savez)\b/.test(text)
+  return talksToDryads && asksQuest
+}
+
+function buildDryadInformationNarrative(): string {
+  return "La dryade retient sa pomme pourrie juste avant de la lancer. \"D'accord, soldat: la recette de Grammy est en deux morceaux. La première moitié dort dans le bureau, sous la poussière; la seconde est dans l'appartement, là où les gobelins se prennent pour des rois. Passe par le quai de chargement si tu veux les surprendre.\""
 }
 
 function detectDryadOffense(message: string, gameState: GameState): boolean {
@@ -1596,21 +1696,31 @@ async function resolveServerFirstAction(
     }
   }
 
-  if (detectDirectiveGuidanceRequest(message)) {
-    const draftNarrative = buildDirectiveSceneNarrative(gameState)
-    logEvent('info', 'dm.cost.engine_first.directive_guidance', {
-      requestId,
-      sessionId,
-      durationMs: Date.now() - startedAt,
-      draftNarrative,
-      gameState: summarizeGameState(gameState),
-    })
-    return {
-      handled: true,
-      gameState,
-      toolsUsed: [],
-      draftNarrative,
-      sawMcpToolError: false,
+  if (isPlayerAtZeroHp(gameState)) {
+    if (
+      gameState.currentTurn === 'player' &&
+      !isPlayerDeathResolved(gameState) &&
+      detectDeathSaveIntent(message) &&
+      !detectPlayerDownStatusQuestion(message)
+    ) {
+      toolName = 'roll_death_save'
+      input = {}
+    } else {
+      const draftNarrative = buildPlayerDownNarrative(gameState)
+      logEvent('info', 'dm.cost.engine_first.player_down_guidance', {
+        requestId,
+        sessionId,
+        durationMs: Date.now() - startedAt,
+        draftNarrative,
+        gameState: summarizeGameState(gameState),
+      })
+      return {
+        handled: true,
+        gameState,
+        toolsUsed: [],
+        draftNarrative,
+        sawMcpToolError: false,
+      }
     }
   }
 
@@ -1632,45 +1742,83 @@ async function resolveServerFirstAction(
     }
   }
 
-  const attackInput = parsePlayerAttackInput(message, gameState)
-  const encounterRepairInput = parseEncounterRepairInput(message, gameState)
-  if (attackInput) {
-    toolName = 'resolve_player_attack'
-    input = attackInput
-  } else if (encounterRepairInput) {
-    toolName = 'start_encounter'
-    input = encounterRepairInput
-  } else if (detectPassTurnIntent(message, gameState)) {
-    toolName = 'pass_turn'
-    input = { reason: 'Le joueur attend et passe son tour.' }
-  } else {
-    const toCell =
-      parseCoordinateMove(message, gameState) ??
-      parseNamedRoomMove(message, gameState) ??
-      parseContextualRoomMove(message, gameState, recentHistory)
-    if (toCell) {
-      const targetRoomId = inferMappedAdventureRoomId(toCell)
-      const encounterId = encounterIdForRoom(targetRoomId)
-      const shouldStartEncounter =
-        gameState.phase === 'exploration' &&
-        countAliveMonsters(gameState) === 0 &&
-        targetRoomId !== null &&
-        encounterId &&
-        (
-          targetRoomId !== gameState.currentRoomId ||
-          !gameState.roomsVisited.includes(targetRoomId)
-        )
+  if (detectDryadInformationRequest(message, gameState)) {
+    const draftNarrative = buildDryadInformationNarrative()
+    logEvent('info', 'dm.cost.engine_first.dryad_information', {
+      requestId,
+      sessionId,
+      durationMs: Date.now() - startedAt,
+      draftNarrative,
+      gameState: summarizeGameState(gameState),
+    })
+    return {
+      handled: true,
+      gameState,
+      toolsUsed: [],
+      draftNarrative,
+      sawMcpToolError: false,
+    }
+  }
 
-      if (shouldStartEncounter) {
-        toolName = 'start_encounter'
-        input = {
-          encounterId,
-          playerCell: toCell,
-          reason: 'Le joueur entre dans une salle occupee.',
+  if (detectDirectiveGuidanceRequest(message)) {
+    const draftNarrative = buildQuestGuidanceNarrative(gameState)
+    logEvent('info', 'dm.cost.engine_first.quest_guidance', {
+      requestId,
+      sessionId,
+      durationMs: Date.now() - startedAt,
+      draftNarrative,
+      gameState: summarizeGameState(gameState),
+    })
+    return {
+      handled: true,
+      gameState,
+      toolsUsed: [],
+      draftNarrative,
+      sawMcpToolError: false,
+    }
+  }
+
+  if (!toolName) {
+    const attackInput = parsePlayerAttackInput(message, gameState)
+    const encounterRepairInput = parseEncounterRepairInput(message, gameState)
+    if (attackInput) {
+      toolName = 'resolve_player_attack'
+      input = attackInput
+    } else if (encounterRepairInput) {
+      toolName = 'start_encounter'
+      input = encounterRepairInput
+    } else if (detectPassTurnIntent(message, gameState)) {
+      toolName = 'pass_turn'
+      input = { reason: 'Le joueur attend et passe son tour.' }
+    } else {
+      const toCell =
+        parseCoordinateMove(message, gameState) ??
+        parseNamedRoomMove(message, gameState) ??
+        parseContextualRoomMove(message, gameState, recentHistory)
+      if (toCell) {
+        const targetRoomId = inferMappedAdventureRoomId(toCell)
+        const encounterId = encounterIdForRoom(targetRoomId)
+        const shouldStartEncounter =
+          gameState.phase === 'exploration' &&
+          countAliveMonsters(gameState) === 0 &&
+          targetRoomId !== null &&
+          encounterId &&
+          (
+            targetRoomId !== gameState.currentRoomId ||
+            !gameState.roomsVisited.includes(targetRoomId)
+          )
+
+        if (shouldStartEncounter) {
+          toolName = 'start_encounter'
+          input = {
+            encounterId,
+            playerCell: toCell,
+            reason: 'Le joueur entre dans une salle occupee.',
+          }
+        } else {
+          toolName = 'move_token'
+          input = { tokenId: 'player', toCell }
         }
-      } else {
-        toolName = 'move_token'
-        input = { tokenId: 'player', toCell }
       }
     }
   }
@@ -1940,7 +2088,6 @@ async function resolveNpcTurnsUntilPlayerTurn(
     state.phase === 'combat' &&
     state.currentTurn &&
     state.currentTurn !== 'player' &&
-    state.player.hp.current > 0 &&
     resolvedTurns < MAX_AUTO_NPC_TURNS
   ) {
     const actorId = state.currentTurn
@@ -1957,6 +2104,39 @@ async function resolveNpcTurnsUntilPlayerTurn(
       monster,
       gameState: summarizeGameState(state),
     })
+
+    if (state.player.hp.current <= 0) {
+      summary.skipped = 'Le joueur est inconscient; on avance jusqu au prochain jet de mort.'
+      const advance = await callMCPTool('next_turn', {
+        actorId,
+        skipAction: true,
+        reason: summary.skipped,
+      }, sessionId)
+      toolsUsed.push('next_turn')
+      if (isMcpErrorResult(advance)) {
+        summary.advanceError = advance
+        summaries.push(summary)
+        logEvent('warn', 'dm.combat.auto_npc.advance_down_player_failed', {
+          requestId,
+          sessionId,
+          actorId,
+          result: advance,
+        })
+        break
+      }
+      state = await loadCurrentGameState(sessionId)
+      summary.advancedTo = state.currentTurn
+      summaries.push(summary)
+      resolvedTurns++
+      logEvent('info', 'dm.combat.auto_npc.skip_down_player', {
+        requestId,
+        sessionId,
+        actorId,
+        advancedTo: state.currentTurn,
+        gameState: summarizeGameState(state),
+      })
+      continue
+    }
 
     if (!monster || !monster.isAlive) {
       summary.skipped = 'Actor is not an active monster.'

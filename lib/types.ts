@@ -39,6 +39,7 @@ export interface PlayerState {
   class: string
   level: number
   hp: { current: number; max: number }
+  deathSaves?: { successes: number; failures: number; stable?: boolean; dead?: boolean }
   ac: number
   stats: EntityStats
   proficiencyBonus: number

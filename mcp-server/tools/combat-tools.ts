@@ -358,6 +358,82 @@ export function registerCombatTools(server: McpServer): void {
     }
   )
 
+  server.tool(
+    'roll_death_save',
+    'Rolls and records the player death saving throw. Only valid on the player turn at 0 HP.',
+    {},
+    async () => {
+      const state = gs.getState()
+      const player = state.player
+
+      try {
+        if (state.phase !== 'combat') {
+          throw new rules.RuleViolation('NOT_IN_COMBAT', 'Death saves only happen during combat.', { phase: state.phase })
+        }
+        if (state.currentTurn !== 'player') {
+          throw new rules.RuleViolation('PLAYER_TURN_REQUIRED', 'Death saves can only be rolled on the player turn.', {
+            currentTurn: state.currentTurn,
+          })
+        }
+        if (player.hp.current > 0) {
+          throw new rules.RuleViolation('PLAYER_NOT_DYING', 'The player is conscious and does not need a death save.', {
+            hp: player.hp,
+          })
+        }
+        if (player.deathSaves?.stable) {
+          throw new rules.RuleViolation('PLAYER_STABLE', 'The player is already stable and does not roll more death saves.', {
+            deathSaves: player.deathSaves,
+          })
+        }
+        if (player.deathSaves?.dead) {
+          throw new rules.RuleViolation('PLAYER_DEAD', 'The player is dead and cannot roll more death saves.', {
+            deathSaves: player.deathSaves,
+          })
+        }
+      } catch (err) {
+        return rules.ruleErrorResult(err)
+      }
+
+      const roll = rollDice('1d20')
+      const naturalRoll = roll.rolls[0] ?? roll.total
+      const deathSave = gs.rollPlayerDeathSave(naturalRoll)
+      const outcome = deathSave.criticalSuccess
+        ? 'CRITIQUE: le joueur reprend 1 PV'
+        : deathSave.criticalFailure
+          ? 'ECHEC CRITIQUE: deux echecs'
+          : deathSave.success
+            ? 'SUCCES'
+            : 'ECHEC'
+      const status = deathSave.dead
+        ? 'mort'
+        : deathSave.stable
+          ? 'stable'
+          : deathSave.hpAfter > 0
+            ? 'conscient'
+            : `${deathSave.successes} succes / ${deathSave.failures} echecs`
+      const mechanicalSummary = `Jet de mort: ${roll.detail} -> ${outcome} | ${status}`
+
+      rules.recordAction('player')
+      gs.addLogEntry({
+        round: gs.getState().round,
+        turn: 'player',
+        action: 'Jet de sauvegarde contre la mort',
+        mechanicalDetail: mechanicalSummary,
+      })
+
+      return {
+        content: [{
+          type: 'text',
+          text: JSON.stringify({
+            ...deathSave,
+            roll,
+            mechanicalSummary,
+          }),
+        }],
+      }
+    }
+  )
+
   // Apply a D&D 5e condition to an entity
   server.tool(
     'apply_condition',

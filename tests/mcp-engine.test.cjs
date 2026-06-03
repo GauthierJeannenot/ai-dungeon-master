@@ -150,6 +150,20 @@ test('advanceTurn removes dead monsters from initiative', () => {
   assert.deepEqual(state.initiativeOrder, ['player', 'goblin_b'])
 })
 
+test('advanceTurn keeps a dying player in initiative for death saves', () => {
+  gameState.spawnMonster(makeMonster('goblin_a'))
+  gameState.setInitiativeOrder(['goblin_a', 'player'])
+  gameState.updatePlayerHP(-99)
+
+  const next = gameState.advanceTurn()
+  const state = gameState.getState()
+
+  assert.equal(next, 'player')
+  assert.deepEqual(state.initiativeOrder, ['goblin_a', 'player'])
+  assert.equal(state.player.hp.current, 0)
+  assert.ok(state.player.conditions.includes('unconscious'))
+})
+
 test('MCP server accepts replace_game_state and move_token toCell contracts', async () => {
   await withMcpClient(async client => {
     const state = await callTool(client, 'get_game_state')
@@ -485,6 +499,34 @@ test('MCP rules require force to end combat with active enemies', async () => {
 
     const stateAfter = await callTool(client, 'get_game_state')
     assert.equal(Object.values(stateAfter.monsters).filter(monster => monster.isAlive).length, 0)
+  })
+})
+
+test('MCP roll_death_save tracks player death saves and consumes the turn action', async () => {
+  await withForcedDiceSequence('19', async () => {
+    await withMcpClient(async client => {
+      const baseState = await callTool(client, 'get_game_state')
+      const state = makeCombatState(baseState)
+      state.player.hp.current = 0
+      state.player.deathSaves = { successes: 0, failures: 0 }
+      state.player.conditions = ['unconscious']
+
+      await callTool(client, 'replace_game_state', { gameState: state })
+
+      const deathSave = await callTool(client, 'roll_death_save')
+      assert.equal(deathSave.roll.total, 19)
+      assert.equal(deathSave.successes, 1)
+      assert.equal(deathSave.failures, 0)
+      assert.equal(deathSave.stable, false)
+      assert.equal(deathSave.dead, false)
+
+      const afterSave = await callTool(client, 'get_game_state')
+      assert.equal(afterSave.actionUsed.player, true)
+      assert.deepEqual(afterSave.player.deathSaves, { successes: 1, failures: 0 })
+
+      const nextTurn = await callTool(client, 'next_turn', { actorId: 'player' })
+      assert.equal(nextTurn.currentTurn, 'goblin_a')
+    })
   })
 })
 
