@@ -48,6 +48,7 @@ const MAX_AUTO_NPC_TURNS = 8
 type LlmMode = 'live' | 'mock' | 'record' | 'replay'
 const INTERNAL_MCP_TOOLS = new Set(['replace_game_state', 'get_game_state', 'next_turn', 'update_hp', 'add_to_log', 'enter_combat', 'resolve_attack'])
 const PRIMARY_ACTION_TOOLS = new Set([
+  'resolve_player_action',
   'start_encounter',
   'resolve_player_attack',
   'pass_turn',
@@ -93,6 +94,7 @@ interface LlmCallContext {
   gameState?: GameState
   playerMessage?: string
   newCombatLogEntries?: CombatLogEntry[]
+  engineTruthPacket?: unknown
   tools?: Anthropic.Tool[]
 }
 
@@ -1217,14 +1219,14 @@ type RequiredMechanicalAction = {
 }
 
 const TOOL_INTENT_SATISFIERS: Record<string, string[]> = {
-  'player-combat-attack-intent': ['resolve_player_attack', 'move_token'],
-  'player-combat-movement-intent': ['move_token', 'resolve_player_attack'],
-  'player-death-save-intent': ['roll_death_save'],
-  'healing-potion-intent': ['use_healing_potion'],
-  'ability-check-intent': ['roll_ability_check'],
-  'local-object-interaction-intent': ['trigger_room_event', 'roll_ability_check', 'start_encounter', 'use_healing_potion'],
-  'exploration-movement-intent': ['move_token', 'trigger_room_event', 'start_encounter', 'end_combat'],
-  'encounter-or-attack-intent': ['start_encounter', 'resolve_player_attack'],
+  'player-combat-attack-intent': ['resolve_player_action', 'resolve_player_attack', 'move_token'],
+  'player-combat-movement-intent': ['resolve_player_action', 'move_token', 'resolve_player_attack'],
+  'player-death-save-intent': ['resolve_player_action', 'roll_death_save'],
+  'healing-potion-intent': ['resolve_player_action', 'use_healing_potion'],
+  'ability-check-intent': ['resolve_player_action', 'roll_ability_check'],
+  'local-object-interaction-intent': ['resolve_player_action', 'trigger_room_event', 'roll_ability_check', 'start_encounter', 'use_healing_potion'],
+  'exploration-movement-intent': ['resolve_player_action', 'move_token', 'trigger_room_event', 'start_encounter', 'end_combat'],
+  'encounter-or-attack-intent': ['resolve_player_action', 'start_encounter', 'resolve_player_attack'],
 }
 
 const LLM_TOOL_SETS = {
@@ -1232,7 +1234,7 @@ const LLM_TOOL_SETS = {
   explorationDefault: ['use_healing_potion', 'roll_ability_check', 'roll_dice', 'trigger_room_event', 'get_entity_stats'],
   explorationMovement: ['move_token', 'trigger_room_event', 'start_encounter', 'use_healing_potion', 'roll_ability_check', 'roll_dice', 'get_entity_stats'],
   explorationEncounter: ['start_encounter', 'move_token', 'trigger_room_event', 'use_healing_potion', 'roll_ability_check', 'roll_dice', 'get_entity_stats'],
-  combatPlayer: ['resolve_player_attack', 'move_token', 'pass_turn', 'end_combat', 'roll_death_save', 'use_healing_potion', 'roll_ability_check', 'roll_dice', 'get_entity_stats', 'resolve_saving_throw'],
+  combatPlayer: ['resolve_player_action', 'resolve_player_attack', 'move_token', 'pass_turn', 'end_combat', 'roll_death_save', 'use_healing_potion', 'roll_ability_check', 'roll_dice', 'get_entity_stats', 'resolve_saving_throw'],
   combatNonPlayer: ['roll_ability_check', 'roll_dice', 'get_entity_stats'],
   dialogue: ['use_healing_potion', 'roll_ability_check', 'roll_dice', 'get_entity_stats', 'apply_condition'],
 } as const
@@ -1273,13 +1275,13 @@ function selectToolsForLlm(
   if (gameState.phase === 'combat') {
     if (gameState.currentTurn !== 'player') return pickTools(allTools, LLM_TOOL_SETS.combatNonPlayer)
 
-    if (actionIntent.kind === 'attack') return pickTools(allTools, ['resolve_player_attack', 'move_token'])
-    if (actionIntent.kind === 'move') return pickTools(allTools, ['move_token'])
-    if (actionIntent.kind === 'wait') return pickTools(allTools, ['pass_turn'])
-    if (actionIntent.kind === 'death_save') return pickTools(allTools, ['roll_death_save'])
-    if (actionIntent.kind === 'use_item') return pickTools(allTools, ['use_healing_potion'])
-    if (actionIntent.kind === 'social') return pickTools(allTools, ['roll_ability_check', 'end_combat'])
-    if (actionIntent.kind === 'ability_check') return pickTools(allTools, ['roll_ability_check'])
+    if (actionIntent.kind === 'attack') return pickTools(allTools, ['resolve_player_action', 'resolve_player_attack', 'move_token'])
+    if (actionIntent.kind === 'move') return pickTools(allTools, ['resolve_player_action', 'move_token'])
+    if (actionIntent.kind === 'wait') return pickTools(allTools, ['resolve_player_action', 'pass_turn'])
+    if (actionIntent.kind === 'death_save') return pickTools(allTools, ['resolve_player_action', 'roll_death_save'])
+    if (actionIntent.kind === 'use_item') return pickTools(allTools, ['resolve_player_action', 'use_healing_potion'])
+    if (actionIntent.kind === 'social') return pickTools(allTools, ['resolve_player_action', 'roll_ability_check', 'end_combat'])
+    if (actionIntent.kind === 'ability_check') return pickTools(allTools, ['resolve_player_action', 'roll_ability_check'])
     if (actionIntent.kind === 'observe' || actionIntent.kind === 'guidance' || actionIntent.kind === 'query_state' || actionIntent.kind === 'unknown') {
       return pickTools(allTools, ['get_entity_stats'])
     }
@@ -1292,23 +1294,23 @@ function selectToolsForLlm(
   }
 
   if (actionIntent.kind === 'move') {
-    return pickTools(allTools, ['move_token', 'start_encounter', 'get_entity_stats'])
+    return pickTools(allTools, ['resolve_player_action', 'move_token', 'start_encounter', 'get_entity_stats'])
   }
 
   if (actionIntent.kind === 'attack' || actionIntent.kind === 'encounter') {
-    return pickTools(allTools, ['start_encounter', 'resolve_player_attack', 'get_entity_stats'])
+    return pickTools(allTools, ['resolve_player_action', 'start_encounter', 'resolve_player_attack', 'get_entity_stats'])
   }
 
   if (actionIntent.kind === 'interact') {
-    return pickTools(allTools, ['trigger_room_event', 'roll_ability_check', 'start_encounter', 'use_healing_potion', 'get_entity_stats'])
+    return pickTools(allTools, ['resolve_player_action', 'trigger_room_event', 'roll_ability_check', 'start_encounter', 'use_healing_potion', 'get_entity_stats'])
   }
 
   if (actionIntent.kind === 'use_item') {
-    return pickTools(allTools, ['use_healing_potion'])
+    return pickTools(allTools, ['resolve_player_action', 'use_healing_potion'])
   }
 
   if (actionIntent.kind === 'social' || actionIntent.kind === 'ability_check') {
-    return pickTools(allTools, ['roll_ability_check', 'get_entity_stats'])
+    return pickTools(allTools, ['resolve_player_action', 'roll_ability_check', 'get_entity_stats'])
   }
 
   if (actionIntent.kind === 'observe' || actionIntent.kind === 'guidance' || actionIntent.kind === 'query_state' || actionIntent.kind === 'unknown') {
@@ -2847,6 +2849,105 @@ function formatCombatLogEntries(entries: CombatLogEntry[]): string {
   }).join('\n')
 }
 
+interface EngineTruthPacket {
+  actionIntent: {
+    kind: GameActionKind
+    primitive: GameActionPrimitive
+    reason: string
+    confidence: GameActionConfidence
+    requiresEngine: boolean
+  }
+  toolsUsed: string[]
+  state: ReturnType<typeof summarizeGameState>
+  combatLog: Array<Pick<CombatLogEntry, 'round' | 'turn' | 'action' | 'mechanicalDetail'>>
+  allowedFacts: string[]
+}
+
+function formatPosition(position: { x: number; y: number }): string {
+  return `(${position.x},${position.y})`
+}
+
+function buildEngineTruthPacket(
+  actionIntent: GameActionIntent,
+  toolsUsed: string[],
+  gameState: GameState,
+  newCombatLogEntries: CombatLogEntry[]
+): EngineTruthPacket {
+  const aliveMonsters = Object.values(gameState.monsters)
+    .filter(monster => monster.isAlive)
+    .map(monster => ({
+      id: monster.id,
+      name: monster.name,
+      hp: `${monster.hp.current}/${monster.hp.max}`,
+      position: formatPosition(monster.position),
+    }))
+
+  const allowedFacts = [
+    `phase=${gameState.phase}`,
+    `currentTurn=${gameState.currentTurn ?? 'none'}`,
+    `round=${gameState.round}`,
+    `playerHp=${gameState.player.hp.current}/${gameState.player.hp.max}`,
+    `playerPosition=${formatPosition(gameState.player.position)}`,
+    `currentRoomId=${gameState.currentRoomId ?? 'unknown'}`,
+    `aliveMonsters=${aliveMonsters.length}`,
+    ...aliveMonsters.map(monster => `monster=${monster.name} id=${monster.id} hp=${monster.hp} position=${monster.position}`),
+  ]
+
+  return {
+    actionIntent: {
+      kind: actionIntent.kind,
+      primitive: actionIntent.primitive,
+      reason: actionIntent.reason,
+      confidence: actionIntent.confidence,
+      requiresEngine: actionIntent.requiresEngine,
+    },
+    toolsUsed: [...new Set(toolsUsed)],
+    state: summarizeGameState(gameState),
+    combatLog: newCombatLogEntries.map(entry => ({
+      round: entry.round,
+      turn: entry.turn,
+      action: entry.action,
+      mechanicalDetail: entry.mechanicalDetail,
+    })),
+    allowedFacts,
+  }
+}
+
+function formatEngineTruthPacket(packet: EngineTruthPacket): string {
+  return JSON.stringify(packet, null, 2)
+}
+
+function buildLocalEngineNarrative(
+  gameState: GameState,
+  toolsUsed: string[],
+  newCombatLogEntries: CombatLogEntry[]
+): string | null {
+  const uniqueTools = [...new Set(toolsUsed)]
+  if (uniqueTools.length !== 1 || newCombatLogEntries.length > 1) return null
+
+  const [toolName] = uniqueTools
+  if (toolName === 'move_token') {
+    return buildOralFallbackNarrative(gameState, toolsUsed)
+  }
+
+  if (toolName === 'use_healing_potion') {
+    const player = gameState.player
+    return `La potion te remet du feu dans les veines: tu remontes a ${player.hp.current} PV sur ${player.hp.max}. Le danger n'a pas disparu, mais tu peux de nouveau peser sur la scene.`
+  }
+
+  if (toolName === 'roll_death_save') {
+    return buildPlayerDownNarrative(gameState)
+  }
+
+  if (toolName === 'pass_turn') {
+    return gameState.phase === 'combat'
+      ? "Tu gardes ton souffle et tu laisses passer l'ouverture. Le combat bouge autour de toi, assez pres pour que le prochain geste compte."
+      : buildDirectiveSceneNarrative(gameState)
+  }
+
+  return null
+}
+
 async function generateFinalNarration(
   params: {
     requestId: string
@@ -2857,6 +2958,7 @@ async function generateFinalNarration(
     draftNarrative: string
     gameState: GameState
     newCombatLogEntries: CombatLogEntry[]
+    engineTruthPacket: EngineTruthPacket
     summaryContext: string | undefined
     usageLog: AnthropicUsageLogEntry[]
   }
@@ -2871,6 +2973,7 @@ async function generateFinalNarration(
     draftNarrative,
     gameState,
     newCombatLogEntries,
+    engineTruthPacket,
     summaryContext,
     usageLog,
   } = params
@@ -2880,14 +2983,16 @@ async function generateFinalNarration(
     sessionId,
     draftNarrativeLength: draftNarrative.length,
     newCombatLogCount: newCombatLogEntries.length,
+    engineTruthPacket,
     gameState: summarizeGameState(gameState),
   })
 
   const finalPrompt = [
     `Action du joueur:\n${playerMessage}`,
-    draftNarrative ? `Notes moteur non autoritaires, a utiliser seulement si elles ne contredisent pas les resultats mecaniques:\n${draftNarrative}` : undefined,
-    `Résultats mécaniques faisant autorité:\n${formatCombatLogEntries(newCombatLogEntries)}`,
-    `Structure obligatoire: consequence visible du resultat mecanique, puis reaction du decor ou d'un PNJ seulement si elle est soutenue par l'etat/module/historique, puis piste, prise ou tension jouable en fiction. Ne cree pas de nouvelle menace presente si le moteur n'a pas cree l'entite ou le danger.`,
+    draftNarrative ? `Brouillon non autoritaire, a utiliser seulement s'il ne contredit pas le paquet moteur:\n${draftNarrative}` : undefined,
+    `Paquet moteur faisant autorité. Tu ne peux affirmer que ces faits, les logs mécaniques, ou une conséquence sensorielle directe:\n${formatEngineTruthPacket(engineTruthPacket)}`,
+    `Logs mécaniques lisibles:\n${formatCombatLogEntries(newCombatLogEntries)}`,
+    `Structure obligatoire: conséquence visible du résultat mécanique, puis réaction du décor ou d'un PNJ seulement si elle est soutenue par le paquet moteur, le module ou l'historique, puis piste, prise ou tension jouable en fiction. Tout fait absent du paquet moteur doit rester hors champ, hypothèse, piste ou ne pas être mentionné. Ne crée pas de nouvelle menace présente si le moteur n'a pas créé l'entité ou le danger.`,
     `Écris la réponse finale au joueur en français correct, au présent, en 2-4 phrases courtes, 120 mots maximum. Elle doit être naturelle à l'oral et donner de l'élan: mouvement, réplique, menace, opportunité ou information exploitable. Termine toujours par une ponctuation finale. Respecte strictement les résultats mécaniques. N'annonce aucune action future non résolue. Pas de Markdown, pas de liste, pas de parenthèse, pas d'excuse, pas de méta, pas de menu, pas de mention du système, du moteur, des tools, de MCP ou de l'IA. Pas de coordonnées ni d'ID technique sauf demande explicite du joueur. Ne déclare pas de fin de quête/campagne ni de conclusion alternative sauf demande explicite. Pas de time-skip: seulement la prochaine minute jouable. Si le joueur critique le style, la longueur, le système ou un bug, ne réponds pas à la critique: applique la correction silencieusement et reprends la scène en fiction.`,
   ].filter(Boolean).join('\n\n')
 
@@ -2905,6 +3010,7 @@ async function generateFinalNarration(
       gameState,
       playerMessage,
       newCombatLogEntries,
+      engineTruthPacket,
     })
 
     logEvent('info', 'dm.final_narration.response', {
@@ -3173,7 +3279,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     let maxTokensRetryInjected = false
     let sawMcpToolError = false
     let latestMcpErrorResult: unknown
-    let lastStopReason: Anthropic.Message['stop_reason'] | null = null
     let lastEndTurnNarrative = ''
 
     const engineFirst = await resolveServerFirstAction(message, currentGameState, sessionId, requestId, recentHistory, actionIntent)
@@ -3186,8 +3291,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       logRoomStateAnomaly(currentGameState, requestId, sessionId, 'after-engine-first')
     }
 
+    const simpleEngineNarrationCandidate =
+      engineFirst.handled &&
+      !sawMcpToolError &&
+      toolsUsed.length === 1 &&
+      ['move_token', 'use_healing_potion', 'roll_death_save', 'pass_turn'].includes(toolsUsed[0])
     const needsLlmIteration = !engineFirst.handled
-    const needsFinalNarrationHistory = engineFirst.handled && toolsUsed.length > 0 && !sawMcpToolError
+    const needsFinalNarrationHistory = engineFirst.handled && toolsUsed.length > 0 && !sawMcpToolError && !simpleEngineNarrationCandidate
     if (needsLlmIteration || needsFinalNarrationHistory) {
       await ensureHistoryReady(needsLlmIteration ? 'dm-iteration' : 'final-narration')
     } else {
@@ -3262,8 +3372,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         stopReason: response.stop_reason,
         content: summarizeContentBlocks(response.content),
       })
-      lastStopReason = response.stop_reason
-
       usageLog.push(logAnthropicUsage({
         requestId,
         sessionId,
@@ -3636,8 +3744,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       })
     } catch { /* garde l'état qu'on avait */ }
 
-    const llmToolCountAfterLoop = toolsUsed.length
-
     try {
       const autoEnd = await autoEndCombatIfWon(currentGameState, sessionId, requestId)
       if (autoEnd.ended) {
@@ -3740,37 +3846,26 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       narrative = ruleNarrative
     }
 
-    const canReuseLlmNarration =
-      toolsUsed.length > 0 &&
-      toolsUsed.length === llmToolCountAfterLoop &&
-      lastStopReason === 'end_turn' &&
-      lastEndTurnNarrative.trim().length > 0 &&
-      !sawMcpToolError &&
-      !isMetaOnlyNarrative(lastEndTurnNarrative)
-
-    const canKeepAccumulatedNarrative =
-      toolsUsed.length > 0 &&
-      toolsUsed.length === llmToolCountAfterLoop &&
-      lastStopReason === 'end_turn' &&
-      lastEndTurnNarrative.trim().length > 0 &&
-      !sawMcpToolError &&
-      isMetaOnlyNarrative(lastEndTurnNarrative) &&
-      narrative.replace(lastEndTurnNarrative, '').trim().length > 0
-
-    if (canReuseLlmNarration) {
-      narrative = lastEndTurnNarrative.trim()
-      logEvent('info', 'dm.final_narration.skipped_reuse_llm', {
+    const engineTruthPacket = buildEngineTruthPacket(actionIntent, toolsUsed, currentGameState, newCombatLogEntries)
+    if (toolsUsed.length > 0 && !sawMcpToolError) {
+      logEvent('info', 'dm.engine.truth_packet', {
         requestId,
         sessionId,
-        toolsUsed: [...new Set(toolsUsed)],
-        narrativeLength: narrative.length,
+        engineTruthPacket,
       })
-    } else if (canKeepAccumulatedNarrative) {
-      logEvent('info', 'dm.final_narration.skipped_strip_meta_end_turn', {
+    }
+
+    const localEngineNarrative = !sawMcpToolError
+      ? buildLocalEngineNarrative(currentGameState, toolsUsed, newCombatLogEntries)
+      : null
+
+    if (localEngineNarrative) {
+      narrative = localEngineNarrative
+      logEvent('info', 'dm.final_narration.local_engine', {
         requestId,
         sessionId,
         toolsUsed: [...new Set(toolsUsed)],
-        lastEndTurnNarrative,
+        newCombatLogCount: newCombatLogEntries.length,
         narrativeLength: narrative.length,
       })
     } else if (toolsUsed.length > 0 && !sawMcpToolError) {
@@ -3783,10 +3878,23 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         draftNarrative: narrative,
         gameState: currentGameState,
         newCombatLogEntries,
+        engineTruthPacket,
         summaryContext: activeSummary,
         usageLog,
       })
-      if (finalNarrative) narrative = finalNarrative
+      if (finalNarrative) {
+        narrative = finalNarrative
+      } else {
+        const fallbackNarrative = buildOralFallbackNarrative(currentGameState, toolsUsed)
+        logEvent('warn', 'dm.final_narration.fallback_after_tool_mutation', {
+          requestId,
+          sessionId,
+          toolsUsed: [...new Set(toolsUsed)],
+          discardedDraftNarrative: narrative,
+          fallbackNarrative,
+        })
+        narrative = fallbackNarrative
+      }
     }
 
     const oralNarrative = normalizeNarrativeForOralPlayback(narrative, currentGameState, toolsUsed)

@@ -31,7 +31,7 @@ function doubleDiceNotation(notation: string): string {
   })
 }
 
-type TargetHint = 'nearest' | 'right' | 'left' | 'front' | 'back' | 'wounded'
+export type TargetHint = 'nearest' | 'right' | 'left' | 'front' | 'back' | 'wounded'
 
 function normalizeTargetText(value: string): string {
   return value
@@ -68,7 +68,7 @@ function monsterMatchesTargetName(monster: { name: string; type: string }, targe
   return terms.some(term => normalizedName.includes(term) || translatedType.includes(term))
 }
 
-function selectPlayerTarget(
+export function selectPlayerTarget(
   targetId: string | undefined,
   targetName: string | undefined,
   targetHint: TargetHint | undefined
@@ -120,7 +120,7 @@ function selectPlayerTarget(
   return candidates[0].id
 }
 
-function resolveAttack(
+export function resolveAttack(
   attackerId: string,
   targetId: string,
   weaponOrSpell: string,
@@ -230,6 +230,35 @@ function resolveAttack(
   rules.recordAction(attackerId)
 
   return { content: [{ type: 'text' as const, text: JSON.stringify(result) }] }
+}
+
+export interface ResolvePlayerAttackInput {
+  targetId?: string
+  targetName?: string
+  targetHint?: TargetHint
+  weaponOrSpell?: string
+  advantage?: boolean
+  disadvantage?: boolean
+  customDamageDice?: string
+  rangeCells?: number
+}
+
+export function resolvePlayerAttack({
+  targetId,
+  targetName,
+  targetHint,
+  weaponOrSpell,
+  advantage,
+  disadvantage,
+  customDamageDice,
+  rangeCells,
+}: ResolvePlayerAttackInput) {
+  try {
+    const resolvedTargetId = selectPlayerTarget(targetId, targetName, targetHint ?? 'nearest')
+    return resolveAttack('player', resolvedTargetId, weaponOrSpell ?? 'longsword', advantage, disadvantage, customDamageDice, rangeCells)
+  } catch (err) {
+    return rules.ruleErrorResult(err)
+  }
 }
 
 export function registerCombatTools(server: McpServer): void {
@@ -371,12 +400,7 @@ export function registerCombatTools(server: McpServer): void {
       rangeCells: z.number().int().positive().optional().describe('Optional attack range in grid cells; defaults to weapon range.'),
     },
     async ({ targetId, targetName, targetHint, weaponOrSpell, advantage, disadvantage, customDamageDice, rangeCells }) => {
-      try {
-        const resolvedTargetId = selectPlayerTarget(targetId, targetName, targetHint ?? 'nearest')
-        return resolveAttack('player', resolvedTargetId, weaponOrSpell ?? 'longsword', advantage, disadvantage, customDamageDice, rangeCells)
-      } catch (err) {
-        return rules.ruleErrorResult(err)
-      }
+      return resolvePlayerAttack({ targetId, targetName, targetHint, weaponOrSpell, advantage, disadvantage, customDamageDice, rangeCells })
     }
   )
 

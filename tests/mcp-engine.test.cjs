@@ -535,6 +535,69 @@ test('MCP resolve_player_attack resolves a named target before nearest fallback'
   })
 })
 
+test('MCP resolve_player_action resolves canonical attack, move, and item actions', async () => {
+  await withForcedDiceSequence('20,1,1,3,4', async () => {
+    await withMcpClient(async client => {
+      const baseState = await callTool(client, 'get_game_state')
+      const state = makeCombatState(baseState)
+      state.player.hp.current = 10
+      state.player.inventory = [
+        ...state.player.inventory,
+        { id: 'potion_extra', name: 'Potion de soin', type: 'potion', description: 'Restaure 2d4+2 HP' },
+      ]
+      state.monsters.goblin_a.position = { x: 2, y: 0 }
+
+      await callTool(client, 'replace_game_state', { gameState: state })
+
+      const move = await callTool(client, 'resolve_player_action', {
+        action: {
+          kind: 'move',
+          toCell: { x: 1, y: 0 },
+        },
+      })
+
+      assert.equal(move.kind, 'move')
+      assert.equal(move.toolEquivalent, 'move_token')
+      assert.equal(move.result.distanceMoved, 1)
+      assert.deepEqual(move.gameState.player.position, { x: 1, y: 0 })
+      assert.equal(move.gameState.movementUsed.player, 1)
+
+      const attack = await callTool(client, 'resolve_player_action', {
+        action: {
+          kind: 'attack',
+          targetHint: 'nearest',
+          weaponOrSpell: 'longsword',
+          customDamageDice: '1d2',
+        },
+      })
+
+      assert.equal(attack.kind, 'attack')
+      assert.equal(attack.toolEquivalent, 'resolve_player_attack')
+      assert.equal(attack.result.targetId, 'goblin_a')
+      assert.equal(attack.result.hit, true)
+      assert.equal(attack.gameState.actionUsed.player, true)
+
+      const advanced = await callTool(client, 'next_turn', { actorId: 'player' })
+      assert.equal(advanced.currentTurn, 'goblin_a')
+      const monsterPass = await callTool(client, 'next_turn', { actorId: 'goblin_a', skipAction: true })
+      assert.equal(monsterPass.currentTurn, 'player')
+
+      const potion = await callTool(client, 'resolve_player_action', {
+        action: {
+          kind: 'use_item',
+          itemId: 'potion_extra',
+        },
+      })
+
+      assert.equal(potion.kind, 'use_item')
+      assert.equal(potion.toolEquivalent, 'use_healing_potion')
+      assert.equal(potion.result.hpBefore, 10)
+      assert.equal(potion.result.hpAfter, 19)
+      assert.equal(potion.gameState.player.hp.current, 19)
+    })
+  })
+})
+
 test('MCP rules reject overlong combat movement and occupied cells', async () => {
   await withMcpClient(async client => {
     const baseState = await callTool(client, 'get_game_state')
@@ -1008,6 +1071,47 @@ test('MCP start_encounter rejects a preset encounter already triggered', async (
     const finalState = await callTool(client, 'get_game_state')
     assert.equal(Object.values(finalState.monsters).filter(monster => monster.isAlive).length, 0)
     assert.deepEqual(finalState.encountersTriggered, ['bakery_floor_goblins'])
+  })
+})
+
+test('MCP start_encounter rolls back partial mutations on late validation failure', async () => {
+  await withMcpClient(async client => {
+    const baseState = await callTool(client, 'get_game_state')
+    const originalPosition = { x: 4, y: 13 }
+
+    await callTool(client, 'replace_game_state', {
+      gameState: {
+        ...baseState,
+        phase: 'exploration',
+        currentTurn: null,
+        round: 0,
+        initiativeOrder: [],
+        movementUsed: {},
+        actionUsed: {},
+        player: {
+          ...baseState.player,
+          hp: { current: 0, max: baseState.player.hp.max },
+          deathSaves: { successes: 0, failures: 1 },
+          position: originalPosition,
+        },
+        monsters: {},
+        encountersTriggered: [],
+      },
+    })
+
+    const failed = await callTool(client, 'start_encounter', {
+      encounterId: 'bakery_floor_goblins',
+      playerCell: { x: 10, y: 13 },
+      reason: 'test rollback when player cannot enter combat',
+    })
+    assert.equal(failed.code, 'ENTITY_DEAD')
+
+    const stateAfter = await callTool(client, 'get_game_state')
+    assert.equal(stateAfter.phase, 'exploration')
+    assert.deepEqual(stateAfter.player.position, originalPosition)
+    assert.deepEqual(Object.keys(stateAfter.monsters), [])
+    assert.deepEqual(stateAfter.encountersTriggered, [])
+    assert.equal(stateAfter.currentTurn, null)
   })
 })
 

@@ -285,6 +285,7 @@ export function describeGameActionLanguageForPrompt(): string {
   return [
     'Le joueur peut dire n importe quoi, mais le moteur ne connait qu un petit langage d actions.',
     'Primitives: attack, move, interact, use_item, ability_check, social, wait, death_save, query_state, observe.',
+    'Quand le tool resolve_player_action est disponible, prefere-le pour resoudre une action joueur avec une seule primitive structuree.',
     'Ton role: traduire l intention vers une primitive autorisee, appeler le tool correspondant si un etat doit changer, puis narrer seulement les evenements renvoyes par le moteur.',
     'N invente jamais une nouvelle primitive ad hoc. Si l intention est creative, ramene-la a interact, ability_check ou social avec une cible et un risque clairs.',
     'Si aucune primitive n est claire, clarifie en fiction au lieu de muter le state.',

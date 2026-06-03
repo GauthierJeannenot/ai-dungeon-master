@@ -397,6 +397,7 @@ export function registerPhaseTools(server: McpServer): void {
       reason: z.string().optional().describe('Short narrative/mechanical reason for starting the encounter.'),
     },
     async ({ encounterId, playerCell, monsters, reason }) => {
+      const stateBefore = structuredClone(gs.getState())
       try {
         const preset = encounterId ? getEncounter(encounterId) : null
         if (encounterId && !preset) {
@@ -458,6 +459,7 @@ export function registerPhaseTools(server: McpServer): void {
           }],
         }
       } catch (err) {
+        gs.replaceState(stateBefore)
         return rules.ruleErrorResult(err)
       }
     }
