@@ -844,8 +844,9 @@ function mcpErrorCode(result: unknown): string | null {
     : null
 }
 
-function buildMcpRuleErrorNarrative(errorResult: unknown, gameState: GameState): string {
+function buildMcpRuleErrorNarrative(errorResult: unknown, gameState: GameState, toolsUsed: string[] = []): string {
   const code = mcpErrorCode(errorResult)
+  const roomName = getCurrentRoomName(gameState)
 
   if (code === 'ACTION_ALREADY_USED') {
     if (gameState.phase === 'combat') {
@@ -854,6 +855,12 @@ function buildMcpRuleErrorNarrative(errorResult: unknown, gameState: GameState):
         : "Ton elan arrive trop tard: ton action est deja depensee. Les adversaires reprennent l'initiative dans la cohue."
     }
     return "Ton geste arrive trop tard: l'ouverture que tu visais s'est deja refermee."
+  }
+
+  if (code === 'ROOM_EVENT_LOCATION_MISMATCH' && toolsUsed.includes('move_token')) {
+    return roomName
+      ? `Tu arrives dans ${roomName}. Le decor reagit mal a ton irruption, mais rien de plus ne se declenche encore.`
+      : "Tu avances. Le decor reagit mal a ton irruption, mais rien de plus ne se declenche encore."
   }
 
   if (code === 'TURN_ACTION_REQUIRED') {
@@ -900,6 +907,10 @@ function getCurrentRoomName(gameState: GameState): string | null {
 
 function buildDirectiveSceneNarrative(gameState: GameState): string {
   if (gameState.phase === 'combat') {
+    if (gameState.player.hp.current <= 0) {
+      return buildPlayerDownNarrative(gameState)
+    }
+
     const alive = aliveMonsters(gameState)
     const aliveNames = Array.from(new Set(alive.map(monster => monster.name)))
     const threatVerb = alive.length <= 1 ? 'tient' : 'tiennent'
@@ -951,10 +962,18 @@ function buildDirectiveSceneNarrative(gameState: GameState): string {
 function buildOralFallbackNarrative(gameState: GameState, toolsUsed: string[]): string {
   const roomName = getCurrentRoomName(gameState)
 
+  if (gameState.phase === 'combat' && gameState.player.hp.current <= 0) {
+    return buildPlayerDownNarrative(gameState)
+  }
+
+  if (toolsUsed.includes('start_encounter')) {
+    return buildDirectiveSceneNarrative(gameState)
+  }
+
   if (toolsUsed.includes('move_token')) {
     return roomName
-      ? `Tu arrives dans ${roomName}; l'air se tend autour de toi.`
-      : "Tu avances; l'air se tend autour de toi."
+      ? `Tu arrives dans ${roomName}; un detail exploitable accroche aussitot ton attention.`
+      : "Tu avances; le decor change assez pour t'offrir une prise claire."
   }
 
   if (gameState.phase === 'combat') {
@@ -1284,25 +1303,40 @@ function countAliveMonsters(gameState: GameState): number {
   return Object.values(gameState.monsters).filter(monster => monster.isAlive).length
 }
 
-function textMentionsSpecificMonster(text: string, monster: MonsterState, gameState: GameState): boolean {
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+const GENERIC_MONSTER_TERMS = new Set(['le', 'la', 'les', 'un', 'une', 'des', 'du', 'de', 'gobelin', 'gobelins', 'garde', 'gardes', 'chef'])
+
+function specificMonsterAliases(monster: MonsterState, gameState: GameState): string[] {
   const normalizedName = normalizeFrenchText(monster.name)
-  const genericTerms = new Set(['le', 'la', 'les', 'un', 'une', 'des', 'du', 'de', 'gobelin', 'gobelins', 'garde', 'gardes', 'chef'])
   const specificNameTerms = normalizedName
     .split(/[^a-z0-9']+/)
-    .filter(term => term.length >= 4 && !genericTerms.has(term))
+    .filter(term => term.length >= 4 && !GENERIC_MONSTER_TERMS.has(term))
 
-  if (specificNameTerms.some(term => new RegExp(`\\b${term}\\b`).test(text))) return true
+  const aliases = [...specificNameTerms]
 
   const normalizedType = normalizeFrenchText(monster.type).replace(/_/g, ' ')
   const typeAliases: string[] = []
   if (normalizedType.includes('hobgoblin')) typeAliases.push('hobgobelin', 'hobgoblin')
   if (normalizedType.includes('violet fungus')) typeAliases.push('champignon violet')
 
-  return typeAliases.some(alias => {
-    const sameTypeCount = Object.values(gameState.monsters)
-      .filter(candidate => normalizeFrenchText(candidate.type).replace(/_/g, ' ') === normalizedType)
-      .length
-    return sameTypeCount === 1 && new RegExp(`\\b${alias}\\b`).test(text)
+  const sameTypeCount = Object.values(gameState.monsters)
+    .filter(candidate => normalizeFrenchText(candidate.type).replace(/_/g, ' ') === normalizedType)
+    .length
+
+  if (sameTypeCount === 1) aliases.push(...typeAliases)
+
+  return Array.from(new Set(aliases))
+}
+
+function textNarratesSpecificMonsterDead(text: string, monster: MonsterState, gameState: GameState): boolean {
+  return specificMonsterAliases(monster, gameState).some(alias => {
+    const escapedAlias = escapeRegExp(alias)
+    const monsterThenDead = new RegExp(`\\b${escapedAlias}\\b.{0,100}\\b(?:meurt|s'effondre|s'ecroule|ne bouge plus|agonise|est\\s+mort(?:e)?|tombe\\s+mort(?:e)?|tombe\\s+pour\\s+de\\s+bon|abattu|inerte)\\b`)
+    const deadThenMonster = new RegExp(`\\b(?:tues?|abats?|acheves?|achever|transperces?|executes?|execute)\\b.{0,100}\\b${escapedAlias}\\b`)
+    return monsterThenDead.test(text) || deadThenMonster.test(text)
   })
 }
 
@@ -1334,8 +1368,7 @@ function detectNarrativeStateContractIssue(
     }
 
     const aliveNamedContradictions = aliveMonsters(gameState).filter(monster =>
-      textMentionsSpecificMonster(text, monster, gameState) &&
-      /\b(meurt|mort|morte|tue|tues|tuer|abats?|abattu|s'effondre|s'ecroule|ne bouge plus|corps inerte|inerte|agonise)\b/.test(text)
+      textNarratesSpecificMonsterDead(text, monster, gameState)
     )
     if (aliveNamedContradictions.length > 0) {
       return {
@@ -1433,6 +1466,13 @@ function buildNarrativeStateCorrection(gameState: GameState): string {
   return buildDirectiveSceneNarrative(gameState)
 }
 
+function isAnaphoricCombatAttackText(normalizedText: string): boolean {
+  const attackContinuation = /\b(encore|continues?|continuer|vas[- ]y|go|allez|pareil|meme chose|recommence|retape|acheves?|achever|finis[- ]le|fini[- ]le|termine[- ]le|remets[- ]lui|refais[- ]ca)\b/.test(normalizedText)
+  if (!attackContinuation) return false
+
+  return !/\b(attends?|attendre|passe|passer|mort|pv|points? de vie|hp|etat|ou suis|regardes?|observer|observe|decris|quoi|pourquoi|comment)\b/.test(normalizedText)
+}
+
 function detectRequiredMechanicalAction(message: string, gameState: GameState): RequiredMechanicalAction | null {
   const text = normalizeFrenchText(message)
   if (
@@ -1468,7 +1508,13 @@ function detectRequiredMechanicalAction(message: string, gameState: GameState): 
     return null
   }
 
-  if (gameState.phase === 'combat' && gameState.currentTurn === 'player' && attackIntent) {
+  const anaphoricCombatAttackIntent =
+    gameState.phase === 'combat' &&
+    gameState.currentTurn === 'player' &&
+    countAliveMonsters(gameState) > 0 &&
+    isAnaphoricCombatAttackText(text)
+
+  if (gameState.phase === 'combat' && gameState.currentTurn === 'player' && (attackIntent || anaphoricCombatAttackIntent)) {
     return { reason: 'player-combat-attack-intent', suggestedTools: ['resolve_player_attack', 'move_token'] }
   }
 
@@ -1906,6 +1952,33 @@ function lastMonsterThatAttackedPlayer(gameState: GameState): string | null {
   return null
 }
 
+function lastPlayerAttackTarget(gameState: GameState): string | null {
+  const alive = aliveMonsters(gameState)
+
+  for (const entry of [...gameState.combatLog].reverse()) {
+    if (entry.turn !== 'player') continue
+
+    const action = normalizeFrenchText(entry.action)
+    const targetText = action.match(/\battaque\s+(.+?)\s+avec\b/)?.[1]?.trim()
+    if (!targetText) continue
+
+    const target = alive.find(monster => {
+      const normalizedId = normalizeFrenchText(monster.id)
+      const normalizedName = normalizeFrenchText(monster.name)
+      const aliases = specificMonsterAliases(monster, gameState)
+
+      return targetText === normalizedId ||
+        normalizedName.includes(targetText) ||
+        targetText.includes(normalizedName) ||
+        aliases.some(alias => targetText.includes(alias) || alias.includes(targetText))
+    })
+
+    if (target) return target.id
+  }
+
+  return null
+}
+
 function parseWeaponOrSpell(message: string): string {
   const text = normalizeFrenchText(message)
   if (/\b(hache|hachette)\b/.test(text)) return 'handaxe'
@@ -1934,11 +2007,14 @@ function parsePlayerAttackInput(
   if (monsters.length === 0) return null
 
   const text = normalizeFrenchText(message)
+  const anaphoricAttack = isAnaphoricCombatAttackText(text)
   const targetId = /\b(dernier|precedent|m[' ]?a attaque|vient de m[' ]?attaquer)\b/.test(text)
     ? lastMonsterThatAttackedPlayer(gameState)
-    : monsters.length === 1
-      ? monsters[0].id
-      : null
+    : anaphoricAttack
+      ? lastPlayerAttackTarget(gameState) ?? lastMonsterThatAttackedPlayer(gameState)
+      : monsters.length === 1
+        ? monsters[0].id
+        : null
 
   const targetHint = parseTargetHint(message) ?? (targetId ? null : 'nearest')
   const targetName = targetId ? null : parseNamedAttackTarget(message, gameState)
@@ -3648,7 +3724,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const newCombatLogEntries = currentGameState.combatLog.slice(combatLogStartLength)
 
     if (sawMcpToolError) {
-      const ruleNarrative = buildMcpRuleErrorNarrative(latestMcpErrorResult, currentGameState)
+      const ruleNarrative = buildMcpRuleErrorNarrative(latestMcpErrorResult, currentGameState, toolsUsed)
       logEvent('warn', 'dm.narrative.mcp_rule_error_deterministic', {
         requestId,
         sessionId,
