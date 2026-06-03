@@ -16,6 +16,7 @@ import {
   normalizeFrenchText,
   referencesLocalObjectInsteadOfRoom,
 } from '@/lib/dm-intent'
+import { sanitizeAdventureModuleToolContracts } from '@/lib/dm-module-sanitizer'
 import {
   logAnthropicUsage,
   logAnthropicUsageSummary,
@@ -575,7 +576,8 @@ function limitModuleContext(text: string): string {
 }
 
 function selectAdventureModuleContext(adventureModule: string, gameState: GameState): string {
-  const sections = extractAdventureRoomSections(adventureModule)
+  const safeAdventureModule = sanitizeAdventureModuleToolContracts(adventureModule)
+  const sections = extractAdventureRoomSections(safeAdventureModule)
   const sectionById = new Map(sections.map(section => [section.id, section]))
   const inferredPlayerRoomId = inferAdventureRoomId(sections, gameState.player.position)
   const selectedRoomIds = new Set<string>()
@@ -602,7 +604,7 @@ function selectAdventureModuleContext(adventureModule: string, gameState: GameSt
     .map(monster => `- ${monster.name} (${monster.type}) a (${monster.position.x},${monster.position.y})`)
 
   const parts = [
-    adventureOverview(adventureModule),
+    adventureOverview(safeAdventureModule),
     [
       'ETAT MODULE:',
       `- salle actuelle serveur: ${gameState.currentRoomId ?? 'inconnue'}`,
@@ -1142,6 +1144,7 @@ const TOOL_INTENT_SATISFIERS: Record<string, string[]> = {
 }
 
 const LLM_TOOL_SETS = {
+  explorationAmbient: ['roll_ability_check', 'trigger_room_event', 'get_entity_stats'],
   explorationDefault: ['use_healing_potion', 'roll_ability_check', 'roll_dice', 'trigger_room_event', 'get_entity_stats'],
   explorationMovement: ['move_token', 'trigger_room_event', 'start_encounter', 'use_healing_potion', 'roll_ability_check', 'roll_dice', 'get_entity_stats'],
   explorationEncounter: ['start_encounter', 'move_token', 'trigger_room_event', 'use_healing_potion', 'roll_ability_check', 'roll_dice', 'get_entity_stats'],
@@ -1209,7 +1212,7 @@ function selectToolsForLlm(
   }
 
   if (!requiredAction && gameState.phase === 'exploration') {
-    return []
+    return pickTools(allTools, LLM_TOOL_SETS.explorationAmbient)
   }
 
   return pickTools(allTools, LLM_TOOL_SETS.explorationDefault)
