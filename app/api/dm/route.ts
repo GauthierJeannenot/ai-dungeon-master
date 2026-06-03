@@ -1215,8 +1215,8 @@ function detectNarrativeStateContractIssue(
   if (gameState.phase === 'combat' && aliveCount > 0 && !toolsUsed.includes('end_combat')) {
     const mentionsEnemies = /\b(gobelins?|ennemis?|monstres?|creatures?|adversaires?|gardes?|hobgobelins?|grukk|chef grukk)\b/.test(text)
     const narratesSurrenderOrEscape = /\b(se rendent?|se rend|rendent les armes|se soumettent?|soumis|soumission|s'agenouillent?|agenouille|lache(?:nt)?\s+(?:son|leur|leurs)\s+(?:arme|armes|cimeterre|cimeterres)|baissent les armes|baisse son arme|fuit|fuient|s'enfuit|s'enfuient|se sauvent?|disparaissent?|renegat|serment)\b/.test(text)
-    const narratesCombatAsOver = /\b(combat cesse|combat est termine|retrouve un silence|silence lourd|plus aucun danger|plus personne ne menace|armes redescendent)\b/.test(text)
-    if (mentionsEnemies && (narratesSurrenderOrEscape || narratesCombatAsOver)) {
+    const narratesCombatAsOver = /\b(combat cesse|combat est termine|combat termine|retrouve un silence|silence retombe|silence lourd|tu es seul|te voila seul|plus aucun danger|plus personne ne menace|armes redescendent|vivant mais victorious|victorious)\b/.test(text)
+    if ((mentionsEnemies && narratesSurrenderOrEscape) || narratesCombatAsOver) {
       return {
         reason: 'enemy_resolution_without_engine_state',
         matchedTriggers: [
@@ -1247,6 +1247,10 @@ function detectNarrativeStateContractIssue(
   const mentionsEnemies = /\b(gobelins?|ennemis?|monstres?|creatures?|silhouettes?|eclaireurs?|grukk|chef grukk)\b/.test(text) ||
     /\b(silhouettes?|formes?)\s+vertes?\b/.test(text)
   if (!mentionsEnemies) return null
+
+  const narratesJustDefeatedEnemy = toolsUsed.includes('resolve_player_attack') &&
+    /\b(meurt|mort|morte|dernier cri|s'effondre|s'ecroule|tombe|inerte|cadavre|corps|transperce|abat|abattu|sang)\b/.test(text)
+  if (narratesJustDefeatedEnemy) return null
 
   const onlySaysNoVisibleEnemies = /\b(aucun|pas de|rien|personne)\b.{0,60}\b(gobelins?|ennemis?|monstres?|creatures?|silhouettes?|grukk)\b.{0,80}\b(visible|en vue|se montre|devant toi)\b/.test(text)
   const explicitVisibleEnemy = /\b(une?|des|deux|trois|quatre|cinq|plusieurs)\s+(gobelins?|ennemis?|monstres?|creatures?|silhouettes?|formes?)\b/.test(text) ||
