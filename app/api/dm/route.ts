@@ -32,7 +32,7 @@ const anthropic = new Anthropic({
 const MODEL = 'claude-haiku-4-5'
 const MAX_TOOL_ITERATIONS = 3
 const MAX_TOKENS = 400
-const FINAL_NARRATION_MAX_TOKENS = parsePositiveInt(process.env.LLM_FINAL_NARRATION_MAX_TOKENS, 180)
+const FINAL_NARRATION_MAX_TOKENS = parsePositiveInt(process.env.LLM_FINAL_NARRATION_MAX_TOKENS, 260)
 const ORAL_NARRATION_MAX_SENTENCES = parsePositiveInt(process.env.ORAL_NARRATION_MAX_SENTENCES, 8)
 const ORAL_NARRATION_MAX_CHARS = parsePositiveInt(process.env.ORAL_NARRATION_MAX_CHARS, 900)
 const COMBAT_LOG_TAIL = 6
@@ -971,6 +971,23 @@ function splitIntoSentences(text: string): string[] {
   return sentences
 }
 
+function trimIncompleteTrailingSentence(text: string): { text: string; changed: boolean } {
+  const trimmed = text.trim()
+  if (!trimmed) return { text: '', changed: text !== '' }
+  if (/[.!?…]["'»”]?$/.test(trimmed)) return { text: trimmed, changed: trimmed !== text }
+
+  for (let index = trimmed.length - 1; index >= 0; index--) {
+    if (!'.!?…'.includes(trimmed[index])) continue
+
+    let end = index + 1
+    while (end < trimmed.length && /["'»”]/.test(trimmed[end])) end++
+    const complete = trimmed.slice(0, end).trim()
+    return { text: complete, changed: complete !== trimmed }
+  }
+
+  return { text: '', changed: true }
+}
+
 function lineLooksLikeMetaCommentary(line: string): boolean {
   const normalized = normalizeFrenchText(line)
   if (!normalized) return false
@@ -1075,6 +1092,13 @@ function normalizeNarrativeForOralPlayback(
   if (filteredSentences.length !== sentences.length) {
     text = filteredSentences.join(' ').trim()
     sentences = splitIntoSentences(text)
+  }
+
+  const completeText = trimIncompleteTrailingSentence(text)
+  if (completeText.changed) {
+    text = completeText.text
+    sentences = splitIntoSentences(text)
+    reasons.add('incomplete_tail_removed')
   }
 
   if (text.length > ORAL_NARRATION_MAX_CHARS && sentences.length > ORAL_NARRATION_MAX_SENTENCES) {
@@ -2759,7 +2783,7 @@ async function generateFinalNarration(
     `Action du joueur:\n${playerMessage}`,
     draftNarrative ? `Notes moteur non autoritaires, a utiliser seulement si elles ne contredisent pas les resultats mecaniques:\n${draftNarrative}` : undefined,
     `Résultats mécaniques faisant autorité:\n${formatCombatLogEntries(newCombatLogEntries)}`,
-    `Écris la réponse finale au joueur en français correct, au présent, en 2-5 phrases courtes. Elle doit être naturelle à l'oral et donner de l'élan: mouvement, réplique, menace, opportunité ou information exploitable. Respecte strictement les résultats mécaniques. N'annonce aucune action future non résolue. Pas de Markdown, pas de liste, pas de parenthèse, pas d'excuse, pas de méta, pas de menu, pas de mention du système, du moteur, des tools, de MCP ou de l'IA. Pas de coordonnées ni d'ID technique sauf demande explicite du joueur. Ne déclare pas de fin de quête/campagne ni de conclusion alternative sauf demande explicite. Pas de time-skip: seulement la prochaine minute jouable. Si le joueur critique le style, la longueur, le système ou un bug, ne réponds pas à la critique: applique la correction silencieusement et reprends la scène en fiction.`,
+    `Écris la réponse finale au joueur en français correct, au présent, en 2-4 phrases courtes, 120 mots maximum. Elle doit être naturelle à l'oral et donner de l'élan: mouvement, réplique, menace, opportunité ou information exploitable. Termine toujours par une ponctuation finale. Respecte strictement les résultats mécaniques. N'annonce aucune action future non résolue. Pas de Markdown, pas de liste, pas de parenthèse, pas d'excuse, pas de méta, pas de menu, pas de mention du système, du moteur, des tools, de MCP ou de l'IA. Pas de coordonnées ni d'ID technique sauf demande explicite du joueur. Ne déclare pas de fin de quête/campagne ni de conclusion alternative sauf demande explicite. Pas de time-skip: seulement la prochaine minute jouable. Si le joueur critique le style, la longueur, le système ou un bug, ne réponds pas à la critique: applique la correction silencieusement et reprends la scène en fiction.`,
   ].filter(Boolean).join('\n\n')
 
   try {
@@ -2802,8 +2826,22 @@ async function generateFinalNarration(
     }))
 
     const text = response.content.find(block => block.type === 'text')
-    const finalNarrative = text && 'text' in text ? text.text.trim() : ''
+    let finalNarrative = text && 'text' in text ? text.text.trim() : ''
     if (!finalNarrative) return null
+
+    if (response.stop_reason === 'max_tokens') {
+      const completeText = trimIncompleteTrailingSentence(finalNarrative)
+      logEvent('warn', 'dm.final_narration.max_tokens_sanitized', {
+        requestId,
+        sessionId,
+        originalLength: finalNarrative.length,
+        sanitizedLength: completeText.text.length,
+        originalNarrative: finalNarrative,
+        sanitizedNarrative: completeText.text,
+      })
+      finalNarrative = completeText.text
+      if (!finalNarrative) return null
+    }
 
     logEvent('info', 'dm.final_narration.ok', {
       requestId,
