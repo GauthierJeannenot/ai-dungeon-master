@@ -11,7 +11,8 @@ export const maxDuration = 300
 // OLLAMA_API_KEY  : optionnel — si tu protèges Ollama avec un reverse proxy auth
 const OLLAMA_BASE_URL = (process.env.OLLAMA_BASE_URL ?? 'http://localhost:11434').replace(/\/$/, '')
 const MODEL           = process.env.OLLAMA_MODEL ?? 'qwen2.5:3b'
-const OLLAMA_API_KEY  = process.env.OLLAMA_API_KEY  // optionnel
+// trim() + || undefined : une chaîne vide dans Railway est traitée comme "pas de clé"
+const OLLAMA_API_KEY  = process.env.OLLAMA_API_KEY?.trim() || undefined
 
 const MAX_TOOL_ITERATIONS = 3
 const MAX_TOKENS          = 600   // un peu plus généreux qu'avec Claude — les modèles open ≥ verbose
