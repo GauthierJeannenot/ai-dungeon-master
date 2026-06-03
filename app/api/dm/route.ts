@@ -39,6 +39,17 @@ const COMBAT_LOG_TAIL = 6
 const MAX_AUTO_NPC_TURNS = 8
 type LlmMode = 'live' | 'mock' | 'record' | 'replay'
 const INTERNAL_MCP_TOOLS = new Set(['replace_game_state', 'get_game_state', 'next_turn', 'update_hp', 'add_to_log', 'enter_combat', 'resolve_attack'])
+const PRIMARY_ACTION_TOOLS = new Set([
+  'start_encounter',
+  'resolve_player_attack',
+  'pass_turn',
+  'use_healing_potion',
+  'roll_ability_check',
+  'resolve_saving_throw',
+  'roll_death_save',
+  'trigger_room_event',
+  'end_combat',
+])
 const LLM_MODE = parseLlmMode(process.env.LLM_MODE)
 const ALLOW_PAID_LLM = process.env.ALLOW_PAID_LLM !== 'false'
 const LLM_REPLAY_FALLBACK_TO_MOCK = process.env.LLM_REPLAY_FALLBACK_TO_MOCK === 'true'
@@ -1354,11 +1365,6 @@ function detectRequiredMechanicalAction(message: string, gameState: GameState): 
     return { reason: 'healing-potion-intent', suggestedTools: ['use_healing_potion'] }
   }
 
-  const asksOnlyForDescription = /\b(observe|regarde|inspecte|ecoute|vois|voir|decris|decrit|quoi|qu'est-ce|est-ce tout)\b/.test(text)
-  if (asksOnlyForDescription && !/\b(deplace|attaque|frappe|spawn|apparaitre|carte|combat|ouvres?|ouvrir|enfonces?|enfoncer|portes?|gobelins?|ennemis?|monstres?)\b/.test(text)) {
-    return null
-  }
-
   const attackIntent = /\b(attaque|attaquer|frappe|frapper|tape|coup|assene|charge|tire|lance)\b/.test(text)
   const directMovementIntent = /\b(deplaces?|deplacer|avances?|avancer|bouges?|bouger|aller|vers|entres?|entrer|rentres?|retournes?|retourner|rejoins?|rejoindre|retrouves?|retrouver|rends|traverses?|approches?|explores?|explorer|aventures?|aventurer|continues?|continuer|plus loin|montes?|monter|grimpes?|grimpe|empruntes?|prends|fuis|fuite|recules?|glisses?|glisser)\b/.test(text)
   const doorMovementIntent = isDoorTraversalIntent(text)
@@ -1368,12 +1374,16 @@ function detectRequiredMechanicalAction(message: string, gameState: GameState): 
   const searchEnemyIntent = /\b(cherches?|chercher|trouves?|trouver|deniches?|denicher|traques?|traquer|pistes?|pister)\b(?=.{0,80}\b(gobelins?|ennemis?|mechants?|monstres?|creatures?|silhouettes?)\b)/.test(text)
   const movementIntent = baseMovementIntent || followIntent || searchEnemyIntent
   const mentionsCreature = /\b(ennemis?|gobelins?|monstres?|creatures?|silhouettes?|eclaireurs?)\b/.test(text)
-  const explicitEncounterIntent = /\b(combat|apparaitre|spawn|carte|initiative|debarques?|perissez|fuyez)\b/.test(text)
+  const explicitEncounterIntent = /\b(combat|initiative|debarques?|perissez|fuyez)\b/.test(text)
   const hostileCreatureIntent = mentionsCreature && /\b(attaquent?|attaquer|hostiles?|menacent?|chargent?|surgissent?|arrivent?|debarquent?|foncent?|encerclent?)\b/.test(text)
   const encounterIntent = explicitEncounterIntent || hostileCreatureIntent
   const abilityCheckIntent = /\b(test|jet|persuasion|intimidation|athletisme|athletics|perception|discretion|stealth|convain|convaincre|negoci|negocier|mentir|mensonge|baratin|crocheter|fouiller|chercher|intimider|forcer|soulever|pousser|soumet|soumission|reddition|rends toi|rendez vous|rejoignez|rejoins moi|parlemente|capitule)\b/.test(text)
   const localObjectIntent = /\b(ouvres?|ouvrir|fouilles?|fouiller|inspectes?|inspecter|examines?|examiner|tiroirs?|coffres?|armoires?|livres?|four|fours|rouleaux?|couteaux?|objets?|potions?)\b/.test(text) &&
     (referencesLocalObjectInsteadOfRoom(text) || /\b(four|fours|rouleaux?|couteaux?|objets? magiques?|potions?)\b/.test(text))
+  const asksOnlyForDescription = /\b(observe|regarde|inspecte|ecoute|vois|voir|decris|decrit|quoi|qu'est-ce|est-ce tout)\b/.test(text)
+  if (asksOnlyForDescription && !localObjectIntent && !/\b(deplace|attaque|frappe|combat|ouvres?|ouvrir|enfonces?|enfoncer|portes?|gobelins?|ennemis?|monstres?)\b/.test(text)) {
+    return null
+  }
 
   if (gameState.phase === 'combat' && gameState.currentTurn === 'player' && attackIntent) {
     return { reason: 'player-combat-attack-intent', suggestedTools: ['resolve_player_attack', 'move_token'] }
@@ -1387,12 +1397,12 @@ function detectRequiredMechanicalAction(message: string, gameState: GameState): 
     return { reason: 'exploration-movement-intent', suggestedTools: ['move_token', 'trigger_room_event', 'start_encounter'] }
   }
 
-  if (abilityCheckIntent) {
-    return { reason: 'ability-check-intent', suggestedTools: ['roll_ability_check'] }
-  }
-
   if (localObjectIntent) {
     return { reason: 'local-object-interaction-intent', suggestedTools: ['trigger_room_event', 'roll_ability_check', 'start_encounter'] }
+  }
+
+  if (abilityCheckIntent) {
+    return { reason: 'ability-check-intent', suggestedTools: ['roll_ability_check'] }
   }
 
   if (attackIntent || encounterIntent) {
@@ -1569,7 +1579,7 @@ function roomEncounterTriggerReason(
   if (gameState.phase !== 'exploration' || countAliveMonsters(gameState) > 0) return null
 
   const text = normalizeFrenchText(message)
-  const hostileOrExplicit = /\b(attaque|attaquer|frappe|frapper|charge|combat|initiative|hostile|menace|provoque|provoquer|debarques?|perissez|fuyez|spawn|apparaitre|carte)\b/.test(text)
+  const hostileOrExplicit = /\b(attaque|attaquer|frappe|frapper|charge|combat|initiative|hostile|menace|provoque|provoquer|debarques?|perissez|fuyez)\b/.test(text)
   const huntsCreatures = /\b(cherches?|chercher|trouves?|trouver|traques?|traquer|pistes?|pister|suis|suivre|poursuis|poursuivre)\b(?=.{0,80}\b(gobelins?|ennemis?|monstres?|creatures?|patrouille|grukk)\b)/.test(text)
 
   if (targetRoomId === '9') {
@@ -1590,7 +1600,7 @@ function roomEncounterTriggerReason(
   }
 
   if (targetRoomId === '7') {
-    const patrolTrigger = /\b(gobelins?|patrouille|directement|bruyamment|sans discretion|je me montre|j'entre en force|j entre en force)\b/.test(text)
+    const patrolTrigger = /\b(gobelins?|patrouille|bruyamment|sans discretion|je me montre|j'entre en force|j entre en force)\b/.test(text)
     if (hostileOrExplicit || huntsCreatures || patrolTrigger) {
       return 'Le joueur attire ou affronte la patrouille du quai de chargement.'
     }
@@ -1738,10 +1748,21 @@ function validateStartEncounterToolInput(
   }
 
   const encounterId = typeof input.encounterId === 'string' ? input.encounterId : null
-  if (!encounterId) return null
+  if (!encounterId) {
+    return {
+      error: 'LLM-triggered encounters must use a predefined encounterId.',
+      code: 'CUSTOM_ENCOUNTER_FORBIDDEN',
+    }
+  }
 
   const preset = ENCOUNTERS[encounterId]
-  if (!preset) return null
+  if (!preset) {
+    return {
+      error: `Unknown encounterId: ${encounterId}.`,
+      code: 'UNKNOWN_ENCOUNTER',
+      detail: { encounterId },
+    }
+  }
 
   const playerCell = cellFromToolInput(input.playerCell)
   const playerCellRoomId = playerCell ? inferMappedAdventureRoomId(playerCell) : null
@@ -1927,10 +1948,13 @@ function parseEncounterRepairInput(
   const asksForMissingEncounter = /\b(tokens?|gobelins?|monstres?|ennemis?|combat|initiative|affich|afficher|apparaitre|spawn|carte|contradiction|desynchro|bug)\b/.test(text)
   if (!asksForMissingEncounter) return null
 
+  const triggerReason = roomEncounterTriggerReason(message, gameState, gameState.currentRoomId, encounterId)
+  if (!triggerReason) return null
+
   return {
     encounterId,
     playerCell: gameState.player.position,
-    reason: 'Synchronisation serveur: la scene decrit une rencontre de salle qui doit exister sur la carte.',
+    reason: triggerReason,
   }
 }
 
@@ -2522,8 +2546,8 @@ async function resolveNpcTurnsUntilPlayerTurn(
       gameState: summarizeGameState(state),
     })
 
-    if (state.player.hp.current <= 0) {
-      summary.skipped = 'Le joueur est inconscient; on avance jusqu au prochain jet de mort.'
+    if (state.player.deathSaves?.dead) {
+      summary.skipped = 'Le joueur est mort; le PNJ ne peut plus le cibler.'
       const advance = await callMCPTool('next_turn', {
         actorId,
         skipAction: true,
@@ -2533,7 +2557,7 @@ async function resolveNpcTurnsUntilPlayerTurn(
       if (isMcpErrorResult(advance)) {
         summary.advanceError = advance
         summaries.push(summary)
-        logEvent('warn', 'dm.combat.auto_npc.advance_down_player_failed', {
+        logEvent('warn', 'dm.combat.auto_npc.advance_dead_player_failed', {
           requestId,
           sessionId,
           actorId,
@@ -2545,7 +2569,7 @@ async function resolveNpcTurnsUntilPlayerTurn(
       summary.advancedTo = state.currentTurn
       summaries.push(summary)
       resolvedTurns++
-      logEvent('info', 'dm.combat.auto_npc.skip_down_player', {
+      logEvent('info', 'dm.combat.auto_npc.skip_dead_player', {
         requestId,
         sessionId,
         actorId,
@@ -2999,6 +3023,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     let narrative = ''
     let iterations = 0
     let turnBoundaryReached = false
+    let primaryActionToolUsed: string | null = null
     let mechanicalRetryInjected = false
     let maxTokensRetryInjected = false
     let sawMcpToolError = false
@@ -3190,6 +3215,34 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             continue
           }
 
+          if (PRIMARY_ACTION_TOOLS.has(toolUse.name) && primaryActionToolUsed) {
+            const result = {
+              error: 'A primary game action has already been resolved for this player message.',
+              code: 'PRIMARY_ACTION_ALREADY_RESOLVED',
+              detail: {
+                firstTool: primaryActionToolUsed,
+                blockedTool: toolUse.name,
+              },
+            }
+            sawMcpToolError = true
+            logEvent('warn', 'dm.tool_use.blocked_extra_primary_action', {
+              requestId,
+              sessionId,
+              iteration: iterations,
+              toolUseId: toolUse.id,
+              toolName: toolUse.name,
+              primaryActionToolUsed,
+              result,
+            })
+            toolResults.push({
+              type: 'tool_result',
+              tool_use_id: toolUse.id,
+              content: JSON.stringify(result),
+              is_error: true,
+            })
+            continue
+          }
+
           if (toolUse.name === 'start_encounter') {
             const validationError = validateStartEncounterToolInput(toolUse.input, currentGameState, message)
             if (validationError) {
@@ -3254,6 +3307,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
                 toolUseId: toolUse.id,
                 result,
               })
+            }
+            if (PRIMARY_ACTION_TOOLS.has(toolUse.name) && !mcpResultIsError) {
+              primaryActionToolUsed = toolUse.name
             }
             toolResults.push({
               type: 'tool_result',

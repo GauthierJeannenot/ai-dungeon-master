@@ -143,15 +143,18 @@ function resolveAttack(
   const strMod = getAbilityModifier(attacker.stats.str)
   const profBonus = 'proficiencyBonus' in attacker ? attacker.proficiencyBonus : 2
   const attackBonus = 'attackBonus' in attacker ? attacker.attackBonus : (strMod + profBonus)
+  const targetDistance = distanceCells(attacker.position, target.position)
+  const unconsciousMeleeTarget = target.conditions.includes('unconscious') && targetDistance <= 1
+  const effectiveAdvantage = Boolean(advantage || unconsciousMeleeTarget)
 
   const roll1 = rollDice(d20WithModifier(attackBonus))
   let attackRoll = roll1
 
-  if (advantage && !disadvantage) {
+  if (effectiveAdvantage && !disadvantage) {
     const roll2 = rollDice(d20WithModifier(attackBonus))
     attackRoll = roll1.total >= roll2.total ? roll1 : roll2
     attackRoll = { ...attackRoll, detail: `ADV: ${roll1.detail} / ${roll2.detail} -> kept ${attackRoll.total}` }
-  } else if (disadvantage && !advantage) {
+  } else if (disadvantage && !effectiveAdvantage) {
     const roll2 = rollDice(d20WithModifier(attackBonus))
     attackRoll = roll1.total <= roll2.total ? roll1 : roll2
     attackRoll = { ...attackRoll, detail: `DIS: ${roll1.detail} / ${roll2.detail} -> kept ${attackRoll.total}` }
@@ -160,13 +163,15 @@ function resolveAttack(
   const targetAC = target.ac
   const naturalRoll = attackRoll.rolls[0]
   const criticalMiss = naturalRoll === 1
-  const criticalHit = naturalRoll === 20
-  const hit = criticalHit || (!criticalMiss && attackRoll.total >= targetAC)
+  const naturalCriticalHit = naturalRoll === 20
+  const hit = naturalCriticalHit || (!criticalMiss && attackRoll.total >= targetAC)
+  const criticalHit = naturalCriticalHit || (hit && unconsciousMeleeTarget && !criticalMiss)
 
   let damageRoll = undefined
   let damageDealt = undefined
   let targetHpAfter = undefined
   let targetDied = false
+  let targetStatusDetail = ''
 
   if (hit) {
     const strModDamage = getAbilityModifier(attacker.stats.str)
@@ -175,18 +180,28 @@ function resolveAttack(
     damageDealt = Math.max(1, damageRoll.total)
 
     if (targetId === 'player') {
-      const updated = gs.updatePlayerHP(-damageDealt)
+      const playerWasDying = target.hp.current <= 0
+      let updated = gs.updatePlayerHP(-damageDealt)
+      if (playerWasDying && criticalHit && !updated.deathSaves?.dead) {
+        updated = gs.updatePlayerHP(-1)
+      }
       targetHpAfter = updated.hp.current
-      targetDied = updated.hp.current === 0
+      targetDied = Boolean(updated.deathSaves?.dead)
+      if (targetDied) {
+        targetStatusDetail = ' | MORT'
+      } else if (updated.hp.current <= 0) {
+        targetStatusDetail = ` | A TERRE (${updated.deathSaves?.successes ?? 0} succes, ${updated.deathSaves?.failures ?? 0} echecs mort)`
+      }
     } else {
       const updated = gs.updateMonsterHP(targetId, -damageDealt)
       targetHpAfter = updated.hp.current
       targetDied = !updated.isAlive
+      if (targetDied) targetStatusDetail = ' | MORT'
     }
   }
 
   const mechanicalSummary = hit
-    ? `Attaque: ${attackRoll.detail} vs CA ${targetAC} -> ${criticalHit ? 'CRITIQUE' : 'TOUCHE'} | Degats: ${damageRoll!.detail}${targetDied ? ' | MORT' : ''}`
+    ? `Attaque: ${attackRoll.detail} vs CA ${targetAC} -> ${criticalHit ? 'CRITIQUE' : 'TOUCHE'} | Degats: ${damageRoll!.detail}${targetStatusDetail}`
     : `Attaque: ${attackRoll.detail} vs CA ${targetAC} -> ${criticalMiss ? 'ECHEC CRITIQUE' : 'RATE'}`
 
   const result: AttackResult = {

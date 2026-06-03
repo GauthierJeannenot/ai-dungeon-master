@@ -226,12 +226,26 @@ export function registerPlayerTools(server: McpServer): void {
     async ({ tokenId, toCell }) => {
       try {
         const movement = rules.validateMove(tokenId, toCell)
+        const beforeState = gs.getState()
+        const entityBefore = gs.getEntity(tokenId)
+        const fromCell = entityBefore ? { ...entityBefore.position } : null
+        const roomBefore = beforeState.currentRoomId
         gs.moveToken(tokenId, toCell.x, toCell.y)
         rules.recordMove(tokenId, movement.distance)
 
         const entity = gs.getEntity(tokenId)
         const name = entity ? ('name' in entity ? entity.name : 'Player') : tokenId
         const state = gs.getState()
+        const roomTransition = tokenId === 'player'
+          ? ` | salle ${roomBefore ?? 'inconnue'} -> ${state.currentRoomId ?? 'inconnue'}`
+          : ''
+        gs.addLogEntry({
+          round: state.round,
+          turn: state.currentTurn ?? tokenId,
+          action: `${name} se deplace`,
+          mechanicalDetail: `Deplacement ${fromCell ? `(${fromCell.x},${fromCell.y})` : '?'} -> (${toCell.x},${toCell.y}) | distance ${movement.distance}${movement.remaining === null ? '' : ` | mouvement restant ${movement.remaining}`}${roomTransition}`,
+        })
+
         return {
           content: [{
             type: 'text',

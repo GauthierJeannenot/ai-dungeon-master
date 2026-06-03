@@ -80,6 +80,13 @@ function assertAlive(entityId: string, entity: Entity): void {
   }
 }
 
+function assertAttackable(entityId: string, entity: Entity): void {
+  if (isAlive(entity)) return
+  if (entityId === 'player' && !('isAlive' in entity) && !entity.deathSaves?.dead) return
+
+  throw new RuleViolation('ENTITY_DEAD', `${entity.name} cannot be targeted because they are dead.`, { entityId })
+}
+
 function assertCurrentTurn(entityId: string): void {
   const state = gs.getState()
   if (state.phase !== 'combat') {
@@ -209,7 +216,7 @@ export function validateAttack(
   const attacker = assertEntity(attackerId)
   const target = assertEntity(targetId)
   assertAlive(attackerId, attacker)
-  assertAlive(targetId, target)
+  assertAttackable(targetId, target)
 
   const distance = distanceCells(attacker.position, target.position)
   const maxRange = attackRangeCells(weaponOrSpell, rangeCells)
@@ -257,7 +264,12 @@ export function validateConditionTarget(entityId: string): void {
 
 export function validateHPUpdate(entityId: string, delta: number): void {
   const entity = assertEntity(entityId)
-  if (delta < 0) assertAlive(entityId, entity)
+  if (delta < 0) {
+    if (entityId === 'player' && !('isAlive' in entity) && entity.hp.current <= 0 && !entity.deathSaves?.dead) {
+      return
+    }
+    assertAlive(entityId, entity)
+  }
   if (entityId === 'player' && delta > 0 && 'deathSaves' in entity && entity.deathSaves?.dead) {
     throw new RuleViolation('PLAYER_DEAD', 'A dead player cannot be healed by ordinary HP recovery.', {
       entityId,

@@ -164,6 +164,20 @@ test('advanceTurn keeps a dying player in initiative for death saves', () => {
   assert.ok(state.player.conditions.includes('unconscious'))
 })
 
+test('advanceTurn does not skip the next monster when the current player is filtered out', () => {
+  gameState.spawnMonster(makeMonster('goblin_a'))
+  gameState.spawnMonster(makeMonster('goblin_b'))
+  gameState.setInitiativeOrder(['player', 'goblin_a', 'goblin_b'])
+  gameState.updatePlayerHP(-99)
+  gameState.getState().player.deathSaves = { successes: 0, failures: 0, stable: true }
+
+  const next = gameState.advanceTurn()
+  const state = gameState.getState()
+
+  assert.equal(next, 'goblin_a')
+  assert.deepEqual(state.initiativeOrder, ['goblin_a', 'goblin_b'])
+})
+
 test('player damage at 0 HP records death failures and ordinary healing does not revive the dead', () => {
   gameState.updatePlayerHP(-99)
   gameState.updatePlayerHP(-1)
@@ -218,6 +232,29 @@ test('MCP move_token tracks room transitions for the player', async () => {
     const stateAfter = await callTool(client, 'get_game_state')
     assert.equal(stateAfter.currentRoomId, '4')
     assert.deepEqual(stateAfter.roomsVisited, ['1', '4'])
+    const lastLog = stateAfter.combatLog.at(-1)
+    assert.match(lastLog.action, /se deplace/)
+    assert.match(lastLog.mechanicalDetail, /Deplacement \(4,13\) -> \(10,10\)/)
+    assert.match(lastLog.mechanicalDetail, /salle 1 -> 4/)
+  })
+})
+
+test('MCP trigger_room_event cannot mutate a room outside the current player room', async () => {
+  await withMcpClient(async client => {
+    const baseState = await callTool(client, 'get_game_state')
+    await callTool(client, 'replace_game_state', { gameState: baseState })
+
+    const blocked = await callTool(client, 'trigger_room_event', {
+      roomId: '8',
+      eventType: 'ambush',
+      description: 'Les gobelins surgissent sans deplacement.',
+    })
+    assert.equal(blocked.code, 'ROOM_EVENT_LOCATION_MISMATCH')
+
+    const stateAfter = await callTool(client, 'get_game_state')
+    assert.equal(stateAfter.currentRoomId, '1')
+    assert.deepEqual(stateAfter.roomsVisited, ['1'])
+    assert.equal(stateAfter.combatLog.length, 0)
   })
 })
 
@@ -341,6 +378,39 @@ test('MCP resolve_attack misses on a natural 1 even with a high bonus', async ()
       assert.equal(attack.hit, false)
       assert.equal(attack.damageRoll, undefined)
       assert.match(attack.mechanicalSummary, /ECHEC CRITIQUE/)
+    })
+  })
+})
+
+test('MCP resolve_attack can target a dying player and records death save failures', async () => {
+  await withForcedDiceSequence('10,10,1,1', async () => {
+    await withMcpClient(async client => {
+      const baseState = await callTool(client, 'get_game_state')
+      const state = makeCombatState(baseState, { currentTurn: 'goblin_a' })
+      state.player.hp.current = 0
+      state.player.ac = 1
+      state.player.deathSaves = { successes: 0, failures: 0 }
+      state.player.conditions = ['unconscious']
+
+      await callTool(client, 'replace_game_state', { gameState: state })
+
+      const attack = await callTool(client, 'resolve_attack', {
+        attackerId: 'goblin_a',
+        targetId: 'player',
+        weaponOrSpell: 'cimeterre',
+        customDamageDice: '1d2',
+      })
+
+      assert.equal(attack.hit, true)
+      assert.equal(attack.criticalHit, true)
+      assert.equal(attack.targetDied, false)
+      assert.equal(attack.targetHpAfter, 0)
+      assert.match(attack.mechanicalSummary, /A TERRE/)
+      assert.match(attack.mechanicalSummary, /2 echecs mort/)
+
+      const stateAfter = await callTool(client, 'get_game_state')
+      assert.deepEqual(stateAfter.player.deathSaves, { successes: 0, failures: 2, stable: false })
+      assert.equal(stateAfter.actionUsed.goblin_a, true)
     })
   })
 })

@@ -289,8 +289,10 @@ export function setInitiativeOrder(order: string[]): void {
 export function advanceTurn(): string | null {
   if (state.initiativeOrder.length === 0) return null
   const current = state.currentTurn
-  const idx = state.initiativeOrder.indexOf(current ?? '')
-  const nextIdx = (idx + 1) % state.initiativeOrder.length
+  const previousOrder = [...state.initiativeOrder]
+  const previousIndex = previousOrder.indexOf(current ?? '')
+
+  if (current) resetTurnEconomy(current)
 
   // Remove dead monsters from initiative. Keep a dying player in the order:
   // in D&D 5e, an unconscious player still has turns for death saves.
@@ -304,15 +306,34 @@ export function advanceTurn(): string | null {
     return null
   }
 
-  const safeNext = Math.min(nextIdx, state.initiativeOrder.length - 1)
+  const filteredCurrentIndex = current ? state.initiativeOrder.indexOf(current) : -1
+  let nextId: string | undefined
+
+  if (filteredCurrentIndex >= 0) {
+    nextId = state.initiativeOrder[(filteredCurrentIndex + 1) % state.initiativeOrder.length]
+  } else {
+    const remainingAfterPrevious = previousOrder
+      .slice(Math.max(0, previousIndex + 1))
+      .find(id => state.initiativeOrder.includes(id))
+    nextId = remainingAfterPrevious ?? state.initiativeOrder[0]
+  }
+  if (!nextId) {
+    state.currentTurn = null
+    return null
+  }
 
   // Increment round when wrapping back to first combatant
-  if (safeNext <= idx && state.initiativeOrder.length > 1) {
+  const nextPreviousIndex = previousOrder.indexOf(nextId)
+  if (
+    previousIndex >= 0 &&
+    nextPreviousIndex >= 0 &&
+    nextPreviousIndex <= previousIndex &&
+    state.initiativeOrder.length > 1
+  ) {
     state.round++
   }
 
-  if (current) resetTurnEconomy(current)
-  state.currentTurn = state.initiativeOrder[safeNext]
+  state.currentTurn = nextId
   resetTurnEconomy(state.currentTurn)
   return state.currentTurn
 }

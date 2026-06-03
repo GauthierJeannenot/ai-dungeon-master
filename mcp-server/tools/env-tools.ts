@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 import * as gs from '../game-state'
+import * as rules from '../rules'
 
 export function registerEnvTools(server: McpServer): void {
   // Triggers a predefined room event and marks room as visited
@@ -22,6 +23,16 @@ export function registerEnvTools(server: McpServer): void {
       description: z.string().optional().describe('Additional context for the event'),
     },
     async ({ roomId, eventType, description }) => {
+      const beforeState = gs.getState()
+      const alreadyVisited = beforeState.roomsVisited.includes(roomId)
+      if (beforeState.currentRoomId !== roomId) {
+        return rules.ruleErrorResult(new rules.RuleViolation('ROOM_EVENT_LOCATION_MISMATCH', 'Cannot trigger a room event outside the current player room.', {
+          requestedRoomId: roomId,
+          currentRoomId: beforeState.currentRoomId,
+          playerPosition: beforeState.player.position,
+        }))
+      }
+
       gs.visitRoom(roomId)
 
       gs.addLogEntry({
@@ -38,7 +49,7 @@ export function registerEnvTools(server: McpServer): void {
             roomId,
             eventType,
             description,
-            alreadyVisited: gs.getState().roomsVisited.filter(r => r === roomId).length > 1,
+            alreadyVisited,
             currentRoomId: gs.getState().currentRoomId,
           }),
         }],
