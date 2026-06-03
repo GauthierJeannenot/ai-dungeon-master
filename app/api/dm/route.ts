@@ -26,6 +26,7 @@ const MODEL = 'claude-haiku-4-5'
 const MAX_TOOL_ITERATIONS = 3
 const MAX_TOKENS = 400
 const FINAL_NARRATION_MAX_TOKENS = parsePositiveInt(process.env.LLM_FINAL_NARRATION_MAX_TOKENS, 180)
+const ORAL_NARRATION_MAX_SENTENCES = parsePositiveInt(process.env.ORAL_NARRATION_MAX_SENTENCES, 2)
 const COMBAT_LOG_TAIL = 6
 const MAX_AUTO_NPC_TURNS = 8
 type LlmMode = 'live' | 'mock' | 'record' | 'replay'
@@ -603,6 +604,16 @@ Après ta réponse : STOP total. Tu attends le prochain message du joueur.
 
 Tu es un Dungeon Master de D&D 5e. Tu narre en français, au présent, de façon brève et dense (1-2 phrases par défaut, 3 seulement si un résultat mécanique complexe l'exige).
 
+FORMAT ORAL:
+- La reponse doit pouvoir etre lue telle quelle a voix haute.
+- Reste dans la fiction. Pas d'excuse, pas de commentaire meta, pas de mention du systeme, des prompts, du moteur, des tools, de MCP ou de l'IA.
+- Pas de Markdown, pas de liste, pas de titre, pas de didascalie entre parentheses.
+- Ne donne pas de coordonnees ni d'ID technique sauf si le joueur les demande explicitement.
+- Ne termine pas par un menu d'options. Une question courte et naturelle est permise seulement si elle sert vraiment la scene.
+- Si une action est impossible ou refusee par les regles, formule-le en fiction et en une phrase.
+- Ne declare jamais "fin de quete", "fin de campagne", "objectif accompli" ou une conclusion alternative sauf si le joueur demande explicitement d'arreter.
+- Si le joueur annonce un plan long, accepte l'intention mais ne saute pas des heures ou des jours: narre seulement la prochaine minute jouable.
+
 PERSONNAGE:
 ${ctx.playerCharacter}
 
@@ -632,7 +643,7 @@ CONTRAT ETAT/NARRATION:
 - Si l'etat indique exploration avec 0 monstre vivant, tu ne peux pas narrer des ennemis presents dans la salle, qui entrent, attaquent, degainent, reperent le heros ou bloquent son chemin.
 - Pour faire apparaitre une rencontre reelle, appelle start_encounter avant de narrer sa presence.
 - Si ce sont seulement des bruits, rumeurs ou mouvements hors champ, dis-le explicitement: aucun ennemi n'est encore sur la carte et le combat n'est pas engage.
-- Si tu detectes que ta narration contredirait l'etat moteur, dis directement dans le chat "Debug moteur: ..." puis corrige la narration.`
+- Si tu detectes que ta narration contredirait l'etat moteur, corrige silencieusement et reste dans la fiction. Ne montre jamais le diagnostic au joueur.`
 }
 
 function buildDynamicPrompt(gameState: GameState, summaryContext: string | undefined): string {
@@ -668,7 +679,11 @@ function buildNarrationStaticPrompt(): string {
 Narre uniquement la consequence immediate de l'action du joueur.
 Respecte strictement les resultats mecaniques fournis: jets, degats, morts, positions, tour courant.
 Ne lance aucun de, n'invente aucun nouvel ennemi, ne resous aucun tour futur.
-Reponse breve: 1-2 phrases, present, style vivant mais clair. Une 3e phrase est autorisee seulement pour clarifier un resultat mecanique complexe.`
+Reponse breve: 1-2 phrases, present, style vivant mais clair.
+Format vocal: pas de Markdown, pas de liste, pas de titre, pas de parenthese, pas d'excuse, pas de commentaire meta, pas de mention du systeme, des prompts, du moteur, des tools, de MCP ou de l'IA.
+Ne donne pas de coordonnees ni d'ID technique sauf si le joueur les demande explicitement.
+Ne termine pas par un menu d'options. Une question courte et naturelle est permise seulement si elle sert vraiment la scene.
+Ne declare pas de fin de quete/campagne ni de conclusion alternative sauf demande explicite. Pas de time-skip: seulement la prochaine minute jouable.`
 }
 
 function buildNarrationSystemBlocks(
@@ -751,6 +766,165 @@ function normalizeFrenchText(value: string): string {
     .toLowerCase()
     .normalize('NFD')
     .replace(/\p{Diacritic}/gu, '')
+}
+
+type OralNarrativeGuardResult = {
+  narrative: string
+  changed: boolean
+  fallbackUsed: boolean
+  reasons: string[]
+  removedLineCount: number
+  originalLength: number
+  finalLength: number
+}
+
+function getCurrentRoomName(gameState: GameState): string | null {
+  return ADVENTURE_ROOMS.find(room => room.id === gameState.currentRoomId)?.name ?? null
+}
+
+function buildOralFallbackNarrative(gameState: GameState, toolsUsed: string[]): string {
+  const roomName = getCurrentRoomName(gameState)
+
+  if (toolsUsed.includes('move_token')) {
+    return roomName
+      ? `Tu arrives dans ${roomName}; l'air se tend autour de toi.`
+      : "Tu avances; l'air se tend autour de toi."
+  }
+
+  if (gameState.phase === 'combat') {
+    return gameState.currentTurn === 'player'
+      ? "Le combat se resserre autour de toi; l'ouverture est a toi."
+      : "Le combat continue dans une tension brutale."
+  }
+
+  return "Un bref silence tombe autour de toi; l'instant reste ouvert."
+}
+
+function splitIntoSentences(text: string): string[] {
+  return text
+    .match(/[^.!?]+[.!?]+|[^.!?]+$/g)
+    ?.map(sentence => sentence.trim())
+    .filter(Boolean) ?? []
+}
+
+function lineLooksLikeMetaCommentary(line: string): boolean {
+  const normalized = normalizeFrenchText(line)
+  if (!normalized) return false
+
+  const containsPositionCoordinates = /\(\s*\d{1,2}\s*,\s*\d{1,2}\s*\)/.test(line) &&
+    /\b(actuellement|position|coordonnees?|salle|tu es)\b/.test(normalized)
+  if (containsPositionCoordinates) return true
+
+  if (/^\s*(?:[-*+]|\d+[.)])\s+/.test(line)) return true
+
+  return [
+    /\b(debug|moteur|mcp|tool|tools|outil|llm|prompt|systeme|etat moteur|contrat)\b/,
+    /\b(action mecanique|resultats? mecaniques?|mutation de l'etat|etat attendu|dernier message du joueur)\b/,
+    /\b(je comprends le systeme|en attente de ton action|tu as entierement raison|tu as raison)\b/,
+    /\b(tu es actuellement|tu es a\s+(?:en\s+)?salle\s+\d+|salle\s+\d+\s+[-:])\b/,
+    /\b(excuse-moi|desole|erreur de ma part|j'aurais du|j aurais du|je vais corriger|merci de cette correction)\b/,
+    /\b(je dois clarifier|non, ce message n'est pas|ce message n'est pas|on continue)\b/,
+    /\b(que fais-tu|ou veux-tu aller ensuite|deplacement,\s*attaque|attaque,\s*test|roleplay pur)\b/,
+    /\b(appeler\s+\w+|move_token|start_encounter|resolve_player_attack|pass_turn|roll_dice)\b/,
+    /\b(fin de quete|fin de campagne|quete alternative|objectif accompli|mission accomplie)\b/,
+    /\b(heures suivantes|jours suivants|semaines suivantes|premiere fournee|faire fortune)\b/,
+  ].some(pattern => pattern.test(normalized))
+}
+
+function looksLikeEnglishDrift(fragment: string): boolean {
+  const normalized = normalizeFrenchText(fragment)
+  const englishMarkers = normalized.match(/\b(eyes|shine|genuine|really|guys|friend|quest|campaign|with|the|you|your)\b/g)
+  return (englishMarkers?.length ?? 0) >= 2
+}
+
+function normalizeNarrativeForOralPlayback(
+  narrative: string,
+  gameState: GameState,
+  toolsUsed: string[]
+): OralNarrativeGuardResult {
+  const reasons = new Set<string>()
+  const original = narrative.trim()
+
+  let text = original
+    .replace(/\r\n/g, '\n')
+    .replace(/```[\s\S]*?```/g, () => {
+      reasons.add('code_block_removed')
+      return ' '
+    })
+
+  const formattingCleaned = text
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/_{1,2}([^_]+)_{1,2}/g, '$1')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/^>\s+/gm, '')
+
+  if (formattingCleaned !== text) {
+    reasons.add('markdown_removed')
+    text = formattingCleaned
+  }
+
+  const withoutParentheticals = text.replace(/\s*\([^)]{0,180}\)/g, match => {
+    reasons.add('parenthetical_removed')
+    return /[.!?]\s*$/.test(match) ? '. ' : ' '
+  })
+  if (withoutParentheticals !== text) text = withoutParentheticals
+
+  let removedLineCount = 0
+  const keptLines = text
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => {
+      if (!line) return false
+      if (!lineLooksLikeMetaCommentary(line)) return true
+
+      removedLineCount++
+      reasons.add('meta_line_removed')
+      return false
+    })
+
+  text = keptLines
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .replace(/\s+([,.!?;:])/g, '$1')
+    .replace(/([.!?]){2,}/g, '$1')
+    .trim()
+
+  let sentences = splitIntoSentences(text)
+  const filteredSentences = sentences.filter(sentence => {
+    if (!lineLooksLikeMetaCommentary(sentence) && !looksLikeEnglishDrift(sentence)) return true
+
+    reasons.add(looksLikeEnglishDrift(sentence) ? 'non_french_sentence_removed' : 'meta_sentence_removed')
+    return false
+  })
+  if (filteredSentences.length !== sentences.length) {
+    text = filteredSentences.join(' ').trim()
+    sentences = splitIntoSentences(text)
+  }
+
+  if (sentences.length > ORAL_NARRATION_MAX_SENTENCES) {
+    text = sentences.slice(0, ORAL_NARRATION_MAX_SENTENCES).join(' ')
+    reasons.add('sentence_limit_applied')
+  }
+
+  let fallbackUsed = false
+  if (!text || normalizeFrenchText(text).length < 12) {
+    text = buildOralFallbackNarrative(gameState, toolsUsed)
+    fallbackUsed = true
+    reasons.add('fallback_used')
+  }
+
+  const finalNarrative = text.trim()
+  return {
+    narrative: finalNarrative,
+    changed: finalNarrative !== original,
+    fallbackUsed,
+    reasons: [...reasons],
+    removedLineCount,
+    originalLength: original.length,
+    finalLength: finalNarrative.length,
+  }
 }
 
 type RequiredMechanicalAction = {
@@ -1023,11 +1197,12 @@ function parsePlayerAttackInput(
 function summarizeMcpResultForNarration(toolName: string, result: unknown): string {
   if (isObjectRecord(result)) {
     if (typeof result.mechanicalSummary === 'string') return result.mechanicalSummary
-    if (typeof result.error === 'string') return `Debug moteur: ${toolName} refuse l'action (${result.error}).`
+    if (typeof result.error === 'string') return "Ton geste se bloque: ce n'est pas possible dans la situation actuelle."
     if (typeof result.reason === 'string') return result.reason
   }
 
-  return `Action moteur resolue par ${toolName}.`
+  if (toolName === 'move_token') return "Tu avances, et la scene change autour de toi."
+  return "L'action se resout dans la scene."
 }
 
 async function resolveServerFirstAction(
@@ -1520,7 +1695,7 @@ async function generateFinalNarration(
     `Action du joueur:\n${playerMessage}`,
     draftNarrative ? `Brouillon narratif precedent, potentiellement incomplet:\n${draftNarrative}` : undefined,
     `Resultats mecaniques faisant autorite:\n${formatCombatLogEntries(newCombatLogEntries)}`,
-    `Ecris la reponse finale au joueur en francais, au present, en 1-2 phrases. Respecte strictement les resultats mecaniques. N'annonce aucune action future non resolue. Ajoute une 3e phrase seulement si elle clarifie un resultat mecanique complexe.`,
+    `Ecris la reponse finale au joueur en francais, au present, en 1-2 phrases. Elle doit etre naturelle a l'oral. Respecte strictement les resultats mecaniques. N'annonce aucune action future non resolue. Pas de Markdown, pas de liste, pas de parenthese, pas d'excuse, pas de meta, pas de menu, pas de mention du systeme, du moteur, des tools, de MCP ou de l'IA. Pas de coordonnees ni d'ID technique sauf demande explicite du joueur. Ne declare pas de fin de quete/campagne ni de conclusion alternative sauf demande explicite. Pas de time-skip: seulement la prochaine minute jouable.`,
   ].filter(Boolean).join('\n\n')
 
   try {
@@ -1859,7 +2034,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           messages.push({ role: 'assistant', content: response.content })
           messages.push({
             role: 'user',
-            content: `SYSTEM: Le dernier message du joueur demande une action mecanique (${requiredMechanicalAction.reason}). Les tools deja utilises (${toolsUsed.length > 0 ? toolsUsed.join(', ') : 'aucun'}) ne mutent pas l'etat attendu. Tu dois appeler au moins un tool MCP adapte (${requiredMechanicalAction.suggestedTools.join(', ')}) ou expliquer explicitement pourquoi aucune mutation de l'etat n'est legale. Un simple roll_dice ne suffit pas pour un deplacement, une entree de salle ou une attaque. Ne narre pas une action mecanique sans tool pertinent.`,
+            content: `SYSTEM INTERNE, a ne jamais citer au joueur: Le dernier message du joueur demande une action mecanique (${requiredMechanicalAction.reason}). Les tools deja utilises (${toolsUsed.length > 0 ? toolsUsed.join(', ') : 'aucun'}) ne mutent pas l'etat attendu. Tu dois appeler au moins un tool MCP adapte (${requiredMechanicalAction.suggestedTools.join(', ')}) ou, si aucune mutation de l'etat n'est legale, repondre en fiction en une phrase courte. Un simple roll_dice ne suffit pas pour un deplacement, une entree de salle ou une attaque. Ne narre pas une action mecanique sans tool pertinent. La reponse visible doit rester orale, sans meta, sans liste, sans Markdown et sans mention d'outil.`,
           })
           continue
         }
@@ -1867,7 +2042,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         const narrativeStateIssue = detectNarrativeStateContractIssue(responseText, currentGameState)
         if (narrativeStateIssue) {
           narrative = narrativeBeforeResponse
-          lastEndTurnNarrative = "Debug moteur: narration corrigée. Aucun ennemi physique n'est présent sur la carte et aucun combat n'est engagé dans l'état moteur actuel; les signes hostiles restent hors champ tant qu'une rencontre n'est pas déclenchée."
+          lastEndTurnNarrative = "Un bruit bouge hors champ, mais rien ne se montre devant toi pour l'instant."
           narrative = narrative
             ? `${narrative}\n\n${lastEndTurnNarrative}`
             : lastEndTurnNarrative
@@ -2018,7 +2193,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         messages.push({ role: 'assistant', content: response.content })
         messages.push({
           role: 'user',
-          content: 'SYSTEM: Ta reponse a ete tronquee. Reponds en 1-2 phrases maximum, ou appelle exactement un tool MCP si une mutation mecanique est necessaire. Ne repete pas le brouillon tronque.',
+          content: 'SYSTEM INTERNE, a ne jamais citer au joueur: Ta reponse a ete tronquee. Reponds en 1-2 phrases maximum, ou appelle exactement un tool MCP si une mutation mecanique est necessaire. Ne repete pas le brouillon tronque. La reponse visible doit rester orale, sans meta, sans liste, sans Markdown et sans mention d outil.',
         })
         continue
       }
@@ -2179,6 +2354,22 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         usageLog,
       })
       if (finalNarrative) narrative = finalNarrative
+    }
+
+    const oralNarrative = normalizeNarrativeForOralPlayback(narrative, currentGameState, toolsUsed)
+    if (oralNarrative.changed) {
+      logEvent(oralNarrative.fallbackUsed ? 'warn' : 'info', 'dm.narrative.oral_guard.applied', {
+        requestId,
+        sessionId,
+        reasons: oralNarrative.reasons,
+        removedLineCount: oralNarrative.removedLineCount,
+        fallbackUsed: oralNarrative.fallbackUsed,
+        originalLength: oralNarrative.originalLength,
+        finalLength: oralNarrative.finalLength,
+        originalNarrative: narrative,
+        oralNarrative: oralNarrative.narrative,
+      })
+      narrative = oralNarrative.narrative
     }
 
     const persistedHistory = [
