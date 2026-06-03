@@ -7,7 +7,7 @@ import { loadContextFiles } from '@/lib/context-loader'
 import { callMCPTool, listMCPTools } from '@/lib/mcp-client'
 import { loadSession, saveSession } from '@/lib/session-store'
 import { acquireSessionLock } from '@/lib/session-lock'
-import { ADVENTURE_ROOMS, inferAdventureRoomId as inferMappedAdventureRoomId } from '@/lib/adventure-map'
+import { ADVENTURE_ROOMS, ENCOUNTERS, inferAdventureRoomId as inferMappedAdventureRoomId } from '@/lib/adventure-map'
 import { DMRequest, DMResponse, GameState, ConversationTurn, CombatLogEntry, MonsterState } from '@/lib/types'
 import {
   logAnthropicUsage,
@@ -1181,6 +1181,11 @@ function centerCellForRoom(roomId: string): { x: number; y: number } | null {
   }
 }
 
+function encounterIdForRoom(roomId: string | null | undefined): string | null {
+  if (!roomId) return null
+  return Object.values(ENCOUNTERS).find(encounter => encounter.roomId === roomId)?.id ?? null
+}
+
 function parseNamedRoomMove(message: string, gameState: GameState): { x: number; y: number } | null {
   const text = normalizeFrenchText(message)
   const hasMovementVerb = /\b(vers|vais|aller|va |deplace|rends|rejoins?|rejoint|entre|entrer|retournes?|retourner|montes?|monter|grimpes?|grimpe|empruntes?|prends|suis|suivre)\b/.test(text)
@@ -1279,6 +1284,25 @@ function parsePlayerAttackInput(
   return input
 }
 
+function parseEncounterRepairInput(
+  message: string,
+  gameState: GameState
+): Record<string, unknown> | null {
+  if (gameState.phase !== 'exploration' || countAliveMonsters(gameState) > 0) return null
+
+  const encounterId = encounterIdForRoom(gameState.currentRoomId)
+  if (!encounterId) return null
+
+  const text = normalizeFrenchText(message)
+  const asksForMissingEncounter = /\b(tokens?|gobelins?|monstres?|ennemis?|combat|initiative|affich|afficher|apparaitre|spawn|carte|contradiction|desynchro|bug)\b/.test(text)
+  if (!asksForMissingEncounter) return null
+
+  return {
+    encounterId,
+    reason: 'Synchronisation serveur: la scene decrit une rencontre de salle qui doit exister sur la carte.',
+  }
+}
+
 function summarizeMcpResultForNarration(toolName: string, result: unknown): string {
   if (isObjectRecord(result)) {
     if (typeof result.mechanicalSummary === 'string') return result.mechanicalSummary
@@ -1307,17 +1331,41 @@ async function resolveServerFirstAction(
   let input: Record<string, unknown> | null = null
 
   const attackInput = parsePlayerAttackInput(message, gameState)
+  const encounterRepairInput = parseEncounterRepairInput(message, gameState)
   if (attackInput) {
     toolName = 'resolve_player_attack'
     input = attackInput
+  } else if (encounterRepairInput) {
+    toolName = 'start_encounter'
+    input = encounterRepairInput
   } else if (detectPassTurnIntent(message, gameState)) {
     toolName = 'pass_turn'
     input = { reason: 'Le joueur attend et passe son tour.' }
   } else {
     const toCell = parseCoordinateMove(message, gameState) ?? parseNamedRoomMove(message, gameState)
     if (toCell) {
-      toolName = 'move_token'
-      input = { tokenId: 'player', toCell }
+      const targetRoomId = inferMappedAdventureRoomId(toCell)
+      const encounterId = encounterIdForRoom(targetRoomId)
+      const shouldStartEncounter =
+        gameState.phase === 'exploration' &&
+        countAliveMonsters(gameState) === 0 &&
+        targetRoomId !== null &&
+        encounterId &&
+        (
+          targetRoomId !== gameState.currentRoomId ||
+          !gameState.roomsVisited.includes(targetRoomId)
+        )
+
+      if (shouldStartEncounter) {
+        toolName = 'start_encounter'
+        input = {
+          encounterId,
+          reason: 'Le joueur entre dans une salle occupee.',
+        }
+      } else {
+        toolName = 'move_token'
+        input = { tokenId: 'player', toCell }
+      }
     }
   }
 
