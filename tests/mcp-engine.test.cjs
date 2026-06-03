@@ -35,6 +35,7 @@ function makeCombatState(baseState, overrides = {}) {
     round: 1,
     initiativeOrder: ['player', 'goblin_a'],
     movementUsed: {},
+    actionUsed: {},
     player: {
       ...baseState.player,
       position: overrides.playerPosition ?? { x: 0, y: 0 },
@@ -181,6 +182,83 @@ test('MCP rules reject overlong combat movement and occupied cells', async () =>
   })
 })
 
+test('MCP rules require an action before advancing the current turn', async () => {
+  await withMcpClient(async client => {
+    const baseState = await callTool(client, 'get_game_state')
+
+    await callTool(client, 'replace_game_state', {
+      gameState: makeCombatState(baseState),
+    })
+
+    const earlyNextTurn = await callTool(client, 'next_turn', { actorId: 'player' })
+    assert.equal(earlyNextTurn.code, 'TURN_ACTION_REQUIRED')
+
+    const attack = await callTool(client, 'resolve_attack', {
+      attackerId: 'player',
+      targetId: 'goblin_a',
+      weaponOrSpell: 'longsword',
+      customDamageDice: '1d2',
+    })
+    assert.equal(attack.attackerId, 'player')
+
+    const secondAttack = await callTool(client, 'resolve_attack', {
+      attackerId: 'player',
+      targetId: 'goblin_a',
+      weaponOrSpell: 'longsword',
+    })
+    assert.equal(secondAttack.code, 'ACTION_ALREADY_USED')
+
+    const nextTurn = await callTool(client, 'next_turn', { actorId: 'player' })
+    assert.equal(nextTurn.endedTurn, 'player')
+    assert.equal(nextTurn.currentTurn, 'goblin_a')
+  })
+})
+
+test('MCP rules do not consume an action for rejected range attempts', async () => {
+  await withMcpClient(async client => {
+    const baseState = await callTool(client, 'get_game_state')
+
+    await callTool(client, 'replace_game_state', {
+      gameState: makeCombatState(baseState, {
+        currentTurn: 'goblin_a',
+        playerPosition: { x: 0, y: 0 },
+        monsterPosition: { x: 3, y: 0 },
+      }),
+    })
+
+    const outOfRange = await callTool(client, 'resolve_attack', {
+      attackerId: 'goblin_a',
+      targetId: 'player',
+      weaponOrSpell: 'cimeterre',
+    })
+    assert.equal(outOfRange.code, 'TARGET_OUT_OF_RANGE')
+
+    const move = await callTool(client, 'move_token', {
+      tokenId: 'goblin_a',
+      toCell: { x: 1, y: 0 },
+    })
+    assert.equal(move.success, true)
+
+    const attack = await callTool(client, 'resolve_attack', {
+      attackerId: 'goblin_a',
+      targetId: 'player',
+      weaponOrSpell: 'cimeterre',
+    })
+    assert.equal(attack.attackerId, 'goblin_a')
+
+    const secondAttack = await callTool(client, 'resolve_attack', {
+      attackerId: 'goblin_a',
+      targetId: 'player',
+      weaponOrSpell: 'cimeterre',
+    })
+    assert.equal(secondAttack.code, 'ACTION_ALREADY_USED')
+
+    const nextTurn = await callTool(client, 'next_turn', { actorId: 'goblin_a' })
+    assert.equal(nextTurn.endedTurn, 'goblin_a')
+    assert.equal(nextTurn.currentTurn, 'player')
+  })
+})
+
 test('MCP rules require force to end combat with active enemies', async () => {
   await withMcpClient(async client => {
     const baseState = await callTool(client, 'get_game_state')
@@ -285,6 +363,7 @@ test('MCP combat scenario resolves movement, attacks, turn order, and combat end
     assert.equal(finalState.currentTurn, null)
     assert.equal(finalState.round, 0)
     assert.deepEqual(finalState.movementUsed, {})
+    assert.deepEqual(finalState.actionUsed, {})
     assert.equal(finalState.monsters[monster.id].isAlive, false)
     assert.ok(finalState.combatLog.length >= 5)
   })

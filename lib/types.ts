@@ -85,6 +85,7 @@ export interface GameState {
   currentTurn: string | null
   round: number
   movementUsed: Record<string, number>  // grid cells spent by entity during its current turn
+  actionUsed: Record<string, boolean>   // action economy consumed by entity during its current turn
   combatLog: CombatLogEntry[]
   roomsVisited: string[]
   currentRoomId: string | null

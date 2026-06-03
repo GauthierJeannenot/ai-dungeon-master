@@ -334,6 +334,60 @@ async function syncMCPState(gameState: GameState, sessionId: string | undefined)
   return gameState
 }
 
+function isObjectRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function isMcpErrorResult(result: unknown): boolean {
+  return isObjectRecord(result) && typeof result.error === 'string'
+}
+
+function hasCompletedCurrentAction(gameState: GameState | undefined | null): boolean {
+  if (!gameState || gameState.phase !== 'combat' || !gameState.currentTurn) return false
+  return Boolean(gameState.actionUsed?.[gameState.currentTurn])
+}
+
+async function autoAdvanceCompletedTurn(
+  gameState: GameState,
+  sessionId: string | undefined,
+  requestId: string
+): Promise<{ gameState: GameState; advanced: boolean }> {
+  if (!hasCompletedCurrentAction(gameState)) {
+    return { gameState, advanced: false }
+  }
+
+  const actorId = gameState.currentTurn!
+  const startedAt = Date.now()
+  logEvent('info', 'dm.turn.auto_advance.start', {
+    requestId,
+    sessionId,
+    actorId,
+    gameState: summarizeGameState(gameState),
+  })
+
+  const result = await callMCPTool('next_turn', { actorId }, sessionId)
+  if (isMcpErrorResult(result)) {
+    logEvent('warn', 'dm.turn.auto_advance.failed', {
+      requestId,
+      sessionId,
+      actorId,
+      result,
+    })
+    return { gameState, advanced: false }
+  }
+
+  const nextGameState = await callMCPTool('get_game_state', {}, sessionId) as GameState
+  logEvent('info', 'dm.turn.auto_advance.ok', {
+    requestId,
+    sessionId,
+    actorId,
+    durationMs: Date.now() - startedAt,
+    result,
+    gameState: summarizeGameState(nextGameState),
+  })
+  return { gameState: nextGameState, advanced: true }
+}
+
 // ── Handler principal ─────────────────────────────────────────────────────────
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const requestStartedAt = Date.now()
@@ -464,6 +518,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     let narrative = ''
     let iterations = 0
+    let turnBoundaryReached = false
 
     while (iterations < MAX_TOOL_ITERATIONS) {
       iterations++
@@ -542,6 +597,29 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
         const toolResults: Anthropic.ToolResultBlockParam[] = []
         for (const toolUse of toolUseBlocks) {
+          if (turnBoundaryReached) {
+            const result = {
+              error: 'Turn boundary already reached in this request. Wait for the next player message before resolving another actor.',
+              code: 'TURN_BOUNDARY_REACHED',
+              detail: { toolName: toolUse.name },
+            }
+            logEvent('warn', 'dm.tool_use.blocked_after_turn_boundary', {
+              requestId,
+              sessionId,
+              iteration: iterations,
+              toolUseId: toolUse.id,
+              toolName: toolUse.name,
+              result,
+            })
+            toolResults.push({
+              type: 'tool_result',
+              tool_use_id: toolUse.id,
+              content: JSON.stringify(result),
+              is_error: true,
+            })
+            continue
+          }
+
           toolsUsed.push(toolUse.name)
           logEvent('info', 'dm.tool_use.start', {
             requestId,
@@ -561,6 +639,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
               toolName: toolUse.name,
               result,
             })
+            if (toolUse.name === 'next_turn' && !isMcpErrorResult(result)) {
+              turnBoundaryReached = true
+              logEvent('info', 'dm.turn.boundary_reached', {
+                requestId,
+                sessionId,
+                iteration: iterations,
+                toolUseId: toolUse.id,
+                result,
+              })
+            }
             toolResults.push({
               type: 'tool_result',
               tool_use_id: toolUse.id,
@@ -590,7 +678,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           sessionId,
           iteration: iterations,
           toolResultCount: toolResults.length,
+          turnBoundaryReached,
         })
+        if (turnBoundaryReached) break
         continue
       }
 
@@ -661,6 +751,22 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         gameState: summarizeGameState(currentGameState),
       })
     } catch { /* garde l'état qu'on avait */ }
+
+    if (!turnBoundaryReached) {
+      try {
+        const autoAdvance = await autoAdvanceCompletedTurn(currentGameState, sessionId, requestId)
+        if (autoAdvance.advanced) {
+          currentGameState = autoAdvance.gameState
+          toolsUsed.push('next_turn')
+        }
+      } catch (err) {
+        logEvent('error', 'dm.turn.auto_advance.error', {
+          requestId,
+          sessionId,
+          err,
+        })
+      }
+    }
 
     const persistedHistory = [
       ...(newSummary ? recentHistory : requestHistory),

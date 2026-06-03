@@ -248,13 +248,28 @@ export function registerPhaseTools(server: McpServer): void {
   // Advances to the next turn in initiative order
   server.tool(
     'next_turn',
-    'Advances to the next combatant in initiative order. Returns who is now acting.',
-    {},
-    async () => {
+    'Ends the current combatant turn and advances initiative. Requires the current actor to have used an action, unless skipAction=true for an explicit pass/hold.',
+    {
+      actorId: z.string().optional().describe('Entity ID ending its own turn. Defaults to currentTurn and must match currentTurn.'),
+      skipAction: z.boolean().optional().describe('Set true only when the current actor explicitly passes/holds instead of using an action.'),
+      reason: z.string().optional().describe('Short reason when skipAction=true, e.g. "holds position" or "cannot reach target".'),
+    },
+    async ({ actorId, skipAction, reason }) => {
+      let endingActorId: string
       try {
-        rules.validateNextTurn()
+        endingActorId = rules.validateNextTurn(actorId, Boolean(skipAction))
       } catch (err) {
         return rules.ruleErrorResult(err)
+      }
+
+      if (skipAction) {
+        const actor = gs.getEntity(endingActorId)
+        gs.addLogEntry({
+          round: gs.getState().round,
+          turn: endingActorId,
+          action: `${actor?.name ?? endingActorId} passe son tour`,
+          mechanicalDetail: reason,
+        })
       }
 
       const nextTurn = gs.advanceTurn()
@@ -263,9 +278,12 @@ export function registerPhaseTools(server: McpServer): void {
         content: [{
           type: 'text',
           text: JSON.stringify({
+            endedTurn: endingActorId,
             currentTurn: nextTurn,
             round: state.round,
             initiativeOrder: state.initiativeOrder,
+            skippedAction: Boolean(skipAction),
+            reason,
           }),
         }],
       }
@@ -298,6 +316,7 @@ export function registerPhaseTools(server: McpServer): void {
       state.currentTurn = null
       state.round = 0
       state.movementUsed = {}
+      state.actionUsed = {}
 
       gs.addLogEntry({
         round: state.round,
