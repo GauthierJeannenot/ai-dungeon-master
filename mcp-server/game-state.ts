@@ -10,7 +10,7 @@ const DEFAULT_PLAYER: PlayerState = {
   ac: 16,
   stats: { str: 16, dex: 12, con: 14, int: 10, wis: 12, cha: 10 },
   proficiencyBonus: 2,
-  position: { x: 10, y: 13 },
+  position: { x: 4, y: 13 },
   conditions: [],
   speed: 30,
   inventory: [
@@ -42,6 +42,11 @@ export function getState(): GameState {
 
 export function resetState(): GameState {
   state = createInitialState()
+  return state
+}
+
+export function replaceState(nextState: GameState): GameState {
+  state = structuredClone(nextState)
   return state
 }
 

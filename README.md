@@ -5,7 +5,7 @@ Application web de jeu de rôle D&D 5e avec un Dungeon Master IA (Claude) comme 
 ## Stack
 
 - **Frontend** : Next.js 16, TypeScript, Tailwind CSS
-- **IA** : Anthropic SDK avec `claude-sonnet-4-20250514`
+- **IA** : Anthropic SDK avec `claude-haiku-4-5`
 - **MCP** : `@modelcontextprotocol/sdk` — game engine déterministe
 
 ## Prérequis
@@ -35,9 +35,10 @@ Placez votre image dans `/public/battlemap.jpg`. En l'absence du fichier, un fon
 
 ### 3. Fichiers de contexte (optionnel)
 
-Les trois fichiers dans `/context/` sont pré-remplis avec une aventure complète :
+Les quatre fichiers dans `/context/` sont pré-remplis avec une aventure complète :
 
-- `context/player-rules.md` — Stats, équipement, capacités du joueur
+- `context/player-character.md` — Fiche, stats, équipement et historique du joueur
+- `context/player-rules.md` — Règles et capacités côté joueur
 - `context/dm-rules.md` — Tables de monstres, règles de combat
 - `context/adventure-module.md` — Carte des salles, monstres, trésors, triggers
 
@@ -71,7 +72,7 @@ Ouvrez http://localhost:3000
 
 ## Monstres disponibles
 
-`goblin`, `hobgoblin`, `orc`, `skeleton`, `zombie`, `wolf`, `bandit`
+`goblin_minion`, `goblin`, `goblin_boss`, `hobgoblin`, `hobgoblin_captain`, `skeleton`, `zombie`, `violet_fungus`, `wolf`, `bandit`, `dryad`, `awakened_tree`
 
 ---
 

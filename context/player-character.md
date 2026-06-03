@@ -9,7 +9,7 @@
 - **Alignement** : Loyal Neutre
 
 ## Histoire
-Ancien soldat d'une compagnie de mercenaires dissoute, tu cherches à te racheter après avoir participé à des actes dont tu n'es pas fier. La crypte des Valecour représente une opportunité : de l'or, certes, mais aussi peut-être une façon de faire le bien en chassant les créatures qui profanent ce lieu.
+Ancien soldat d'une compagnie de mercenaires dissoute, tu cherches à te racheter après avoir participé à des actes dont tu n'es pas fier. La mission confiée par Tyndareus le Vert à la Boulangerie de Grammy représente une opportunité : de l'or, certes, mais aussi peut-être une façon de faire le bien sans dégainer l'épée au premier souffle de conflit.
 
 ## Caractéristiques
 | Caractéristique | Score | Modificateur |
