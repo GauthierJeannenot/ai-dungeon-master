@@ -93,8 +93,9 @@ async function ollamaChat(
     messages,
     tools: tools.length > 0 ? tools : undefined,
     stream: false,
+    tool_choice: tools.length > 0 ? 'auto' : undefined,
     options: {
-      temperature: 0.4,      // bas pour fiabiliser le tool calling
+      temperature: 0.2,      // très bas pour forcer le tool calling
       num_predict: MAX_TOKENS,
     },
   }
@@ -159,12 +160,16 @@ ${ctx.dmRules}
 MODULE:
 ${ctx.adventureModule}
 
-RÈGLES MÉCANIQUES:
-- Tout calcul → tools MCP obligatoires. Ne jamais inventer de chiffres.
-- Déplacement → move_token AVANT de narrer.
-- Début combat → spawn_monster + enter_combat, narre, STOP.
-- Tour joueur → resolve_attack ou saving_throw + next_turn, STOP.
-- Tour monstre → resolve_attack + next_turn, STOP.
+RÈGLES MÉCANIQUES — FUNCTION CALLING OBLIGATOIRE:
+⚠️ Tu as accès à des fonctions (tools). Tu DOIS les appeler via le mécanisme function_call de l'API.
+NE JAMAIS écrire un appel de tool dans le texte de ta réponse (pas de backticks, pas de "trigger_room_event(...)").
+Appelle TOUJOURS la fonction via l'API, puis attends le résultat avant de narrer.
+
+- Déplacement explicite → appelle move_token, puis narre.
+- Entrée dans une salle → appelle trigger_room_event.
+- Début combat → appelle spawn_monster puis enter_combat.
+- Attaque joueur → appelle resolve_attack puis next_turn.
+- Tour monstre → appelle resolve_attack puis next_turn.
 - HP monstres : vigoureux / légèrement blessé / gravement blessé / à l'agonie.
 
 ÉTAT DU JEU: ${serializeGameState(gs)}`)
