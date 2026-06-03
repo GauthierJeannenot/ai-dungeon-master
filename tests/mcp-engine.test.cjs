@@ -84,6 +84,12 @@ test('rollDice rejects invalid notation', () => {
   assert.throws(() => dice.rollDice('not-dice'), /Invalid dice notation/)
 })
 
+test('d20WithModifier formats positive, zero, and negative modifiers', () => {
+  assert.equal(dice.d20WithModifier(5), '1d20+5')
+  assert.equal(dice.d20WithModifier(0), '1d20')
+  assert.equal(dice.d20WithModifier(-5), '1d20-5')
+})
+
 test('replaceState deep-copies incoming state', () => {
   const source = JSON.parse(JSON.stringify(gameState.getState()))
   source.player.position = { x: 2, y: 3 }
@@ -191,5 +197,95 @@ test('MCP rules require force to end combat with active enemies', async () => {
     })
     assert.equal(forced.phase, 'exploration')
     assert.equal(forced.reason, 'Les gobelins fuient.')
+  })
+})
+
+test('MCP combat scenario resolves movement, attacks, turn order, and combat end', async () => {
+  await withMcpClient(async client => {
+    const baseState = await callTool(client, 'get_game_state')
+    baseState.player.position = { x: 0, y: 0 }
+    baseState.player.stats = { ...baseState.player.stats, str: 100, dex: 100 }
+    baseState.player.ac = 1
+    baseState.player.hp = { current: 20, max: 20 }
+
+    await callTool(client, 'replace_game_state', { gameState: baseState })
+    const monster = await callTool(client, 'spawn_monster', {
+      monsterType: 'training_dummy',
+      cell: { x: 2, y: 0 },
+      name: 'Training Dummy',
+      hpOverride: 50,
+    })
+
+    const stagedState = await callTool(client, 'get_game_state')
+    stagedState.monsters[monster.id] = {
+      ...stagedState.monsters[monster.id],
+      stats: { ...stagedState.monsters[monster.id].stats, dex: 1 },
+      attackBonus: 50,
+      damageDice: '1d2',
+    }
+    await callTool(client, 'replace_game_state', { gameState: stagedState })
+
+    const combat = await callTool(client, 'enter_combat', {
+      combatants: ['player', monster.id],
+    })
+    assert.equal(combat.phase, 'combat')
+    assert.equal(combat.currentTurn, 'player')
+
+    const move = await callTool(client, 'move_token', {
+      tokenId: 'player',
+      toCell: { x: 1, y: 0 },
+    })
+    assert.equal(move.success, true)
+    assert.equal(move.distanceMoved, 1)
+    assert.equal(move.remainingMovement, 5)
+
+    const firstAttack = await callTool(client, 'resolve_attack', {
+      attackerId: 'player',
+      targetId: monster.id,
+      weaponOrSpell: 'longsword',
+      customDamageDice: '1d2',
+    })
+    assert.equal(firstAttack.hit, true)
+    assert.equal(firstAttack.targetDied, false)
+    assert.ok(firstAttack.targetHpAfter < 50)
+
+    const monsterTurn = await callTool(client, 'next_turn')
+    assert.equal(monsterTurn.currentTurn, monster.id)
+
+    const counterAttack = await callTool(client, 'resolve_attack', {
+      attackerId: monster.id,
+      targetId: 'player',
+      weaponOrSpell: 'club',
+      customDamageDice: '1d2',
+    })
+    assert.equal(counterAttack.hit, true)
+    assert.equal(counterAttack.targetDied, false)
+    assert.ok(counterAttack.targetHpAfter < 20)
+
+    const playerTurn = await callTool(client, 'next_turn')
+    assert.equal(playerTurn.currentTurn, 'player')
+
+    const killingAttack = await callTool(client, 'resolve_attack', {
+      attackerId: 'player',
+      targetId: monster.id,
+      weaponOrSpell: 'longsword',
+      customDamageDice: '50d2',
+    })
+    assert.equal(killingAttack.hit, true)
+    assert.equal(killingAttack.targetDied, true)
+    assert.equal(killingAttack.targetHpAfter, 0)
+
+    const ended = await callTool(client, 'end_combat')
+    assert.equal(ended.phase, 'exploration')
+    assert.equal(ended.xpAwarded, 50)
+    assert.deepEqual(ended.defeatedMonsters, [{ id: monster.id, name: 'Training Dummy', xp: 50 }])
+
+    const finalState = await callTool(client, 'get_game_state')
+    assert.equal(finalState.phase, 'exploration')
+    assert.equal(finalState.currentTurn, null)
+    assert.equal(finalState.round, 0)
+    assert.deepEqual(finalState.movementUsed, {})
+    assert.equal(finalState.monsters[monster.id].isAlive, false)
+    assert.ok(finalState.combatLog.length >= 5)
   })
 })
