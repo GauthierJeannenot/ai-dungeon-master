@@ -633,7 +633,8 @@ RYTHME DE TABLE:
 - Court ne veut pas dire sec: vise 2-5 phrases courtes avec un mouvement, une reaction ou une information utile.
 - Evite les reponses purement atmospheriques. Chaque reponse doit faire avancer la scene, meme legerement.
 - Si un PNJ repond, donne une replique savoureuse ou une decision visible, pas seulement une description.
-- Termine sur une situation qui appelle naturellement l'action du joueur, sans menu ni formule froide.
+- Si le joueur semble perdu, sois directif: donne la meilleure piste immediate en fiction et une pression claire.
+- Termine sur une situation qui appelle naturellement l'action du joueur, sans menu ni formule froide. Evite "que fais-tu ?" et "vous allez ou ?".
 - Si le joueur critique le style, la longueur, le systeme ou un bug, ne reponds pas a la critique et ne t'excuse pas: applique la correction silencieusement puis reprends la scene en fiction.
 
 PERSONNAGE:
@@ -704,9 +705,10 @@ Ne lance aucun de, n'invente aucun nouvel ennemi, ne resous aucun tour futur.
 Reponse breve: 2-5 phrases courtes, present, style vivant mais clair.
 Format vocal: pas de Markdown, pas de liste, pas de titre, pas de parenthese, pas d'excuse, pas de commentaire meta, pas de mention du systeme, des prompts, du moteur, des tools, de MCP ou de l'IA.
 Ne donne pas de coordonnees ni d'ID technique sauf si le joueur les demande explicitement.
-Ne termine pas par un menu d'options. Une question courte et naturelle est permise seulement si elle sert vraiment la scene.
+Ne termine pas par un menu d'options. Evite "que fais-tu ?" et "vous allez ou ?"; prefere une pression concrete ou une piste directe.
 Ne declare pas de fin de quete/campagne ni de conclusion alternative sauf demande explicite. Pas de time-skip: seulement la prochaine minute jouable.
 Donne de l'elan: un mouvement, une replique, une menace, une opportunite ou une information exploitable. Evite les sorties qui ne font que decrire une ambiance.
+Si le joueur semble perdu, sois directif: indique la piste immediate la plus interessante en fiction.
 Si le joueur critique le style, la longueur, le systeme ou un bug, ne reponds pas a la critique: applique la correction silencieusement et reprends la scene en fiction.`
 }
 
@@ -806,6 +808,35 @@ function getCurrentRoomName(gameState: GameState): string | null {
   return ADVENTURE_ROOMS.find(room => room.id === gameState.currentRoomId)?.name ?? null
 }
 
+function buildDirectiveSceneNarrative(gameState: GameState): string {
+  if (gameState.phase === 'combat') {
+    return gameState.currentTurn === 'player'
+      ? "Le combat est a toi. Choisis vite: frappe l'ennemi le plus proche, recule pour respirer, ou tente quelque chose de sale avec le decor."
+      : "Le combat continue sans pause. Reste en garde: ca va bouger autour de toi."
+  }
+
+  switch (gameState.currentRoomId) {
+    case '1':
+      return "Tu es devant la boulangerie. La grande porte mene droit a l'entree; sur le flanc, le quai de chargement promet une approche plus risquee. Si tu veux trouver les gobelins, entre maintenant ou contourne par le quai."
+    case '2':
+      return "Tu es dans le verger. Les arbres cachent des angles morts, mais la piste chaude repart vers le batiment. Choisis: fouiller les pommiers, revenir vers l'entree, ou longer le mur vers le quai."
+    case '3':
+      return "Tu es pres du tas de dechets. Ca sent mauvais et ca remue peut-etre sous les gravats, mais la vraie piste mene encore vers la boulangerie. Fouille le tas si tu oses, sinon reviens vers l'entree."
+    case '4':
+      return "Tu es dans l'entree. Les traces les plus fraiches partent vers les fours, et l'appartement de Grammy sent la taniere occupee. Si tu veux de l'action, pousse vers le sol de la boulangerie; si tu veux le chef, vise l'appartement."
+    case '5':
+      return "Tu es dans le bureau. Les papiers peuvent donner une piste, mais le danger est ailleurs. Fouille vite les registres, puis repars vers l'entree ou l'appartement."
+    case '7':
+      return "Tu es au quai de chargement. La porte laterale donne sur le sol de la boulangerie, parfait pour surprendre ce qui traine dedans. Ouvre, observe une seconde, puis entre franchement."
+    case '8':
+      return "Tu es au sol de la boulangerie. Les fours claquent, les poutres grincent, et la reserve pue la farine rance. Prends l'initiative: fouille les fours, ouvre la reserve, ou grimpe vers les poutres."
+    case '9':
+      return "Tu es dans l'appartement de Grammy. Ici, ca sent la fourrure, la viande sechee et l'autorite brutale. Si tu veux negocier, parle fort; si tu veux survivre, garde ta lame prete."
+    default:
+      return "La piste est confuse, mais pas morte. Reviens vers l'entree, cherche une porte claire, ou annonce franchement ce que tu veux obtenir."
+  }
+}
+
 function buildOralFallbackNarrative(gameState: GameState, toolsUsed: string[]): string {
   const roomName = getCurrentRoomName(gameState)
 
@@ -821,7 +852,7 @@ function buildOralFallbackNarrative(gameState: GameState, toolsUsed: string[]): 
       : "Le combat continue dans une tension brutale."
   }
 
-  return "Un bref silence tombe autour de toi; l'instant reste ouvert."
+  return buildDirectiveSceneNarrative(gameState)
 }
 
 function splitIntoSentences(text: string): string[] {
@@ -900,7 +931,7 @@ function lineLooksLikeMetaCommentary(line: string): boolean {
     /\b(tu es actuellement|tu es a\s+(?:en\s+)?salle\s+\d+|salle\s+\d+\s+[-:])\b/,
     /\b(excuse-moi|desole|erreur de ma part|j'aurais du|j aurais du|je vais corriger|merci de cette correction)\b/,
     /\b(je dois clarifier|non, ce message n'est pas|ce message n'est pas|on continue|laissez-moi recommencer|plus de substance)\b/,
-    /\b(que fais-tu|que faites-vous|qu[' ]?allez-vous faire|qu[' ]?en est-il|ou veux-tu aller ensuite|deplacement,\s*attaque|attaque,\s*test|roleplay pur)\b/,
+    /\b(que fais-tu|que faites-vous|qu[' ]?allez-vous faire|qu[' ]?en est-il|ou veux-tu aller ensuite|vous allez ou|tu vas ou|ou allez-vous|qu[' ]?est-ce que tu fais|deplacement,\s*attaque|attaque,\s*test|roleplay pur)\b/,
     /\b(appeler\s+\w+|move_token|start_encounter|resolve_player_attack|pass_turn|roll_dice)\b/,
     /\b(fin de quete|fin de campagne|quete alternative|objectif accompli|mission accomplie)\b/,
     /\b(heures suivantes|jours suivants|semaines suivantes|premiere fournee|faire fortune)\b/,
@@ -1177,12 +1208,7 @@ function detectNarrativeRoomContractIssue(
 }
 
 function buildNarrativeStateCorrection(gameState: GameState): string {
-  const roomName = getCurrentRoomName(gameState)
-  if (roomName) {
-    return `Tu restes dans ${roomName}. Tu percois des traces et des bruits dans le batiment, mais aucun ennemi n'est visible devant toi pour l'instant.`
-  }
-
-  return "Tu percois des traces et des bruits dans le batiment, mais aucun ennemi n'est visible devant toi pour l'instant."
+  return buildDirectiveSceneNarrative(gameState)
 }
 
 function detectRequiredMechanicalAction(message: string, gameState: GameState): RequiredMechanicalAction | null {
@@ -1197,7 +1223,8 @@ function detectRequiredMechanicalAction(message: string, gameState: GameState): 
   const goToMovementIntent = /\b(vais|va)\b(?=.{0,80}\b(vers|au|aux|a la|a l|dans|voir|parler|rejoindre|retrouver|retourner|salle|piece|bureau|appartement|boulangerie|quai|verger|pommier)\b)/.test(text)
   const baseMovementIntent = directMovementIntent || goToMovementIntent
   const followIntent = /\b(suis|suivre|poursuis|poursuivre)\b/.test(text) && /\b(gobelins?|ennemis?|monstres?|creatures?|silhouettes?|eux|traces?)\b/.test(text)
-  const movementIntent = baseMovementIntent || followIntent
+  const searchEnemyIntent = /\b(cherches?|chercher|trouves?|trouver|deniches?|denicher|traques?|traquer|pistes?|pister)\b(?=.{0,80}\b(gobelins?|ennemis?|mechants?|monstres?|creatures?|silhouettes?)\b)/.test(text)
+  const movementIntent = baseMovementIntent || followIntent || searchEnemyIntent
   const mentionsCreature = /\b(ennemis?|gobelins?|monstres?|creatures?|silhouettes?|eclaireurs?)\b/.test(text)
   const explicitEncounterIntent = /\b(combat|apparaitre|spawn|carte|initiative|debarques?|perissez|fuyez)\b/.test(text)
   const hostileCreatureIntent = mentionsCreature && /\b(attaquent?|attaquer|hostiles?|menacent?|chargent?|surgissent?|arrivent?|debarquent?|foncent?|encerclent?)\b/.test(text)
@@ -1233,6 +1260,11 @@ function detectDebugStateQuestion(message: string): boolean {
   const mentionsDebugSurface = /\b(client|javascript|js|serveur|pion|token|jeton|carte|battlemap|affichage|desynchro|desynchronise|bug|bonne salle|bonne piece)\b/.test(text)
   const asksForLocation = /\b(position|salle|piece|ou je suis|ou suis|bonne salle|bonne piece|bon endroit|la ou je devrais etre)\b/.test(text)
   return mentionsDebugSurface && asksForLocation
+}
+
+function detectDirectiveGuidanceRequest(message: string): boolean {
+  const text = normalizeFrenchText(message)
+  return /\b(quoi maintenant|je fais quoi|on fait quoi|que faire|quoi faire|quelle suite|prochaine action|tu proposes quoi|tu me proposes quoi|guide moi|aide moi|je suis perdu|on est perdu|quelle direction|ou aller|ou je vais|par ou|donne moi une piste)\b/.test(text)
 }
 
 function buildDebugStateNarrative(gameState: GameState): string {
@@ -1279,12 +1311,16 @@ function encounterIdForRoom(roomId: string | null | undefined): string | null {
 }
 
 function relativeRoomIdForExplorationMove(text: string, gameState: GameState): string | null {
-  if (!/\b(plus loin|continue|continuer|aventure|aventurer|avance|avancer|explore|explorer|nourriture|manger|reserve|reserves)\b/.test(text)) {
+  const exploresForward = /\b(plus loin|continue|continuer|aventure|aventurer|avance|avancer|explore|explorer|nourriture|manger|reserve|reserves)\b/.test(text)
+  const huntsEnemies = /\b(cherches?|chercher|trouves?|trouver|deniches?|denicher|traques?|traquer|pistes?|pister)\b(?=.{0,80}\b(gobelins?|ennemis?|mechants?|monstres?|creatures?|silhouettes?)\b)/.test(text)
+  if (!exploresForward && !huntsEnemies) {
     return null
   }
 
   if (gameState.currentRoomId === '1') return '4'
   if (gameState.currentRoomId === '4') return '8'
+  if (gameState.currentRoomId === '7') return '8'
+  if (gameState.currentRoomId === '8') return '9'
   return null
 }
 
@@ -1325,7 +1361,7 @@ function contextualRoomIdFromRecentDm(
 
 function parseNamedRoomMove(message: string, gameState: GameState): { x: number; y: number } | null {
   const text = normalizeFrenchText(message)
-  const hasMovementVerb = /\b(vers|vais|aller|va |deplace|rends|rejoins?|rejoint|entre|entrer|retournes?|retourner|montes?|monter|grimpes?|grimpe|empruntes?|prends|suis|suivre|aventure|aventurer|continue|continuer|avances?|avancer|explores?|explorer|investig\w*|inspect\w*|examin\w*|fouill\w*)\b/.test(text)
+  const hasMovementVerb = /\b(vers|vais|aller|va |deplace|rends|rejoins?|rejoint|entre|entrer|retournes?|retourner|montes?|monter|grimpes?|grimpe|empruntes?|prends|suis|suivre|aventure|aventurer|continue|continuer|avances?|avancer|explores?|explorer|investig\w*|inspect\w*|examin\w*|fouill\w*|cherch\w*|trouv\w*|denich\w*|traqu\w*|pist\w*)\b/.test(text)
   if (!hasMovementVerb) return null
 
   const relativeRoomId = relativeRoomIdForExplorationMove(text, gameState)
@@ -1482,6 +1518,24 @@ async function resolveServerFirstAction(
   if (detectDebugStateQuestion(message)) {
     const draftNarrative = buildDebugStateNarrative(gameState)
     logEvent('info', 'dm.cost.engine_first.debug_state', {
+      requestId,
+      sessionId,
+      durationMs: Date.now() - startedAt,
+      draftNarrative,
+      gameState: summarizeGameState(gameState),
+    })
+    return {
+      handled: true,
+      gameState,
+      toolsUsed: [],
+      draftNarrative,
+      sawMcpToolError: false,
+    }
+  }
+
+  if (detectDirectiveGuidanceRequest(message)) {
+    const draftNarrative = buildDirectiveSceneNarrative(gameState)
+    logEvent('info', 'dm.cost.engine_first.directive_guidance', {
       requestId,
       sessionId,
       durationMs: Date.now() - startedAt,
