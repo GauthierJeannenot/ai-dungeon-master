@@ -97,7 +97,7 @@ async function ollamaChat(
     options: {
       temperature: 0.2,      // très bas pour forcer le tool calling
       num_predict: MAX_TOKENS,
-      num_ctx: 8192,         // limite le KV cache — évite le débordement VRAM sur A100 80GB
+      num_ctx: 32768,        // ~20GB KV cache + 43GB modèle = ~63GB / 80GB VRAM A100
     },
   }
 
