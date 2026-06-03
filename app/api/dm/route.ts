@@ -26,7 +26,7 @@ const MODEL = 'claude-haiku-4-5'
 const MAX_TOOL_ITERATIONS = 3
 const MAX_TOKENS = 400
 const FINAL_NARRATION_MAX_TOKENS = parsePositiveInt(process.env.LLM_FINAL_NARRATION_MAX_TOKENS, 180)
-const ORAL_NARRATION_MAX_SENTENCES = parsePositiveInt(process.env.ORAL_NARRATION_MAX_SENTENCES, 4)
+const ORAL_NARRATION_MAX_SENTENCES = parsePositiveInt(process.env.ORAL_NARRATION_MAX_SENTENCES, 5)
 const COMBAT_LOG_TAIL = 6
 const MAX_AUTO_NPC_TURNS = 8
 type LlmMode = 'live' | 'mock' | 'record' | 'replay'
@@ -615,7 +615,7 @@ FORMAT ORAL:
 - Si le joueur annonce un plan long, accepte l'intention mais ne saute pas des heures ou des jours: narre seulement la prochaine minute jouable.
 
 RYTHME DE TABLE:
-- Court ne veut pas dire sec: vise 2-4 phrases courtes avec un mouvement, une reaction ou une information utile.
+- Court ne veut pas dire sec: vise 2-5 phrases courtes avec un mouvement, une reaction ou une information utile.
 - Evite les reponses purement atmospheriques. Chaque reponse doit faire avancer la scene, meme legerement.
 - Si un PNJ repond, donne une replique savoureuse ou une decision visible, pas seulement une description.
 - Termine sur une situation qui appelle naturellement l'action du joueur, sans menu ni formule froide.
@@ -686,7 +686,7 @@ function buildNarrationStaticPrompt(): string {
 Narre uniquement la consequence immediate de l'action du joueur.
 Respecte strictement les resultats mecaniques fournis: jets, degats, morts, positions, tour courant.
 Ne lance aucun de, n'invente aucun nouvel ennemi, ne resous aucun tour futur.
-Reponse breve: 2-4 phrases courtes, present, style vivant mais clair.
+Reponse breve: 2-5 phrases courtes, present, style vivant mais clair.
 Format vocal: pas de Markdown, pas de liste, pas de titre, pas de parenthese, pas d'excuse, pas de commentaire meta, pas de mention du systeme, des prompts, du moteur, des tools, de MCP ou de l'IA.
 Ne donne pas de coordonnees ni d'ID technique sauf si le joueur les demande explicitement.
 Ne termine pas par un menu d'options. Une question courte et naturelle est permise seulement si elle sert vraiment la scene.
@@ -885,11 +885,20 @@ function lineLooksLikeMetaCommentary(line: string): boolean {
     /\b(tu es actuellement|tu es a\s+(?:en\s+)?salle\s+\d+|salle\s+\d+\s+[-:])\b/,
     /\b(excuse-moi|desole|erreur de ma part|j'aurais du|j aurais du|je vais corriger|merci de cette correction)\b/,
     /\b(je dois clarifier|non, ce message n'est pas|ce message n'est pas|on continue|laissez-moi recommencer|plus de substance)\b/,
-    /\b(que fais-tu|ou veux-tu aller ensuite|deplacement,\s*attaque|attaque,\s*test|roleplay pur)\b/,
+    /\b(que fais-tu|que faites-vous|qu[' ]?allez-vous faire|qu[' ]?en est-il|ou veux-tu aller ensuite|deplacement,\s*attaque|attaque,\s*test|roleplay pur)\b/,
     /\b(appeler\s+\w+|move_token|start_encounter|resolve_player_attack|pass_turn|roll_dice)\b/,
     /\b(fin de quete|fin de campagne|quete alternative|objectif accompli|mission accomplie)\b/,
     /\b(heures suivantes|jours suivants|semaines suivantes|premiere fournee|faire fortune)\b/,
   ].some(pattern => pattern.test(normalized))
+}
+
+function isMetaOnlyNarrative(text: string): boolean {
+  const lines = text
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean)
+
+  return lines.length > 0 && lines.every(lineLooksLikeMetaCommentary)
 }
 
 function looksLikeEnglishDrift(fragment: string): boolean {
@@ -1110,7 +1119,9 @@ function detectRequiredMechanicalAction(message: string, gameState: GameState): 
   }
 
   const attackIntent = /\b(attaque|attaquer|frappe|frapper|tape|coup|assene|charge|tire|lance)\b/.test(text)
-  const baseMovementIntent = /\b(deplaces?|deplacer|avances?|avancer|bouges?|bouger|vais|aller|va |vers|entres?|entrer|rentres?|traverses?|approches?|explores?|explorer|fuis|fuite|recules?|ouvres?|ouvrir|enfonces?|enfoncer|portes?|glisses?|glisser)\b/.test(text)
+  const directMovementIntent = /\b(deplaces?|deplacer|avances?|avancer|bouges?|bouger|aller|vers|entres?|entrer|rentres?|retournes?|retourner|rejoins?|rejoindre|retrouves?|retrouver|rends|traverses?|approches?|explores?|explorer|montes?|monter|grimpes?|grimpe|empruntes?|prends|fuis|fuite|recules?|ouvres?|ouvrir|enfonces?|enfoncer|portes?|glisses?|glisser)\b/.test(text)
+  const goToMovementIntent = /\b(vais|va)\b(?=.{0,80}\b(vers|au|aux|a la|a l|dans|voir|parler|rejoindre|retrouver|retourner|salle|piece|bureau|appartement|boulangerie|quai|verger|pommier)\b)/.test(text)
+  const baseMovementIntent = directMovementIntent || goToMovementIntent
   const followIntent = /\b(suis|suivre|poursuis|poursuivre)\b/.test(text) && /\b(gobelins?|ennemis?|monstres?|creatures?|silhouettes?|eux|traces?)\b/.test(text)
   const movementIntent = baseMovementIntent || followIntent
   const mentionsCreature = /\b(ennemis?|gobelins?|monstres?|creatures?|silhouettes?|eclaireurs?)\b/.test(text)
@@ -1172,7 +1183,10 @@ function centerCellForRoom(roomId: string): { x: number; y: number } | null {
 
 function parseNamedRoomMove(message: string, gameState: GameState): { x: number; y: number } | null {
   const text = normalizeFrenchText(message)
-  if (!/\b(vers|vais|aller|va |deplace|rends|rejoint|entre|entrer|salle|piece|bureau|appartement|boulangerie|quai|verger|mac|treant|pommier)\b/.test(text)) {
+  const hasMovementVerb = /\b(vers|vais|aller|va |deplace|rends|rejoins?|rejoint|entre|entrer|retournes?|retourner|montes?|monter|grimpes?|grimpe|empruntes?|prends|suis|suivre)\b/.test(text)
+  if (!hasMovementVerb) return null
+
+  if (!/\b(salle|piece|bureau|appartement|boulangerie|quai|verger|mac|treant|pommier|etage|haut|escalier)\b/.test(text)) {
     return null
   }
 
@@ -1188,7 +1202,7 @@ function parseNamedRoomMove(message: string, gameState: GameState): { x: number;
 
   const roomAliases: Array<[string, RegExp]> = [
     ['5', /\b(bureau|bureau de grammy)\b/],
-    ['9', /\b(appartement|appartement de grammy)\b/],
+    ['9', /\b(appartement|appartement de grammy|etage|a l etage|en haut|escalier)\b/],
     ['8', /\b(sol de la boulangerie|boulangerie|four|cuisine)\b/],
     ['7', /\b(quai|chargement|dock)\b/],
     ['2', /\b(verger|pommiers?|pommier|arbres?)\b/],
@@ -1766,7 +1780,7 @@ async function generateFinalNarration(
     `Action du joueur:\n${playerMessage}`,
     draftNarrative ? `Brouillon narratif precedent, potentiellement incomplet:\n${draftNarrative}` : undefined,
     `Resultats mecaniques faisant autorite:\n${formatCombatLogEntries(newCombatLogEntries)}`,
-    `Ecris la reponse finale au joueur en francais, au present, en 2-4 phrases courtes. Elle doit etre naturelle a l'oral et donner de l'elan: mouvement, replique, menace, opportunite ou information exploitable. Respecte strictement les resultats mecaniques. N'annonce aucune action future non resolue. Pas de Markdown, pas de liste, pas de parenthese, pas d'excuse, pas de meta, pas de menu, pas de mention du systeme, du moteur, des tools, de MCP ou de l'IA. Pas de coordonnees ni d'ID technique sauf demande explicite du joueur. Ne declare pas de fin de quete/campagne ni de conclusion alternative sauf demande explicite. Pas de time-skip: seulement la prochaine minute jouable. Si le joueur critique le style, la longueur, le systeme ou un bug, ne reponds pas a la critique: applique la correction silencieusement et reprends la scene en fiction.`,
+    `Ecris la reponse finale au joueur en francais, au present, en 2-5 phrases courtes. Elle doit etre naturelle a l'oral et donner de l'elan: mouvement, replique, menace, opportunite ou information exploitable. Respecte strictement les resultats mecaniques. N'annonce aucune action future non resolue. Pas de Markdown, pas de liste, pas de parenthese, pas d'excuse, pas de meta, pas de menu, pas de mention du systeme, du moteur, des tools, de MCP ou de l'IA. Pas de coordonnees ni d'ID technique sauf demande explicite du joueur. Ne declare pas de fin de quete/campagne ni de conclusion alternative sauf demande explicite. Pas de time-skip: seulement la prochaine minute jouable. Si le joueur critique le style, la longueur, le systeme ou un bug, ne reponds pas a la critique: applique la correction silencieusement et reprends la scene en fiction.`,
   ].filter(Boolean).join('\n\n')
 
   try {
@@ -2255,16 +2269,20 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
       if (response.stop_reason === 'max_tokens' && !maxTokensRetryInjected && iterations < MAX_TOOL_ITERATIONS) {
         maxTokensRetryInjected = true
+        const discardedNarrativeLength = narrative.length - narrativeBeforeResponse.length
+        narrative = narrativeBeforeResponse
+        lastEndTurnNarrative = ''
         logEvent('warn', 'dm.anthropic.max_tokens_retry', {
           requestId,
           sessionId,
           iteration: iterations,
           narrativeLength: narrative.length,
+          discardedNarrativeLength,
         })
         messages.push({ role: 'assistant', content: response.content })
         messages.push({
           role: 'user',
-          content: 'SYSTEM INTERNE, a ne jamais citer au joueur: Ta reponse a ete tronquee. Reponds en 1-2 phrases maximum, ou appelle exactement un tool MCP si une mutation mecanique est necessaire. Ne repete pas le brouillon tronque. La reponse visible doit rester orale, sans meta, sans liste, sans Markdown et sans mention d outil.',
+          content: 'SYSTEM INTERNE, a ne jamais citer au joueur: Ta reponse a ete tronquee. Reponds en 2-5 phrases courtes, ou appelle exactement un tool MCP si une mutation mecanique est necessaire. Ne repete pas le brouillon tronque. La reponse visible doit rester orale, vivante, sans meta, sans liste, sans Markdown et sans mention d outil.',
         })
         continue
       }
@@ -2403,7 +2421,17 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       toolsUsed.length === llmToolCountAfterLoop &&
       lastStopReason === 'end_turn' &&
       lastEndTurnNarrative.trim().length > 0 &&
-      !sawMcpToolError
+      !sawMcpToolError &&
+      !isMetaOnlyNarrative(lastEndTurnNarrative)
+
+    const canKeepAccumulatedNarrative =
+      toolsUsed.length > 0 &&
+      toolsUsed.length === llmToolCountAfterLoop &&
+      lastStopReason === 'end_turn' &&
+      lastEndTurnNarrative.trim().length > 0 &&
+      !sawMcpToolError &&
+      isMetaOnlyNarrative(lastEndTurnNarrative) &&
+      narrative.replace(lastEndTurnNarrative, '').trim().length > 0
 
     if (canReuseLlmNarration) {
       narrative = lastEndTurnNarrative.trim()
@@ -2411,6 +2439,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         requestId,
         sessionId,
         toolsUsed: [...new Set(toolsUsed)],
+        narrativeLength: narrative.length,
+      })
+    } else if (canKeepAccumulatedNarrative) {
+      logEvent('info', 'dm.final_narration.skipped_strip_meta_end_turn', {
+        requestId,
+        sessionId,
+        toolsUsed: [...new Set(toolsUsed)],
+        lastEndTurnNarrative,
         narrativeLength: narrative.length,
       })
     } else if (toolsUsed.length > 0) {

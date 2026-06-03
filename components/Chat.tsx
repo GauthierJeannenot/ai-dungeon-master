@@ -11,6 +11,13 @@ interface ChatProps {
   onInputChange: (v: string) => void
 }
 
+const PLAYFUL_PLACEHOLDERS = [
+  "Amadouer l'arbre, forcer la porte, prétendre inspecter les tartes...",
+  "Amadouer l'arbre, forcer la porte, accuser une pomme d'espionnage...",
+  "Amadouer l'arbre, forcer la porte, lancer un grand sourire suspect...",
+  "Amadouer l'arbre, forcer la porte, négocier avec une odeur de cannelle...",
+]
+
 function MessageBubble({ msg }: { msg: ChatMessage }) {
   if (msg.role === 'dm') {
     return (
@@ -65,6 +72,7 @@ function TypingIndicator() {
 export default function Chat({ messages, isLoading, onSendMessage, inputValue, onInputChange }: ChatProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const placeholder = PLAYFUL_PLACEHOLDERS[messages.length % PLAYFUL_PLACEHOLDERS.length]
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -117,7 +125,7 @@ export default function Chat({ messages, isLoading, onSendMessage, inputValue, o
             value={inputValue}
             onChange={e => onInputChange(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Votre coup: amadouer l'arbre, forcer la porte, flairer l'embrouille..."
+            placeholder={placeholder}
             disabled={isLoading}
             rows={2}
             className="flex-1 bg-stone-800/80 border border-stone-600/50 rounded-lg px-3 py-2 text-stone-200 placeholder-stone-600 text-sm resize-none focus:outline-none focus:border-amber-700/60 disabled:opacity-50 leading-relaxed"
