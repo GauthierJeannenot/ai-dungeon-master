@@ -1,6 +1,25 @@
 import { GameState } from './types'
 
-type LogLevel = 'debug' | 'info' | 'warn' | 'error'
+export type LogLevel = 'debug' | 'info' | 'warn' | 'error'
+
+export interface BufferedLogEntry {
+  sequence: number
+  timestamp: string
+  level: LogLevel
+  event: string
+  line: string
+  payload: Record<string, unknown>
+}
+
+export interface BufferedLogQuery {
+  after?: number
+  since?: Date
+  level?: LogLevel
+  event?: string
+  requestId?: string
+  sessionId?: string
+  limit?: number
+}
 
 const LEVEL_ORDER: Record<LogLevel, number> = {
   debug: 10,
@@ -15,6 +34,8 @@ const STRING_LIMIT = parsePositiveInt(process.env.APP_LOG_STRING_LIMIT, 800)
 const ARRAY_LIMIT = parsePositiveInt(process.env.APP_LOG_ARRAY_LIMIT, 30)
 const OBJECT_KEY_LIMIT = parsePositiveInt(process.env.APP_LOG_OBJECT_KEY_LIMIT, 80)
 const INCLUDE_TEXT = process.env.APP_LOG_INCLUDE_TEXT !== 'false'
+const BUFFER_ENABLED = process.env.APP_LOG_BUFFER_ENABLED !== 'false'
+const BUFFER_LIMIT = parseBoundedInt(process.env.APP_LOG_BUFFER_LIMIT, 1000, 0, 5000)
 
 const SECRET_KEY_PATTERN = /api[_-]?key|authorization|bearer|cookie|password|secret|access[_-]?token|refresh[_-]?token|id[_-]?token/i
 const TEXT_KEY_PATTERN = /content|message|narrative|prompt|summary|text/i
@@ -29,6 +50,13 @@ function parsePositiveInt(value: string | undefined, fallback: number): number {
   if (!value) return fallback
   const parsed = Number.parseInt(value, 10)
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
+}
+
+function parseBoundedInt(value: string | undefined, fallback: number, min: number, max: number): number {
+  if (!value) return fallback
+  const parsed = Number.parseInt(value, 10)
+  if (!Number.isFinite(parsed)) return fallback
+  return Math.min(Math.max(parsed, min), max)
 }
 
 function shouldLog(level: LogLevel): boolean {
@@ -94,6 +122,65 @@ function sanitizeValue(value: unknown, key = '', depth = 0, seen = new WeakSet<o
   return result
 }
 
+const logBuffer: BufferedLogEntry[] = []
+let nextLogSequence = 1
+
+function appendBufferedLog(entry: Omit<BufferedLogEntry, 'sequence'>): void {
+  if (!BUFFER_ENABLED || BUFFER_LIMIT <= 0) return
+
+  logBuffer.push({
+    sequence: nextLogSequence++,
+    ...entry,
+  })
+
+  if (logBuffer.length > BUFFER_LIMIT) {
+    logBuffer.splice(0, logBuffer.length - BUFFER_LIMIT)
+  }
+}
+
+export function getBufferedLogEvents(query: BufferedLogQuery = {}): {
+  entries: BufferedLogEntry[]
+  totalBuffered: number
+  bufferLimit: number
+  nextAfter: number | null
+} {
+  const limit = Math.min(Math.max(query.limit ?? 100, 1), 500)
+  const eventFilter = query.event?.toLowerCase()
+  const requestIdFilter = query.requestId?.toLowerCase()
+  const sessionIdFilter = query.sessionId?.toLowerCase()
+  const sinceTime = query.since?.getTime()
+
+  const entries = logBuffer.filter(entry => {
+    if (query.after !== undefined && entry.sequence <= query.after) return false
+    if (query.level && entry.level !== query.level) return false
+    if (eventFilter && !entry.event.toLowerCase().includes(eventFilter)) return false
+    if (requestIdFilter && String(entry.payload.requestId ?? '').toLowerCase() !== requestIdFilter) {
+      return false
+    }
+    if (sessionIdFilter && String(entry.payload.sessionId ?? '').toLowerCase() !== sessionIdFilter) {
+      return false
+    }
+    if (sinceTime !== undefined && Date.parse(entry.timestamp) < sinceTime) return false
+    return true
+  })
+
+  const limitedEntries = entries.slice(-limit)
+  const lastEntry = limitedEntries.at(-1)
+
+  return {
+    entries: limitedEntries,
+    totalBuffered: logBuffer.length,
+    bufferLimit: BUFFER_LIMIT,
+    nextAfter: lastEntry?.sequence ?? null,
+  }
+}
+
+export function clearBufferedLogEvents(): number {
+  const cleared = logBuffer.length
+  logBuffer.length = 0
+  return cleared
+}
+
 export function summarizeGameState(gameState: GameState | undefined | null): Record<string, unknown> | null {
   if (!gameState) return null
 
@@ -147,7 +234,16 @@ export function logEvent(
     ...fields,
   }
 
-  const line = `[ai-dm:${event}] ${JSON.stringify(sanitizeValue(payload))}`
+  const sanitizedPayload = sanitizeValue(payload) as Record<string, unknown>
+  const line = `[ai-dm:${event}] ${JSON.stringify(sanitizedPayload)}`
+
+  appendBufferedLog({
+    timestamp: sanitizedPayload.timestamp as string,
+    level,
+    event,
+    line,
+    payload: sanitizedPayload,
+  })
 
   if (level === 'error') console.error(line)
   else if (level === 'warn') console.warn(line)

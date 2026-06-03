@@ -222,6 +222,8 @@ APP_LOG_INCLUDE_TEXT=true
 APP_LOG_STRING_LIMIT=800
 APP_LOG_ARRAY_LIMIT=30
 APP_LOG_OBJECT_KEY_LIMIT=80
+APP_LOG_BUFFER_ENABLED=true
+APP_LOG_BUFFER_LIMIT=1000
 ```
 
 `APP_LOG_LEVEL=debug` est deja la valeur par defaut en `NODE_ENV=production`. Passez `APP_LOG_INCLUDE_TEXT=false` si vous voulez masquer les textes narratifs/messages joueur et ne garder que les longueurs.
@@ -234,5 +236,22 @@ railway logs | grep 'ai-dm:dm.request'
 railway logs | grep 'dm-'
 railway logs | grep 'mcp.tool'
 ```
+
+Lecture via endpoint HTTP protege :
+
+```bash
+railway variables set APP_DEBUG_LOG_TOKEN=un-token-long-aleatoire
+
+curl -H "Authorization: Bearer un-token-long-aleatoire" \
+  "https://votre-app.railway.app/api/debug/logs?limit=100"
+
+curl -H "Authorization: Bearer un-token-long-aleatoire" \
+  "https://votre-app.railway.app/api/debug/logs?event=dm.request"
+
+curl -X DELETE -H "Authorization: Bearer un-token-long-aleatoire" \
+  "https://votre-app.railway.app/api/debug/logs"
+```
+
+L'endpoint `/api/debug/logs` retourne les logs recents gardes en memoire par le process Node. Il reste desactive tant que `APP_DEBUG_LOG_TOKEN` n'est pas configure, et refuse les tokens de moins de 16 caracteres. Utilisez de preference le header `Authorization: Bearer ...`; le parametre `?token=` existe pour depannage manuel mais peut fuiter dans des historiques navigateur/proxy.
 
 Les logs incluent notamment `requestId`, `sessionId`, appels Anthropic, usage tokens/cout estime, appels MCP, erreurs de regles, resume compact du `GameState`, persistance session et durees. Les valeurs ressemblant a des secrets/tokens sont masquees automatiquement.
