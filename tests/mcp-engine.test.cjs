@@ -214,6 +214,28 @@ test('MCP rules require an action before advancing the current turn', async () =
   })
 })
 
+test('MCP pass_turn is limited to the player turn', async () => {
+  await withMcpClient(async client => {
+    const baseState = await callTool(client, 'get_game_state')
+
+    await callTool(client, 'replace_game_state', {
+      gameState: makeCombatState(baseState),
+    })
+
+    const passed = await callTool(client, 'pass_turn', {
+      reason: 'Le joueur attend.',
+    })
+    assert.equal(passed.endedTurn, 'player')
+    assert.equal(passed.currentTurn, 'goblin_a')
+    assert.equal(passed.skippedAction, true)
+
+    const blocked = await callTool(client, 'pass_turn', {
+      reason: 'Le gobelin attend.',
+    })
+    assert.equal(blocked.code, 'PLAYER_TURN_REQUIRED')
+  })
+})
+
 test('MCP rules do not consume an action for rejected range attempts', async () => {
   await withMcpClient(async client => {
     const baseState = await callTool(client, 'get_game_state')
