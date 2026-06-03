@@ -240,6 +240,66 @@ async function processHistory(
   return { recent, newSummary }
 }
 
+// ── Parser de tool calls textuels ────────────────────────────────────────────
+// Fallback pour les modèles (llama3.3, mistral-nemo...) qui écrivent les tool calls
+// dans leur texte au lieu d'utiliser l'API function_call.
+// Supporte les formats :
+//   {"type":"function","name":"X","parameters":{...}}
+//   {"name":"X","parameters":{...}}
+//   {"function":{"name":"X","arguments":{...}}}
+interface TextToolCall { name: string; args: Record<string, unknown> }
+
+function extractTextToolCalls(text: string): TextToolCall[] {
+  const calls: TextToolCall[] = []
+  // Trouve tous les blocs JSON (y compris imbriqués sur 1 niveau)
+  const jsonRegex = /\{[^{}]*(?:\{[^{}]*\}[^{}]*)?\}/g
+  let match: RegExpExecArray | null
+
+  while ((match = jsonRegex.exec(text)) !== null) {
+    try {
+      const obj = JSON.parse(match[0]) as Record<string, unknown>
+
+      // Format 1 : {"type":"function","name":"X","parameters":{...}}
+      if (typeof obj.name === 'string' && obj.parameters && typeof obj.parameters === 'object') {
+        calls.push({ name: obj.name, args: obj.parameters as Record<string, unknown> })
+        continue
+      }
+      // Format 2 : {"name":"X","arguments":{...}}
+      if (typeof obj.name === 'string' && obj.arguments && typeof obj.arguments === 'object') {
+        calls.push({ name: obj.name, args: obj.arguments as Record<string, unknown> })
+        continue
+      }
+      // Format 3 : {"function":{"name":"X","arguments":{...}}}
+      const fn = obj.function
+      if (fn && typeof fn === 'object' && !Array.isArray(fn)) {
+        const f = fn as Record<string, unknown>
+        if (typeof f.name === 'string' && f.arguments && typeof f.arguments === 'object') {
+          calls.push({ name: f.name, args: f.arguments as Record<string, unknown> })
+        }
+      }
+    } catch { /* JSON invalide, on ignore */ }
+  }
+
+  return calls
+}
+
+function stripToolCallsFromText(text: string): string {
+  // Retire les blocs JSON qui ressemblent à des tool calls
+  return text
+    .replace(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)?\}/g, (block) => {
+      try {
+        const obj = JSON.parse(block) as Record<string, unknown>
+        if (
+          (typeof obj.name === 'string' && (obj.parameters || obj.arguments)) ||
+          (obj.function && typeof (obj.function as Record<string, unknown>).name === 'string')
+        ) return ''
+      } catch { /* pas du JSON ou pas un tool call */ }
+      return block
+    })
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+}
+
 // ── Conversion historique → messages OpenAI ──────────────────────────────────
 function historyToMessages(turns: ConversationTurn[]): Array<OllamaUserMessage | OllamaAssistantMessage> {
   const msgs: Array<OllamaUserMessage | OllamaAssistantMessage> = []
@@ -337,47 +397,62 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
       const msg = choice.message
 
-      // Accumule la narration textuelle
-      if (msg.content) {
-        narrative += (narrative ? '\n\n' : '') + msg.content
-      }
+      const responseText = msg.content ?? ''
 
-      // Fin de la réponse — pas de tool call
-      if (choice.finish_reason === 'stop' || !msg.tool_calls?.length) break
-
-      // ── Traitement des tool calls ─────────────────────────────────────────
+      // ── Chemin A : API tool_calls (format OpenAI natif) ──────────────────
       if (msg.tool_calls?.length) {
-        // Ajoute le message assistant avec les tool calls à l'historique
         messages.push({
           role: 'assistant',
-          content: msg.content ?? null,
+          content: responseText || null,
           tool_calls: msg.tool_calls,
         })
 
-        // Exécute chaque tool call via le MCP server
         for (const tc of msg.tool_calls) {
-          const toolName = tc.function.name
-          toolsUsed.push(toolName)
-
+          toolsUsed.push(tc.function.name)
           let resultContent: string
           try {
             const args = JSON.parse(tc.function.arguments) as Record<string, unknown>
-            const result = await callMCPTool(toolName, args)
+            const result = await callMCPTool(tc.function.name, args)
             resultContent = JSON.stringify(result)
           } catch (err) {
             resultContent = JSON.stringify({ error: err instanceof Error ? err.message : 'Tool error' })
           }
-
-          messages.push({
-            role: 'tool',
-            tool_call_id: tc.id,
-            content: resultContent,
-          })
+          messages.push({ role: 'tool', tool_call_id: tc.id, content: resultContent })
         }
-
-        continue // relance la boucle pour que le LLM traite les résultats
+        continue
       }
 
+      // ── Chemin B : tool calls écrits dans le texte (fallback) ────────────
+      // Modèles comme llama3.3 qui ne supportent pas bien le function_call API
+      const textCalls = extractTextToolCalls(responseText)
+
+      if (textCalls.length > 0) {
+        // Retire les JSON de tool calls du texte, garde la narration propre
+        const cleanNarrative = stripToolCallsFromText(responseText)
+
+        // Exécute chaque tool call extrait du texte
+        const toolResultsSummary: string[] = []
+        for (const tc of textCalls) {
+          toolsUsed.push(tc.name)
+          try {
+            const result = await callMCPTool(tc.name, tc.args)
+            toolResultsSummary.push(`${tc.name}: ${JSON.stringify(result)}`)
+          } catch (err) {
+            toolResultsSummary.push(`${tc.name}: erreur — ${err instanceof Error ? err.message : 'unknown'}`)
+          }
+        }
+
+        // Ajoute l'échange dans l'historique pour que le LLM puisse narrer
+        messages.push({ role: 'assistant', content: cleanNarrative || responseText })
+        messages.push({
+          role: 'user',
+          content: `Résultats des actions mécaniques : ${toolResultsSummary.join(' | ')}. Narre maintenant le résultat en 2-3 phrases, sans JSON.`,
+        })
+        continue
+      }
+
+      // ── Chemin C : réponse narrative pure (pas de tool calls) ────────────
+      narrative += (narrative ? '\n\n' : '') + responseText
       break
     }
 
