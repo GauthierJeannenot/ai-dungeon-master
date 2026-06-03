@@ -249,7 +249,7 @@ APP_LOG_BUFFER_LIMIT=1000
 APP_DEBUG_LOG_PUBLIC_READ=true
 ```
 
-En `NODE_ENV=production`, `APP_LOG_LEVEL=info` et `APP_LOG_INCLUDE_TEXT=false` sont les valeurs par defaut. Passez temporairement `APP_LOG_LEVEL=debug` et `APP_LOG_INCLUDE_TEXT=true` si vous voulez diagnostiquer une partie en detail.
+En debug live, les textes narratifs/messages joueur sont inclus par defaut pour faciliter la correlation avec le chat. Remettez `APP_LOG_INCLUDE_TEXT=false` apres la session si vous voulez masquer les textes et ne garder que les longueurs.
 
 Lecture via Railway CLI :
 
