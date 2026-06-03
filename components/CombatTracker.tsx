@@ -29,6 +29,11 @@ export default function CombatTracker({ gameState }: CombatTrackerProps) {
   if (gameState.phase !== 'combat') return null
 
   const { initiativeOrder, currentTurn, round, player, monsters } = gameState
+  const playerMovementMax = Math.floor(player.speed / 5)
+  const playerMovementUsed = gameState.movementUsed.player ?? 0
+  const playerMovementLeft = Math.max(0, playerMovementMax - playerMovementUsed)
+  const playerActionUsed = Boolean(gameState.actionUsed.player)
+  const isPlayerTurn = currentTurn === 'player'
 
   function getEntityName(id: string): string {
     if (id === 'player') return player.name
@@ -64,6 +69,23 @@ export default function CombatTracker({ gameState }: CombatTrackerProps) {
         </div>
         <HPBar current={player.hp.current} max={player.hp.max} />
       </div>
+
+      {isPlayerTurn && (
+        <div className="grid grid-cols-2 gap-2 text-xs">
+          <div className={`rounded border px-2 py-1.5 ${
+            playerActionUsed
+              ? 'border-stone-700 bg-stone-800/40 text-stone-400'
+              : 'border-amber-700/50 bg-amber-950/30 text-amber-200'
+          }`}>
+            <div className="text-[10px] uppercase tracking-wider text-stone-500">Action</div>
+            <div className="font-semibold">{playerActionUsed ? 'Utilisee' : 'Disponible'}</div>
+          </div>
+          <div className="rounded border border-blue-800/40 bg-blue-950/20 px-2 py-1.5 text-blue-100">
+            <div className="text-[10px] uppercase tracking-wider text-stone-500">Mouvement</div>
+            <div className="font-semibold">{playerMovementLeft}/{playerMovementMax} cases</div>
+          </div>
+        </div>
+      )}
 
       {/* Initiative order */}
       <div className="space-y-1">

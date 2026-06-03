@@ -551,6 +551,12 @@ function adventureOverview(adventureModule: string): string {
   return (firstRoomIndex >= 0 ? adventureModule.slice(0, firstRoomIndex) : adventureModule).trim()
 }
 
+function compactAdventureOverview(adventureModule: string): string {
+  const overview = adventureOverview(adventureModule)
+  const mapIndex = overview.search(/^## Carte des salles/im)
+  return (mapIndex >= 0 ? overview.slice(0, mapIndex) : overview).trim()
+}
+
 function roomContainsCell(section: AdventureRoomSection, cell: { x: number; y: number }): boolean {
   const zone = section.text.match(/\*\*Zone\*\*\s*:\s*x:(\d+)-(\d+),?\s*y:(\d+)-(\d+)/i)
   if (!zone) return false
@@ -604,7 +610,7 @@ function selectAdventureModuleContext(adventureModule: string, gameState: GameSt
     .map(monster => `- ${monster.name} (${monster.type}) a (${monster.position.x},${monster.position.y})`)
 
   const parts = [
-    adventureOverview(safeAdventureModule),
+    compactAdventureOverview(safeAdventureModule),
     [
       'ETAT MODULE:',
       `- salle actuelle serveur: ${gameState.currentRoomId ?? 'inconnue'}`,
@@ -659,7 +665,8 @@ FORMAT ORAL:
 RYTHME DE TABLE:
 - Court ne veut pas dire sec: vise 2-5 phrases courtes avec un mouvement, une réaction ou une information utile.
 - Évite les réponses purement atmosphériques. Chaque réponse doit faire avancer la scène, même légèrement.
-- Ajoute souvent une pression active: bruit qui se rapproche, porte qui cède, PNJ qui coupe la parole, trace fraîche, odeur nouvelle, minute qui file, danger hors champ.
+- Ajoute une pression active seulement si elle est soutenue par l'etat, le module, l'historique recent ou le dernier resultat mecanique.
+- Termine par une affordance jouable concrete: une prise, une piste, un risque ou une reaction visible; jamais par un evenement qui resout la prochaine action a la place du joueur.
 - Si un PNJ répond, donne une réplique savoureuse ou une décision visible, pas seulement une description.
 - Si le joueur semble perdu, relance par un événement de scène ou une piste évidente, sans lui donner d'ordre.
 - Termine sur une tension jouable, pas sur une formule froide. Évite "que fais-tu ?" et "vous allez où ?".
@@ -831,6 +838,47 @@ function isMcpErrorResult(result: unknown): boolean {
   return isObjectRecord(result) && typeof result.error === 'string'
 }
 
+function mcpErrorCode(result: unknown): string | null {
+  return isObjectRecord(result) && typeof result.code === 'string'
+    ? result.code
+    : null
+}
+
+function buildMcpRuleErrorNarrative(errorResult: unknown, gameState: GameState): string {
+  const code = mcpErrorCode(errorResult)
+
+  if (code === 'ACTION_ALREADY_USED') {
+    if (gameState.phase === 'combat') {
+      return gameState.currentTurn === 'player'
+        ? "Ton elan arrive trop tard: ton action est deja depensee. Une nouvelle ouverture revient, mais il faut choisir un geste net."
+        : "Ton elan arrive trop tard: ton action est deja depensee. Les adversaires reprennent l'initiative dans la cohue."
+    }
+    return "Ton geste arrive trop tard: l'ouverture que tu visais s'est deja refermee."
+  }
+
+  if (code === 'TURN_ACTION_REQUIRED') {
+    return "Pas encore: il te reste une vraie action a poser avant de laisser filer ton tour."
+  }
+
+  if (code === 'NOT_CURRENT_TURN' || code === 'PLAYER_TURN_REQUIRED') {
+    return "Pas maintenant: le rythme du combat ne te laisse pas cette ouverture."
+  }
+
+  if (code === 'CELL_OCCUPIED') {
+    return "Tu t'elances, mais la place est deja prise; il faut trouver une autre ligne ou bousculer la situation."
+  }
+
+  if (code === 'MOVE_TOO_FAR' || code === 'OUT_OF_BOUNDS') {
+    return "Tu cherches l'angle, mais ce mouvement est trop court ou trop risque pour aboutir maintenant."
+  }
+
+  if (isObjectRecord(errorResult) && typeof errorResult.error === 'string') {
+    return "Ton geste se bloque: la situation ne le permet pas encore."
+  }
+
+  return "Ton geste se bloque: il faut une ouverture plus claire."
+}
+
 function hasCompletedCurrentAction(gameState: GameState | undefined | null): boolean {
   if (!gameState || gameState.phase !== 'combat' || !gameState.currentTurn) return false
   return Boolean(gameState.actionUsed?.[gameState.currentTurn])
@@ -853,9 +901,13 @@ function getCurrentRoomName(gameState: GameState): string | null {
 function buildDirectiveSceneNarrative(gameState: GameState): string {
   if (gameState.phase === 'combat') {
     const alive = aliveMonsters(gameState)
-    const aliveNames = alive.map(monster => monster.name)
-    const namedThreats = aliveNames.length === 0
-      ? "l'ennemi"
+    const aliveNames = Array.from(new Set(alive.map(monster => monster.name)))
+    const threatVerb = alive.length <= 1 ? 'tient' : 'tiennent'
+    const pressureVerb = alive.length <= 1 ? 'garde' : 'gardent'
+    const namedThreats = alive.length > aliveNames.length
+      ? `${alive.length} adversaires, dont ${aliveNames.join(', ')}`
+      : alive.length === 0
+      ? "le danger"
       : aliveNames.length === 1
         ? aliveNames[0]
         : `${aliveNames.slice(0, -1).join(', ')} et ${aliveNames[aliveNames.length - 1]}`
@@ -867,8 +919,8 @@ function buildDirectiveSceneNarrative(gameState: GameState): string {
     const killSentence = killedName ? `${killedName} tombe pour de bon. ` : ''
 
     return gameState.currentTurn === 'player'
-      ? `${killSentence}${namedThreats} reste${aliveNames.length > 1 ? 'nt' : ''} dans le combat, armes sorties; l'ouverture est a toi maintenant.`
-      : `${killSentence}${namedThreats} garde${aliveNames.length > 1 ? 'nt' : ''} la pression, et l'air se charge d'une menace immediate.`
+      ? `${killSentence}Le combat ne lache pas: ${namedThreats} ${threatVerb} encore la salle, mais une ouverture se dessine dans la cohue.`
+      : `${killSentence}Le combat ne lache pas: ${namedThreats} ${pressureVerb} la pression, et chaque pas compte.`
     return gameState.currentTurn === 'player'
       ? "Le combat se resserre autour de toi. L'ennemi le plus proche baisse sa garde une fraction de seconde, tandis qu'une échappée s'ouvre près du décor."
       : "Le combat continue sans pause. Quelque chose heurte le sol derrière toi, et l'air se charge d'une menace immédiate."
@@ -1344,6 +1396,10 @@ function detectNarrativeRoomContractIssue(
   }
 
   const text = normalizeFrenchText(responseText)
+  if (/\b(?:passes?|passe|tombe|descend|monte)\s+a\s+\d+\/\d+\b/.test(text)) {
+    return null
+  }
+
   const narratesTransition = /\b(tu|vous)\s+(?:te|vous)?\s*(?:approches?|approchez|avances?|avancez|entres?|entrez|passes?|passez|traverses?|traversez|arrives?|arrivez|remontes?|remontez|retournes?|retournez|descends?|descendez|montes?|montez)\b/.test(text) ||
     /\b(tu|vous)\s+(?:l[' ]?)?(?:ouvres?|ouvrez|pousses?|poussez|franchis|franchissez)\b/.test(text) ||
     /\b(?:te|vous)\s+voila\s+(?:dans|pres de|devant)\b/.test(text) ||
@@ -2008,6 +2064,7 @@ async function resolveServerFirstAction(
   toolsUsed: string[]
   draftNarrative: string
   sawMcpToolError: boolean
+  mcpErrorResult?: unknown
 }> {
   const startedAt = Date.now()
   let toolName: string | null = null
@@ -2182,6 +2239,7 @@ async function resolveServerFirstAction(
       toolsUsed,
       draftNarrative,
       sawMcpToolError,
+      mcpErrorResult: sawMcpToolError ? abilityResult : undefined,
     }
   }
 
@@ -2266,6 +2324,7 @@ async function resolveServerFirstAction(
     toolsUsed: [toolName],
     draftNarrative,
     sawMcpToolError,
+    mcpErrorResult: sawMcpToolError ? result : undefined,
   }
 }
 
@@ -2291,17 +2350,23 @@ async function autoAdvanceCompletedTurn(
   sessionId: string | undefined,
   requestId: string
 ): Promise<{ gameState: GameState; advanced: boolean }> {
+  if (!hasCompletedCurrentAction(gameState)) {
+    if (gameState.phase === 'combat' && gameState.currentTurn === 'player') {
+      logEvent('info', 'dm.turn.auto_advance.skipped_player_action_open', {
+        requestId,
+        sessionId,
+        gameState: summarizeGameState(gameState),
+      })
+    }
+    return { gameState, advanced: false }
+  }
+
   if (gameState.currentTurn === 'player') {
-    logEvent('info', 'dm.turn.auto_advance.skipped_player_table_mode', {
+    logEvent('info', 'dm.turn.auto_advance.player_action_spent', {
       requestId,
       sessionId,
       gameState: summarizeGameState(gameState),
     })
-    return { gameState, advanced: false }
-  }
-
-  if (!hasCompletedCurrentAction(gameState)) {
-    return { gameState, advanced: false }
   }
 
   const actorId = gameState.currentTurn!
@@ -2786,6 +2851,7 @@ async function generateFinalNarration(
     `Action du joueur:\n${playerMessage}`,
     draftNarrative ? `Notes moteur non autoritaires, a utiliser seulement si elles ne contredisent pas les resultats mecaniques:\n${draftNarrative}` : undefined,
     `Résultats mécaniques faisant autorité:\n${formatCombatLogEntries(newCombatLogEntries)}`,
+    `Structure obligatoire: consequence visible du resultat mecanique, puis reaction du decor ou d'un PNJ seulement si elle est soutenue par l'etat/module/historique, puis piste, prise ou tension jouable en fiction. Ne cree pas de nouvelle menace presente si le moteur n'a pas cree l'entite ou le danger.`,
     `Écris la réponse finale au joueur en français correct, au présent, en 2-4 phrases courtes, 120 mots maximum. Elle doit être naturelle à l'oral et donner de l'élan: mouvement, réplique, menace, opportunité ou information exploitable. Termine toujours par une ponctuation finale. Respecte strictement les résultats mécaniques. N'annonce aucune action future non résolue. Pas de Markdown, pas de liste, pas de parenthèse, pas d'excuse, pas de méta, pas de menu, pas de mention du système, du moteur, des tools, de MCP ou de l'IA. Pas de coordonnées ni d'ID technique sauf demande explicite du joueur. Ne déclare pas de fin de quête/campagne ni de conclusion alternative sauf demande explicite. Pas de time-skip: seulement la prochaine minute jouable. Si le joueur critique le style, la longueur, le système ou un bug, ne réponds pas à la critique: applique la correction silencieusement et reprends la scène en fiction.`,
   ].filter(Boolean).join('\n\n')
 
@@ -3054,6 +3120,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       messageCount: messages.length,
       historyMessageCount: historyMessages.length,
       systemBlockCount: systemBlocks.length,
+      systemBlockChars: systemBlocks.map(block => block.text.length),
       rawToolsAvailable: mcpTools.length,
       toolsAvailable: llmTools.length,
       toolNames: llmTools.map(tool => tool.name),
@@ -3068,6 +3135,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     let mechanicalRetryInjected = false
     let maxTokensRetryInjected = false
     let sawMcpToolError = false
+    let latestMcpErrorResult: unknown
     let lastStopReason: Anthropic.Message['stop_reason'] | null = null
     let lastEndTurnNarrative = ''
 
@@ -3076,6 +3144,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       currentGameState = engineFirst.gameState
       narrative = engineFirst.draftNarrative
       sawMcpToolError = engineFirst.sawMcpToolError
+      latestMcpErrorResult = engineFirst.mcpErrorResult
       toolsUsed.push(...engineFirst.toolsUsed)
       logRoomStateAnomaly(currentGameState, requestId, sessionId, 'after-engine-first')
     }
@@ -3330,6 +3399,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             })
             if (mcpResultIsError) {
               sawMcpToolError = true
+              latestMcpErrorResult = result
               logEvent('warn', 'dm.tool_use.rule_error', {
                 requestId,
                 sessionId,
@@ -3575,6 +3645,22 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       })
     }
 
+    const newCombatLogEntries = currentGameState.combatLog.slice(combatLogStartLength)
+
+    if (sawMcpToolError) {
+      const ruleNarrative = buildMcpRuleErrorNarrative(latestMcpErrorResult, currentGameState)
+      logEvent('warn', 'dm.narrative.mcp_rule_error_deterministic', {
+        requestId,
+        sessionId,
+        toolsUsed: [...new Set(toolsUsed)],
+        latestMcpErrorResult,
+        previousNarrative: narrative,
+        ruleNarrative,
+        gameState: summarizeGameState(currentGameState),
+      })
+      narrative = ruleNarrative
+    }
+
     const canReuseLlmNarration =
       toolsUsed.length > 0 &&
       toolsUsed.length === llmToolCountAfterLoop &&
@@ -3608,7 +3694,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         lastEndTurnNarrative,
         narrativeLength: narrative.length,
       })
-    } else if (toolsUsed.length > 0) {
+    } else if (toolsUsed.length > 0 && !sawMcpToolError) {
       const finalNarrative = await generateFinalNarration({
         requestId,
         sessionId,
@@ -3617,7 +3703,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         playerMessage: message,
         draftNarrative: narrative,
         gameState: currentGameState,
-        newCombatLogEntries: currentGameState.combatLog.slice(combatLogStartLength),
+        newCombatLogEntries,
         summaryContext: activeSummary,
         usageLog,
       })

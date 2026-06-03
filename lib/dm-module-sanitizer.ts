@@ -7,6 +7,10 @@ const INLINE_LEGACY_TOOL_CALL_PATTERN = /`(?:spawn_monster|enter_combat)\([^`]*\
 
 export function sanitizeAdventureModuleToolContracts(adventureModule: string): string {
   return adventureModule
+    .replace(
+      /Le DM DOIT toujours proposer cette option avant de faire combattre\.?/g,
+      'Le DM fait emerger une option non violente quand la fiction le permet, sans menu systematique.'
+    )
     .replace(CODE_FENCE_PATTERN, block =>
       LEGACY_TOOL_PATTERN.test(block) ? LEGACY_TOOL_CONTRACT_NOTICE : block
     )

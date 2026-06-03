@@ -47,3 +47,13 @@ test('dm module sanitizer removes legacy MCP tool contracts from prompt context'
   assert.match(sanitized, /start_encounter/)
   assert.match(sanitized, /Contrat moteur/)
 })
+
+test('dm module sanitizer keeps nonviolent options in fiction instead of menu directives', () => {
+  const sanitized = sanitizer.sanitizeAdventureModuleToolContracts(
+    'Pour desamorcer un combat: CHA DD 13. Le DM DOIT toujours proposer cette option avant de faire combattre.'
+  )
+
+  assert.doesNotMatch(sanitized, /DOIT toujours proposer/)
+  assert.match(sanitized, /option non violente/)
+  assert.match(sanitized, /sans menu systematique/)
+})

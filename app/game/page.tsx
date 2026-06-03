@@ -53,6 +53,7 @@ const SESSION_KEYS = {
 const CLIENT_DEBUG_LOG_KEY = 'ai-dm-client-debug-log-v1'
 const CLIENT_DEBUG_BROWSER_ID_KEY = 'ai-dm-client-debug-browser-id'
 const CLIENT_DEBUG_LOG_LIMIT = 200
+const CLIENT_DEBUG_SYNC_BATCH_SIZE = 100
 
 interface ClientDebugEntry {
   id: string
@@ -197,16 +198,21 @@ function appendClientDebugLog(
 async function syncClientDebugLog(sessionId: string): Promise<void> {
   const entries = readClientDebugLog()
   if (entries.length === 0) return
+  const batch = entries.slice(0, CLIENT_DEBUG_SYNC_BATCH_SIZE)
 
-  await fetch('/api/debug/client-logs', {
+  const res = await fetch('/api/debug/client-logs', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       browserLogId: getOrCreateBrowserLogId(),
       sessionId,
-      entries,
+      entries: batch,
     }),
   })
+  if (!res.ok) return
+
+  const sentIds = new Set(batch.map(entry => entry.id))
+  writeClientDebugLog(readClientDebugLog().filter(entry => !sentIds.has(entry.id)))
 }
 
 function phaseLabel(phase: GameState['phase']): { label: string; color: string } {

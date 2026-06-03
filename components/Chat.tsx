@@ -66,7 +66,7 @@ interface SpeechWindow extends Window {
 const VOICE_LANGUAGE = 'fr-FR'
 const MAX_SPOKEN_SENTENCES = 7
 const MAX_SPOKEN_CHARS = 650
-const MAX_SPEECH_SEGMENT_CHARS = 180
+const MAX_SPEECH_SEGMENT_CHARS = 320
 const MAX_RECOGNITION_AUTO_RESTARTS = 20
 const MAX_RECOGNITION_SESSION_MS = 120_000
 const RECOGNITION_RESTART_DELAY_MS = 160
@@ -194,9 +194,10 @@ function voiceScore(voice: SpeechSynthesisVoice): number {
   else if (lang.startsWith('fr')) score += 70
   if (voice.localService === false) score += 8
   if (/natural|neural|online|premium|cloud/.test(name)) score += 45
-  if (/google|apple|siri/.test(name)) score += 25
+  if (/google|apple|siri|microsoft/.test(name)) score += 25
   if (/denise|henri|vivienne|thomas|paul|julie/.test(name)) score += 15
-  if (/hortense/.test(name)) score -= 45
+  if (/desktop|mobile/.test(name)) score -= 10
+  if (/hortense/.test(name)) score -= 60
 
   return score
 }
@@ -251,6 +252,32 @@ function truncateVoiceLogText(value: string, maxLength = 260): string {
   return value.length <= maxLength
     ? value
     : `${value.slice(0, maxLength)}...[truncated ${value.length - maxLength} chars]`
+}
+
+function playerMovementAllowance(gameState: GameState): number {
+  return Math.floor(gameState.player.speed / 5)
+}
+
+function describePlayerTurn(gameState: GameState): string {
+  if (gameState.phase !== 'combat') {
+    if (gameState.currentRoomId === '8') return 'Les fours claquent: parle, fouille, provoque, ou cherche une sortie.'
+    if (gameState.currentRoomId === '9') return "Grammy n'est plus tres loin: arrache une info, negocie, ou tente un coup."
+    if (gameState.currentRoomId === '4') return "Les traces menent aux fours; une autre piste grimpe vers l'appartement."
+    return 'Dis ce que tu fais, ce que tu demandes, ou le risque que tu prends.'
+  }
+
+  if (gameState.currentTurn !== 'player') {
+    return 'Les adversaires agissent; garde ton souffle une seconde.'
+  }
+
+  if (gameState.player.hp.current <= 0) {
+    return "Tu es au sol: tiens bon, appelle a l'aide, ou laisse partir le jet de mort."
+  }
+
+  const movementUsed = gameState.movementUsed.player ?? 0
+  const movementLeft = Math.max(0, playerMovementAllowance(gameState) - movementUsed)
+  const actionText = gameState.actionUsed.player ? 'action deja prise' : 'action dispo'
+  return `A toi: ${actionText}, ${movementLeft} case${movementLeft > 1 ? 's' : ''} de mouvement, attaque, potion, parole ou passe.`
 }
 
 function MessageBubble({ msg }: { msg: ChatMessage }) {
@@ -397,13 +424,13 @@ export default function Chat({
 
       const utterance = new SpeechSynthesisUtterance(segment)
       utterance.lang = voice?.lang ?? VOICE_LANGUAGE
-      utterance.rate = 0.94
-      utterance.pitch = 1
+      utterance.rate = 0.98
+      utterance.pitch = 1.02
       utterance.volume = 1
       if (voice) utterance.voice = voice
 
       utterance.onend = () => {
-        window.setTimeout(() => speakSegment(index + 1), 120)
+        window.setTimeout(() => speakSegment(index + 1), 60)
       }
 
       utterance.onerror = event => {
@@ -761,11 +788,12 @@ export default function Chat({
     }
   }
 
+  const playerTurnStatus = describePlayerTurn(gameState)
   const voiceStatus = voiceError
     ? voiceError
     : isListening
-      ? speechPreview || "Je t'écoute. Clique Envoyer quand tu as fini."
-      : speechPreview || "Osez le plan bancal. Les des adorent le chaos."
+      ? speechPreview || `Je t'ecoute. ${playerTurnStatus}`
+      : speechPreview || playerTurnStatus
 
   return (
     <div className="flex flex-col h-full bg-stone-900/50 rounded-lg border border-amber-900/30 overflow-hidden">
