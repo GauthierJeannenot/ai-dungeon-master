@@ -801,10 +801,40 @@ function buildOralFallbackNarrative(gameState: GameState, toolsUsed: string[]): 
 }
 
 function splitIntoSentences(text: string): string[] {
-  return text
-    .match(/[^.!?]+[.!?]+|[^.!?]+$/g)
-    ?.map(sentence => sentence.trim())
-    .filter(Boolean) ?? []
+  const sentences: string[] = []
+  let start = 0
+  let index = 0
+
+  while (index < text.length) {
+    const char = text[index]
+    if (!'.!?'.includes(char)) {
+      index++
+      continue
+    }
+
+    let end = index + 1
+    while (end < text.length && '.!?'.includes(text[end])) end++
+    while (end < text.length && /["'»”’]/.test(text[end])) end++
+
+    const whitespaceMatch = text.slice(end).match(/^\s+/)
+    const nextIndex = end + (whitespaceMatch?.[0].length ?? 0)
+    const nextChar = text[nextIndex]
+    const startsNewSentence = !nextChar || /["'«“A-ZÀÂÄÉÈÊËÎÏÔÖÙÛÜÇ]/.test(nextChar)
+
+    if (startsNewSentence) {
+      const sentence = text.slice(start, end).trim()
+      if (sentence) sentences.push(sentence)
+      start = nextIndex
+      index = nextIndex
+      continue
+    }
+
+    index = end
+  }
+
+  const tail = text.slice(start).trim()
+  if (tail) sentences.push(tail)
+  return sentences
 }
 
 function lineLooksLikeMetaCommentary(line: string): boolean {
@@ -888,7 +918,7 @@ function normalizeNarrativeForOralPlayback(
     .join(' ')
     .replace(/\s+/g, ' ')
     .replace(/\s+([,.!?;:])/g, '$1')
-    .replace(/([.!?]){2,}/g, '$1')
+    .replace(/([!?]){2,}/g, '$1')
     .trim()
 
   let sentences = splitIntoSentences(text)
@@ -1111,8 +1141,18 @@ function centerCellForRoom(roomId: string): { x: number; y: number } | null {
 
 function parseNamedRoomMove(message: string, gameState: GameState): { x: number; y: number } | null {
   const text = normalizeFrenchText(message)
-  if (!/\b(vers|vais|aller|va |deplace|rends|rejoint|entre|entrer|salle|piece|bureau|appartement|boulangerie|quai|verger)\b/.test(text)) {
+  if (!/\b(vers|vais|aller|va |deplace|rends|rejoint|entre|entrer|salle|piece|bureau|appartement|boulangerie|quai|verger|mac|treant|pommier)\b/.test(text)) {
     return null
+  }
+
+  const namedLocations: Array<{ pattern: RegExp; cell: { x: number; y: number } }> = [
+    { pattern: /\b(mac|treant|grand pommier|pommier anime|pommier eveille)\b/, cell: { x: 7, y: 13 } },
+  ]
+  const namedLocation = namedLocations.find(location => location.pattern.test(text))
+  if (namedLocation) {
+    const { cell } = namedLocation
+    if (cell.x === gameState.player.position.x && cell.y === gameState.player.position.y) return null
+    return cell
   }
 
   const roomAliases: Array<[string, RegExp]> = [
