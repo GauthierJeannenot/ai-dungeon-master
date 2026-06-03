@@ -34,6 +34,7 @@ const INITIAL_GAME_STATE: GameState = {
   currentTurn: null,
   round: 0,
   movementUsed: {},
+  actionUsed: {},
   combatLog: [],
   roomsVisited: [],
   currentRoomId: null,

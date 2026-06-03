@@ -135,6 +135,7 @@ export function registerCombatTools(server: McpServer): void {
         action: `${attacker.name} attaque ${target.name} avec ${weaponOrSpell}`,
         mechanicalDetail: mechanicalSummary,
       })
+      rules.recordAction(attackerId)
 
       return { content: [{ type: 'text', text: JSON.stringify(result) }] }
     }
@@ -180,6 +181,9 @@ export function registerCombatTools(server: McpServer): void {
         action: `${entity.name} — Jet de sauvegarde ${ability.toUpperCase()} DD ${dc}`,
         mechanicalDetail: mechanicalSummary,
       })
+      if (gs.getState().phase === 'combat' && gs.getState().currentTurn === entityId) {
+        rules.recordAction(entityId)
+      }
 
       return { content: [{ type: 'text', text: JSON.stringify(result) }] }
     }

@@ -31,6 +31,7 @@ function createInitialState(): GameState {
     currentTurn: null,
     round: 0,
     movementUsed: {},
+    actionUsed: {},
     combatLog: [],
     roomsVisited: [],
     currentRoomId: null,
@@ -50,6 +51,7 @@ export function replaceState(nextState: GameState): GameState {
   state = {
     ...structuredClone(nextState),
     movementUsed: structuredClone(nextState.movementUsed ?? {}),
+    actionUsed: structuredClone(nextState.actionUsed ?? {}),
   }
   return state
 }
@@ -108,6 +110,23 @@ export function resetMovement(entityId: string): void {
   delete state.movementUsed[entityId]
 }
 
+export function hasActionUsed(entityId: string): boolean {
+  return Boolean(state.actionUsed[entityId])
+}
+
+export function markActionUsed(entityId: string): void {
+  state.actionUsed[entityId] = true
+}
+
+export function resetActionUsed(entityId: string): void {
+  delete state.actionUsed[entityId]
+}
+
+export function resetTurnEconomy(entityId: string): void {
+  resetMovement(entityId)
+  resetActionUsed(entityId)
+}
+
 export function spawnMonster(monster: MonsterState): void {
   state.monsters[monster.id] = monster
 }
@@ -139,6 +158,7 @@ export function setInitiativeOrder(order: string[]): void {
   state.currentTurn = order[0] ?? null
   state.round = 1
   state.movementUsed = {}
+  state.actionUsed = {}
 }
 
 export function advanceTurn(): string | null {
@@ -165,8 +185,9 @@ export function advanceTurn(): string | null {
     state.round++
   }
 
+  if (current) resetTurnEconomy(current)
   state.currentTurn = state.initiativeOrder[safeNext]
-  resetMovement(state.currentTurn)
+  resetTurnEconomy(state.currentTurn)
   return state.currentTurn
 }
 

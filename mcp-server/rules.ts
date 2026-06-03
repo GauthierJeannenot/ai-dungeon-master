@@ -97,6 +97,15 @@ function assertInInitiative(entityId: string): void {
   }
 }
 
+function assertActionAvailable(entityId: string): void {
+  if (gs.hasActionUsed(entityId)) {
+    throw new RuleViolation('ACTION_ALREADY_USED', `${entityId} has already used their action this turn.`, {
+      entityId,
+      currentTurn: gs.getState().currentTurn,
+    })
+  }
+}
+
 function occupiedByLivingEntity(cell: { x: number; y: number }, exceptId?: string): Entity | undefined {
   return gs.getAllEntities().find(entity =>
     entity.id !== exceptId &&
@@ -167,6 +176,7 @@ export function validateAttack(
   assertCurrentTurn(attackerId)
   assertInInitiative(attackerId)
   assertInInitiative(targetId)
+  assertActionAvailable(attackerId)
 
   const attacker = assertEntity(attackerId)
   const target = assertEntity(targetId)
@@ -184,6 +194,10 @@ export function validateAttack(
       maxRange,
     })
   }
+}
+
+export function recordAction(entityId: string): void {
+  gs.markActionUsed(entityId)
 }
 
 export function validateSavingThrow(entityId: string): void {
@@ -232,7 +246,7 @@ export function validateEnterCombat(combatants: string[]): void {
   }
 }
 
-export function validateNextTurn(): void {
+export function validateNextTurn(actorId?: string, skipAction = false): string {
   const state = gs.getState()
   if (state.phase !== 'combat') {
     throw new RuleViolation('NOT_IN_COMBAT', 'Cannot advance turns because combat is not active.', { phase: state.phase })
@@ -240,6 +254,22 @@ export function validateNextTurn(): void {
   if (!state.currentTurn || state.initiativeOrder.length === 0) {
     throw new RuleViolation('EMPTY_INITIATIVE', 'Cannot advance turns without an initiative order.')
   }
+  const endingActorId = actorId ?? state.currentTurn
+  if (endingActorId !== state.currentTurn) {
+    throw new RuleViolation('NOT_CURRENT_TURN', `It is ${state.currentTurn}'s turn, not ${endingActorId}'s.`, {
+      currentTurn: state.currentTurn,
+      requestedEntity: endingActorId,
+    })
+  }
+  assertInInitiative(endingActorId)
+  if (!skipAction && !gs.hasActionUsed(endingActorId)) {
+    throw new RuleViolation('TURN_ACTION_REQUIRED', `${endingActorId} cannot end their turn before using an action.`, {
+      currentTurn: state.currentTurn,
+      requestedEntity: endingActorId,
+      actionUsed: gs.hasActionUsed(endingActorId),
+    })
+  }
+  return endingActorId
 }
 
 export function validateEndCombat(force?: boolean): void {

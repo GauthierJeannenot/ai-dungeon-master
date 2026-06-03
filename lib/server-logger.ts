@@ -206,6 +206,7 @@ export function summarizeGameState(gameState: GameState | undefined | null): Rec
     },
     initiativeOrder: gameState.initiativeOrder,
     movementUsed: gameState.movementUsed,
+    actionUsed: gameState.actionUsed,
     combatLogCount: gameState.combatLog.length,
     roomsVisitedCount: gameState.roomsVisited.length,
     currentRoomId: gameState.currentRoomId,

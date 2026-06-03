@@ -88,6 +88,7 @@ const GameStateSchema = z.object({
   currentTurn: z.string().nullable(),
   round: z.number().int().min(0),
   movementUsed: z.record(z.string(), z.number().min(0)).optional().default({}),
+  actionUsed: z.record(z.string(), z.boolean()).optional().default({}),
   combatLog: z.array(CombatLogEntrySchema),
   roomsVisited: z.array(z.string()),
   currentRoomId: z.string().nullable(),
