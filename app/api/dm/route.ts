@@ -10,6 +10,13 @@ import { acquireSessionLock } from '@/lib/session-lock'
 import { ADVENTURE_ROOMS, ENCOUNTERS, inferAdventureRoomId as inferMappedAdventureRoomId } from '@/lib/adventure-map'
 import { DMRequest, DMResponse, GameState, ConversationTurn, CombatLogEntry, MonsterState } from '@/lib/types'
 import {
+  detectDebugStateQuestion,
+  detectHealingPotionIntent,
+  isDoorTraversalIntent,
+  normalizeFrenchText,
+  referencesLocalObjectInsteadOfRoom,
+} from '@/lib/dm-intent'
+import {
   logAnthropicUsage,
   logAnthropicUsageSummary,
   type AnthropicUsageLogEntry,
@@ -809,14 +816,6 @@ function hasCompletedCurrentAction(gameState: GameState | undefined | null): boo
   return Boolean(gameState.actionUsed?.[gameState.currentTurn])
 }
 
-function normalizeFrenchText(value: string): string {
-  return value
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/\p{Diacritic}/gu, '')
-    .replace(/[’‘`´]/g, "'")
-}
-
 type OralNarrativeGuardResult = {
   narrative: string
   changed: boolean
@@ -1179,16 +1178,6 @@ function countAliveMonsters(gameState: GameState): number {
   return Object.values(gameState.monsters).filter(monster => monster.isAlive).length
 }
 
-function isDoorTraversalIntent(text: string): boolean {
-  return /\b(ouvres?|ouvrir|pousses?|pousser|forces?|forcer|enfonces?|enfoncer|defonces?|defoncer|casses?|casser|exploses?|exploser|deboites?|deboiter|franchis|franchir|passes?|passer|entres?|entrer)\b(?=.{0,80}\b(portes?|entree|seuil|battants?|double porte|grande porte)\b)/.test(text) ||
-    /\b(portes?|entree|seuil|battants?|double porte|grande porte)\b(?=.{0,80}\b(ouvres?|ouvrir|pousses?|pousser|forces?|forcer|enfonces?|enfoncer|defonces?|defoncer|casses?|casser|exploses?|exploser|deboites?|deboiter|franchis|franchir|passes?|passer|entres?|entrer)\b)/.test(text)
-}
-
-function referencesLocalObjectInsteadOfRoom(text: string): boolean {
-  return /\b(tiroirs?|coffres?|armoires?|placards?|malles?|carnets?|livres?|grimoires?|parchemins?|papiers?|documents?|registre|registres|bureau couvert|lit|trophees?)\b/.test(text) ||
-    /\b(ouvres?|ouvrir|fouilles?|fouiller|cherches?|chercher|inspectes?|inspecter|regardes?|regarder|examines?|examiner)\b(?=.{0,80}\b(bureau|tiroirs?|coffres?|armoires?|placards?|carnets?|livres?|grimoires?|parchemins?|papiers?|documents?|lit)\b)/.test(text)
-}
-
 function textMentionsSpecificMonster(text: string, monster: MonsterState, gameState: GameState): boolean {
   const normalizedName = normalizeFrenchText(monster.name)
   const genericTerms = new Set(['le', 'la', 'les', 'un', 'une', 'des', 'du', 'de', 'gobelin', 'gobelins', 'garde', 'gardes', 'chef'])
@@ -1393,13 +1382,6 @@ function detectPassTurnIntent(message: string, gameState: GameState): boolean {
   return /\b(passe|passer|attends?|attendre|patient|patiente|ne fais rien|reste sur place)\b/.test(text)
 }
 
-function detectHealingPotionIntent(message: string): boolean {
-  const text = normalizeFrenchText(message)
-  const mentionsPotion = /\b(potions?|fio(le|les)?|elixir|soin|soins|soigner|soigne|guerison|guerrison|healing)\b/.test(text)
-  const consumesPotion = /\b(bois|boire|avale|avaler|utilise|utiliser|prends|prendre|attrape|choppe|me soigne|me soigner|recupere|recuperer)\b/.test(text)
-  return mentionsPotion && consumesPotion
-}
-
 function isPlayerAtZeroHp(gameState: GameState): boolean {
   return gameState.player.hp.current <= 0
 }
@@ -1440,14 +1422,6 @@ function buildPlayerDownNarrative(gameState: GameState): string {
   }
 
   return `Tu es à zéro PV et inconscient, donc tu ne peux pas agir pendant que l'initiative tourne encore. Dès que ton tour revient, le prochain vrai levier sera le jet de mort; pour l'instant tu as ${saveText}.`
-}
-
-function detectDebugStateQuestion(message: string): boolean {
-  const text = normalizeFrenchText(message)
-  const mentionsDebugSurface = /\b(client|javascript|js|serveur|pion|token|jeton|carte|battlemap|affichage|desynchro|desynchronise|bug|bonne salle|bonne piece|pv|points? de vie|hp|me vois|je me vois)\b/.test(text)
-  const asksForLocation = /\b(position|salle|piece|ou je suis|ou suis|bonne salle|bonne piece|bon endroit|la ou je devrais etre)\b/.test(text)
-  const asksForState = asksForLocation || /\b(pv|points? de vie|hp|carte|affichage|token|jeton|pion|gobelin|ennemi|monstre|pourquoi|alors|toujours)\b/.test(text)
-  return mentionsDebugSurface && asksForState
 }
 
 function detectDirectiveGuidanceRequest(message: string): boolean {
