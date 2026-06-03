@@ -2,6 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 import * as gs from '../game-state'
 import * as rules from '../rules'
+import { rollDice } from '../dice'
 import { GameState } from '../../lib/types'
 
 const ConditionSchema = z.enum([
@@ -212,6 +213,74 @@ export function registerPlayerTools(server: McpServer): void {
               hpMax: entity.hp.max,
               died,
               reason,
+            }),
+          }],
+        }
+      } catch (err) {
+        return rules.ruleErrorResult(err)
+      }
+    }
+  )
+
+  server.tool(
+    'use_healing_potion',
+    'Consumes one healing potion from the player inventory, rolls its healing, applies HP, and consumes the player action in combat. Use this instead of roll_dice for drinking a potion.',
+    {
+      potionId: z.string().optional().describe('Optional exact potion item id. Defaults to the first healing potion in inventory.'),
+    },
+    async ({ potionId }) => {
+      try {
+        rules.validateActionUse('player')
+
+        const playerBefore = gs.getPlayer()
+        const potion = playerBefore.inventory.find(item =>
+          potionId ? item.id === potionId : item.type === 'potion'
+        )
+        if (!potion) {
+          throw new rules.RuleViolation('ITEM_NOT_FOUND', 'The player has no healing potion to drink.', {
+            potionId,
+            inventory: playerBefore.inventory.map(item => ({ id: item.id, name: item.name, type: item.type })),
+          })
+        }
+
+        const hpBefore = playerBefore.hp.current
+        const hpMax = playerBefore.hp.max
+        const healingRoll = rollDice('2d4+2')
+        const consumed = gs.consumePlayerItem(item => item.id === potion.id)
+        if (!consumed) {
+          throw new rules.RuleViolation('ITEM_NOT_FOUND', 'The healing potion disappeared before it could be consumed.', {
+            potionId: potion.id,
+          })
+        }
+
+        const playerAfter = gs.updatePlayerHP(healingRoll.total)
+        if (gs.getState().phase === 'combat' && gs.getState().currentTurn === 'player') {
+          rules.recordAction('player')
+        }
+
+        const remainingPotions = playerAfter.inventory.filter(item => item.type === 'potion').length
+        const mechanicalSummary = `Potion de soin: ${healingRoll.detail} | HP ${hpBefore}/${hpMax} -> ${playerAfter.hp.current}/${playerAfter.hp.max} | potions restantes: ${remainingPotions}`
+        gs.addLogEntry({
+          round: gs.getState().round,
+          turn: gs.getState().currentTurn ?? 'player',
+          action: `${playerAfter.name} boit ${consumed.name}`,
+          mechanicalDetail: mechanicalSummary,
+        })
+
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              entityId: 'player',
+              itemId: consumed.id,
+              itemName: consumed.name,
+              healingRoll,
+              healingDone: playerAfter.hp.current - hpBefore,
+              hpBefore,
+              hpAfter: playerAfter.hp.current,
+              hpMax: playerAfter.hp.max,
+              remainingPotions,
+              mechanicalSummary,
             }),
           }],
         }

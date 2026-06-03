@@ -1,4 +1,4 @@
-import { GameState, MonsterState, Condition, PlayerState } from '../lib/types'
+import { GameState, MonsterState, Condition, PlayerState, Item } from '../lib/types'
 import { inferAdventureRoomId } from '../lib/adventure-map'
 
 // Initial player template — overridable via context files
@@ -124,6 +124,13 @@ export function updatePlayerHP(delta: number): PlayerState {
   }
 
   return player
+}
+
+export function consumePlayerItem(predicate: (item: Item) => boolean): Item | null {
+  const index = state.player.inventory.findIndex(predicate)
+  if (index < 0) return null
+  const [item] = state.player.inventory.splice(index, 1)
+  return item ?? null
 }
 
 export function rollPlayerDeathSave(roll: number): {

@@ -237,6 +237,10 @@ export function validateSavingThrow(entityId: string): void {
 }
 
 export function validateAbilityCheck(entityId: string): void {
+  validateActionUse(entityId)
+}
+
+export function validateActionUse(entityId: string): void {
   const entity = assertEntity(entityId)
   assertAlive(entityId, entity)
   if (gs.getState().phase === 'combat') {

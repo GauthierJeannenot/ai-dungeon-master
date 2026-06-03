@@ -535,6 +535,50 @@ test('MCP roll_ability_check is limited to the actor turn in combat', async () =
   })
 })
 
+test('MCP use_healing_potion heals, consumes inventory, and consumes a combat action', async () => {
+  await withForcedDiceSequence('3,4', async () => {
+    await withMcpClient(async client => {
+      const baseState = await callTool(client, 'get_game_state')
+      const state = makeCombatState(baseState)
+      state.player.hp.current = 10
+      state.player.inventory = [
+        ...state.player.inventory,
+        { id: 'potion_extra', name: 'Potion de soin', type: 'potion', description: 'Restaure 2d4+2 HP' },
+      ]
+
+      await callTool(client, 'replace_game_state', { gameState: state })
+
+      const potion = await callTool(client, 'use_healing_potion', {
+        potionId: 'potion_extra',
+      })
+
+      assert.equal(potion.hpBefore, 10)
+      assert.equal(potion.hpAfter, 19)
+      assert.equal(potion.healingDone, 9)
+      assert.equal(potion.remainingPotions, 1)
+      assert.match(potion.mechanicalSummary, /HP 10\/20 -> 19\/20/)
+
+      const stateAfter = await callTool(client, 'get_game_state')
+      assert.equal(stateAfter.player.hp.current, 19)
+      assert.equal(stateAfter.player.inventory.some(item => item.id === 'potion_extra'), false)
+      assert.equal(stateAfter.actionUsed.player, true)
+    })
+  })
+})
+
+test('MCP use_healing_potion is limited to the player turn in combat', async () => {
+  await withMcpClient(async client => {
+    const baseState = await callTool(client, 'get_game_state')
+
+    await callTool(client, 'replace_game_state', {
+      gameState: makeCombatState(baseState, { currentTurn: 'goblin_a' }),
+    })
+
+    const wrongTurn = await callTool(client, 'use_healing_potion')
+    assert.equal(wrongTurn.code, 'NOT_CURRENT_TURN')
+  })
+})
+
 test('MCP rules do not consume an action for rejected range attempts', async () => {
   await withMcpClient(async client => {
     const baseState = await callTool(client, 'get_game_state')

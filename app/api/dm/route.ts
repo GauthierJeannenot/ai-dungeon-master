@@ -662,6 +662,7 @@ Le contexte de module pertinent est fourni dans le bloc dynamique "CONTEXTE MODU
 RÈGLES MÉCANIQUES:
 - Tout calcul (attaque, dégâts, déplacement, HP, sauvegarde) → tools MCP obligatoires.
 - Test de caractéristique ou compétence (Persuasion, Intimidation, Athlétisme, Perception, forcer une porte, chercher, mentir, négocier) → roll_ability_check. N'utilise resolve_saving_throw que pour résister à un danger, sort, poison, piège ou effet subi.
+- Boire une potion de soin → use_healing_potion obligatoire. Ne fais jamais seulement roll_dice pour une potion: l'outil doit aussi appliquer les PV et consommer l'objet/action.
 - Ouvrir/fouiller un tiroir, coffre, armoire, livre ou objet local ne déplace jamais le pion. move_token sert seulement à changer de case/salle ou franchir une porte/seuil.
 - Les tools MCP refusent les actions illégales (mauvais tour, cible morte, hors portée, déplacement trop long). Si un tool renvoie une erreur, narre sobrement pourquoi l'action échoue ou demande une action valide.
 - Déplacement explicite du joueur → move_token AVANT de narrer.
@@ -1092,18 +1093,19 @@ const TOOL_INTENT_SATISFIERS: Record<string, string[]> = {
   'player-combat-attack-intent': ['resolve_player_attack', 'move_token'],
   'player-combat-movement-intent': ['move_token', 'resolve_player_attack'],
   'player-death-save-intent': ['roll_death_save'],
+  'healing-potion-intent': ['use_healing_potion'],
   'ability-check-intent': ['roll_ability_check'],
   'exploration-movement-intent': ['move_token', 'trigger_room_event', 'start_encounter', 'end_combat'],
   'encounter-or-attack-intent': ['start_encounter', 'resolve_player_attack'],
 }
 
 const LLM_TOOL_SETS = {
-  explorationDefault: ['roll_ability_check', 'roll_dice', 'trigger_room_event', 'get_entity_stats'],
-  explorationMovement: ['move_token', 'trigger_room_event', 'start_encounter', 'roll_ability_check', 'roll_dice', 'get_entity_stats'],
-  explorationEncounter: ['start_encounter', 'move_token', 'trigger_room_event', 'roll_ability_check', 'roll_dice', 'get_entity_stats'],
-  combatPlayer: ['resolve_player_attack', 'move_token', 'pass_turn', 'end_combat', 'roll_death_save', 'roll_ability_check', 'roll_dice', 'get_entity_stats', 'resolve_saving_throw'],
+  explorationDefault: ['use_healing_potion', 'roll_ability_check', 'roll_dice', 'trigger_room_event', 'get_entity_stats'],
+  explorationMovement: ['move_token', 'trigger_room_event', 'start_encounter', 'use_healing_potion', 'roll_ability_check', 'roll_dice', 'get_entity_stats'],
+  explorationEncounter: ['start_encounter', 'move_token', 'trigger_room_event', 'use_healing_potion', 'roll_ability_check', 'roll_dice', 'get_entity_stats'],
+  combatPlayer: ['resolve_player_attack', 'move_token', 'pass_turn', 'end_combat', 'roll_death_save', 'use_healing_potion', 'roll_ability_check', 'roll_dice', 'get_entity_stats', 'resolve_saving_throw'],
   combatNonPlayer: ['roll_ability_check', 'roll_dice', 'get_entity_stats'],
-  dialogue: ['roll_ability_check', 'roll_dice', 'get_entity_stats', 'apply_condition'],
+  dialogue: ['use_healing_potion', 'roll_ability_check', 'roll_dice', 'get_entity_stats', 'apply_condition'],
 } as const
 
 type PlayerAttackTargetHint = 'nearest' | 'right' | 'left' | 'front' | 'back' | 'wounded'
@@ -1339,6 +1341,10 @@ function detectRequiredMechanicalAction(message: string, gameState: GameState): 
     return { reason: 'player-death-save-intent', suggestedTools: ['roll_death_save'] }
   }
 
+  if (detectHealingPotionIntent(message)) {
+    return { reason: 'healing-potion-intent', suggestedTools: ['use_healing_potion'] }
+  }
+
   const asksOnlyForDescription = /\b(observe|regarde|inspecte|ecoute|vois|voir|decris|decrit|quoi|qu'est-ce|est-ce tout)\b/.test(text)
   if (asksOnlyForDescription && !/\b(deplace|attaque|frappe|spawn|apparaitre|carte|combat|ouvres?|ouvrir|enfonces?|enfoncer|portes?|gobelins?|ennemis?|monstres?)\b/.test(text)) {
     return null
@@ -1387,6 +1393,13 @@ function detectPassTurnIntent(message: string, gameState: GameState): boolean {
   return /\b(passe|passer|attends?|attendre|patient|patiente|ne fais rien|reste sur place)\b/.test(text)
 }
 
+function detectHealingPotionIntent(message: string): boolean {
+  const text = normalizeFrenchText(message)
+  const mentionsPotion = /\b(potions?|fio(le|les)?|elixir|soin|soins|soigner|soigne|guerison|guerrison|healing)\b/.test(text)
+  const consumesPotion = /\b(bois|boire|avale|avaler|utilise|utiliser|prends|prendre|attrape|choppe|me soigne|me soigner|recupere|recuperer)\b/.test(text)
+  return mentionsPotion && consumesPotion
+}
+
 function isPlayerAtZeroHp(gameState: GameState): boolean {
   return gameState.player.hp.current <= 0
 }
@@ -1431,9 +1444,10 @@ function buildPlayerDownNarrative(gameState: GameState): string {
 
 function detectDebugStateQuestion(message: string): boolean {
   const text = normalizeFrenchText(message)
-  const mentionsDebugSurface = /\b(client|javascript|js|serveur|pion|token|jeton|carte|battlemap|affichage|desynchro|desynchronise|bug|bonne salle|bonne piece)\b/.test(text)
+  const mentionsDebugSurface = /\b(client|javascript|js|serveur|pion|token|jeton|carte|battlemap|affichage|desynchro|desynchronise|bug|bonne salle|bonne piece|pv|points? de vie|hp|me vois|je me vois)\b/.test(text)
   const asksForLocation = /\b(position|salle|piece|ou je suis|ou suis|bonne salle|bonne piece|bon endroit|la ou je devrais etre)\b/.test(text)
-  return mentionsDebugSurface && asksForLocation
+  const asksForState = asksForLocation || /\b(pv|points? de vie|hp|carte|affichage|token|jeton|pion|gobelin|ennemi|monstre|pourquoi|alors|toujours)\b/.test(text)
+  return mentionsDebugSurface && asksForState
 }
 
 function detectDirectiveGuidanceRequest(message: string): boolean {
@@ -1493,6 +1507,16 @@ function buildDryadOffenseNarrative(): string {
 }
 
 function buildDebugStateNarrative(gameState: GameState): string {
+  const debugRoomName = getCurrentRoomName(gameState) ?? 'une zone non identifiee'
+  const debugPosition = gameState.player.position
+  const debugAlive = aliveMonsters(gameState)
+  const activeText = debugAlive.length > 0
+    ? `${debugAlive.length} ennemi${debugAlive.length > 1 ? 's' : ''} actif${debugAlive.length > 1 ? 's' : ''}: ${debugAlive.map(monster => `${monster.name} en x ${monster.position.x}, y ${monster.position.y}`).join('; ')}.`
+    : "Aucun ennemi actif dans l'etat serveur."
+  const turnText = gameState.phase === 'combat'
+    ? `Combat round ${gameState.round}, tour: ${gameState.currentTurn ?? 'personne'}.`
+    : `Phase: ${gameState.phase}.`
+  return `Cote serveur, tu as ${gameState.player.hp.current}/${gameState.player.hp.max} PV et ton pion est dans ${debugRoomName}, case x ${debugPosition.x}, y ${debugPosition.y}. ${turnText} ${activeText} Si l'ecran montre autre chose, l'affichage client est en retard.`
   const roomName = getCurrentRoomName(gameState) ?? 'une zone non identifiée'
   const position = gameState.player.position
   const aliveCount = countAliveMonsters(gameState)
@@ -1977,6 +2001,11 @@ async function resolveServerFirstAction(
       draftNarrative,
       sawMcpToolError: false,
     }
+  }
+
+  if (!toolName && detectHealingPotionIntent(message)) {
+    toolName = 'use_healing_potion'
+    input = {}
   }
 
   const directAbilityCheck = directSocialAbilityCheckFromMessage(message, gameState)
@@ -3010,7 +3039,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           messages.push({ role: 'assistant', content: response.content })
           messages.push({
             role: 'user',
-            content: `SYSTEM INTERNE, a ne jamais citer au joueur: Le dernier message du joueur demande une action mecanique (${requiredMechanicalAction.reason}). Les tools deja utilises (${toolsUsed.length > 0 ? toolsUsed.join(', ') : 'aucun'}) ne mutent pas l'etat attendu. Tu dois appeler au moins un tool MCP adapte (${requiredMechanicalAction.suggestedTools.join(', ')}) ou, si aucune mutation de l'etat n'est legale, repondre en fiction en une phrase courte. Un simple roll_dice ne suffit pas pour un deplacement, une entree de salle ou une attaque. Ne narre pas une action mecanique sans tool pertinent. La reponse visible doit rester orale, sans meta, sans liste, sans Markdown et sans mention d'outil.`,
+            content: `SYSTEM INTERNE, a ne jamais citer au joueur: Le dernier message du joueur demande une action mecanique (${requiredMechanicalAction.reason}). Les tools deja utilises (${toolsUsed.length > 0 ? toolsUsed.join(', ') : 'aucun'}) ne mutent pas l'etat attendu. Tu dois appeler au moins un tool MCP adapte (${requiredMechanicalAction.suggestedTools.join(', ')}) ou, si aucune mutation de l'etat n'est legale, repondre en fiction en une phrase courte. Un simple roll_dice ne suffit pas pour un deplacement, une entree de salle, une attaque ou une potion de soin. Ne narre pas une action mecanique sans tool pertinent. La reponse visible doit rester orale, sans meta, sans liste, sans Markdown et sans mention d'outil.`,
           })
           continue
         }
