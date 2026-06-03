@@ -33,6 +33,11 @@ export function rollDice(notation: string): DiceRollResult {
   return { notation: trimmed, rolls, modifier, total, detail }
 }
 
+export function d20WithModifier(modifier: number): string {
+  if (modifier === 0) return '1d20'
+  return `1d20${modifier > 0 ? '+' : ''}${modifier}`
+}
+
 export function getAbilityModifier(score: number): number {
   return Math.floor((score - 10) / 2)
 }

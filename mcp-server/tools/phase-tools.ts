@@ -1,6 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
-import { rollDice, getAbilityModifier } from '../dice'
+import { rollDice, getAbilityModifier, d20WithModifier } from '../dice'
 import * as gs from '../game-state'
 import * as rules from '../rules'
 import { MonsterState } from '../../lib/types'
@@ -213,7 +213,7 @@ export function registerPhaseTools(server: McpServer): void {
         const entity = gs.getEntity(id)
         if (!entity) continue
         const dexMod = getAbilityModifier(entity.stats.dex)
-        const roll = rollDice(`1d20+${dexMod}`)
+        const roll = rollDice(d20WithModifier(dexMod))
         entity.initiative = roll.total
         initiatives.push({ id, initiative: roll.total, roll: roll.detail })
       }

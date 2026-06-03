@@ -1,6 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
-import { rollDice, getAbilityModifier } from '../dice'
+import { rollDice, getAbilityModifier, d20WithModifier } from '../dice'
 import * as gs from '../game-state'
 import * as rules from '../rules'
 import { EntityStats, AttackResult, SavingThrowResult, Condition } from '../../lib/types'
@@ -71,15 +71,15 @@ export function registerCombatTools(server: McpServer): void {
       const attackBonus = 'attackBonus' in attacker ? attacker.attackBonus : (strMod + profBonus)
 
       // Roll to-hit (with advantage/disadvantage)
-      const roll1 = rollDice(`1d20+${attackBonus}`)
+      const roll1 = rollDice(d20WithModifier(attackBonus))
       let attackRoll = roll1
 
       if (advantage && !disadvantage) {
-        const roll2 = rollDice(`1d20+${attackBonus}`)
+        const roll2 = rollDice(d20WithModifier(attackBonus))
         attackRoll = roll1.total >= roll2.total ? roll1 : roll2
         attackRoll = { ...attackRoll, detail: `ADV: ${roll1.detail} / ${roll2.detail} → kept ${attackRoll.total}` }
       } else if (disadvantage && !advantage) {
-        const roll2 = rollDice(`1d20+${attackBonus}`)
+        const roll2 = rollDice(d20WithModifier(attackBonus))
         attackRoll = roll1.total <= roll2.total ? roll1 : roll2
         attackRoll = { ...attackRoll, detail: `DIS: ${roll1.detail} / ${roll2.detail} → kept ${attackRoll.total}` }
       }
@@ -160,7 +160,7 @@ export function registerCombatTools(server: McpServer): void {
       }
 
       const abilityMod = getAbilityModifier(entity.stats[ability as keyof EntityStats])
-      const roll = rollDice(`1d20+${abilityMod}`)
+      const roll = rollDice(d20WithModifier(abilityMod))
       const success = roll.total >= dc
 
       const mechanicalSummary = `JS ${ability.toUpperCase()}: ${roll.detail} vs DD ${dc} → ${success ? 'SUCCÈS' : 'ÉCHEC'}${!success && onFailure ? ` | ${onFailure}` : ''}`
