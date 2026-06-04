@@ -874,7 +874,7 @@ export default function Chat({
       </div>
 
       <div className="flex-shrink-0 border-t border-amber-900/30 p-3 bg-stone-900/80">
-        <div className="flex gap-2 items-end">
+        <div className="flex min-w-0 gap-2 items-end">
           <textarea
             ref={inputRef}
             value={inputValue}
@@ -883,7 +883,7 @@ export default function Chat({
             placeholder={placeholder}
             disabled={isLoading || isListening}
             rows={2}
-            className="flex-1 bg-stone-800/80 border border-stone-600/50 rounded-lg px-3 py-2 text-stone-200 placeholder-stone-600 text-sm resize-none focus:outline-none focus:border-amber-700/60 disabled:opacity-50 leading-relaxed"
+            className="min-w-0 flex-1 bg-stone-800/80 border border-stone-600/50 rounded-lg px-3 py-2 text-stone-200 placeholder-stone-600 text-sm resize-none focus:outline-none focus:border-amber-700/60 disabled:opacity-50 leading-relaxed"
           />
           <button
             onClick={handleSend}
