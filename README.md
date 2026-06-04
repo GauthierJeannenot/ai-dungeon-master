@@ -212,9 +212,11 @@ fly deploy
 **Avantages** : free tier sans limite de temps (750h/mois)  
 **Inconvénient** : mise en veille après 15 min d'inactivité (cold start ~30 sec)
 
+Chemin recommande pour une prod de test rapide: le fichier `render.yaml` est pret pour Render Blueprint, avec build Node 20, healthcheck, auto-deploy apres CI verte, `NARRATION_MODE=quality`, logs debug et sessions temporaires.
+
 #### 1. Créer le service
 
-1. Ouvre [render.com](https://render.com) → New → **Web Service**
+1. Ouvre [render.com](https://render.com) → New → **Blueprint**
 2. Connecte ton repo GitHub
 3. Render détecte automatiquement `render.yaml` → configuration appliquée
 
@@ -225,9 +227,11 @@ Dans le dashboard Render → ton service → **Environment** :
 ANTHROPIC_API_KEY = sk-ant-ta-vraie-cle
 ```
 
+Voir [docs/render-deploy.md](docs/render-deploy.md) pour les logs, limites du free tier et commandes de debug.
+
 #### 3. Auto-deploy
 
-Activé par défaut (`autoDeploy: true` dans `render.yaml`). Chaque push sur la branche configurée redéploie.
+Activé par défaut (`autoDeployTrigger: checksPass` dans `render.yaml`). Chaque push sur `master` redéploie après CI verte.
 
 ---
 
