@@ -378,6 +378,11 @@ export interface DMDebugTurnView {
   targetResolution?: Record<string, unknown> | null
   actionPlan?: Record<string, unknown> | null
   sceneSurface?: Record<string, unknown> | null
+  intentInterpreterInputSummary?: Record<string, unknown> | null
+  intentInterpreterOutput?: Record<string, unknown> | null
+  intentInterpreterModel?: string | null
+  intentInterpreterUsed?: boolean
+  intentInterpreterFallbackReason?: string | null
   refusalCode?: string | null
   worldDiff?: {
     events: EngineEvent[]
@@ -461,6 +466,11 @@ export interface TurnTrace {
   targetResolution?: Record<string, unknown> | null
   actionPlan?: Record<string, unknown> | null
   sceneSurface?: Record<string, unknown> | null
+  intentInterpreterInputSummary?: Record<string, unknown> | null
+  intentInterpreterOutput?: Record<string, unknown> | null
+  intentInterpreterModel?: string | null
+  intentInterpreterUsed?: boolean
+  intentInterpreterFallbackReason?: string | null
   actions: TurnTraceActionExecution[]
   toolsUsed: string[]
   engineEvents: EngineEvent[]

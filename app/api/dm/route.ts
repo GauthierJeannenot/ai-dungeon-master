@@ -60,6 +60,13 @@ import {
 } from '@/lib/narrative-world-contract'
 import { normalizeLlmToolInput } from '@/lib/tool-input-normalizer'
 import { actionExecution, buildTurnTrace } from '@/lib/turn-trace'
+import {
+  buildIntentInterpreterInputSummary,
+  interpretPlayerIntentMock,
+  validateIntentInterpreterOutput,
+  type IntentInterpreterInputSummary,
+  type IntentInterpreterOutput,
+} from '@/lib/intent-interpreter'
 
 export const maxDuration = 60
 
@@ -68,6 +75,7 @@ const anthropic = new Anthropic({
 })
 
 const MODEL = 'claude-haiku-4-5'
+const INTENT_INTERPRETER_MODEL = process.env.INTENT_INTERPRETER_MODEL || MODEL
 const MAX_TOOL_ITERATIONS = 3
 const MAX_TOKENS = 400
 const FINAL_NARRATION_MAX_TOKENS = parsePositiveInt(process.env.LLM_FINAL_NARRATION_MAX_TOKENS, 260)
@@ -109,12 +117,16 @@ const DIRECTOR_LOCAL_FINAL_TOOLS = new Set([
 const LLM_MODE = parseLlmMode(process.env.LLM_MODE)
 const NARRATION_MODE = parseNarrationMode(process.env.NARRATION_MODE)
 const ALLOW_PAID_LLM = process.env.ALLOW_PAID_LLM !== 'false'
+const INTENT_INTERPRETER_ENABLED = process.env.INTENT_INTERPRETER_ENABLED !== 'false'
+const LLM_HARD_BUDGET_ENABLED = process.env.LLM_HARD_BUDGET_ENABLED === 'true'
+const LLM_FINAL_NARRATION_ALWAYS = process.env.LLM_FINAL_NARRATION_ALWAYS !== 'false'
 const LLM_REPLAY_FALLBACK_TO_MOCK = process.env.LLM_REPLAY_FALLBACK_TO_MOCK === 'true'
 const LLM_CASSETTE_DIR = process.env.LLM_CASSETTE_DIR || path.join(process.cwd(), '.data', 'llm-cassettes')
 const LLM_MAX_CALLS_PER_REQUEST = parsePositiveInt(process.env.LLM_MAX_CALLS_PER_REQUEST, 10)
 const LLM_MAX_CALLS_PER_SESSION = parsePositiveInt(process.env.LLM_MAX_CALLS_PER_SESSION, 0)
 const LLM_PROMPT_CACHE_ENABLED = process.env.LLM_PROMPT_CACHE_ENABLED !== 'false'
 const LLM_PROMPT_CACHE_TTL = parsePromptCacheTtl(process.env.LLM_PROMPT_CACHE_TTL)
+const NO_GENERIC_FALLBACK_NARRATION_INSTRUCTION = 'Interdit absolu: pas de fallback generique de salle, pas de "la piece gronde", pas de boucle d ambiance, pas de texte carte postale. Si aucun event moteur n a change l etat, reponds par une clarification naturelle fondee sur l intention interpretee et les affordances, ou par une reaction conversationnelle concrete si un PNJ est present.'
 
 // Nombre de messages récents conservés verbatim avant compression.
 // Au-delà, les plus anciens sont résumés en un paragraphe.
@@ -130,6 +142,7 @@ const sessionLlmCalls = new Map<string, number>()
 
 type LlmOperation =
   | 'history.compress'
+  | 'dm.intent_interpreter'
   | 'dm.iteration'
   | 'dm.final_narration'
   | 'dm.final_narration_fallback'
@@ -226,6 +239,7 @@ function withToolPromptCache(tools: Anthropic.Tool[]): Anthropic.Tool[] {
 }
 
 function nextLlmCallWouldExceedBudget(requestCallCount: number, sessionId: string | undefined): boolean {
+  if (!LLM_HARD_BUDGET_ENABLED) return false
   if (requestCallCount > LLM_MAX_CALLS_PER_REQUEST) return true
 
   const budgetSessionId = normalizeBudgetSessionId(sessionId)
@@ -361,6 +375,28 @@ function createMockLlmMessage(params: MessageCreateParams, context: LlmCallConte
     return mockTextMessage('Résumé mock: les échanges précédents sont conservés sous forme condensée pour les tests.')
   }
 
+  if (context.operation === 'dm.intent_interpreter') {
+    const gameState = context.gameState
+    if (!gameState) {
+      return mockTextMessage(JSON.stringify({
+        schemaVersion: 1,
+        intentKind: 'pass_through',
+        confidence: 0.2,
+        requiresClarification: false,
+        canonicalAction: null,
+        improvisation: null,
+        targetHints: {},
+        reasoningSummary: 'Aucun etat moteur disponible pour interpreter.',
+        source: 'mock',
+      }))
+    }
+
+    return mockTextMessage(JSON.stringify(interpretPlayerIntentMock({
+      message: context.playerMessage || lastUserText(params.messages),
+      gameState,
+    })))
+  }
+
   if (context.operation === 'dm.final_narration' || context.operation === 'dm.final_narration_fallback') {
     const prompt = lastUserText(params.messages)
     const draftMatch = prompt.match(/Brouillon non autoritaire[\s\S]*?:\n([\s\S]*?)\n\nPaquet moteur/)
@@ -461,13 +497,13 @@ async function writeCassette(key: string, message: Anthropic.Message): Promise<v
 }
 
 async function createLlmMessage(params: MessageCreateParams, context: LlmCallContext): Promise<Anthropic.Message> {
-  if (context.requestCallCount > LLM_MAX_CALLS_PER_REQUEST) {
+  if (LLM_HARD_BUDGET_ENABLED && context.requestCallCount > LLM_MAX_CALLS_PER_REQUEST) {
     throw new Error(`Budget LLM dépassé pour cette requête (${LLM_MAX_CALLS_PER_REQUEST} appels max).`)
   }
 
   const budgetSessionId = normalizeBudgetSessionId(context.sessionId)
   const nextSessionCalls = (sessionLlmCalls.get(budgetSessionId) ?? 0) + 1
-  if (LLM_MAX_CALLS_PER_SESSION > 0 && nextSessionCalls > LLM_MAX_CALLS_PER_SESSION) {
+  if (LLM_HARD_BUDGET_ENABLED && LLM_MAX_CALLS_PER_SESSION > 0 && nextSessionCalls > LLM_MAX_CALLS_PER_SESSION) {
     throw new Error(`Budget LLM dépassé pour cette session (${LLM_MAX_CALLS_PER_SESSION} appels max).`)
   }
 
@@ -479,6 +515,7 @@ async function createLlmMessage(params: MessageCreateParams, context: LlmCallCon
     llmRoute: context.llmRoute ?? 'none',
     requestCallCount: context.requestCallCount,
     sessionCallCount: nextSessionCalls,
+    hardBudgetEnabled: LLM_HARD_BUDGET_ENABLED,
     promptCacheEnabled: LLM_PROMPT_CACHE_ENABLED,
     promptCacheTtl: LLM_PROMPT_CACHE_ENABLED ? LLM_PROMPT_CACHE_TTL : null,
   })
@@ -1230,6 +1267,47 @@ function buildOralFallbackNarrative(gameState: GameState, toolsUsed: string[]): 
   }
 
   return buildDirectiveSceneNarrative(gameState)
+}
+
+function looksLikeGenericSceneFallback(text: string): boolean {
+  const normalized = normalizeFrenchText(text)
+  return [
+    /\bla piece gronde\b/,
+    /\bla scene (?:avance|progresse)\b/,
+    /\bun detail concret\b/,
+    /\bla facade de la boulangerie grince\b/,
+    /\bdans le verger, les branches se referment\b/,
+    /\bau quai de chargement, la porte laterale\b/,
+    /\bau sol de la boulangerie, les fours claquent\b/,
+    /\bdans l'appartement de grammy, l'odeur\b/,
+    /\bla piste se brouille\b/,
+  ].some(pattern => pattern.test(normalized))
+}
+
+function buildContextualNoFallbackNarrative(
+  gameState: GameState,
+  actionIntent: GameActionIntent,
+  intentInterpreter?: IntentInterpreterTurnResult
+): string {
+  const clarification = intentInterpreter?.output?.clarificationQuestion
+  if (clarification) return clarification
+
+  const surface = buildSceneSurface(gameState)
+  const npc = surface.npcs[0]
+  if (npc && ['talk', 'ask', 'persuade', 'threaten', 'social'].includes(actionIntent.kind)) {
+    return `${npc.name} te fixe et attend quelque chose de plus net: une question, une offre, une menace, ou un objet a montrer.`
+  }
+
+  const enabledAffordances = surface.affordances
+    .filter(affordance => affordance.enabled)
+    .map(affordance => affordance.target?.name ?? affordance.label)
+    .filter(Boolean)
+    .slice(0, 4)
+  if (enabledAffordances.length > 0) {
+    return `Je comprends l'intention, mais il me manque une cible nette. Ici, les prises claires sont: ${enabledAffordances.join(', ')}.`
+  }
+
+  return "Je comprends l'intention, mais je ne veux pas inventer une consequence sans fait moteur. Precise la cible ou l'effet voulu, et je le resous proprement."
 }
 
 const SOCIAL_ACTION_KINDS = new Set<GameActionKind>([
@@ -2625,6 +2703,298 @@ function playerActionKindFromToolUse(toolName: string, input: unknown): Canonica
   return null
 }
 
+interface IntentInterpreterTurnResult {
+  used: boolean
+  model: string | null
+  inputSummary: IntentInterpreterInputSummary | null
+  output: IntentInterpreterOutput | null
+  fallbackReason: string | null
+}
+
+function numericConfidenceToActionConfidence(value: number): GameActionConfidence {
+  if (value >= 0.8) return 'high'
+  if (value >= 0.55) return 'medium'
+  return 'low'
+}
+
+function primitiveForInterpretedKind(kind: CanonicalPlayerActionKind): GameActionPrimitive {
+  if (kind === 'attack') return 'resolve_attack'
+  if (kind === 'move') return 'move'
+  if (kind === 'use_item') return 'use_item'
+  if (kind === 'ability_check' || kind === 'social' || kind === 'death_save') return 'check'
+  if (kind === 'wait') return 'wait'
+  if (kind === 'observe') return 'narrate'
+  return 'world_action'
+}
+
+function suggestedToolsForInterpretedKind(kind: CanonicalPlayerActionKind): string[] {
+  if (kind === 'attack') return ['resolve_player_action', 'resolve_player_attack']
+  if (kind === 'move') return ['resolve_player_action', 'move_token']
+  if (kind === 'ability_check' || kind === 'social') return ['resolve_player_action', 'roll_ability_check']
+  if (kind === 'death_save') return ['resolve_player_action', 'roll_death_save']
+  if (kind === 'use_item') return ['resolve_player_action', 'use_healing_potion']
+  if (kind === 'wait') return ['resolve_player_action', 'pass_turn']
+  if (kind === 'observe') return []
+  return ['resolve_player_action']
+}
+
+function interpreterCanonicalAction(output: IntentInterpreterOutput | null | undefined): Record<string, unknown> | null {
+  if (!output || output.requiresClarification || !isObjectRecord(output.canonicalAction)) return null
+  const kind = output.canonicalAction.kind
+  if (typeof kind !== 'string') return null
+  if (!PLAYER_ACTION_KINDS.has(kind as CanonicalPlayerActionKind)) return null
+  return output.canonicalAction
+}
+
+function shouldExecuteInterpreterActionDirectly(action: Record<string, unknown>, gameState: GameState): boolean {
+  const kind = action.kind
+  if (typeof kind !== 'string') return false
+  if (kind === 'social' || kind === 'ability_check') return false
+  if (kind === 'move') return isObjectRecord(action.toCell)
+  if (kind === 'attack') return gameState.phase === 'combat' && gameState.currentTurn === 'player'
+  return PLAYER_ACTION_KINDS.has(kind as CanonicalPlayerActionKind)
+}
+
+function intentInterpreterFastPathReason(
+  message: string,
+  gameState: GameState,
+  preliminaryIntent: GameActionIntent
+): string | null {
+  if (!INTENT_INTERPRETER_ENABLED) return 'disabled'
+  if (preliminaryIntent.reason === 'debug-state-question') return 'debug-state-question'
+  if (preliminaryIntent.reason === 'state-reconcile-location') return 'state-reconcile-location'
+  if (preliminaryIntent.reason === 'player-death-save-intent') return 'player-death-save-intent'
+  if (preliminaryIntent.reason === 'healing-potion-intent') return 'healing-potion-intent'
+  if (preliminaryIntent.reason === 'player-pass-turn-intent') return 'player-pass-turn-intent'
+  if (
+    preliminaryIntent.confidence === 'high' &&
+    isCanonicalWorldActionKind(preliminaryIntent.kind) &&
+    preliminaryIntent.kind !== 'improvise' &&
+    preliminaryIntent.reason.startsWith('world-')
+  ) {
+    return `canonical-world-action:${preliminaryIntent.kind}`
+  }
+
+  const text = normalizeFrenchText(message)
+  const coordinateMoveIntent =
+    preliminaryIntent.kind === 'move' &&
+    /\(?\s*\d{1,2}\s*[,;]\s*\d{1,2}\s*\)?/.test(text) &&
+    /\b(va|vais|aller|deplaces?|deplacer|avances?|avancer|bouges?|bouger|marche|case|coordonnees?)\b/.test(text)
+  if (coordinateMoveIntent) return 'coordinate-move'
+
+  if (gameState.phase === 'combat' && gameState.currentTurn && gameState.currentTurn !== 'player') {
+    return 'non-player-combat-turn'
+  }
+
+  return null
+}
+
+function intentFromInterpreterOutput(
+  message: string,
+  fallbackIntent: GameActionIntent,
+  output: IntentInterpreterOutput | null | undefined
+): GameActionIntent | null {
+  if (!output) return null
+  const normalizedText = normalizeFrenchText(message)
+
+  if (output.requiresClarification) {
+    return {
+      kind: 'unknown',
+      primitive: 'narrate',
+      reason: 'intent-interpreter-clarification',
+      requiresEngine: false,
+      suggestedTools: [],
+      confidence: numericConfidenceToActionConfidence(output.confidence),
+      normalizedText,
+    }
+  }
+
+  if (output.intentKind === 'guidance') {
+    return {
+      kind: 'guidance',
+      primitive: 'narrate',
+      reason: 'intent-interpreter-guidance',
+      requiresEngine: false,
+      suggestedTools: [],
+      confidence: numericConfidenceToActionConfidence(output.confidence),
+      normalizedText,
+    }
+  }
+
+  if (output.intentKind === 'query_state') {
+    return {
+      kind: 'query_state',
+      primitive: 'query_state',
+      reason: 'intent-interpreter-query-state',
+      requiresEngine: false,
+      suggestedTools: [],
+      confidence: numericConfidenceToActionConfidence(output.confidence),
+      normalizedText,
+    }
+  }
+
+  const canonicalAction = interpreterCanonicalAction(output)
+  const actionKind = canonicalAction?.kind
+  if (typeof actionKind !== 'string') return null
+  const kind = actionKind as CanonicalPlayerActionKind
+  const primitive = primitiveForInterpretedKind(kind)
+  const requiresEngine = primitive !== 'narrate'
+  return {
+    kind,
+    primitive,
+    reason: `intent-interpreter-${output.intentKind || kind}`,
+    requiresEngine,
+    suggestedTools: suggestedToolsForInterpretedKind(kind),
+    confidence: numericConfidenceToActionConfidence(output.confidence),
+    normalizedText,
+  }
+}
+
+function parseJsonObjectFromLlmText(text: string): unknown {
+  try {
+    return JSON.parse(text)
+  } catch {
+    const start = text.indexOf('{')
+    const end = text.lastIndexOf('}')
+    if (start >= 0 && end > start) {
+      return JSON.parse(text.slice(start, end + 1))
+    }
+    throw new Error('Intent interpreter response did not contain a JSON object.')
+  }
+}
+
+function textFromLlmMessage(message: Anthropic.Message): string {
+  return message.content
+    .map(block => block.type === 'text' && 'text' in block ? block.text : '')
+    .filter(Boolean)
+    .join('\n')
+    .trim()
+}
+
+function buildIntentInterpreterPrompt(summary: IntentInterpreterInputSummary): string {
+  return [
+    'Retourne uniquement un objet JSON valide conforme au schema demande. Pas de prose.',
+    'Tu interpretes une intention joueur pour un moteur de JDR. Tu proposes, tu ne mutes rien.',
+    'Si une action creative plausible sort des actions prevues, prefere canonicalAction.kind="improvise" avec un type improvisation.',
+    'Si la cible est vraiment ambigue, requiresClarification=true et pose une question courte.',
+    'Ne transforme pas une question en attaque ou en rencontre.',
+    'Schema attendu: intentKind, confidence, requiresClarification, clarificationQuestion, canonicalAction, improvisation, targetHints, reasoningSummary.',
+    `Resume moteur:\n${JSON.stringify(summary, null, 2)}`,
+  ].join('\n\n')
+}
+
+async function interpretIntentForTurn(params: {
+  message: string
+  gameState: GameState
+  recentHistory: ConversationTurn[]
+  preliminaryIntent: GameActionIntent
+  usageLog: AnthropicUsageLogEntry[]
+  requestId: string
+  sessionId: string | undefined
+  inputMode: string
+  clientRequestId: string | undefined
+}): Promise<IntentInterpreterTurnResult> {
+  const {
+    message,
+    gameState,
+    recentHistory,
+    preliminaryIntent,
+    usageLog,
+    requestId,
+    sessionId,
+    inputMode,
+    clientRequestId,
+  } = params
+  const inputSummary = buildIntentInterpreterInputSummary({ message, gameState, recentHistory })
+  const fastPathReason = intentInterpreterFastPathReason(message, gameState, preliminaryIntent)
+  if (fastPathReason) {
+    return {
+      used: false,
+      model: null,
+      inputSummary,
+      output: null,
+      fallbackReason: `fast-path:${fastPathReason}`,
+    }
+  }
+
+  if (LLM_MODE === 'mock' || !ALLOW_PAID_LLM) {
+    return {
+      used: true,
+      model: 'mock-intent-interpreter',
+      inputSummary,
+      output: interpretPlayerIntentMock({ message, gameState, recentHistory }),
+      fallbackReason: LLM_MODE === 'mock' ? 'mock-mode' : 'paid-llm-disabled',
+    }
+  }
+
+  try {
+    const response = await createLlmMessage({
+      model: INTENT_INTERPRETER_MODEL,
+      max_tokens: 650,
+      system: [
+        'Tu es un Intent Interpreter strict pour un moteur de JDR.',
+        'Tu comprends le francais naturel, les typos, les anaphores simples et les actions absurdes.',
+        'Tu ne juges pas la legalite finale: tu proposes un plan JSON court; le moteur valide ensuite.',
+        'Pas de chaine de pensee. reasoningSummary doit etre bref et non technique.',
+      ].join(' '),
+      messages: [{ role: 'user', content: buildIntentInterpreterPrompt(inputSummary) }],
+    }, {
+      requestId,
+      sessionId,
+      operation: 'dm.intent_interpreter',
+      requestCallCount: usageLog.length + 1,
+      gameState,
+      playerMessage: message,
+    })
+
+    usageLog.push(logAnthropicUsage({
+      requestId,
+      sessionId,
+      inputMode,
+      clientRequestId,
+      operation: 'dm.intent_interpreter',
+      model: INTENT_INTERPRETER_MODEL,
+      usage: response.usage,
+      stopReason: response.stop_reason,
+      metadata: {
+        preliminaryIntent: {
+          kind: preliminaryIntent.kind,
+          reason: preliminaryIntent.reason,
+          confidence: preliminaryIntent.confidence,
+        },
+      },
+    }))
+
+    const parsed = parseJsonObjectFromLlmText(textFromLlmMessage(response))
+    return {
+      used: true,
+      model: INTENT_INTERPRETER_MODEL,
+      inputSummary,
+      output: validateIntentInterpreterOutput(parsed, 'llm'),
+      fallbackReason: null,
+    }
+  } catch (err) {
+    const fallbackOutput = interpretPlayerIntentMock({ message, gameState, recentHistory })
+    logEvent('warn', 'dm.intent_interpreter.fallback_to_mock', {
+      requestId,
+      sessionId,
+      err,
+      preliminaryIntent,
+      fallbackOutput,
+    })
+    return {
+      used: true,
+      model: 'mock-intent-interpreter',
+      inputSummary,
+      output: {
+        ...fallbackOutput,
+        source: 'fallback',
+      },
+      fallbackReason: err instanceof Error ? err.message : 'intent-interpreter-error',
+    }
+  }
+}
+
 function validateToolUseAgainstAffordances(
   toolName: string,
   input: unknown,
@@ -3043,11 +3413,13 @@ function parseWorldActionInput(
 function buildDmTurnDebug(
   message: string,
   gameState: GameState,
-  actionIntent: GameActionIntent
+  actionIntent: GameActionIntent,
+  intentInterpreter?: IntentInterpreterTurnResult
 ): DMDebugTurnView {
   const isWorldAction = isCanonicalWorldActionKind(actionIntent.kind)
   const actionPlan = buildActionPlan(message, gameState, actionIntent.kind)
   const plannedAction = actionPlan?.steps.find(step => step.action)?.action ?? null
+  const interpretedCanonicalAction = interpreterCanonicalAction(intentInterpreter?.output)
   const reconcileRoomId = actionIntent.kind === 'state_reconcile'
     ? resolveLocationReconcileRoomId(message)
     : null
@@ -3067,13 +3439,19 @@ function buildDmTurnDebug(
       confidence: actionIntent.confidence,
       requiresEngine: actionIntent.requiresEngine,
     },
-    parsedAction: isWorldAction
+    parsedAction: interpretedCanonicalAction ?? (isWorldAction
       ? plannedAction ?? buildWorldActionInput(message, gameState, actionIntent.kind)
       : actionIntent.kind === 'state_reconcile' && reconcileCell
         ? { kind: 'move', tokenId: 'player', toCell: reconcileCell }
-        : moveCanonicalAction ?? plannedAction,
+        : moveCanonicalAction ?? plannedAction),
     targetResolution: actionPlan?.targetResolution
       ? actionPlan.targetResolution as unknown as Record<string, unknown>
+      : interpretedCanonicalAction
+        ? {
+            status: 'interpreted',
+            targetHints: intentInterpreter?.output?.targetHints ?? {},
+            reasoningSummary: intentInterpreter?.output?.reasoningSummary,
+          }
       : isWorldAction
         ? resolveWorldActionTargets(message, gameState, actionIntent.kind) as unknown as Record<string, unknown>
         : moveLocationResolution
@@ -3087,8 +3465,27 @@ function buildDmTurnDebug(
               toCell: reconcileCell,
             }
           : null,
-    actionPlan: actionPlan ? summarizeActionPlanForDebug(actionPlan) : null,
+    actionPlan: actionPlan
+      ? summarizeActionPlanForDebug(actionPlan)
+      : interpretedCanonicalAction
+        ? {
+            id: 'intent-interpreter-direct',
+            source: 'intent_interpreter',
+            reason: intentInterpreter?.output?.reasoningSummary ?? 'Action canonique proposee par Intent Interpreter.',
+            steps: [{
+              id: 'intent-interpreter-direct-step-1',
+              toolName: 'resolve_player_action',
+              action: interpretedCanonicalAction,
+              reason: 'Execution via facade canonique resolve_player_action.',
+            }],
+          }
+        : null,
     sceneSurface: summarizeSceneSurfaceForDebug(sceneSurface),
+    intentInterpreterInputSummary: intentInterpreter?.inputSummary as unknown as Record<string, unknown> ?? null,
+    intentInterpreterOutput: intentInterpreter?.output as unknown as Record<string, unknown> ?? null,
+    intentInterpreterModel: intentInterpreter?.model ?? null,
+    intentInterpreterUsed: intentInterpreter?.used ?? false,
+    intentInterpreterFallbackReason: intentInterpreter?.fallbackReason ?? null,
   }
 }
 
@@ -3385,11 +3782,57 @@ async function resolveServerFirstAction(
   sessionId: string | undefined,
   requestId: string,
   recentHistory: ConversationTurn[],
-  actionIntent: GameActionIntent
+  actionIntent: GameActionIntent,
+  intentInterpreter?: IntentInterpreterTurnResult
 ): Promise<EngineFirstResolution> {
   const startedAt = Date.now()
   let toolName: string | null = null
   let input: Record<string, unknown> | null = null
+
+  if (intentInterpreter?.output?.requiresClarification) {
+    const draftNarrative = intentInterpreter.output.clarificationQuestion ??
+      "Je vois l'intention, mais il me manque une cible claire. Precise qui ou quoi tu vises, et je l'applique proprement."
+    const detail = {
+      status: 'clarification_required',
+      intentKind: intentInterpreter.output.intentKind,
+      targetHints: intentInterpreter.output.targetHints,
+      reasoningSummary: intentInterpreter.output.reasoningSummary,
+    }
+    logEvent('info', 'dm.cost.engine_first.intent_interpreter.clarification_required', {
+      requestId,
+      sessionId,
+      actionIntent,
+      intentInterpreter: intentInterpreter.output,
+      durationMs: Date.now() - startedAt,
+      draftNarrative,
+      gameState: summarizeGameState(gameState),
+    })
+    return {
+      handled: true,
+      gameState,
+      toolsUsed: [],
+      draftNarrative,
+      sawMcpToolError: false,
+      actionExecutions: [
+        toolActionExecution('rule', 'unresolved_intent', {
+          message,
+          actionIntent: {
+            kind: actionIntent.kind,
+            primitive: actionIntent.primitive,
+            reason: actionIntent.reason,
+          },
+          intentInterpreter: intentInterpreter.output,
+        }, {
+          success: false,
+          code: 'INTENT_CLARIFICATION_REQUIRED',
+          detail,
+        }, 1, false),
+      ],
+      refusalCode: 'INTENT_CLARIFICATION_REQUIRED',
+      skipFinalNarration: true,
+      narratorSource: 'rule',
+    }
+  }
 
   if (actionIntent.kind === 'state_reconcile') {
     const targetRoomId = resolveLocationReconcileRoomId(message)
@@ -3554,7 +3997,21 @@ async function resolveServerFirstAction(
     }
   }
 
-  if (detectDryadOffense(message, gameState)) {
+  const interpretedAction = interpreterCanonicalAction(intentInterpreter?.output)
+  if (!toolName && interpretedAction && shouldExecuteInterpreterActionDirectly(interpretedAction, gameState)) {
+    toolName = 'resolve_player_action'
+    input = canonicalPlayerActionInput(interpretedAction)
+    logEvent('info', 'dm.cost.engine_first.intent_interpreter.direct_action', {
+      requestId,
+      sessionId,
+      actionIntent,
+      intentInterpreter: intentInterpreter?.output,
+      input,
+      gameState: summarizeGameState(gameState),
+    })
+  }
+
+  if (!toolName && detectDryadOffense(message, gameState)) {
     const draftNarrative = buildDryadOffenseNarrative()
     logEvent('info', 'dm.cost.engine_first.dryad_offense', {
       requestId,
@@ -4378,6 +4835,12 @@ interface EngineTruthPacket {
     confidence: GameActionConfidence
     requiresEngine: boolean
   }
+  intentInterpreter?: {
+    used: boolean
+    model: string | null
+    output: IntentInterpreterOutput | null
+    fallbackReason: string | null
+  }
   toolsUsed: string[]
   state: ReturnType<typeof summarizeGameState>
   sceneSurface: Record<string, unknown>
@@ -4425,7 +4888,8 @@ function buildEngineTruthPacket(
   toolsUsed: string[],
   gameState: GameState,
   newCombatLogEntries: CombatLogEntry[],
-  newWorldEvents: EngineEvent[] = []
+  newWorldEvents: EngineEvent[] = [],
+  intentInterpreter?: IntentInterpreterTurnResult
 ): EngineTruthPacket {
   const engineResolution = buildEngineResolutionView(gameState, newCombatLogEntries, newWorldEvents)
   const sceneSurface = buildSceneSurface(gameState)
@@ -4494,6 +4958,12 @@ function buildEngineTruthPacket(
       confidence: actionIntent.confidence,
       requiresEngine: actionIntent.requiresEngine,
     },
+    intentInterpreter: intentInterpreter ? {
+      used: intentInterpreter.used,
+      model: intentInterpreter.model,
+      output: intentInterpreter.output,
+      fallbackReason: intentInterpreter.fallbackReason,
+    } : undefined,
     toolsUsed: [...new Set(toolsUsed)],
     state: summarizeGameState(gameState),
     sceneSurface: sceneSurfaceDebug,
@@ -4638,6 +5108,7 @@ async function generateFinalNarration(
   })
 
   const finalPrompt = [
+    NO_GENERIC_FALLBACK_NARRATION_INSTRUCTION,
     `Action du joueur:\n${playerMessage}`,
     draftNarrative ? `Brouillon non autoritaire, a utiliser seulement s'il ne contredit pas le paquet moteur:\n${draftNarrative}` : undefined,
     `Paquet moteur faisant autorité. Tu ne peux affirmer que ces faits, les logs mécaniques, ou une conséquence sensorielle directe:\n${formatEngineTruthPacket(engineTruthPacket)}`,
@@ -4890,17 +5361,38 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       }
     }
 
-    const actionIntent = classifyPlayerAction(message, currentGameState)
-    const turnDebug = buildDmTurnDebug(message, currentGameState, actionIntent)
+    let recentHistory = requestHistory.slice(-HISTORY_KEEP_RECENT)
+    const preliminaryActionIntent = classifyPlayerAction(message, currentGameState)
+    const intentInterpreter = await interpretIntentForTurn({
+      message,
+      gameState: currentGameState,
+      recentHistory,
+      preliminaryIntent: preliminaryActionIntent,
+      usageLog,
+      requestId,
+      sessionId,
+      inputMode,
+      clientRequestId,
+    })
+    const interpretedActionIntent = intentFromInterpreterOutput(message, preliminaryActionIntent, intentInterpreter.output)
+    const actionIntent = interpretedActionIntent ?? preliminaryActionIntent
+    const turnDebug = buildDmTurnDebug(message, currentGameState, actionIntent, intentInterpreter)
     const requiredMechanicalAction = requiredMechanicalActionFromIntent(actionIntent)
     logEvent('info', 'dm.action.intent', {
       requestId,
       clientRequestId,
       sessionId,
       inputMode,
+      preliminaryActionIntent,
       actionIntent,
       requiresEngine: actionIntent.requiresEngine,
       suggestedTools: actionIntent.suggestedTools,
+      intentInterpreter: {
+        used: intentInterpreter.used,
+        model: intentInterpreter.model,
+        output: intentInterpreter.output,
+        fallbackReason: intentInterpreter.fallbackReason,
+      },
       gameState: summarizeGameState(currentGameState),
     })
     logEvent('debug', 'dm.turn.debug_action', {
@@ -4910,7 +5402,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       debug: turnDebug,
     })
 
-    let recentHistory = requestHistory.slice(-HISTORY_KEEP_RECENT)
     let newSummary: string | undefined
     let activeSummary = requestSummaryContext
     let historyProcessed = false
@@ -4955,7 +5446,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     let engineFirstRefusalCode: string | null = null
     let lastEndTurnNarrative = ''
 
-    const engineFirst = await resolveServerFirstAction(message, currentGameState, sessionId, requestId, recentHistory, actionIntent)
+    const engineFirst = await resolveServerFirstAction(message, currentGameState, sessionId, requestId, recentHistory, actionIntent, intentInterpreter)
     if (engineFirst.handled) {
       currentGameState = engineFirst.gameState
       narrative = engineFirst.draftNarrative
@@ -4984,7 +5475,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       engineFirst.skipFinalNarration !== true &&
       !sawMcpToolError &&
       (
-        NARRATION_MODE === 'quality'
+        LLM_FINAL_NARRATION_ALWAYS || NARRATION_MODE === 'quality'
           ? (toolsUsed.length > 0 || engineFirstVisibleDraft)
           : (toolsUsed.length > 0 && !engineFirstLocalNarrationCandidate)
       )
@@ -5731,7 +6222,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       })
     }
 
-    const engineTruthPacket = buildEngineTruthPacket(actionIntent, toolsUsed, currentGameState, newCombatLogEntries, newWorldEvents)
+    const engineTruthPacket = buildEngineTruthPacket(actionIntent, toolsUsed, currentGameState, newCombatLogEntries, newWorldEvents, intentInterpreter)
     if (toolsUsed.length > 0 && !sawMcpToolError) {
       logEvent('info', 'dm.engine.truth_packet', {
         requestId,
@@ -5748,7 +6239,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const hasPlayerVisibleDraft = Boolean(draftNarrative.trim())
     const shouldPolishEngineFirstDraft = engineFirst.handled && hasPlayerVisibleDraft && narratorSource !== 'llm'
     const shouldTryFinalLlmNarration = !sawMcpToolError && actionIntent.kind !== 'state_reconcile' && engineFirst.skipFinalNarration !== true && (
-      NARRATION_MODE === 'quality'
+      LLM_FINAL_NARRATION_ALWAYS || NARRATION_MODE === 'quality'
         ? (toolsUsed.length > 0 || shouldPolishEngineFirstDraft)
         : (toolsUsed.length > 0 && !directorNarrative && !localEngineNarrative && directorDecision?.shouldUseLlmNarrator !== false)
     )
@@ -5844,6 +6335,21 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       })
       narrative = fallbackNarrative
       narratorSource = (socialFallbackNarrative || isSocialNarrationContext(actionIntent, toolsUsed, newWorldEvents)) ? 'local' : 'fallback'
+    }
+
+    if (looksLikeGenericSceneFallback(narrative)) {
+      const replacementNarrative = buildContextualNoFallbackNarrative(currentGameState, actionIntent, intentInterpreter)
+      logEvent('warn', 'dm.narrative.generic_fallback_rejected', {
+        requestId,
+        sessionId,
+        originalNarrative: narrative,
+        replacementNarrative,
+        actionIntent,
+        intentInterpreter: intentInterpreter.output,
+        toolsUsed: [...new Set(toolsUsed)],
+      })
+      narrative = replacementNarrative
+      narratorSource = 'rule'
     }
 
     const oralNarrative = normalizeNarrativeForOralPlayback(narrative, currentGameState, toolsUsed)

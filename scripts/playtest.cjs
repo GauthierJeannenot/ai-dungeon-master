@@ -522,6 +522,38 @@ const builtInScenarios = [
         expectTools: ['resolve_player_action', 'world.improvise'],
         expectEvents: ['fiction.fact_created', 'improvisation.resolved'],
         expectAffordances: ['improvise'],
+        expectIntentInterpreter: true,
+        expectIntentKind: 'improvise',
+      },
+      {
+        message: 'je prends un tabouret pour bloquer la porte',
+        expectNoLlm: narrationMode === 'budget',
+        category: 'world',
+        expectTools: ['resolve_player_action', 'world.improvise'],
+        expectEvents: ['fiction.fact_created', 'improvisation.resolved'],
+        expectAffordances: ['improvise'],
+        expectIntentInterpreter: true,
+        expectIntentKind: 'improvise',
+      },
+      {
+        message: 'je fais diversion',
+        expectNoLlm: narrationMode === 'budget',
+        category: 'world',
+        expectTools: ['resolve_player_action', 'world.improvise'],
+        expectEvents: ['fiction.fact_created', 'improvisation.resolved'],
+        expectAffordances: ['improvise'],
+        expectIntentInterpreter: true,
+        expectIntentKind: 'improvise',
+      },
+      {
+        message: 'je lui fais un croche-patte',
+        expectNoLlm: narrationMode === 'budget',
+        category: 'world',
+        expectTools: ['resolve_player_action', 'world.improvise'],
+        expectEvents: ['fiction.fact_created', 'improvisation.resolved'],
+        expectAffordances: ['improvise'],
+        expectIntentInterpreter: true,
+        expectIntentKind: 'improvise',
       },
     ],
   },
@@ -536,6 +568,8 @@ const builtInScenarios = [
         expectTools: ['resolve_player_action', 'world.improvise'],
         expectEvents: ['fiction.fact_created', 'npc.disposition_changed', 'state.changed', 'improvisation.resolved'],
         expectAffordances: ['improvise'],
+        expectIntentInterpreter: true,
+        expectIntentKind: 'improvise',
       },
     ],
   },
@@ -551,6 +585,8 @@ const builtInScenarios = [
         expectEvents: ['npc.information_revealed'],
         expectAffordances: ['ask'],
         forbidEvents: ['combat.started'],
+        expectIntentInterpreter: true,
+        expectIntentKind: 'ask',
       },
       {
         message: 'ou sont les gobelins',
@@ -560,6 +596,8 @@ const builtInScenarios = [
         expectEvents: ['npc.information_revealed'],
         expectAffordances: ['ask'],
         forbidEvents: ['combat.started'],
+        expectIntentInterpreter: true,
+        expectIntentKind: 'ask',
       },
     ],
   },
@@ -687,6 +725,8 @@ const builtInScenarios = [
         category: 'combat',
         expectTools: ['resolve_player_action', 'roll_ability_check'],
         forbidEvents: ['combat.attack'],
+        expectIntentInterpreter: true,
+        expectIntentKind: 'social_deescalation',
       },
     ],
   },
@@ -861,6 +901,9 @@ const roboticNarrativePatterns = [
   /\[Mock\]/i,
   /\bcase\s+\d/i,
   /decor se replace/i,
+  /la piece gronde/i,
+  /la piste se brouille/i,
+  /facade de la boulangerie grince/i,
   /scene progresse/i,
   /detail exploitable/i,
   /prise claire/i,
@@ -913,10 +956,10 @@ async function run() {
     startedAt: new Date().toISOString(),
     targets: {
       maxEstimatedCostUsd: numberOption('--max-cost-usd', Number(process.env.PLAYTEST_MAX_COST_USD ?? 0.05)),
-      minDirectorLocalRatio: numberOption('--min-director-local-ratio', Number(process.env.PLAYTEST_MIN_DIRECTOR_LOCAL_RATIO ?? (narrationMode === 'budget' ? 0.65 : 0))),
+      minDirectorLocalRatio: numberOption('--min-director-local-ratio', Number(process.env.PLAYTEST_MIN_DIRECTOR_LOCAL_RATIO ?? 0)),
       minLlmNarratorRatio: numberOption('--min-llm-narrator-ratio', Number(process.env.PLAYTEST_MIN_LLM_NARRATOR_RATIO ?? (narrationMode === 'quality' ? 0.75 : 0))),
-      maxAverageLlmCallsPerTurn: numberOption('--max-average-llm-calls', Number(process.env.PLAYTEST_MAX_AVERAGE_LLM_CALLS ?? (narrationMode === 'quality' ? 1.2 : 0.45))),
-      maxSimpleTurnLlmCalls: numberOption('--max-simple-turn-llm-calls', Number(process.env.PLAYTEST_MAX_SIMPLE_TURN_LLM_CALLS ?? (narrationMode === 'quality' ? 2 : 0))),
+      maxAverageLlmCallsPerTurn: numberOption('--max-average-llm-calls', Number(process.env.PLAYTEST_MAX_AVERAGE_LLM_CALLS ?? 1.2)),
+      maxSimpleTurnLlmCalls: numberOption('--max-simple-turn-llm-calls', Number(process.env.PLAYTEST_MAX_SIMPLE_TURN_LLM_CALLS ?? 2)),
     },
     summary: {
       turns: 0,
@@ -946,6 +989,8 @@ async function run() {
       contradictoryTurnTraces: [],
       missingWorldDebugDiffs: [],
       missingTargetResolutions: [],
+      missingIntentInterpreter: [],
+      unexpectedIntentKinds: [],
       unexpectedTools: [],
       unexpectedEvents: [],
       mixedSecondPersonNarratives: [],
@@ -1018,6 +1063,10 @@ async function run() {
               parsedKind: data.debug.parsedAction?.kind,
               targetResolution: data.debug.targetResolution,
               actionPlan: data.debug.actionPlan,
+              intentInterpreterUsed: data.debug.intentInterpreterUsed,
+              intentInterpreterModel: data.debug.intentInterpreterModel,
+              intentInterpreterKind: data.debug.intentInterpreterOutput?.intentKind,
+              intentInterpreterFallbackReason: data.debug.intentInterpreterFallbackReason,
               sceneSurfaceObjectIds: data.debug.sceneSurface?.objects?.map?.(object => object.id) ?? [],
               sceneSurfaceExits: data.debug.sceneSurface?.exits?.map?.(exit => exit.roomId) ?? [],
               refusalCode: data.debug.refusalCode,
@@ -1029,6 +1078,9 @@ async function run() {
             turnTrace: data.turnTrace ? {
               traceId: data.turnTrace.traceId,
               actionCount: data.turnTrace.actions?.length ?? 0,
+              intentInterpreterUsed: data.turnTrace.intentInterpreterUsed,
+              intentInterpreterKind: data.turnTrace.intentInterpreterOutput?.intentKind,
+              intentInterpreterFallbackReason: data.turnTrace.intentInterpreterFallbackReason,
               contradictionReasons: data.turnTrace.contradictions?.map?.(issue => issue.reason) ?? [],
               narrativeFactKinds: data.turnTrace.narrativeFacts?.map?.(fact => fact.kind) ?? [],
               enemyReactionCount: data.turnTrace.enemyReactions?.length ?? 0,
@@ -1105,6 +1157,16 @@ async function run() {
             if (!turnReport.enabledAffordances.includes(expectedAffordance)) {
               report.quality.missingExpectedAffordances.push({ ...turnReport, expectedAffordance })
             }
+          }
+          if (turn.expectIntentInterpreter && !data.turnTrace?.intentInterpreterUsed) {
+            report.quality.missingIntentInterpreter.push(turnReport)
+          }
+          if (turn.expectIntentKind && data.turnTrace?.intentInterpreterOutput?.intentKind !== turn.expectIntentKind) {
+            report.quality.unexpectedIntentKinds.push({
+              ...turnReport,
+              expectedIntentKind: turn.expectIntentKind,
+              actualIntentKind: data.turnTrace?.intentInterpreterOutput?.intentKind,
+            })
           }
           if (turn.expectNoLlm && turnReport.llmCalls > report.targets.maxSimpleTurnLlmCalls) {
             report.quality.simpleTurnLlmViolations.push(turnReport)
@@ -1205,6 +1267,12 @@ async function run() {
   }
   if (report.quality.missingExpectedAffordances.length > 0) {
     report.targetViolations.push(`${report.quality.missingExpectedAffordances.length} expected affordances were not enabled`)
+  }
+  if (report.quality.missingIntentInterpreter.length > 0) {
+    report.targetViolations.push(`${report.quality.missingIntentInterpreter.length} turns did not use the intent interpreter`)
+  }
+  if (report.quality.unexpectedIntentKinds.length > 0) {
+    report.targetViolations.push(`${report.quality.unexpectedIntentKinds.length} turns returned an unexpected interpreted intent kind`)
   }
 
   if (reportPath) {
