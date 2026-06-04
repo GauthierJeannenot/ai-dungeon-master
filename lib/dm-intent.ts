@@ -7,8 +7,8 @@ export function normalizeFrenchText(value: string): string {
 }
 
 export function isDoorTraversalIntent(normalizedText: string): boolean {
-  return /\b(ouvres?|ouvrir|pousses?|pousser|forces?|forcer|enfonces?|enfoncer|defonces?|defoncer|casses?|casser|exploses?|exploser|deboites?|deboiter|franchis|franchir|passes?|passer|entres?|entrer)\b(?=.{0,80}\b(portes?|entree|seuil|battants?|double porte|grande porte)\b)/.test(normalizedText) ||
-    /\b(portes?|entree|seuil|battants?|double porte|grande porte)\b(?=.{0,80}\b(ouvres?|ouvrir|pousses?|pousser|forces?|forcer|enfonces?|enfoncer|defonces?|defoncer|casses?|casser|exploses?|exploser|deboites?|deboiter|franchis|franchir|passes?|passer|entres?|entrer)\b)/.test(normalizedText)
+  return /\b(ouvres?|ouvrir|pousses?|pousser|forces?|forcer|enfonces?|enfoncer|defonces?|defoncer|detruis|detruire|casses?|casser|exploses?|exploser|deboites?|deboiter|franchis|franchir|passes?|passer|entres?|entrer|rentres?|rentrer)\b(?=.{0,80}\b(portes?|entree|seuil|battants?|double porte|grande porte|batiment|interieur|dedans)\b)/.test(normalizedText) ||
+    /\b(portes?|entree|seuil|battants?|double porte|grande porte|batiment|interieur|dedans)\b(?=.{0,80}\b(ouvres?|ouvrir|pousses?|pousser|forces?|forcer|enfonces?|enfoncer|defonces?|defoncer|detruis|detruire|casses?|casser|exploses?|exploser|deboites?|deboiter|franchis|franchir|passes?|passer|entres?|entrer|rentres?|rentrer)\b)/.test(normalizedText)
 }
 
 export function referencesLocalObjectInsteadOfRoom(normalizedText: string): boolean {

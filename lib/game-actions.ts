@@ -208,7 +208,7 @@ export function classifyPlayerAction(message: string, gameState: GameState): Gam
       /^(?:je |j[' ])?(?:regarde|observe|inspecte|ecoute)\.?$/.test(text)
     )
   const unlockIntent = /\b(crochettes?|crochetes?|crocheter|crochetage|deverrouilles?|deverrouiller|deverouille|serrure)\b/.test(text)
-  const forceObjectIntent = /\b(forces?|forcer|enfonces?|enfoncer|defonces?|defoncer|casses?|casser)\b/.test(text) &&
+  const forceObjectIntent = /\b(forces?|forcer|enfonces?|enfoncer|defonces?|defoncer|detruis|detruire|casses?|casser)\b/.test(text) &&
     /\b(porte|tiroir|coffre|armoire|serrure|verrou)\b/.test(text)
   const disarmIntent = /\b(desamorces?|desamorcer|desactives?|desactiver|neutralises?|neutraliser|securises?|securiser)\b/.test(text) &&
     /\b(piege|champignons?|couteaux?|ratelier|mecanisme)\b/.test(text)

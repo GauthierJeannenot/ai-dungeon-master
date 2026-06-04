@@ -59,6 +59,7 @@ function mergeObjectState(defaultObject: WorldObjectState | undefined, incomingO
     aliases: incomingObject.aliases ?? defaultObject?.aliases,
     tags: incomingObject.tags ?? defaultObject?.tags,
     contains: incomingObject.contains ?? defaultObject?.contains,
+    portal: incomingObject.portal ?? defaultObject?.portal,
   }
 }
 

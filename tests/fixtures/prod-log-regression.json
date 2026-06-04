@@ -39,7 +39,8 @@
         "category": "regression",
         "expectNoLlm": false,
         "expectTools": ["resolve_player_action"],
-        "expectEvents": ["entity.moved"],
+        "expectEvents": ["action.blocked"],
+        "forbidEvents": ["entity.moved"],
         "expectTargetResolution": false
       }
     ]

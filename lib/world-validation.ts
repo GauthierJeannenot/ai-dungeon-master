@@ -133,6 +133,25 @@ function validateObject(objectId: string, object: WorldObjectState, world: World
     }
   }
 
+  if (object.portal) {
+    if (!Array.isArray(object.portal.roomIds) || object.portal.roomIds.length < 2) {
+      issues.push(issue('OBJECT_PORTAL_ROOMS_INVALID', `${path}.portal.roomIds`, 'Portal objects must connect at least two rooms.'))
+    } else {
+      const uniqueRoomIds = new Set(object.portal.roomIds)
+      if (uniqueRoomIds.size !== object.portal.roomIds.length) {
+        issues.push(issue('OBJECT_PORTAL_ROOM_DUPLICATE', `${path}.portal.roomIds`, 'Portal roomIds must be unique.'))
+      }
+      if (!uniqueRoomIds.has(object.roomId)) {
+        issues.push(issue('OBJECT_PORTAL_HOST_ROOM_MISSING', `${path}.portal.roomIds`, `Portal roomIds must include host room "${object.roomId}".`))
+      }
+      for (const portalRoomId of object.portal.roomIds) {
+        if (!world.rooms[portalRoomId]) {
+          issues.push(issue('OBJECT_PORTAL_ROOM_UNKNOWN', `${path}.portal.roomIds`, `Portal room "${portalRoomId}" does not exist.`))
+        }
+      }
+    }
+  }
+
   if ((object.tags?.includes('readable') || object.readableText) && !object.readableText?.trim()) {
     issues.push(issue('OBJECT_READABLE_TEXT_MISSING', `${path}.readableText`, 'Readable objects must define readableText.'))
   }

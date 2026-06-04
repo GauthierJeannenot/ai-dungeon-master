@@ -43,7 +43,8 @@ import {
 } from '@/lib/anthropic-usage'
 import { logEvent, summarizeGameState } from '@/lib/server-logger'
 import { buildEngineResolutionView, derivePlayerAffordances } from '@/lib/world-engine'
-import { buildWorldActionInput, resolveWorldActionTargets } from '@/lib/world-target-resolver'
+import { buildPortalTraversalActionInput, buildWorldActionInput, resolveWorldActionTargets } from '@/lib/world-target-resolver'
+import { buildSceneSurface, summarizeSceneSurfaceForDebug } from '@/lib/scene-surface'
 import {
   detectUnsupportedNarratedWorldFacts,
   type NarratedWorldFact,
@@ -1051,6 +1052,7 @@ function mcpErrorCode(result: unknown): string | null {
 function buildMcpRuleErrorNarrative(errorResult: unknown, gameState: GameState, toolsUsed: string[] = []): string {
   const code = mcpErrorCode(errorResult)
   const roomName = getCurrentRoomName(gameState)
+  const detail = isObjectRecord(errorResult) && isObjectRecord(errorResult.detail) ? errorResult.detail : {}
 
   if (code === 'ACTION_ALREADY_USED') {
     if (gameState.phase === 'combat') {
@@ -1076,6 +1078,28 @@ function buildMcpRuleErrorNarrative(errorResult: unknown, gameState: GameState, 
       return buildPlayerDownNarrative(gameState)
     }
     return "Ton intention cherche une prise, mais la scene ne l'offre pas encore: il faut un geste plus direct ou un angle plus clair."
+  }
+
+  if (code === 'WORLD_OBJECT_AMBIGUOUS') {
+    const candidates = Array.isArray(detail.candidates)
+      ? detail.candidates
+          .map(candidate => isObjectRecord(candidate) && typeof candidate.name === 'string' ? candidate.name : null)
+          .filter((name): name is string => Boolean(name))
+      : []
+    return candidates.length > 0
+      ? `Il y a plusieurs cibles possibles ici: ${candidates.slice(0, 4).join(', ')}. Dis laquelle tu vises, et je resous le geste.`
+      : "Il y a plusieurs cibles possibles ici. Precise laquelle tu vises, et je resous le geste."
+  }
+
+  if (code === 'WORLD_OBJECT_NOT_AFFORDED') {
+    const surface = buildSceneSurface(gameState)
+    const visibleTargets = surface.objects
+      .filter(object => object.actionKinds.length > 0)
+      .map(object => object.name)
+      .slice(0, 4)
+    return visibleTargets.length > 0
+      ? `La cible n'est pas claire dans la scene actuelle. Tu peux viser ${visibleTargets.join(', ')}.`
+      : "Je ne vois pas de cible manipulable ici pour ce geste. Donne un objet concret ou change d'approche."
   }
 
   if (code === 'NOT_CURRENT_TURN' || code === 'PLAYER_TURN_REQUIRED') {
@@ -2239,13 +2263,13 @@ function parseNamedRoomMove(message: string, gameState: GameState): { x: number;
   const text = normalizeFrenchText(message)
   if (referencesLocalObjectInsteadOfRoom(text) && !isDoorTraversalIntent(text)) return null
 
-  const hasMovementVerb = /\b(vers|vais|aller|va |deplace|rends|rejoins?|rejoint|entre|entrer|retournes?|retourner|montes?|monter|grimpes?|grimpe|empruntes?|prends|suis|suivre|aventure|aventurer|continue|continuer|avances?|avancer|explores?|explorer|ouvres?|ouvrir|pousses?|pousser|forces?|forcer|enfonces?|enfoncer|defonces?|defoncer|casses?|casser|exploses?|exploser|deboites?|deboiter|franchis|franchir|passes?|passer|investig\w*|inspect\w*|examin\w*|fouill\w*|cherch\w*|trouv\w*|denich\w*|traqu\w*|pist\w*)\b/.test(text)
+  const hasMovementVerb = /\b(vers|vais|aller|va |deplace|rends|rejoins?|rejoint|entre|entrer|rentres?|rentrer|retournes?|retourner|montes?|monter|grimpes?|grimpe|empruntes?|prends|suis|suivre|aventure|aventurer|continue|continuer|avances?|avancer|explores?|explorer|ouvres?|ouvrir|pousses?|pousser|forces?|forcer|enfonces?|enfoncer|defonces?|defoncer|detruis|detruire|casses?|casser|exploses?|exploser|deboites?|deboiter|franchis|franchir|passes?|passer|investig\w*|inspect\w*|examin\w*|fouill\w*|cherch\w*|trouv\w*|denich\w*|traqu\w*|pist\w*)\b/.test(text)
   if (!hasMovementVerb) return null
 
   const relativeRoomId = relativeRoomIdForExplorationMove(text, gameState)
   const sensoryRoomId = contextualSensoryRoomIdForExplorationMove(text, gameState)
   const uniqueVagueRoomId = uniqueVagueExplorationRoomId(text, gameState)
-  if (!relativeRoomId && !sensoryRoomId && !uniqueVagueRoomId && !/\b(salle|piece|bureau|appartement|boulangerie|quai|verger|mac|treant|pommier|etage|haut|escalier|four|fours?|odeur|bruit|cuisine|reserve|reserves|portes?|entree|seuil|battants?)\b/.test(text)) {
+  if (!relativeRoomId && !sensoryRoomId && !uniqueVagueRoomId && !/\b(salle|piece|bureau|appartement|boulangerie|quai|verger|mac|treant|pommier|etage|haut|escalier|four|fours?|odeur|bruit|cuisine|reserve|reserves|portes?|entree|seuil|battants?|batiment|interieur|dedans|dehors|exterieur|sortie)\b/.test(text)) {
     return null
   }
 
@@ -2843,6 +2867,10 @@ function buildDmTurnDebug(
   actionIntent: GameActionIntent
 ): DMDebugTurnView {
   const isWorldAction = isCanonicalWorldActionKind(actionIntent.kind)
+  const portalTraversalInput = actionIntent.kind === 'move'
+    ? buildPortalTraversalActionInput(message, gameState)
+    : null
+  const sceneSurface = buildSceneSurface(gameState)
   return {
     actionIntent: {
       kind: actionIntent.kind,
@@ -2851,10 +2879,15 @@ function buildDmTurnDebug(
       confidence: actionIntent.confidence,
       requiresEngine: actionIntent.requiresEngine,
     },
-    parsedAction: isWorldAction ? buildWorldActionInput(message, gameState, actionIntent.kind) : null,
+    parsedAction: isWorldAction
+      ? buildWorldActionInput(message, gameState, actionIntent.kind)
+      : portalTraversalInput,
     targetResolution: isWorldAction
       ? resolveWorldActionTargets(message, gameState, actionIntent.kind) as unknown as Record<string, unknown>
+      : portalTraversalInput
+        ? resolveWorldActionTargets(message, gameState, 'open') as unknown as Record<string, unknown>
       : null,
+    sceneSurface: summarizeSceneSurfaceForDebug(sceneSurface),
   }
 }
 
@@ -3188,59 +3221,65 @@ async function resolveServerFirstAction(
         reason: 'Le joueur attend et passe son tour.',
       })
     } else if (actionIntent.kind === 'move') {
-      if (isAmbiguousExplorationMove(message, gameState)) {
-        const draftNarrative = buildAmbiguousExplorationMoveNarrative(gameState)
-        logEvent('info', 'dm.cost.engine_first.ambiguous_move', {
-          requestId,
-          sessionId,
-          actionIntent,
-          exits: currentRoomExitIds(gameState),
-          durationMs: Date.now() - startedAt,
-          draftNarrative,
-          gameState: summarizeGameState(gameState),
-        })
-        return {
-          handled: true,
-          gameState,
-          toolsUsed: [],
-          draftNarrative,
-          sawMcpToolError: false,
-        }
-      }
-
-      const toCell =
-        parseCoordinateMove(message, gameState) ??
-        parseNamedRoomMove(message, gameState) ??
-        parseContextualRoomMove(message, gameState, recentHistory)
-      if (toCell) {
-        const targetRoomId = inferMappedAdventureRoomId(toCell)
-        const encounterId = encounterIdForRoom(targetRoomId)
-        const encounterTriggerReason = roomEncounterTriggerReason(message, gameState, targetRoomId, encounterId)
-        const shouldStartEncounter =
-          gameState.phase === 'exploration' &&
-          countAliveMonsters(gameState) === 0 &&
-          targetRoomId !== null &&
-          encounterId &&
-          encounterTriggerReason &&
-          (
-            targetRoomId !== gameState.currentRoomId ||
-            !gameState.roomsVisited.includes(targetRoomId)
-          )
-
-        if (shouldStartEncounter) {
-          toolName = 'start_encounter'
-          input = {
-            encounterId,
-            playerCell: toCell,
-            reason: encounterTriggerReason ?? 'Le joueur declenche une rencontre de salle.',
-          }
-        } else {
-          toolName = 'resolve_player_action'
-          input = canonicalPlayerActionInput({
-            kind: 'move',
-            tokenId: 'player',
-            toCell,
+      const portalTraversalInput = buildPortalTraversalActionInput(message, gameState)
+      if (portalTraversalInput) {
+        toolName = 'resolve_player_action'
+        input = canonicalPlayerActionInput(portalTraversalInput)
+      } else {
+        if (isAmbiguousExplorationMove(message, gameState)) {
+          const draftNarrative = buildAmbiguousExplorationMoveNarrative(gameState)
+          logEvent('info', 'dm.cost.engine_first.ambiguous_move', {
+            requestId,
+            sessionId,
+            actionIntent,
+            exits: currentRoomExitIds(gameState),
+            durationMs: Date.now() - startedAt,
+            draftNarrative,
+            gameState: summarizeGameState(gameState),
           })
+          return {
+            handled: true,
+            gameState,
+            toolsUsed: [],
+            draftNarrative,
+            sawMcpToolError: false,
+          }
+        }
+
+        const toCell =
+          parseCoordinateMove(message, gameState) ??
+          parseNamedRoomMove(message, gameState) ??
+          parseContextualRoomMove(message, gameState, recentHistory)
+        if (toCell) {
+          const targetRoomId = inferMappedAdventureRoomId(toCell)
+          const encounterId = encounterIdForRoom(targetRoomId)
+          const encounterTriggerReason = roomEncounterTriggerReason(message, gameState, targetRoomId, encounterId)
+          const shouldStartEncounter =
+            gameState.phase === 'exploration' &&
+            countAliveMonsters(gameState) === 0 &&
+            targetRoomId !== null &&
+            encounterId &&
+            encounterTriggerReason &&
+            (
+              targetRoomId !== gameState.currentRoomId ||
+              !gameState.roomsVisited.includes(targetRoomId)
+            )
+
+          if (shouldStartEncounter) {
+            toolName = 'start_encounter'
+            input = {
+              encounterId,
+              playerCell: toCell,
+              reason: encounterTriggerReason ?? 'Le joueur declenche une rencontre de salle.',
+            }
+          } else {
+            toolName = 'resolve_player_action'
+            input = canonicalPlayerActionInput({
+              kind: 'move',
+              tokenId: 'player',
+              toCell,
+            })
+          }
         }
       }
     }
@@ -3780,6 +3819,7 @@ interface EngineTruthPacket {
   }
   toolsUsed: string[]
   state: ReturnType<typeof summarizeGameState>
+  sceneSurface: Record<string, unknown>
   events: EngineEvent[]
   affordances: PlayerAffordance[]
   combatLog: Array<Pick<CombatLogEntry, 'round' | 'turn' | 'action' | 'mechanicalDetail'>>
@@ -3827,6 +3867,8 @@ function buildEngineTruthPacket(
   newWorldEvents: EngineEvent[] = []
 ): EngineTruthPacket {
   const engineResolution = buildEngineResolutionView(gameState, newCombatLogEntries, newWorldEvents)
+  const sceneSurface = buildSceneSurface(gameState)
+  const sceneSurfaceDebug = summarizeSceneSurfaceForDebug(sceneSurface)
   const aliveMonsters = Object.values(gameState.monsters)
     .filter(monster => monster.isAlive)
     .map(monster => ({
@@ -3855,12 +3897,11 @@ function buildEngineTruthPacket(
       : []),
     `worldFlags=${JSON.stringify(gameState.world?.flags ?? {})}`,
     `aliveMonsters=${aliveMonsters.length}`,
-    ...Object.values(gameState.world?.objects ?? {})
-      .filter(object => object.roomId === gameState.currentRoomId)
-      .map(object => `worldObject=${object.id} name=${object.name} kind=${object.kind} visible=${object.visible} discovered=${object.discovered} opened=${Boolean(object.opened)} locked=${Boolean(object.locked)} taken=${Boolean(object.taken)} used=${Boolean(object.used)} disarmed=${Boolean(object.disarmed)} readable=${Boolean(object.readableText || object.tags?.includes('readable'))}`),
-    ...Object.values(gameState.world?.npcs ?? {})
-      .filter(npc => npc.roomId === gameState.currentRoomId)
-      .map(npc => `worldNpc=${npc.id} name=${npc.name} disposition=${npc.disposition} known=${Boolean(npc.known)} faction=${npc.faction ?? 'none'} goals=${JSON.stringify(npc.goals ?? [])} memory=${JSON.stringify(npc.memory ?? {})}`),
+    ...sceneSurface.narratableFacts.map(fact => `sceneSurface=${fact}`),
+    ...sceneSurface.objects
+      .map(object => `worldObject=${object.id} name=${object.name} kind=${object.kind} visible=${object.visible} discovered=${object.discovered} opened=${Boolean(object.opened)} locked=${Boolean(object.locked)} taken=${Boolean(object.taken)} used=${Boolean(object.used)} disarmed=${Boolean(object.disarmed)} readable=${object.readable} distance=${object.distance} portal=${JSON.stringify(object.portal ?? null)}`),
+    ...sceneSurface.npcs
+      .map(npc => `worldNpc=${npc.id} name=${npc.name} disposition=${npc.disposition} known=${Boolean(npc.known)} faction=${npc.faction ?? 'none'} goals=${JSON.stringify(npc.goals ?? [])}`),
     ...Object.values(gameState.world?.quests ?? {})
       .map(quest => `quest=${quest.id} progress=${quest.progress}/${quest.goal} completed=${Boolean(quest.completed)} flags=${JSON.stringify(quest.flags ?? {})}`),
     ...Object.entries(gameState.world?.alarms ?? {})
@@ -3894,6 +3935,7 @@ function buildEngineTruthPacket(
     },
     toolsUsed: [...new Set(toolsUsed)],
     state: summarizeGameState(gameState),
+    sceneSurface: sceneSurfaceDebug,
     events: engineResolution.events,
     affordances: engineResolution.affordances,
     combatLog: newCombatLogEntries.map(entry => ({
@@ -3933,6 +3975,10 @@ function buildLocalEngineNarrative(
     if (eventTypes.includes('clue.read')) return latestWorldEvent?.summary ?? 'Le texte lu devient un fait moteur clair.'
     if (eventTypes.includes('room.object_discovered')) return latestWorldEvent?.summary ?? 'Ta fouille revele un element concret.'
     if (eventTypes.includes('quest.completed')) return latestWorldEvent?.summary ?? 'La quete est completee dans l etat moteur.'
+    if ((eventTypes.includes('object.opened') || eventTypes.includes('door.opened')) && eventTypes.includes('entity.moved')) {
+      const roomName = getCurrentRoomName(gameState) ?? 'la piece suivante'
+      return `${latestWorldEvent?.summary ?? 'Le passage est ouvert.'} Tu franchis le seuil et tu arrives dans ${roomName}.`
+    }
     if (eventTypes.includes('object.opened') || eventTypes.includes('door.opened')) return latestWorldEvent?.summary ?? 'L ouverture est maintenant un fait moteur.'
     if (eventTypes.includes('object.taken') || eventTypes.includes('quest.item_found')) return latestWorldEvent?.summary ?? 'L objet rejoint ton inventaire.'
     if (eventTypes.includes('npc.disposition_changed')) return latestWorldEvent?.summary ?? 'La disposition du PNJ change selon le moteur.'

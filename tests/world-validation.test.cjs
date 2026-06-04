@@ -51,6 +51,7 @@ test('world validation catches broken room, containment, and recipe invariants',
   world.rooms['5'].exits = ['missing-room']
   world.objects.office_drawer.contains = ['missing-object']
   world.objects.recipe_half_office.roomId = 'missing-room'
+  world.objects.front_double_door.portal = { roomIds: ['1', 'missing-room'] }
   world.quests.grammy_recipe.goal = 3
 
   const result = validateWorldState(world)
@@ -60,6 +61,7 @@ test('world validation catches broken room, containment, and recipe invariants',
   assert.ok(codes.includes('ROOM_EXIT_UNKNOWN'))
   assert.ok(codes.includes('OBJECT_CONTAINS_UNKNOWN'))
   assert.ok(codes.includes('OBJECT_ROOM_UNKNOWN'))
+  assert.ok(codes.includes('OBJECT_PORTAL_ROOM_UNKNOWN'))
   assert.ok(codes.includes('QUEST_RECIPE_FRAGMENT_COUNT_LOW'))
   assert.throws(() => assertWorldStateValid(world), /Initial|WorldState|validation failed/)
 })

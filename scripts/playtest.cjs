@@ -403,6 +403,7 @@ function loadSessionRegressionScenarios() {
     : [
         path.join(process.cwd(), 'tests', 'fixtures', 'real-session-regression.json'),
         path.join(process.cwd(), 'tests', 'fixtures', 'prod-log-regression.json'),
+        path.join(process.cwd(), 'tests', 'fixtures', 'front-door-regression.json'),
       ]
 
   const scenarios = []
@@ -923,6 +924,8 @@ async function run() {
               actionKind: data.debug.actionIntent?.kind,
               parsedKind: data.debug.parsedAction?.kind,
               targetResolution: data.debug.targetResolution,
+              sceneSurfaceObjectIds: data.debug.sceneSurface?.objects?.map?.(object => object.id) ?? [],
+              sceneSurfaceExits: data.debug.sceneSurface?.exits?.map?.(exit => exit.roomId) ?? [],
               refusalCode: data.debug.refusalCode,
               changedObjects: Object.keys(data.debug.worldDiff?.objects ?? {}),
               changedNpcs: Object.keys(data.debug.worldDiff?.npcs ?? {}),

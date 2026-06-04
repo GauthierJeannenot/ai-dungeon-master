@@ -5,6 +5,8 @@ import dynamic from 'next/dynamic'
 import Chat from '@/components/Chat'
 import CombatTracker from '@/components/CombatTracker'
 import { GameState, ChatMessage, DMResponse, DMRequest, ConversationTurn, DMClientMeta, type DMTurnUsage } from '@/lib/types'
+import { createInitialWorldState } from '@/lib/adventure-world'
+import { buildInitialSceneNarrative } from '@/lib/scene-surface'
 
 // Battlemap uses browser APIs — load client-only
 const Battlemap = dynamic(() => import('@/components/Battlemap'), { ssr: false })
@@ -39,6 +41,7 @@ const INITIAL_GAME_STATE: GameState = {
   roomsVisited: ['1'],
   currentRoomId: '1',
   encountersTriggered: [],
+  world: createInitialWorldState(),
 }
 
 function generateId(): string {
@@ -78,8 +81,7 @@ interface ClientBudgetSummary {
   lastLlmRoute: DMTurnUsage['llmRoute']
 }
 
-const WELCOME_MESSAGE =
-  'Le vieux sorcier Tyndareus le Vert vous a confié une mission des plus… particulières. Sa carte en main, vous avez chevauché deux jours jusqu\'à cette bâtisse en pierre abandonnée au bout d\'un chemin de gravier envahi par les herbes folles. L\'odeur vous a frappé bien avant que le bâtiment n\'apparaisse : cannelle, muscade, pommes mûres — un parfum presque magique qui flotte dans l\'air chaud. Devant vous se dressent de grandes portes en bois doubles, à moitié vermoulues. Sur le chemin, un immense pommier aux branches noueuses vous observe… ou du moins, c\'est l\'impression que donne son écorce ridée. Bienvenue à la Boulangerie de Grammy. La porte attend, l\'arbre vous juge, et quelque chose sent beaucoup trop bon pour être honnête.'
+const WELCOME_MESSAGE = buildInitialSceneNarrative(INITIAL_GAME_STATE)
 
 function createWelcomeMessage(): ChatMessage {
   return {

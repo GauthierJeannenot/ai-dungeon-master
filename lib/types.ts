@@ -127,6 +127,9 @@ export interface WorldObjectState {
   }
   description?: string
   readableText?: string
+  portal?: {
+    roomIds: string[]
+  }
 }
 
 export type WorldNpcDisposition = 'hostile' | 'wary' | 'neutral' | 'helpful' | 'offended'
@@ -341,6 +344,7 @@ export interface DMDebugTurnView {
   }
   parsedAction?: Record<string, unknown> | null
   targetResolution?: Record<string, unknown> | null
+  sceneSurface?: Record<string, unknown> | null
   refusalCode?: string | null
   worldDiff?: {
     events: EngineEvent[]

@@ -14,6 +14,8 @@ import {
   WorldQuestState,
 } from '../../lib/types'
 import { normalizeFrenchText } from '../../lib/dm-intent'
+import { centerCellForAdventureRoom } from '../../lib/adventure-map'
+import { buildSceneSurface, objectIsOnSceneSurface } from '../../lib/scene-surface'
 import {
   isWorldObjectOpenable,
   isWorldObjectReadable,
@@ -110,6 +112,7 @@ const PlayerActionSchema = z.discriminatedUnion('kind', [
     targetId: z.string().optional(),
     targetName: z.string().optional(),
     force: z.boolean().optional(),
+    traverse: z.boolean().optional(),
   }),
   z.object({
     kind: z.literal('take'),
@@ -120,11 +123,13 @@ const PlayerActionSchema = z.discriminatedUnion('kind', [
     kind: z.literal('unlock'),
     targetId: z.string().optional(),
     targetName: z.string().optional(),
+    traverse: z.boolean().optional(),
   }),
   z.object({
     kind: z.literal('force'),
     targetId: z.string().optional(),
     targetName: z.string().optional(),
+    traverse: z.boolean().optional(),
   }),
   z.object({
     kind: z.literal('disarm'),
@@ -384,7 +389,10 @@ function objectMatchesTarget(object: WorldObjectState, targetName?: string): boo
   }
 
   const parts = normalizedTargetParts(targetName)
-  return parts.length > 0 && parts.some(part => haystacks.some(haystack => haystack.includes(part)))
+  if (parts.length > 1) {
+    return parts.every(part => haystacks.some(haystack => haystack.includes(part)))
+  }
+  return parts.length === 1 && haystacks.some(haystack => haystack.includes(parts[0]))
 }
 
 function npcMatchesTarget(npc: WorldNpcState, targetName?: string): boolean {
@@ -400,7 +408,10 @@ function npcMatchesTarget(npc: WorldNpcState, targetName?: string): boolean {
     return true
   }
   const parts = normalizedTargetParts(targetName)
-  return parts.length > 0 && parts.some(part => haystacks.some(haystack => haystack.includes(part)))
+  if (parts.length > 1) {
+    return parts.every(part => haystacks.some(haystack => haystack.includes(part)))
+  }
+  return parts.length === 1 && haystacks.some(haystack => haystack.includes(parts[0]))
 }
 
 function resolveWorldObjectTarget({
@@ -420,12 +431,16 @@ function resolveWorldObjectTarget({
 }): WorldObjectState | ToolResponse {
   const roomId = currentRoomOrError()
   const world = gs.getWorldState()
+  const surface = buildSceneSurface(gs.getState())
+  const surfaceObjectIds = new Set(surface.objects.map(object => object.id))
   const candidates = Object.values(world.objects).filter(object => {
     if (targetId && object.id !== targetId) return false
-    if (object.roomId !== roomId) return false
+    if (!includeHidden && !surfaceObjectIds.has(object.id)) return false
+    if (includeHidden && !objectIsOnSceneSurface(object, roomId) && object.roomId !== roomId) return false
     if (object.taken) return false
     if (kinds && !kinds.includes(object.kind)) return false
     if (onlyOpenable && !isWorldObjectOpenable(object)) return false
+    if (onlyOpenable && !targetId && !targetName && object.opened) return false
     if (onlyTakeable && !isWorldObjectTakeable(object)) return false
     if (!includeHidden && !object.visible && !object.discovered) return false
     if (!objectMatchesTarget(object, targetName)) return false
@@ -440,10 +455,11 @@ function resolveWorldObjectTarget({
       includeHidden,
       onlyOpenable,
       onlyTakeable,
+      sceneSurfaceObjectIds: [...surfaceObjectIds],
     })
   }
 
-  if (!targetId && !targetName && candidates.length > 1) {
+  if (!targetId && candidates.length > 1) {
     return blockedAction('WORLD_OBJECT_AMBIGUOUS', 'Several objects could match this action; the player must make the target clearer.', {
       roomId,
       candidates: candidates.map(object => ({ id: object.id, name: object.name, kind: object.kind })),
@@ -503,7 +519,10 @@ function inventoryItemMatches(item: Item, itemName?: string): boolean {
     return true
   }
   const parts = normalizedTargetParts(itemName)
-  return parts.length > 0 && parts.some(part => haystacks.some(haystack => haystack.includes(part)))
+  if (parts.length > 1) {
+    return parts.every(part => haystacks.some(haystack => haystack.includes(part)))
+  }
+  return parts.length === 1 && haystacks.some(haystack => haystack.includes(parts[0]))
 }
 
 function resolveInventoryItemTarget({
@@ -541,9 +560,10 @@ function resolveReadableObjectTarget(targetId?: string, targetName?: string): Wo
   const world = gs.getWorldState()
   const inventoryIds = new Set(gs.getPlayer().inventory.map(item => item.id))
   const roomId = gs.getState().currentRoomId
+  const surfaceObjectIds = new Set(buildSceneSurface(gs.getState()).objects.map(object => object.id))
   const candidates = Object.values(world.objects).filter(object => {
     if (targetId && object.id !== targetId) return false
-    const inRoom = roomId && object.roomId === roomId && (object.visible || object.discovered)
+    const inRoom = surfaceObjectIds.has(object.id) || (roomId && object.roomId === roomId && (object.visible || object.discovered))
     const inInventory = inventoryIds.has(object.id)
     if (!inRoom && !inInventory) return false
     if (!isWorldObjectReadable(object)) return false
@@ -718,6 +738,60 @@ function resolveMoveAction(tokenId: string, toCell: { x: number; y: number }): T
     })
   } catch (err) {
     return rules.ruleErrorResult(err)
+  }
+}
+
+function portalDestinationRoomId(object: WorldObjectState): string | null {
+  const currentRoomId = gs.getState().currentRoomId
+  if (!currentRoomId || !object.portal?.roomIds?.includes(currentRoomId)) return null
+  return object.portal.roomIds.find(roomId => roomId !== currentRoomId) ?? null
+}
+
+function resolvePortalTraversalIfRequested(
+  object: WorldObjectState,
+  traverse?: boolean
+): { response?: ToolResponse; payload?: unknown; summarySuffix?: string } {
+  if (!traverse) return {}
+
+  const destinationRoomId = portalDestinationRoomId(object)
+  if (!destinationRoomId) {
+    return {
+      response: blockedAction('PORTAL_DESTINATION_UNKNOWN', 'This object is not a traversable portal from the current room.', {
+        objectId: object.id,
+        objectName: object.name,
+        currentRoomId: gs.getState().currentRoomId,
+        portalRoomIds: object.portal?.roomIds,
+      }),
+    }
+  }
+
+  if (object.locked) {
+    return {
+      response: blockedAction('PORTAL_LOCKED', 'This portal is still locked and cannot be crossed.', {
+        objectId: object.id,
+        objectName: object.name,
+        destinationRoomId,
+      }),
+    }
+  }
+
+  const toCell = centerCellForAdventureRoom(destinationRoomId)
+  if (!toCell) {
+    return {
+      response: blockedAction('PORTAL_DESTINATION_UNMAPPED', 'This portal destination has no mapped cell.', {
+        objectId: object.id,
+        objectName: object.name,
+        destinationRoomId,
+      }),
+    }
+  }
+
+  const moveResponse = resolveMoveAction('player', toCell)
+  if (moveResponse.isError) return { response: moveResponse }
+  const roomName = gs.getWorldState().rooms[destinationRoomId]?.name ?? `salle ${destinationRoomId}`
+  return {
+    payload: parseToolPayload(moveResponse),
+    summarySuffix: ` | traverse vers ${roomName}`,
   }
 }
 
@@ -991,9 +1065,8 @@ function resolveExamineAction({
   const targetText = targetName ?? query
 
   if (!targetId && !targetText) {
-    const world = gs.getWorldState()
-    const visibleObjects = Object.values(world.objects)
-      .filter(object => object.roomId === roomId && (object.visible || object.discovered) && !object.taken)
+    const surface = buildSceneSurface(gs.getState())
+    const visibleObjects = surface.objects
       .map(object => ({
         id: object.id,
         name: object.name,
@@ -1003,8 +1076,7 @@ function resolveExamineAction({
         disarmed: object.disarmed,
         description: object.description,
       }))
-    const knownNpcs = Object.values(world.npcs)
-      .filter(npc => npc.roomId === roomId && npc.known)
+    const knownNpcs = surface.npcs
       .map(npc => ({ id: npc.id, name: npc.name, disposition: npc.disposition }))
     gs.recordWorldEvent({
       type: 'room.examined',
@@ -1208,13 +1280,15 @@ function resolveOpenAction({
   targetId,
   targetName,
   force,
+  traverse,
 }: {
   targetId?: string
   targetName?: string
   force?: boolean
+  traverse?: boolean
 }): ToolResponse {
   if (force) {
-    return resolveForceAction({ targetId, targetName })
+    return resolveForceAction({ targetId, targetName, traverse })
   }
 
   const availabilityError = assertWorldActionAvailable()
@@ -1233,6 +1307,16 @@ function resolveOpenAction({
   if ('content' in object) return object
 
   if (object.opened) {
+    const traversal = resolvePortalTraversalIfRequested(object, traverse)
+    if (traversal.response) return traversal.response
+    if (traversal.payload) {
+      return jsonResponse({
+        success: true,
+        object,
+        traversal: traversal.payload,
+        mechanicalSummary: `${object.name} deja ouvert${traversal.summarySuffix ?? ''}`,
+      })
+    }
     return blockedAction('OBJECT_ALREADY_OPEN', 'This object is already open.', {
       objectId: object.id,
       objectName: object.name,
@@ -1256,20 +1340,26 @@ function resolveOpenAction({
   })
   recordActionIfCombat()
 
+  const traversal = resolvePortalTraversalIfRequested(opened, traverse)
+  if (traversal.response) return traversal.response
+
   return jsonResponse({
     success: true,
     object: opened,
     discoveredObjects: discoveries,
-    mechanicalSummary: `${opened.name} ouvert | contenu revele: ${discoveries.length}`,
+    ...(traversal.payload ? { traversal: traversal.payload } : {}),
+    mechanicalSummary: `${opened.name} ouvert | contenu revele: ${discoveries.length}${traversal.summarySuffix ?? ''}`,
   })
 }
 
 function resolveUnlockAction({
   targetId,
   targetName,
+  traverse,
 }: {
   targetId?: string
   targetName?: string
+  traverse?: boolean
 }): ToolResponse {
   const availabilityError = assertWorldActionAvailable()
   if (availabilityError) return availabilityError
@@ -1287,6 +1377,16 @@ function resolveUnlockAction({
   if ('content' in object) return object
 
   if (object.opened) {
+    const traversal = resolvePortalTraversalIfRequested(object, traverse)
+    if (traversal.response) return traversal.response
+    if (traversal.payload) {
+      return jsonResponse({
+        success: true,
+        object,
+        traversal: traversal.payload,
+        mechanicalSummary: `${object.name} deja ouvert${traversal.summarySuffix ?? ''}`,
+      })
+    }
     return blockedAction('OBJECT_ALREADY_OPEN', 'This object is already open.', {
       objectId: object.id,
       objectName: object.name,
@@ -1297,11 +1397,14 @@ function resolveUnlockAction({
     recordObjectOpened(opened, 'success')
     const discoveries = discoverContainedObjects(opened)
     recordActionIfCombat()
+    const traversal = resolvePortalTraversalIfRequested(opened, traverse)
+    if (traversal.response) return traversal.response
     return jsonResponse({
       success: true,
       object: opened,
       discoveredObjects: discoveries,
-      mechanicalSummary: `${opened.name} n etait pas verrouille et s ouvre.`,
+      ...(traversal.payload ? { traversal: traversal.payload } : {}),
+      mechanicalSummary: `${opened.name} n etait pas verrouille et s ouvre.${traversal.summarySuffix ?? ''}`,
     })
   }
 
@@ -1321,22 +1424,27 @@ function resolveUnlockAction({
   recordObjectOpened(opened, 'success', check.mechanicalSummary)
   const discoveries = discoverContainedObjects(opened)
   recordActionIfCombat()
+  const traversal = resolvePortalTraversalIfRequested(opened, traverse)
+  if (traversal.response) return traversal.response
 
   return jsonResponse({
     success: true,
     object: opened,
     check,
     discoveredObjects: discoveries,
-    mechanicalSummary: `${check.mechanicalSummary} | ${opened.name} ouvert | contenu revele: ${discoveries.length}`,
+    ...(traversal.payload ? { traversal: traversal.payload } : {}),
+    mechanicalSummary: `${check.mechanicalSummary} | ${opened.name} ouvert | contenu revele: ${discoveries.length}${traversal.summarySuffix ?? ''}`,
   })
 }
 
 function resolveForceAction({
   targetId,
   targetName,
+  traverse,
 }: {
   targetId?: string
   targetName?: string
+  traverse?: boolean
 }): ToolResponse {
   const availabilityError = assertWorldActionAvailable()
   if (availabilityError) return availabilityError
@@ -1354,6 +1462,16 @@ function resolveForceAction({
   if ('content' in object) return object
 
   if (object.opened) {
+    const traversal = resolvePortalTraversalIfRequested(object, traverse)
+    if (traversal.response) return traversal.response
+    if (traversal.payload) {
+      return jsonResponse({
+        success: true,
+        object,
+        traversal: traversal.payload,
+        mechanicalSummary: `${object.name} deja ouvert${traversal.summarySuffix ?? ''}`,
+      })
+    }
     return blockedAction('OBJECT_ALREADY_OPEN', 'This object is already open.', {
       objectId: object.id,
       objectName: object.name,
@@ -1391,6 +1509,8 @@ function resolveForceAction({
   recordObjectOpened(opened, 'success', check.mechanicalSummary)
   const discoveries = discoverContainedObjects(opened)
   recordActionIfCombat()
+  const traversal = resolvePortalTraversalIfRequested(opened, traverse)
+  if (traversal.response) return traversal.response
 
   return jsonResponse({
     success: true,
@@ -1398,7 +1518,8 @@ function resolveForceAction({
     check,
     alarm,
     discoveredObjects: discoveries,
-    mechanicalSummary: `${check.mechanicalSummary} | ${opened.name} force et ouvert | contenu revele: ${discoveries.length}`,
+    ...(traversal.payload ? { traversal: traversal.payload } : {}),
+    mechanicalSummary: `${check.mechanicalSummary} | ${opened.name} force et ouvert | contenu revele: ${discoveries.length}${traversal.summarySuffix ?? ''}`,
   })
 }
 
@@ -2116,6 +2237,7 @@ function resolveUseObjectAction({
       targetId,
       targetName,
       includeHidden: false,
+      kinds: ['fixture', 'trap'],
     })
   } catch (err) {
     return rules.ruleErrorResult(err)
@@ -2312,6 +2434,7 @@ export function registerActionTools(server: McpServer): void {
             targetId: action.targetId,
             targetName: action.targetName,
             force: action.force,
+            traverse: action.traverse,
           }))
 
         case 'take':
@@ -2324,12 +2447,14 @@ export function registerActionTools(server: McpServer): void {
           return wrapActionResult('unlock', 'world.unlock', resolveUnlockAction({
             targetId: action.targetId,
             targetName: action.targetName,
+            traverse: action.traverse,
           }))
 
         case 'force':
           return wrapActionResult('force', 'world.force', resolveForceAction({
             targetId: action.targetId,
             targetName: action.targetName,
+            traverse: action.traverse,
           }))
 
         case 'disarm':

@@ -1,5 +1,6 @@
 import type { EngineEvent, GameState } from './types'
 import { normalizeFrenchText } from './dm-intent'
+import { buildSceneSurface } from './scene-surface'
 
 export type NarratedWorldFactKind =
   | 'recipe_acquired'
@@ -135,7 +136,8 @@ export function detectUnsupportedNarratedWorldFact(
       return null
     }
     case 'object_opened': {
-      const opened = objects.some(object => ['door', 'container'].includes(object.kind) && object.opened)
+      const surface = buildSceneSurface(gameState)
+      const opened = surface.objects.some(object => ['door', 'container'].includes(object.kind) && object.opened)
       if (!opened && !eventTypes.has('door.opened') && !eventTypes.has('object.opened')) {
         return { reason: 'object_opened_without_engine_state', fact, suggestedTools }
       }

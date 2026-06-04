@@ -1,6 +1,12 @@
-import type { GameState, PlayerAffordance, WorldObjectState } from './types'
+import type { CanonicalPlayerActionKind, GameState, PlayerAffordance, WorldObjectState } from './types'
 import { normalizeFrenchText } from './dm-intent'
-import { derivePlayerAffordances } from './world-engine'
+import {
+  buildSceneSurface,
+  findSceneTargetsByText,
+  objectIsOnSceneSurface,
+  type SceneSurface,
+  type SceneSurfaceTarget,
+} from './scene-surface'
 import type { GameActionKind } from './game-actions'
 
 type TargetSource = 'explicit' | 'recent_event' | 'unique_affordance' | 'unique_present_npc' | 'none'
@@ -88,6 +94,11 @@ function extractWorldItemName(message: string): string | undefined {
   return itemPatterns.find(([, pattern]) => pattern.test(text))?.[0]
 }
 
+function wantsPortalTraversal(message: string): boolean {
+  const text = normalizeFrenchText(message)
+  return /\b(pousses?|pousser|rentres?|rentrer|entres?|entrer|franchis|franchir|passes?|passer|traverses?|traverser|dedans|interieur|a l interieur|dans le batiment|boulangerie)\b/.test(text)
+}
+
 function hasAnaphoricObjectReference(message: string): boolean {
   const text = normalizeFrenchText(message)
   return /\b(?:l[' ]?(?:ouvre|ouvres|examines?|etudies?|empoches?|attrapes?)|le prends|la prends|le lis|la lis|ouvre[- ]?(?:le|la|ca)|lis[- ]?(?:le|la)|prends ca|ramasse ca|recupere ca|reprends ca|utilise ca|desamorce ca)\b/.test(text)
@@ -110,7 +121,7 @@ function isAnaphoricObjectCandidateForKind(
   object: WorldObjectState,
   gameState: GameState
 ): boolean {
-  const visibleHere = object.roomId === gameState.currentRoomId && (object.visible || object.discovered)
+  const visibleHere = objectIsOnSceneSurface(object, gameState.currentRoomId)
   const inventoryIds = new Set(gameState.player.inventory.map(item => item.id))
   const readable = Boolean(object.readableText || object.tags?.includes('readable'))
   switch (kind) {
@@ -131,6 +142,84 @@ function isAnaphoricObjectCandidateForKind(
     default:
       return false
   }
+}
+
+function canonicalKind(kind: GameActionKind): CanonicalPlayerActionKind | undefined {
+  return [
+    'examine',
+    'read',
+    'search',
+    'open',
+    'take',
+    'unlock',
+    'force',
+    'disarm',
+    'talk',
+    'ask',
+    'persuade',
+    'threaten',
+    'show_item',
+    'give_item',
+    'hide',
+    'help',
+    'flee',
+    'stabilize',
+    'use_object',
+    'combine_recipe',
+    'use_item',
+  ].includes(kind) ? kind as CanonicalPlayerActionKind : undefined
+}
+
+function uniqueTargetOrAmbiguous(
+  candidates: SceneSurfaceTarget[]
+): { name?: string; ambiguous?: string[] } {
+  const names = uniqueOrUndefined(candidates.map(target => target.name))
+  if (names) return { name: names }
+  const uniqueNames = [...new Set(candidates.map(target => target.name))]
+  return uniqueNames.length > 1 ? { ambiguous: uniqueNames } : {}
+}
+
+function surfaceObjectTargetFromMessage(
+  message: string,
+  gameState: GameState,
+  kind: GameActionKind
+): { name?: string; ambiguous?: string[] } {
+  if (!['examine', 'read', 'search', 'open', 'take', 'unlock', 'force', 'disarm', 'use_object'].includes(kind)) {
+    return {}
+  }
+  const surface = buildSceneSurface(gameState)
+  const targetKind = canonicalKind(kind)
+  const directCandidates = findSceneTargetsByText(surface, message, 'object', targetKind)
+  const direct = uniqueTargetOrAmbiguous(directCandidates)
+  if (direct.name || direct.ambiguous) return direct
+
+  const fallbackName = extractExpandedWorldTargetName(message)
+  if (!fallbackName) return {}
+  const fallbackCandidates = findSceneTargetsByText(surface, fallbackName, 'object', targetKind)
+  const fallback = uniqueTargetOrAmbiguous(fallbackCandidates)
+  if (fallback.name || fallback.ambiguous) return fallback
+
+  return { name: fallbackName }
+}
+
+function surfaceNpcTargetFromMessage(
+  message: string,
+  gameState: GameState,
+  kind: GameActionKind
+): { name?: string; ambiguous?: string[] } {
+  const surface = buildSceneSurface(gameState)
+  const targetKind = canonicalKind(kind)
+  const directCandidates = findSceneTargetsByText(surface, message, 'npc', targetKind)
+  const direct = uniqueTargetOrAmbiguous(directCandidates)
+  if (direct.name || direct.ambiguous) return direct
+
+  const fallbackName = extractWorldNpcTargetName(message)
+  if (!fallbackName) return {}
+  const fallbackCandidates = findSceneTargetsByText(surface, fallbackName, 'npc', targetKind)
+  const fallback = uniqueTargetOrAmbiguous(fallbackCandidates)
+  if (fallback.name || fallback.ambiguous) return fallback
+
+  return { name: fallbackName }
 }
 
 function objectTargetNameFromAffordance(affordance: PlayerAffordance, gameState: GameState): string | undefined {
@@ -162,7 +251,7 @@ function inferAnaphoricWorldTarget(
     .find(object => object && isAnaphoricObjectCandidateForKind(kind, object, gameState))
   if (recentObject) return { name: recentObject.name, source: 'recent_event' }
 
-  const affordedNames = derivePlayerAffordances(gameState)
+  const affordedNames = buildSceneSurface(gameState).affordances
     .filter(affordance => affordance.kind === kind)
     .map(affordance => objectTargetNameFromAffordance(affordance, gameState))
     .filter((name): name is string => Boolean(name))
@@ -200,7 +289,7 @@ function inferAnaphoricNpcTarget(
     .find(npc => npc && npc.roomId === gameState.currentRoomId)
   if (recentNpc) return { name: recentNpc.name, source: 'recent_event' }
 
-  const affordedNames = derivePlayerAffordances(gameState)
+  const affordedNames = buildSceneSurface(gameState).affordances
     .filter(affordance => affordance.kind === kind)
     .map(affordance => npcTargetNameFromAffordance(affordance, gameState))
     .filter((name): name is string => Boolean(name))
@@ -222,15 +311,19 @@ export function resolveWorldActionTargets(
   gameState: GameState,
   kind: GameActionKind
 ): WorldActionTargetResolution {
-  const explicitTargetName = extractExpandedWorldTargetName(message)
-  const inferredTarget = explicitTargetName
-    ? { name: explicitTargetName, source: 'explicit' as TargetSource }
-    : inferAnaphoricWorldTarget(message, gameState, kind)
+  const explicitTarget = surfaceObjectTargetFromMessage(message, gameState, kind)
+  const inferredTarget = explicitTarget.name
+    ? { name: explicitTarget.name, source: 'explicit' as TargetSource }
+    : explicitTarget.ambiguous
+      ? { source: 'none' as TargetSource, ambiguous: explicitTarget.ambiguous }
+      : inferAnaphoricWorldTarget(message, gameState, kind)
 
-  const explicitNpcTargetName = extractWorldNpcTargetName(message)
-  const inferredNpcTarget = explicitNpcTargetName
-    ? { name: explicitNpcTargetName, source: 'explicit' as TargetSource }
-    : inferAnaphoricNpcTarget(message, gameState, kind)
+  const explicitNpcTarget = surfaceNpcTargetFromMessage(message, gameState, kind)
+  const inferredNpcTarget = explicitNpcTarget.name
+    ? { name: explicitNpcTarget.name, source: 'explicit' as TargetSource }
+    : explicitNpcTarget.ambiguous
+      ? { source: 'none' as TargetSource, ambiguous: explicitNpcTarget.ambiguous }
+      : inferAnaphoricNpcTarget(message, gameState, kind)
 
   const itemName = extractWorldItemName(message)
   const ambiguous = [
@@ -270,13 +363,13 @@ export function buildWorldActionInput(
         ? { kind: 'search', targetName }
         : { kind: 'search' }
     case 'open':
-      return { kind: 'open', ...(targetName ? { targetName } : {}) }
+      return { kind: 'open', ...(targetName ? { targetName } : {}), ...(wantsPortalTraversal(message) ? { traverse: true } : {}) }
     case 'take':
       return { kind: 'take', ...(targetName ? { targetName } : {}) }
     case 'unlock':
-      return { kind: 'unlock', ...(targetName ? { targetName } : {}) }
+      return { kind: 'unlock', ...(targetName ? { targetName } : {}), ...(wantsPortalTraversal(message) ? { traverse: true } : {}) }
     case 'force':
-      return { kind: 'force', ...(targetName ? { targetName } : {}) }
+      return { kind: 'force', ...(targetName ? { targetName } : {}), ...(wantsPortalTraversal(message) ? { traverse: true } : {}) }
     case 'disarm':
       return { kind: 'disarm', ...(targetName ? { targetName } : {}) }
     case 'talk':
@@ -305,5 +398,44 @@ export function buildWorldActionInput(
       return { kind: 'combine_recipe' }
     default:
       return null
+  }
+}
+
+export function buildPortalTraversalActionInput(
+  message: string,
+  gameState: GameState
+): Record<string, unknown> | null {
+  if (!wantsPortalTraversal(message)) return null
+  const surface = buildSceneSurface(gameState)
+  const text = normalizeFrenchText(message)
+  const mentionsPortalCue = /\b(portes?|entree|battants?|seuil|dedans|interieur|batiment|boulangerie|pousses?|pousser|rentres?|rentrer|entres?|entrer|franchis|franchir|passes?|passer)\b/.test(text)
+  if (!mentionsPortalCue) return null
+
+  const directCandidates = findSceneTargetsByText(surface, message, 'object', 'open')
+    .filter(target => surface.objects.some(object => object.id === target.id && object.portal?.otherRoomIds.length))
+  const candidates = directCandidates.length > 0
+    ? directCandidates
+    : surface.objects
+        .filter(object => object.portal?.otherRoomIds.length && object.actionKinds.includes('open'))
+        .map(object => ({
+          id: object.id,
+          type: 'object' as const,
+          name: object.name,
+          aliases: object.aliases,
+          kinds: object.actionKinds,
+        }))
+  const uniqueTarget = uniqueTargetOrAmbiguous(candidates)
+  if (uniqueTarget.ambiguous) {
+    return {
+      kind: 'open',
+      traverse: true,
+    }
+  }
+  if (!uniqueTarget.name) return null
+
+  return {
+    kind: 'open',
+    targetName: uniqueTarget.name,
+    traverse: true,
   }
 }

@@ -74,9 +74,49 @@ test('target resolver maps explicit natural object aliases to canonical input', 
   const input = targetResolver.buildWorldActionInput("j'ouvre les sacs de farine", state, 'open')
   const resolution = targetResolver.resolveWorldActionTargets("j'ouvre les sacs de farine", state, 'open')
 
-  assert.deepEqual(input, { kind: 'open', targetName: 'sacs de farine' })
-  assert.equal(resolution.targetName, 'sacs de farine')
+  assert.deepEqual(input, { kind: 'open', targetName: 'sacs de farine effondres' })
+  assert.equal(resolution.targetName, 'sacs de farine effondres')
   assert.equal(resolution.targetSource, 'explicit')
+})
+
+test('target resolver maps the initial narrated door through the scene surface', () => {
+  const state = baseGameState({
+    currentRoomId: '1',
+    roomsVisited: ['1'],
+    player: {
+      ...baseGameState().player,
+      position: { x: 4, y: 13 },
+    },
+  })
+
+  const input = targetResolver.buildWorldActionInput('JE CASSE LA PORTE', state, 'force')
+  const composite = targetResolver.buildWorldActionInput('je detruis la porte et je rentre dans le batiment', state, 'force')
+  const resolution = targetResolver.resolveWorldActionTargets('JE CASSE LA PORTE', state, 'force')
+
+  assert.deepEqual(input, { kind: 'force', targetName: 'double porte de la boulangerie' })
+  assert.deepEqual(composite, { kind: 'force', targetName: 'double porte de la boulangerie', traverse: true })
+  assert.equal(resolution.targetName, 'double porte de la boulangerie')
+  assert.equal(resolution.targetSource, 'explicit')
+})
+
+test('target resolver refuses to invent a door side when several scene portals match', () => {
+  const state = baseGameState({
+    currentRoomId: '4',
+    roomsVisited: ['1', '4'],
+    player: {
+      ...baseGameState().player,
+      position: { x: 12, y: 11 },
+    },
+  })
+
+  const resolution = targetResolver.resolveWorldActionTargets('je casse la porte', state, 'force')
+
+  assert.equal(resolution.targetName, undefined)
+  assert.equal(resolution.targetSource, 'none')
+  assert.deepEqual(resolution.ambiguous, [{
+    type: 'object',
+    candidates: ['double porte de la boulangerie', 'porte de la reserve'],
+  }])
 })
 
 test('target resolver resolves object anaphora from recent engine events', () => {
@@ -115,6 +155,6 @@ test('target resolver reports ambiguous npc anaphora instead of inventing a targ
   assert.equal(resolution.npcTargetSource, 'none')
   assert.deepEqual(resolution.ambiguous, [{
     type: 'npc',
-    candidates: ['Mac', 'druidesse du verger'],
+    candidates: ['druidesse du verger', 'Mac'],
   }])
 })

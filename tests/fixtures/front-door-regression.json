@@ -1,0 +1,75 @@
+[
+  {
+    "name": "front-door-regression",
+    "initialGameState": "base",
+    "turns": [
+      {
+        "message": "JE CASSE LA PORTE",
+        "category": "regression",
+        "expectNoLlm": false,
+        "expectTools": ["resolve_player_action"],
+        "expectEvents": ["alarm.raised", "door.opened"],
+        "expectAffordances": ["move"],
+        "diceSequence": "20,20,20"
+      }
+    ]
+  },
+  {
+    "name": "front-door-composite-regression",
+    "initialGameState": "base",
+    "turns": [
+      {
+        "message": "je detruis la porte et je rentre dans le batiment",
+        "category": "regression",
+        "expectNoLlm": false,
+        "expectTools": ["resolve_player_action"],
+        "expectEvents": ["alarm.raised", "door.opened", "entity.moved"],
+        "expectAffordances": ["open"],
+        "diceSequence": "20,20,20"
+      },
+      {
+        "message": "je parle a Mac",
+        "category": "regression",
+        "expectNoLlm": false,
+        "expectTools": ["resolve_player_action"],
+        "expectEvents": ["action.blocked"]
+      }
+    ]
+  },
+  {
+    "name": "front-door-natural-entry-regression",
+    "initialGameState": "base",
+    "turns": [
+      {
+        "message": "je pousse la porte",
+        "category": "regression",
+        "expectNoLlm": false,
+        "expectTools": ["resolve_player_action"],
+        "expectEvents": ["door.opened", "entity.moved"],
+        "expectAffordances": ["open"]
+      },
+      {
+        "message": "je retourne dehors",
+        "category": "regression",
+        "expectNoLlm": false,
+        "expectTools": ["resolve_player_action"],
+        "expectEvents": ["entity.moved"],
+        "expectTargetResolution": false
+      }
+    ]
+  },
+  {
+    "name": "interior-door-ambiguity-regression",
+    "initialGameState": "bakery-entrance",
+    "turns": [
+      {
+        "message": "je pousse la porte",
+        "category": "regression",
+        "expectNoLlm": false,
+        "expectTools": ["resolve_player_action"],
+        "expectEvents": ["action.blocked"],
+        "forbidEvents": ["entity.moved"]
+      }
+    ]
+  }
+]

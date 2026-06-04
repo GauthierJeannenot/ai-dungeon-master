@@ -371,6 +371,64 @@ test('DM API resolves sensory movement toward smell origin from room 4', async t
   assert.deepEqual(data.newGameState.player.position, { x: 9, y: 7 })
 })
 
+test('DM API resolves the narrated initial front door through scene surface affordances', async t => {
+  const previousDice = process.env.AI_DM_TEST_DICE_SEQUENCE
+  process.env.AI_DM_TEST_DICE_SEQUENCE = '20,20,20,20'
+  t.after(() => {
+    if (previousDice === undefined) delete process.env.AI_DM_TEST_DICE_SEQUENCE
+    else process.env.AI_DM_TEST_DICE_SEQUENCE = previousDice
+  })
+
+  for (const [index, message] of [
+    'JE CASSE LA PORTE',
+    'je detruis la porte et je rentre dans le batiment',
+    'je pousse la porte',
+    'je rentre',
+    "je vais a l'interieur",
+  ].entries()) {
+    const sessionId = `api-front-door-${process.pid}-${Date.now()}-${index}`
+    t.after(() => cleanupSession(sessionId))
+
+    const { response, data } = await postDm({
+      message,
+      clientRequestId: `client-${sessionId}`,
+      sessionId,
+      gameState: baseGameState(),
+      history: [],
+    })
+
+    assert.equal(response.status, 200, message)
+    assert.ok(data.toolsUsed.includes('resolve_player_action'), message)
+    assert.notEqual(data.debug?.refusalCode, 'WORLD_OBJECT_NOT_AFFORDED', message)
+    assert.ok(data.debug?.sceneSurface?.objects?.some?.(object => object.id === 'front_double_door'), message)
+    assert.ok(data.engine?.events?.some(event => event.type === 'door.opened' && event.targetId === 'front_double_door'), message)
+    if (/rentre|interieur|pousse|detruis/i.test(message)) {
+      assert.ok(data.engine?.events?.some(event => event.type === 'entity.moved'), message)
+      assert.equal(data.newGameState.currentRoomId, '4', message)
+    }
+  }
+})
+
+test('DM API returns a useful ambiguity instead of moving through an unspecified interior door', async t => {
+  const sessionId = `api-ambiguous-door-${process.pid}-${Date.now()}`
+  t.after(() => cleanupSession(sessionId))
+
+  const { response, data } = await postDm({
+    message: 'je pousse la porte',
+    clientRequestId: `client-${sessionId}`,
+    sessionId,
+    gameState: bakeryEntranceGameState(),
+    history: [],
+  })
+
+  assert.equal(response.status, 200)
+  assert.ok(data.toolsUsed.includes('resolve_player_action'))
+  assert.equal(data.debug?.refusalCode, 'WORLD_OBJECT_AMBIGUOUS')
+  assert.ok(data.engine?.events?.some(event => event.type === 'action.blocked'))
+  assert.equal(data.newGameState.currentRoomId, '4')
+  assert.match(data.narrative, /plusieurs|cibles|laquelle|porte/i)
+})
+
 test('DM API refuses vague multi-exit exploration without triggering final encounter', async t => {
   const sessionId = `api-vague-explore-${process.pid}-${Date.now()}`
   t.after(() => cleanupSession(sessionId))
