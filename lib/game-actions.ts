@@ -98,7 +98,7 @@ export function isAnaphoricCombatAttackText(normalizedText: string): boolean {
 
 export function detectDeathSaveIntent(message: string): boolean {
   const text = normalizeFrenchText(message)
-  return /\b(jet de mort|jets de mort|sauvegarde contre la mort|death save|je tente|tente le jet|tenter le jet|je le fais|je lance|lance le|vas y|vas-y|continue|continuer|on attend|j'attends|j attends|attends|attendre|d'accord|d accord|ok)\b/.test(text)
+  return /\b(jet de mort|jets de mort|sauvegarde contre la mort|death save|je tente|tente le jet|tenter le jet|je le fais|je lance|lance le|lances?|jette?s? les des|jettes? les des|tu jettes? les des|toi qui jettes? les des|c'est toi qui jettes? les des|c est toi qui jettes? les des|vas y|vas-y|continue|continuer|on attend|j'attends|j attends|attends|attendre|d'accord|d accord|ok)\b/.test(text)
 }
 
 export function detectPassTurnIntent(message: string, gameState: GameState): boolean {

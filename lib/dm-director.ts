@@ -252,27 +252,62 @@ function buildAttackNarrative(gameState: GameState, entries: CombatLogEntry[]): 
   const enemyAttacks = attacks.filter(entry => entry !== playerAttack)
   const alive = countAliveMonsters(gameState)
   const first = playerAttack ?? attacks[0]
+  const playerAttackCount = gameState.combatLog.filter(entry => {
+    const outcome = attackOutcome(entry)
+    return outcome && isPlayerActorName(outcome.actor)
+  }).length
+  const variant = Math.max(0, playerAttackCount - 1)
+  const choose = (values: string[]) => values[variant % values.length]
 
   const opener = first.critical
-    ? `Tu trouves une ouverture brutale sur ${first.target}.`
+    ? choose([
+        `Tu trouves une ouverture brutale sur ${first.target}.`,
+        `Ta lame passe enfin sous la garde de ${first.target}.`,
+        `Le choc tombe juste: ${first.target} encaisse de plein fouet.`,
+      ])
     : first.hit
-      ? `Ton attaque accroche ${first.target}.`
-      : `Ton attaque force ${first.target} a reculer, mais ne mord pas assez.`
+      ? choose([
+          `Ton attaque accroche ${first.target}.`,
+          `Tu fais plier la garde de ${first.target}.`,
+          `${first.target} doit casser sa posture pour eviter le pire.`,
+        ])
+      : choose([
+          `Ton attaque coupe l'air devant ${first.target}.`,
+          `${first.target} devie le coup d'un geste sec.`,
+          `Tu le forces a bouger, mais la lame ne trouve pas la chair.`,
+          `Le coup part fort; ${first.target} l'absorbe sur sa garde.`,
+        ])
 
   const outcome = first.killed
     ? ` ${first.target} tombe net; il reste ${alive} menace${alive > 1 ? 's' : ''} debout.`
     : first.downed
       ? ` ${first.target} vacille au bord du noir.`
       : first.hit
-        ? ` Il reste dans la melee, plus prudent qu'avant.`
-        : ` L'echange reste ouvert.`
+        ? choose([
+            ` Il reste dans la melee, plus prudent qu'avant.`,
+            ` Le coup compte, meme s'il ne suffit pas.`,
+            ` Sa respiration se durcit; il t'a senti passer pres.`,
+          ])
+        : choose([
+            ` L'echange reste ouvert.`,
+            ` L'avantage ne bascule pas encore.`,
+            ` Il garde sa place, mais son attention se resserre sur toi.`,
+          ])
 
   const riposte = enemyAttacks.length > 0
-    ? ` La riposte part aussitot: ${enemyAttacks.map(entry => entry.hit ? `${entry.actor} touche` : `${entry.actor} rate`).join(', ')}.`
+    ? choose([
+        ` La riposte part aussitot: ${enemyAttacks.map(entry => entry.hit ? `${entry.actor} touche` : `${entry.actor} rate`).join(', ')}.`,
+        ` En face, la reponse fuse: ${enemyAttacks.map(entry => entry.hit ? `${entry.actor} touche` : `${entry.actor} manque son angle`).join(', ')}.`,
+        ` Le contre arrive sans politesse: ${enemyAttacks.map(entry => entry.hit ? `${entry.actor} touche` : `${entry.actor} frappe trop court`).join(', ')}.`,
+      ])
     : ''
 
   const turnHint = gameState.phase === 'combat' && gameState.currentTurn === 'player'
-    ? ' A toi de reprendre le tempo.'
+    ? choose([
+        " Le rythme te revient, et la prochaine ouverture sera breve.",
+        " Tu recuperes l'initiative dans une respiration courte.",
+        " La melee te rend une fenetre, pas une pause.",
+      ])
     : gameState.phase === 'combat'
       ? ' Le tour continue de tourner.'
       : ''
@@ -325,6 +360,9 @@ function buildLocalNarrative(input: DirectorInput): string | null {
   if (tools.includes('resolve_player_action')) {
     if (actionIntent.kind === 'move') return buildMoveNarrative(gameState)
     if (actionIntent.kind === 'use_item') {
+      if (gameState.player.hp.current <= 0) {
+        return "La potion rallume tes forces un instant; la chaleur revient, nette et reelle. Puis la riposte te fauche aussitot, et tu retombes inconscient au milieu du danger."
+      }
       return `La potion rallume tes forces: tu remontes a ${gameState.player.hp.current}/${gameState.player.hp.max} PV. Ce n'est pas du confort, mais c'est assez pour agir.`
     }
     if (actionIntent.kind === 'death_save') {
@@ -344,6 +382,9 @@ function buildLocalNarrative(input: DirectorInput): string | null {
   }
   if (tools.includes('move_token')) return buildMoveNarrative(gameState)
   if (tools.includes('use_healing_potion')) {
+    if (gameState.player.hp.current <= 0) {
+      return "La potion rallume tes forces un instant; la chaleur revient, nette et reelle. Puis la riposte te fauche aussitot, et tu retombes inconscient au milieu du danger."
+    }
     return `La potion rallume tes forces: tu remontes a ${gameState.player.hp.current}/${gameState.player.hp.max} PV. Ce n'est pas du confort, mais c'est assez pour agir.`
   }
   if (tools.includes('roll_death_save')) {

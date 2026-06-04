@@ -142,3 +142,24 @@ test('narrative contract blocks calm narration while an alarm remains raised', (
 
   assert.equal(problems[0]?.reason, 'alarm_ignored_by_narration')
 })
+
+test('narrative contract blocks potion negation after item.used event', () => {
+  const state = baseGameState()
+  const recentEvents = [
+    {
+      id: 'potion-used',
+      type: 'item.used',
+      summary: 'Potion de soin consommee.',
+      visibleToPlayer: true,
+    },
+  ]
+
+  const problems = detectUnsupportedNarratedWorldFacts(
+    'La fiole etait vide depuis le debut, elle ne fait rien.',
+    state,
+    recentEvents,
+    ['resolve_player_action']
+  )
+
+  assert.equal(problems[0]?.reason, 'item_used_contradicted_by_narration')
+})

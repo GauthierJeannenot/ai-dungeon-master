@@ -1,0 +1,132 @@
+[
+  {
+    "name": "prod-log-exploration-regression",
+    "initialGameState": "bakery-entrance",
+    "turns": [
+      {
+        "message": "j'observe",
+        "category": "regression",
+        "expectNoLlm": false
+      },
+      {
+        "message": "je vais vers l'origine de l'odeur",
+        "category": "regression",
+        "expectNoLlm": false,
+        "expectTools": ["resolve_player_action"],
+        "expectEvents": ["entity.moved"],
+        "expectTargetResolution": false
+      },
+      {
+        "message": "y a quelqu'un??",
+        "category": "regression",
+        "expectNoLlm": false
+      },
+      {
+        "message": "ok je change de piece alors, j'explore encore",
+        "category": "regression",
+        "expectNoLlm": false,
+        "forbidTools": ["start_encounter"],
+        "forbidEvents": ["combat.started"]
+      }
+    ]
+  },
+  {
+    "name": "prod-log-door-regression",
+    "initialGameState": "bakery-entrance",
+    "turns": [
+      {
+        "message": "je pousse la porte",
+        "category": "regression",
+        "expectNoLlm": false,
+        "expectTools": ["resolve_player_action"],
+        "expectEvents": ["entity.moved"],
+        "expectTargetResolution": false
+      }
+    ]
+  },
+  {
+    "name": "prod-log-grukk-combat-regression",
+    "initialGameState": "grukk-combat",
+    "turns": [
+      {
+        "message": "j'attaque grukk a la gorge",
+        "category": "regression",
+        "expectNoLlm": false,
+        "expectTools": ["resolve_player_action"],
+        "expectEvents": ["combat.attack"],
+        "expectTargetResolution": false
+      },
+      {
+        "message": "j'attaque grukk a nouveau pour le tuer",
+        "category": "regression",
+        "expectNoLlm": false,
+        "expectTools": ["resolve_player_action"],
+        "expectEvents": ["combat.attack"],
+        "expectTargetResolution": false
+      },
+      {
+        "message": "j'acheve grukk",
+        "category": "regression",
+        "expectNoLlm": false,
+        "expectTools": ["resolve_player_action"],
+        "expectEvents": ["combat.attack"],
+        "expectTargetResolution": false
+      },
+      {
+        "message": "je recommence",
+        "category": "regression",
+        "expectNoLlm": false,
+        "expectTools": ["resolve_player_action"],
+        "expectEvents": ["combat.attack"],
+        "expectTargetResolution": false
+      }
+    ]
+  },
+  {
+    "name": "prod-log-potion-ko-regression",
+    "initialGameState": "potion-ko-combat",
+    "turns": [
+      {
+        "message": "je bois ma potion",
+        "category": "regression",
+        "expectNoLlm": false,
+        "expectTools": ["resolve_player_action"],
+        "expectEvents": ["item.used"],
+        "expectTargetResolution": false,
+        "diceSequence": "1,1,20,6"
+      }
+    ]
+  },
+  {
+    "name": "prod-log-death-save-explicit-regression",
+    "initialGameState": "downed-combat",
+    "turns": [
+      {
+        "message": "je fais mon jet de mort",
+        "category": "regression",
+        "expectNoLlm": false,
+        "expectTools": ["resolve_player_action"],
+        "expectEvents": ["combat.death_save"],
+        "expectAffordances": ["death_save"],
+        "expectTargetResolution": false,
+        "diceSequence": "12,12,12"
+      }
+    ]
+  },
+  {
+    "name": "prod-log-death-save-correction-regression",
+    "initialGameState": "downed-combat",
+    "turns": [
+      {
+        "message": "bah c'est toi qui jettes les des",
+        "category": "regression",
+        "expectNoLlm": false,
+        "expectTools": ["resolve_player_action"],
+        "expectEvents": ["combat.death_save"],
+        "expectAffordances": ["death_save"],
+        "expectTargetResolution": false,
+        "diceSequence": "12,12,12"
+      }
+    ]
+  }
+]

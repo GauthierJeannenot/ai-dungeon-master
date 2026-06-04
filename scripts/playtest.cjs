@@ -260,6 +260,74 @@ function bakeryHazardGameState() {
   })
 }
 
+function bakeryEntranceGameState() {
+  return baseGameState({
+    player: {
+      ...baseGameState().player,
+      position: { x: 12, y: 11 },
+    },
+    roomsVisited: ['1', '4'],
+    currentRoomId: '4',
+  })
+}
+
+function bakeryFloorGameState() {
+  return baseGameState({
+    player: {
+      ...baseGameState().player,
+      position: { x: 9, y: 7 },
+    },
+    roomsVisited: ['1', '4', '8'],
+    currentRoomId: '8',
+  })
+}
+
+function grukkCombatGameState() {
+  return baseGameState({
+    phase: 'combat',
+    player: {
+      ...baseGameState().player,
+      hp: { current: 12, max: 20 },
+      ac: 24,
+      position: { x: 8, y: 10 },
+    },
+    monsters: {
+      grukk: makeGoblin('grukk', {
+        name: 'Chef Grukk',
+        type: 'hobgoblin',
+        hp: { current: 80, max: 80 },
+        ac: 18,
+        attackBonus: 0,
+        damageDice: '1d8+1',
+        position: { x: 8, y: 11 },
+      }),
+    },
+    initiativeOrder: ['player', 'grukk'],
+    currentTurn: 'player',
+    round: 1,
+    roomsVisited: ['9'],
+    currentRoomId: '9',
+  })
+}
+
+function potionKoCombatGameState() {
+  const state = combatGameState()
+  return {
+    ...state,
+    player: {
+      ...state.player,
+      hp: { current: 1, max: 20 },
+      ac: 5,
+    },
+    monsters: {
+      goblin_a: makeGoblin('goblin_a', {
+        attackBonus: 10,
+        damageDice: '1d6+2',
+      }),
+    },
+  }
+}
+
 function downedCombatGameState() {
   const state = combatGameState()
   return {
@@ -295,6 +363,14 @@ function fixtureGameState(name) {
       return apartmentRecipeGameState()
     case 'bakery-hazard':
       return bakeryHazardGameState()
+    case 'bakery-entrance':
+      return bakeryEntranceGameState()
+    case 'bakery-floor':
+      return bakeryFloorGameState()
+    case 'grukk-combat':
+      return grukkCombatGameState()
+    case 'potion-ko-combat':
+      return potionKoCombatGameState()
     case 'combat':
       return combatGameState()
     case 'downed-combat':
@@ -321,18 +397,29 @@ function normalizeFixtureTurn(turn) {
 }
 
 function loadSessionRegressionScenarios() {
-  const fixturePath = option('--session-fixture', path.join(process.cwd(), 'tests', 'fixtures', 'real-session-regression.json'))
-  if (!fixturePath || !fs.existsSync(fixturePath)) return []
+  const requestedFixturePath = option('--session-fixture', undefined)
+  const fixturePaths = requestedFixturePath
+    ? [requestedFixturePath]
+    : [
+        path.join(process.cwd(), 'tests', 'fixtures', 'real-session-regression.json'),
+        path.join(process.cwd(), 'tests', 'fixtures', 'prod-log-regression.json'),
+      ]
 
-  const fixture = JSON.parse(fs.readFileSync(fixturePath, 'utf8'))
-  const fixtures = Array.isArray(fixture) ? fixture : [fixture]
-  return fixtures.map((entry, index) => ({
-    name: entry.name ?? `session-regression-${index + 1}`,
-    initialGameState: typeof entry.initialGameState === 'string'
-      ? fixtureGameState(entry.initialGameState)
-      : entry.initialGameState ?? baseGameState(),
-    turns: (entry.turns ?? entry.messages ?? []).map(normalizeFixtureTurn),
-  }))
+  const scenarios = []
+  for (const fixturePath of fixturePaths) {
+    if (!fixturePath || !fs.existsSync(fixturePath)) continue
+
+    const fixture = JSON.parse(fs.readFileSync(fixturePath, 'utf8'))
+    const fixtures = Array.isArray(fixture) ? fixture : [fixture]
+    scenarios.push(...fixtures.map((entry, index) => ({
+      name: entry.name ?? `${path.basename(fixturePath, '.json')}-${index + 1}`,
+      initialGameState: typeof entry.initialGameState === 'string'
+        ? fixtureGameState(entry.initialGameState)
+        : entry.initialGameState ?? baseGameState(),
+      turns: (entry.turns ?? entry.messages ?? []).map(normalizeFixtureTurn),
+    })))
+  }
+  return scenarios
 }
 
 const builtInScenarios = [
@@ -695,6 +782,20 @@ function findRoboticNarrativeReason(narrative) {
   return pattern ? String(pattern) : null
 }
 
+function normalizeFrenchText(value) {
+  return String(value ?? '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .replace(/[’‘`´]/g, "'")
+}
+
+function hasMixedSecondPersonNarration(narrative) {
+  const text = normalizeFrenchText(narrative)
+  return (/\b(tu|te|toi|ton|ta|tes)\b|t'/.test(text)) &&
+    /\b(vous|votre|vos)\b/.test(text)
+}
+
 async function postDm(POST, body) {
   const response = await POST(new Request('http://localhost/api/dm', {
     method: 'POST',
@@ -751,6 +852,9 @@ async function run() {
       missingDebugViews: [],
       missingWorldDebugDiffs: [],
       missingTargetResolutions: [],
+      unexpectedTools: [],
+      unexpectedEvents: [],
+      mixedSecondPersonNarratives: [],
     },
     targetViolations: [],
   }
@@ -768,15 +872,28 @@ async function run() {
         for (let index = 0; index < scenario.turns.length; index++) {
           const turn = scenario.turns[index]
           const turnStartedAt = Date.now()
-          const { status, data } = await postDm(POST, {
-            message: turn.message,
-            clientRequestId: `playtest-${scenario.name}-${index + 1}`,
-            sessionId,
-            gameState,
-            history,
-            summaryContext,
-            clientMeta: { inputMode: 'text' },
-          })
+          const previousDiceSequence = process.env.AI_DM_TEST_DICE_SEQUENCE
+          if (turn.diceSequence) process.env.AI_DM_TEST_DICE_SEQUENCE = String(turn.diceSequence)
+          let status
+          let data
+          try {
+            const result = await postDm(POST, {
+              message: turn.message,
+              clientRequestId: `playtest-${scenario.name}-${index + 1}`,
+              sessionId,
+              gameState,
+              history,
+              summaryContext,
+              clientMeta: { inputMode: 'text' },
+            })
+            status = result.status
+            data = result.data
+          } finally {
+            if (turn.diceSequence) {
+              if (previousDiceSequence === undefined) delete process.env.AI_DM_TEST_DICE_SEQUENCE
+              else process.env.AI_DM_TEST_DICE_SEQUENCE = previousDiceSequence
+            }
+          }
 
           const durationMs = Date.now() - turnStartedAt
           const usage = data.usage
@@ -849,6 +966,7 @@ async function run() {
             status < 400 &&
             (turn.category === 'world' || turn.category === 'regression' || turn.category === 'fuzz' || turn.category === 'social') &&
             (turn.expectTools ?? []).includes('resolve_player_action') &&
+            turn.expectTargetResolution !== false &&
             !data.debug?.targetResolution
           ) {
             report.quality.missingTargetResolutions.push(turnReport)
@@ -858,9 +976,19 @@ async function run() {
               report.quality.missingExpectedTools.push({ ...turnReport, expectedTool })
             }
           }
+          for (const forbiddenTool of turn.forbidTools ?? []) {
+            if (turnReport.toolsUsed.includes(forbiddenTool)) {
+              report.quality.unexpectedTools.push({ ...turnReport, forbiddenTool })
+            }
+          }
           for (const expectedEvent of turn.expectEvents ?? []) {
             if (!turnReport.engineEventTypes.includes(expectedEvent)) {
               report.quality.missingExpectedEvents.push({ ...turnReport, expectedEvent })
+            }
+          }
+          for (const forbiddenEvent of turn.forbidEvents ?? []) {
+            if (turnReport.engineEventTypes.includes(forbiddenEvent)) {
+              report.quality.unexpectedEvents.push({ ...turnReport, forbiddenEvent })
             }
           }
           for (const expectedAffordance of turn.expectAffordances ?? []) {
@@ -877,6 +1005,9 @@ async function run() {
           const roboticReason = findRoboticNarrativeReason(data.narrative)
           if (roboticReason) {
             report.quality.roboticNarratives.push({ ...turnReport, reason: roboticReason })
+          }
+          if (hasMixedSecondPersonNarration(data.narrative)) {
+            report.quality.mixedSecondPersonNarratives.push(turnReport)
           }
 
           if (status >= 400) break
@@ -929,6 +1060,9 @@ async function run() {
   if (report.quality.roboticNarratives.length > 0) {
     report.targetViolations.push(`${report.quality.roboticNarratives.length} turns matched robotic narration patterns`)
   }
+  if (report.quality.mixedSecondPersonNarratives.length > 0) {
+    report.targetViolations.push(`${report.quality.mixedSecondPersonNarratives.length} turns mixed tu/vous narration`)
+  }
   if (report.quality.missingEngineViews.length > 0) {
     report.targetViolations.push(`${report.quality.missingEngineViews.length} turns missed engine debug views`)
   }
@@ -944,8 +1078,14 @@ async function run() {
   if (report.quality.missingExpectedTools.length > 0) {
     report.targetViolations.push(`${report.quality.missingExpectedTools.length} expected tools were not used`)
   }
+  if (report.quality.unexpectedTools.length > 0) {
+    report.targetViolations.push(`${report.quality.unexpectedTools.length} forbidden tools were used`)
+  }
   if (report.quality.missingExpectedEvents.length > 0) {
     report.targetViolations.push(`${report.quality.missingExpectedEvents.length} expected engine events were not emitted`)
+  }
+  if (report.quality.unexpectedEvents.length > 0) {
+    report.targetViolations.push(`${report.quality.unexpectedEvents.length} forbidden engine events were emitted`)
   }
   if (report.quality.missingExpectedAffordances.length > 0) {
     report.targetViolations.push(`${report.quality.missingExpectedAffordances.length} expected affordances were not enabled`)

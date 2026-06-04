@@ -174,7 +174,7 @@ test('game action language routes coordinate phrases with vais as movement', () 
 })
 
 test('game action language routes dying player acceptance to death save', () => {
-  const intent = actions.classifyPlayerAction('ok je tente', baseGameState({
+  const state = baseGameState({
     phase: 'combat',
     currentTurn: 'player',
     player: {
@@ -183,8 +183,11 @@ test('game action language routes dying player acceptance to death save', () => 
       conditions: ['unconscious'],
       deathSaves: { successes: 1, failures: 1 },
     },
-  }))
+  })
 
-  assert.equal(intent.kind, 'death_save')
-  assert.deepEqual(intent.suggestedTools, ['roll_death_save'])
+  for (const message of ['ok je tente', 'bah c est toi qui jettes les des']) {
+    const intent = actions.classifyPlayerAction(message, state)
+    assert.equal(intent.kind, 'death_save', message)
+    assert.deepEqual(intent.suggestedTools, ['roll_death_save'], message)
+  }
 })

@@ -10,6 +10,7 @@ export type NarratedWorldFactKind =
   | 'trap_triggered'
   | 'trap_disarmed'
   | 'alarm_negated'
+  | 'item_used_negated'
   | 'player_dead'
   | 'player_unconscious'
 
@@ -74,6 +75,11 @@ export function extractNarratedWorldFacts(responseText: string): NarratedWorldFa
     'alarm_negated',
     'alarm negated wording',
     /\b(tout est calme|aucune alerte|personne n a entendu|personne ne remarque|personne ne reagit|le silence retombe|rien ne bouge)\b/
+  )
+  add(
+    'item_used_negated',
+    'used item negated wording',
+    /\b(potion|fiole|elixir)\b.{0,100}\b(vide|etait vide|etait deja vide|depuis le debut|sans effet|n a rien fait|ne fait rien|inutile|eventee|evente)\b/
   )
   add(
     'player_dead',
@@ -163,6 +169,11 @@ export function detectUnsupportedNarratedWorldFact(
       }
       return null
     }
+    case 'item_used_negated':
+      if (eventTypes.has('item.used') || toolsUsed.includes('use_healing_potion')) {
+        return { reason: 'item_used_contradicted_by_narration', fact, suggestedTools: ['resolve_player_action', 'use_healing_potion'] }
+      }
+      return null
     case 'player_dead':
       if (!gameState.player.deathSaves?.dead) {
         return { reason: 'player_dead_without_engine_state', fact, suggestedTools: ['roll_death_save'] }

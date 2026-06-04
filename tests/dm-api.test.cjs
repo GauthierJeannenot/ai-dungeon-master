@@ -165,6 +165,46 @@ function officeGameState() {
   })
 }
 
+function bakeryEntranceGameState() {
+  return baseGameState({
+    player: {
+      ...baseGameState().player,
+      position: { x: 12, y: 11 },
+    },
+    roomsVisited: ['1', '4'],
+    currentRoomId: '4',
+  })
+}
+
+function bakeryFloorGameState() {
+  return baseGameState({
+    player: {
+      ...baseGameState().player,
+      position: { x: 9, y: 7 },
+    },
+    roomsVisited: ['1', '4', '8'],
+    currentRoomId: '8',
+  })
+}
+
+function lowHpPotionCombatGameState() {
+  const state = combatGameState()
+  return {
+    ...state,
+    player: {
+      ...state.player,
+      hp: { current: 1, max: 20 },
+      ac: 5,
+    },
+    monsters: {
+      goblin_a: makeGoblin({
+        attackBonus: 10,
+        damageDice: '1d6+2',
+      }),
+    },
+  }
+}
+
 async function postDm(body) {
   const response = await POST(new Request('http://localhost/api/dm', {
     method: 'POST',
@@ -282,6 +322,101 @@ test('DM API routes downed player status guidance through final LLM narration', 
   assert.deepEqual(data.usage?.operations, ['dm.final_narration'])
   assert.equal(data.usage?.llmRoute, 'rich')
   assert.equal(data.usage?.narrator, 'llm')
+})
+
+test('DM API automatically resolves natural death save requests while player is down', async t => {
+  const previousDice = process.env.AI_DM_TEST_DICE_SEQUENCE
+  process.env.AI_DM_TEST_DICE_SEQUENCE = '12,12,12,12'
+  t.after(() => {
+    if (previousDice === undefined) delete process.env.AI_DM_TEST_DICE_SEQUENCE
+    else process.env.AI_DM_TEST_DICE_SEQUENCE = previousDice
+  })
+
+  for (const message of ['je fais mon jet de mort', 'bah c est toi qui jettes les des']) {
+    const sessionId = `api-death-save-${process.pid}-${Date.now()}-${message.length}`
+    t.after(() => cleanupSession(sessionId))
+
+    const { response, data } = await postDm({
+      message,
+      clientRequestId: `client-${sessionId}`,
+      sessionId,
+      gameState: downedCombatGameState(),
+      history: [],
+    })
+
+    assert.equal(response.status, 200, message)
+    assert.ok(data.toolsUsed.includes('resolve_player_action'), message)
+    assert.ok(data.engine?.events?.some(event => event.type === 'combat.death_save'), message)
+    assert.doesNotMatch(data.narrative, /a toi de lancer|lance(?:r)? toi|lance(?:r)? le de|jettes? toi/i, message)
+  }
+})
+
+test('DM API resolves sensory movement toward smell origin from room 4', async t => {
+  const sessionId = `api-sensory-move-${process.pid}-${Date.now()}`
+  t.after(() => cleanupSession(sessionId))
+
+  const { response, data } = await postDm({
+    message: "je vais vers l'origine de l'odeur",
+    clientRequestId: `client-${sessionId}`,
+    sessionId,
+    gameState: bakeryEntranceGameState(),
+    history: [],
+  })
+
+  assert.equal(response.status, 200)
+  assert.ok(data.toolsUsed.includes('resolve_player_action'))
+  assert.ok(data.engine?.events?.some(event => event.type === 'entity.moved'))
+  assert.equal(data.newGameState.currentRoomId, '8')
+  assert.equal(data.newGameState.phase, 'exploration')
+  assert.deepEqual(data.newGameState.player.position, { x: 9, y: 7 })
+})
+
+test('DM API refuses vague multi-exit exploration without triggering final encounter', async t => {
+  const sessionId = `api-vague-explore-${process.pid}-${Date.now()}`
+  t.after(() => cleanupSession(sessionId))
+
+  const { response, data } = await postDm({
+    message: "ok je change de piece alors, j'explore encore",
+    clientRequestId: `client-${sessionId}`,
+    sessionId,
+    gameState: bakeryFloorGameState(),
+    history: [],
+  })
+
+  assert.equal(response.status, 200)
+  assert.equal(data.newGameState.phase, 'exploration')
+  assert.equal(data.newGameState.currentRoomId, '8')
+  assert.ok(!data.toolsUsed.includes('start_encounter'))
+  assert.ok(!data.engine?.events?.some(event => event.type === 'combat.started'))
+  assert.match(data.narrative, /plusieurs|issues|repere/i)
+})
+
+test('DM API preserves potion-used then KO event order in narration', async t => {
+  const sessionId = `api-potion-ko-${process.pid}-${Date.now()}`
+  const previousDice = process.env.AI_DM_TEST_DICE_SEQUENCE
+  process.env.AI_DM_TEST_DICE_SEQUENCE = '1,1,20,6'
+  t.after(async () => {
+    if (previousDice === undefined) delete process.env.AI_DM_TEST_DICE_SEQUENCE
+    else process.env.AI_DM_TEST_DICE_SEQUENCE = previousDice
+    await cleanupSession(sessionId)
+  })
+
+  const { response, data } = await postDm({
+    message: 'je bois ma potion',
+    clientRequestId: `client-${sessionId}`,
+    sessionId,
+    gameState: lowHpPotionCombatGameState(),
+    history: [],
+  })
+
+  assert.equal(response.status, 200)
+  assert.ok(data.toolsUsed.includes('resolve_player_action'))
+  assert.ok(data.engine?.events?.some(event => event.type === 'item.used'))
+  assert.equal(data.newGameState.player.hp.current, 0)
+  assert.ok(data.newGameState.player.conditions.includes('unconscious'))
+  assert.match(data.narrative, /potion/i)
+  assert.match(data.narrative, /riposte|fauche|retombes|inconscient|0 PV/i)
+  assert.doesNotMatch(data.narrative, /fiole.*vide|potion.*vide|sans effet|depuis le debut/i)
 })
 
 test('DM API resolves natural stateful world actions through canonical engine events', async t => {

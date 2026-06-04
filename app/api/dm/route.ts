@@ -48,6 +48,7 @@ import {
   detectUnsupportedNarratedWorldFacts,
   type NarratedWorldFact,
 } from '@/lib/narrative-world-contract'
+import { normalizeLlmToolInput } from '@/lib/tool-input-normalizer'
 
 export const maxDuration = 60
 
@@ -961,6 +962,7 @@ Salle 2: les dryades du verger ne sont pas une rencontre de combat prédéfinie.
 Joueur à 0 PV: il est inconscient. Ne lui propose pas d'attaque ou de mouvement; un tour joueur inconscient sert à lancer roll_death_save.
 Si currentTurn=player et que le joueur est inconscient, la main visible correspond au jet de mort: ne dis pas que les ennemis vont agir maintenant ni que c'est à eux de frapper.
 Réponse brève: 2-5 phrases courtes, au présent, style vivant mais clair.
+Tutoiement strict pour le joueur: utilise tu/te/ton/ta/tes, jamais vous/votre/vos.
 Français naturel et correct: accents, accords simples, phrases propres. Pas de franglais gratuit.
 Format vocal: pas de Markdown, pas de liste, pas de titre, pas de parenthèse, pas d'excuse, pas de commentaire méta, pas de mention du système, des prompts, du moteur, des tools, de MCP ou de l'IA.
 Ne donne pas de coordonnées ni d'ID technique sauf si le joueur les demande explicitement.
@@ -1310,6 +1312,44 @@ function looksLikeEnglishDrift(fragment: string): boolean {
   return (englishMarkers?.length ?? 0) >= 2
 }
 
+function hasMixedSecondPersonAddress(fragment: string): boolean {
+  const normalized = normalizeFrenchText(fragment)
+  return /\b(tu|te|toi|ton|ta|tes)\b|t'/.test(normalized) &&
+    /\b(vous|votre|vos)\b/.test(normalized)
+}
+
+function normalizeSecondPersonAddress(fragment: string): { text: string; changed: boolean } {
+  if (!hasMixedSecondPersonAddress(fragment)) return { text: fragment, changed: false }
+
+  let text = fragment
+    .replace(/\b[Vv]otre\b/g, match => match[0] === 'V' ? 'Ton' : 'ton')
+    .replace(/\b[Vv]os\b/g, match => match[0] === 'V' ? 'Tes' : 'tes')
+    .replace(/\b[Vv]ous\b/g, match => match[0] === 'V' ? 'Tu' : 'tu')
+
+  const verbFixes: Array<[RegExp, string]> = [
+    [/\btu etes\b/gi, 'tu es'],
+    [/\btu avez\b/gi, 'tu as'],
+    [/\btu allez\b/gi, 'tu vas'],
+    [/\btu faites\b/gi, 'tu fais'],
+    [/\btu pouvez\b/gi, 'tu peux'],
+    [/\btu voulez\b/gi, 'tu veux'],
+    [/\btu voyez\b/gi, 'tu vois'],
+    [/\btu entendez\b/gi, 'tu entends'],
+    [/\btu sentez\b/gi, 'tu sens'],
+    [/\btu devez\b/gi, 'tu dois'],
+    [/\btu approchez\b/gi, 'tu approches'],
+    [/\btu avancez\b/gi, 'tu avances'],
+    [/\btu entrez\b/gi, 'tu entres'],
+    [/\btu ouvrez\b/gi, 'tu ouvres'],
+    [/\btu attaquez\b/gi, 'tu attaques'],
+  ]
+  for (const [pattern, replacement] of verbFixes) {
+    text = text.replace(pattern, replacement)
+  }
+
+  return { text, changed: text !== fragment }
+}
+
 function normalizeNarrativeForOralPlayback(
   narrative: string,
   gameState: GameState,
@@ -1363,6 +1403,12 @@ function normalizeNarrativeForOralPlayback(
     .replace(/\s+([,.!?;:])/g, '$1')
     .replace(/([!?]){2,}/g, '$1')
     .trim()
+
+  const secondPerson = normalizeSecondPersonAddress(text)
+  if (secondPerson.changed) {
+    text = secondPerson.text
+    reasons.add('second_person_normalized')
+  }
 
   let sentences = splitIntoSentences(text)
   const filteredSentences = sentences.filter(sentence => {
@@ -1673,7 +1719,8 @@ function detectNarrativeStateContractIssue(
 function detectNarrativeWorldContractIssue(
   responseText: string,
   gameState: GameState,
-  toolsUsed: string[] = []
+  toolsUsed: string[] = [],
+  engineEvents: EngineEvent[] = []
 ): NarrativeStateContractIssue | null {
   if (!responseText || !gameState.world) return null
 
@@ -1681,7 +1728,7 @@ function detectNarrativeWorldContractIssue(
   const world = gameState.world
   const objects = Object.values(world.objects)
   const npcs = Object.values(world.npcs)
-  const recentEvents = world.eventLog.slice(-8)
+  const recentEvents = [...world.eventLog.slice(-8), ...engineEvents]
   const recentEventTypes = new Set(recentEvents.map(event => event.type))
   const unsupportedFacts = detectUnsupportedNarratedWorldFacts(responseText, gameState, recentEvents, toolsUsed)
   if (unsupportedFacts.length > 0) {
@@ -1861,7 +1908,18 @@ function detectNarrativeRoomContractIssue(
   }
 }
 
-function buildNarrativeStateCorrection(gameState: GameState): string {
+function buildPotionContradictionCorrection(gameState: GameState): string {
+  if (gameState.player.hp.current <= 0) {
+    return "La potion agit bel et bien: une chaleur breve te remonte dans la poitrine. Mais la riposte te fauche aussitot, et tu retombes a 0 PV, inconscient; la seule ouverture claire maintenant, c'est le jet de mort."
+  }
+
+  return `La potion agit bel et bien: tu remontes a ${gameState.player.hp.current}/${gameState.player.hp.max} PV. La fiole est vide parce que tu l'as bue, pas parce qu'elle etait inutile.`
+}
+
+function buildNarrativeStateCorrection(gameState: GameState, issue?: NarrativeStateContractIssue): string {
+  if (issue?.reason === 'item_used_contradicted_by_narration') {
+    return buildPotionContradictionCorrection(gameState)
+  }
   return buildDirectiveSceneNarrative(gameState)
 }
 
@@ -2060,12 +2118,96 @@ function roomEncounterTriggerReason(
 
 function relativeRoomIdForExplorationMove(text: string, gameState: GameState): string | null {
   const doorAction = isDoorTraversalIntent(text)
-  const exploresForward = /\b(plus loin|continue|continuer|aventure|aventurer|avance|avancer|explore|explorer|nourriture|manger|reserve|reserves)\b/.test(text)
+  const exploresForward = /\b(plus loin|aventure|aventurer|avance|avancer|nourriture|manger|reserve|reserves)\b/.test(text)
   const huntsEnemies = /\b(cherches?|chercher|trouves?|trouver|deniches?|denicher|traques?|traquer|pistes?|pister)\b(?=.{0,80}\b(gobelins?|ennemis?|mechants?|monstres?|creatures?|silhouettes?)\b)/.test(text)
   return relativeAdventureRoomIdForText(text, gameState.currentRoomId, {
     doorAction,
     forwardAction: exploresForward || huntsEnemies,
   })
+}
+
+function currentRoomExitIds(gameState: GameState): string[] {
+  const roomId = gameState.currentRoomId
+  if (!roomId || !gameState.world?.rooms?.[roomId]) return []
+  return gameState.world.rooms[roomId].exits?.filter(exitId => exitId !== roomId) ?? []
+}
+
+function roomNameForChoice(gameState: GameState, roomId: string): string {
+  return gameState.world?.rooms?.[roomId]?.name ??
+    ADVENTURE_ROOMS.find(room => room.id === roomId)?.name ??
+    `salle ${roomId}`
+}
+
+function isVagueExplorationMoveText(text: string): boolean {
+  return /\b(change de piece|changer de piece|changes? de piece|explores? encore|explorer encore|continue|continuer|j explore|j'explore|explores?|explorer|j avance|avances?|avancer|plus loin|je cherche une autre salle|autre piece|autre salle)\b/.test(text)
+}
+
+function hasSpecificExplorationCue(text: string): boolean {
+  return isDoorTraversalIntent(text) ||
+    /\(?\s*\d{1,2}\s*[,;]\s*\d{1,2}\s*\)?/.test(text) ||
+    /\b(odeur|fumet|origine|bruit|son|voix|chant|fours?|fournee|cuisine|reserve|reserves|escalier|etage|haut|bas|bureau|appartement|quai|chargement|verger|pommier|dechets?|champignons?|dehors|exterieur|sortie|gauche|droite|grammy|grukk|mac|treant|porte|portes?|seuil|battants?)\b/.test(text)
+}
+
+function contextualSensoryRoomIdForExplorationMove(text: string, gameState: GameState): string | null {
+  const currentRoomId = gameState.currentRoomId
+  if (!currentRoomId) return null
+
+  const followsBakerySmell = /\b(origine de l odeur|source de l odeur|odeur|fumet|senteur|nourriture|pain|levain|fournee|fours?|four)\b/.test(text)
+  const followsBakeryNoise = /\b(bruit|son|claquement|raclement|fracas|chant|voix|couteaux?)\b/.test(text)
+  const followsStairs = /\b(escalier|etage|haut|monte|grimpes?|appartement|grammy|grukk)\b/.test(text)
+
+  if (currentRoomId === '1' && (followsBakerySmell || followsBakeryNoise || /\b(entree|portes?|boulangerie)\b/.test(text))) {
+    return '4'
+  }
+
+  if (currentRoomId === '4') {
+    if (followsStairs) return '9'
+    if (followsBakerySmell || followsBakeryNoise || /\b(cuisine|reserve|reserves|porte des reserves|porte vers les fours)\b/.test(text)) return '8'
+  }
+
+  if (currentRoomId === '5' && (followsBakerySmell || followsBakeryNoise || /\b(sol de la boulangerie|boulangerie)\b/.test(text))) {
+    return '8'
+  }
+
+  if (currentRoomId === '7' && (followsBakerySmell || followsBakeryNoise || /\b(sol de la boulangerie|boulangerie)\b/.test(text))) {
+    return '8'
+  }
+
+  if (currentRoomId === '8') {
+    if (followsStairs) return '9'
+    if (/\b(bureau|paperasse|registres?)\b/.test(text)) return '5'
+    if (/\b(quai|chargement|laterale|dock)\b/.test(text)) return '7'
+  }
+
+  if (currentRoomId === '9' && /\b(fours?|fournee|boulangerie|reserve|reserves|descends?|descendre|bas)\b/.test(text)) {
+    return '8'
+  }
+
+  return null
+}
+
+function uniqueVagueExplorationRoomId(text: string, gameState: GameState): string | null {
+  if (!isVagueExplorationMoveText(text) || hasSpecificExplorationCue(text)) return null
+  const exits = currentRoomExitIds(gameState)
+  return exits.length === 1 ? exits[0] : null
+}
+
+function isAmbiguousExplorationMove(message: string, gameState: GameState): boolean {
+  if (gameState.phase !== 'exploration') return false
+  const text = normalizeFrenchText(message)
+  if (!isVagueExplorationMoveText(text) || hasSpecificExplorationCue(text)) return false
+  return currentRoomExitIds(gameState).length > 1
+}
+
+function buildAmbiguousExplorationMoveNarrative(gameState: GameState): string {
+  const roomName = getCurrentRoomName(gameState) ?? 'la piece'
+  const exits = currentRoomExitIds(gameState)
+    .map(roomId => roomNameForChoice(gameState, roomId))
+    .slice(0, 4)
+  const exitText = exits.length > 0
+    ? `Plusieurs issues restent ouvertes depuis ${roomName}: ${exits.join(', ')}.`
+    : `Depuis ${roomName}, la direction n'est pas assez nette pour changer de piece.`
+  return `${exitText} Donne-moi un repere concret, comme l'odeur des fours, l'escalier, le bureau ou le quai, et je te fais avancer sans tricher avec la carte.`
 }
 
 function contextualRoomIdFromRecentDm(
@@ -2101,7 +2243,9 @@ function parseNamedRoomMove(message: string, gameState: GameState): { x: number;
   if (!hasMovementVerb) return null
 
   const relativeRoomId = relativeRoomIdForExplorationMove(text, gameState)
-  if (!relativeRoomId && !/\b(salle|piece|bureau|appartement|boulangerie|quai|verger|mac|treant|pommier|etage|haut|escalier|four|cuisine|reserve|reserves|portes?|entree|seuil|battants?)\b/.test(text)) {
+  const sensoryRoomId = contextualSensoryRoomIdForExplorationMove(text, gameState)
+  const uniqueVagueRoomId = uniqueVagueExplorationRoomId(text, gameState)
+  if (!relativeRoomId && !sensoryRoomId && !uniqueVagueRoomId && !/\b(salle|piece|bureau|appartement|boulangerie|quai|verger|mac|treant|pommier|etage|haut|escalier|four|fours?|odeur|bruit|cuisine|reserve|reserves|portes?|entree|seuil|battants?)\b/.test(text)) {
     return null
   }
 
@@ -2112,7 +2256,7 @@ function parseNamedRoomMove(message: string, gameState: GameState): { x: number;
     return cell
   }
 
-  const targetRoomId = relativeRoomId ?? findAdventureRoomIdByAlias(text)
+  const targetRoomId = sensoryRoomId ?? uniqueVagueRoomId ?? relativeRoomId ?? findAdventureRoomIdByAlias(text)
   if (!targetRoomId || targetRoomId === gameState.currentRoomId) return null
 
   return centerCellForRoom(targetRoomId)
@@ -2852,8 +2996,7 @@ async function resolveServerFirstAction(
     if (
       gameState.currentTurn === 'player' &&
       !isPlayerDeathResolved(gameState) &&
-      actionIntent.kind === 'death_save' &&
-      !detectPlayerDownStatusQuestion(message)
+      actionIntent.kind === 'death_save'
     ) {
       toolName = 'resolve_player_action'
       input = canonicalPlayerActionInput({ kind: 'death_save' })
@@ -3045,6 +3188,26 @@ async function resolveServerFirstAction(
         reason: 'Le joueur attend et passe son tour.',
       })
     } else if (actionIntent.kind === 'move') {
+      if (isAmbiguousExplorationMove(message, gameState)) {
+        const draftNarrative = buildAmbiguousExplorationMoveNarrative(gameState)
+        logEvent('info', 'dm.cost.engine_first.ambiguous_move', {
+          requestId,
+          sessionId,
+          actionIntent,
+          exits: currentRoomExitIds(gameState),
+          durationMs: Date.now() - startedAt,
+          draftNarrative,
+          gameState: summarizeGameState(gameState),
+        })
+        return {
+          handled: true,
+          gameState,
+          toolsUsed: [],
+          draftNarrative,
+          sawMcpToolError: false,
+        }
+      }
+
       const toCell =
         parseCoordinateMove(message, gameState) ??
         parseNamedRoomMove(message, gameState) ??
@@ -3704,7 +3867,7 @@ function buildEngineTruthPacket(
       .map(([alarmId, alarm]) => `alarm=${alarmId} raised=${alarm.raised} level=${alarm.level} clock=${alarm.clock ? `${alarm.clock.value}:${JSON.stringify(alarm.clock.thresholds ?? {})}` : 'none'} reason=${alarm.reason ?? 'none'}`),
     `narrativeFactContract=${JSON.stringify({
       supportedEventTypes: [...new Set(engineResolution.events.map(event => event.type))],
-      riskyFactKinds: ['recipe_acquired', 'recipe_completed', 'object_discovered', 'object_opened', 'npc_convinced', 'trap_triggered', 'trap_disarmed', 'alarm_negated', 'player_dead', 'player_unconscious'],
+      riskyFactKinds: ['recipe_acquired', 'recipe_completed', 'object_discovered', 'object_opened', 'npc_convinced', 'trap_triggered', 'trap_disarmed', 'alarm_negated', 'item_used_negated', 'player_dead', 'player_unconscious'],
     })}`,
     ...engineResolution.events.map(event => `event=${event.type} outcome=${event.outcome ?? 'none'} summary=${event.summary}`),
     ...engineResolution.affordances.map(action => `affordance=${action.kind} enabled=${action.enabled} tool=${action.toolName ?? 'none'} reason=${action.reason}`),
@@ -3713,6 +3876,13 @@ function buildEngineTruthPacket(
 
   const downedInstruction = buildDownedPlayerFinalNarrationInstruction(gameState)
   if (downedInstruction) allowedFacts.push(downedInstruction)
+  const eventTypes = engineResolution.events.map(event => event.type)
+  if (eventTypes.includes('item.used')) {
+    allowedFacts.push('CONTRAINTE POTION: Une potion a bien ete consommee et appliquee par le moteur ce tour-ci. Ne dis jamais que la fiole etait vide, inutile, sans effet, ou vide depuis le debut.')
+    if (gameState.player.hp.current <= 0) {
+      allowedFacts.push('CONTRAINTE ORDRE DES EVENTS: Narre la sequence comme potion appliquee, puis riposte ou consequence mecanique, puis KO. Le KO ne retro-annule pas la potion.')
+    }
+  }
 
   return {
     actionIntent: {
@@ -3735,7 +3905,7 @@ function buildEngineTruthPacket(
     allowedFacts,
     narrativeFactContract: {
       supportedEventTypes: [...new Set(engineResolution.events.map(event => event.type))],
-      riskyFactKinds: ['recipe_acquired', 'recipe_completed', 'object_discovered', 'object_opened', 'npc_convinced', 'trap_triggered', 'trap_disarmed', 'alarm_negated', 'player_dead', 'player_unconscious'],
+      riskyFactKinds: ['recipe_acquired', 'recipe_completed', 'object_discovered', 'object_opened', 'npc_convinced', 'trap_triggered', 'trap_disarmed', 'alarm_negated', 'item_used_negated', 'player_dead', 'player_unconscious'],
     },
   }
 }
@@ -3775,6 +3945,7 @@ function buildLocalEngineNarrative(
     if (eventTypes.includes('action.blocked')) return latestWorldEvent?.summary ?? "Ton geste n'est pas possible dans l'etat actuel."
     if (eventTypes.includes('entity.moved')) return buildOralFallbackNarrative(gameState, ['move_token'])
     if (eventTypes.includes('item.used')) {
+      if (gameState.player.hp.current <= 0) return buildPotionContradictionCorrection(gameState)
       const player = gameState.player
       return `La potion te remet du feu dans les veines: tu remontes a ${player.hp.current} PV sur ${player.hp.max}. Le danger n'a pas disparu, mais tu peux de nouveau peser sur la scene.`
     }
@@ -3858,7 +4029,7 @@ async function generateFinalNarration(
     buildDownedPlayerFinalNarrationInstruction(gameState),
     `Logs mécaniques lisibles:\n${formatCombatLogEntries(newCombatLogEntries)}`,
     `Structure obligatoire: narre d'abord les events moteur canoniques du paquet, puis réaction du décor ou d'un PNJ seulement si elle est soutenue par le paquet moteur, le module ou l'historique, puis une piste ou tension jouable compatible avec les affordances enabled. Tout fait absent du paquet moteur doit rester hors champ, hypothèse, piste ou ne pas être mentionné. Ne crée pas de nouvelle menace présente si le moteur n'a pas créé l'entité ou le danger.`,
-    `Écris la réponse finale au joueur en français correct, au présent, en 2-4 phrases courtes, 120 mots maximum. Elle doit être naturelle à l'oral et donner de l'élan: mouvement, réplique, menace, opportunité ou information exploitable. Termine toujours par une ponctuation finale. Respecte strictement les résultats mécaniques. N'annonce aucune action future non résolue. Pas de Markdown, pas de liste, pas de parenthèse, pas d'excuse, pas de méta, pas de menu, pas de mention du système, du moteur, des tools, de MCP ou de l'IA. Pas de coordonnées ni d'ID technique sauf demande explicite du joueur. Ne déclare pas de fin de quête/campagne ni de conclusion alternative sauf demande explicite. Pas de time-skip: seulement la prochaine minute jouable. Si le joueur critique le style, la longueur, le système ou un bug, ne réponds pas à la critique: applique la correction silencieusement et reprends la scène en fiction.`,
+    `Écris la réponse finale au joueur en français correct, au présent, en 2-4 phrases courtes, 120 mots maximum. Elle doit être naturelle à l'oral et donner de l'élan: mouvement, réplique, menace, opportunité ou information exploitable. Tutoiement strict pour le joueur: tu/te/ton/ta/tes, jamais vous/votre/vos. Termine toujours par une ponctuation finale. Respecte strictement les résultats mécaniques. N'annonce aucune action future non résolue. Pas de Markdown, pas de liste, pas de parenthèse, pas d'excuse, pas de méta, pas de menu, pas de mention du système, du moteur, des tools, de MCP ou de l'IA. Pas de coordonnées ni d'ID technique sauf demande explicite du joueur. Ne déclare pas de fin de quête/campagne ni de conclusion alternative sauf demande explicite. Pas de time-skip: seulement la prochaine minute jouable. Si le joueur critique le style, la longueur, le système ou un bug, ne réponds pas à la critique: applique la correction silencieusement et reprends la scène en fiction.`,
   ].filter(Boolean).join('\n\n')
 
   try {
@@ -4356,7 +4527,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           detectNarrativeRoomContractIssue(responseText, currentGameState, toolsUsed)
         if (narrativeStateIssue) {
           narrative = narrativeBeforeResponse
-          lastEndTurnNarrative = buildNarrativeStateCorrection(currentGameState)
+          lastEndTurnNarrative = buildNarrativeStateCorrection(currentGameState, narrativeStateIssue)
           narrative = narrative
             ? `${narrative}\n\n${lastEndTurnNarrative}`
             : lastEndTurnNarrative
@@ -4447,7 +4618,47 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             continue
           }
 
-          const affordanceValidationError = validateToolUseAgainstAffordances(toolUse.name, toolUse.input, currentGameState)
+          const normalizedToolInput = normalizeLlmToolInput(toolUse.name, toolUse.input)
+          if (normalizedToolInput.error || !normalizedToolInput.input) {
+            const result = normalizedToolInput.error ?? {
+              error: 'Invalid tool input.',
+              code: 'INVALID_TOOL_INPUT',
+            }
+            sawMcpToolError = true
+            latestMcpErrorResult = result
+            logEvent('warn', 'dm.tool_use.invalid_input', {
+              requestId,
+              sessionId,
+              iteration: iterations,
+              toolUseId: toolUse.id,
+              toolName: toolUse.name,
+              input: toolUse.input,
+              result,
+            })
+            toolResults.push({
+              type: 'tool_result',
+              tool_use_id: toolUse.id,
+              content: JSON.stringify(result),
+              is_error: true,
+            })
+            continue
+          }
+
+          const toolInput = normalizedToolInput.input
+          if (normalizedToolInput.changed) {
+            logEvent('info', 'dm.tool_use.input_normalized', {
+              requestId,
+              sessionId,
+              iteration: iterations,
+              toolUseId: toolUse.id,
+              toolName: toolUse.name,
+              corrections: normalizedToolInput.corrections,
+              originalInput: toolUse.input,
+              normalizedInput: toolInput,
+            })
+          }
+
+          const affordanceValidationError = validateToolUseAgainstAffordances(toolUse.name, toolInput, currentGameState)
           if (affordanceValidationError) {
             sawMcpToolError = true
             latestMcpErrorResult = affordanceValidationError
@@ -4457,7 +4668,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
               iteration: iterations,
               toolUseId: toolUse.id,
               toolName: toolUse.name,
-              input: toolUse.input,
+              input: toolInput,
               result: affordanceValidationError,
               gameState: summarizeGameState(currentGameState),
             })
@@ -4471,7 +4682,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           }
 
           if (toolUse.name === 'start_encounter') {
-            const validationError = validateStartEncounterToolInput(toolUse.input, currentGameState, message)
+            const validationError = validateStartEncounterToolInput(toolInput, currentGameState, message)
             if (validationError) {
               sawMcpToolError = true
               logEvent('warn', 'dm.tool_use.blocked_start_encounter_mismatch', {
@@ -4480,7 +4691,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
                 iteration: iterations,
                 toolUseId: toolUse.id,
                 toolName: toolUse.name,
-                input: toolUse.input,
+                input: toolInput,
                 result: validationError,
                 gameState: summarizeGameState(currentGameState),
               })
@@ -4501,10 +4712,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             iteration: iterations,
             toolUseId: toolUse.id,
             toolName: toolUse.name,
-            input: toolUse.input,
+            input: toolInput,
           })
           try {
-            const result = await callMCPTool(toolUse.name, toolUse.input as Record<string, unknown>, sessionId)
+            const result = await callMCPTool(toolUse.name, toolInput, sessionId)
             const mcpResultIsError = isMcpErrorResult(result)
             logEvent('info', 'dm.tool_use.ok', {
               requestId,
@@ -4839,7 +5050,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       ? buildLocalEngineNarrative(currentGameState, toolsUsed, newCombatLogEntries, newWorldEvents)
       : null
     const directorNarrative = directorDecision?.narrative ?? null
-    const draftNarrative = narrative || directorNarrative || localEngineNarrative || ''
+    const draftNarrative = directorNarrative || localEngineNarrative || narrative || ''
     const hasPlayerVisibleDraft = Boolean(draftNarrative.trim())
     const shouldPolishEngineFirstDraft = engineFirst.handled && hasPlayerVisibleDraft && narratorSource !== 'llm'
     const shouldTryFinalLlmNarration = !sawMcpToolError && (
@@ -4952,11 +5163,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     const finalNarrativeStateIssue =
-      detectNarrativeWorldContractIssue(narrative, currentGameState, toolsUsed) ??
+      detectNarrativeWorldContractIssue(narrative, currentGameState, toolsUsed, engineTruthPacket.events) ??
       detectNarrativeStateContractIssue(narrative, currentGameState, toolsUsed) ??
       detectNarrativeRoomContractIssue(narrative, currentGameState, toolsUsed)
     if (finalNarrativeStateIssue) {
-      const serverCorrection = buildNarrativeStateCorrection(currentGameState)
+      const serverCorrection = buildNarrativeStateCorrection(currentGameState, finalNarrativeStateIssue)
       logEvent('warn', 'anomaly.final_narrative_state_contract', {
         requestId,
         sessionId,
