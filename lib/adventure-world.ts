@@ -7,6 +7,7 @@ export function createInitialWorldState(): WorldState {
       '1': {
         id: '1',
         name: 'Entree exterieure',
+        aliases: ['dehors', 'exterieur', 'facade', 'chemin', 'route', 'mac'],
         description: 'Le chemin d arrivee, les grandes portes et Mac le pommier eveille.',
         tags: ['outside', 'safe', 'mac'],
         exits: ['2', '4'],
@@ -14,6 +15,7 @@ export function createInitialWorldState(): WorldState {
       '2': {
         id: '2',
         name: 'Verger de pommiers',
+        aliases: ['verger', 'pommiers', 'pommier', 'arbres', 'dryade', 'dryades', 'druidesse', 'fees', 'soeur de mac', 'ta soeur'],
         description: 'Un verger nerveux ou la dryade surveille les intrus.',
         tags: ['orchard', 'social', 'route_hint'],
         exits: ['1', '7'],
@@ -357,7 +359,7 @@ export function createInitialWorldState(): WorldState {
         id: 'dryad_orchard',
         name: 'druidesse du verger',
         roomId: '2',
-        aliases: ['dryade', 'druidesse', 'fee', 'femme du verger'],
+        aliases: ['dryade', 'dryades', 'druidesse', 'fee', 'fees', 'femme du verger', 'soeur de mac', 'ta soeur', 'sa soeur', 'demoiselles'],
         disposition: 'neutral',
         known: false,
         faction: 'orchard_spirits',

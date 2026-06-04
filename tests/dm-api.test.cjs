@@ -388,6 +388,69 @@ test('DM API resolves sensory movement toward smell origin from room 4', async t
   assert.deepEqual(data.newGameState.player.position, { x: 9, y: 7 })
 })
 
+test('DM API resolves npc and landmark destinations through the location index', async t => {
+  const cases = [
+    ['tres bien je vais aller voir les dryades dans ce cas', baseGameState()],
+    ['je me dirige vers les dryades', baseGameState()],
+    ['je vais voir ta soeur', baseGameState()],
+    ['je sors du quai de chargement et vais vers le verger', loadingDockGameState()],
+  ]
+
+  for (const [index, [message, gameState]] of cases.entries()) {
+    const sessionId = `api-location-destination-${process.pid}-${Date.now()}-${index}`
+    t.after(() => cleanupSession(sessionId))
+
+    const { response, data } = await postDm({
+      message,
+      clientRequestId: `client-${sessionId}`,
+      sessionId,
+      gameState,
+      history: [],
+    })
+
+    assert.equal(response.status, 200, message)
+    assert.ok(data.toolsUsed.includes('resolve_player_action'), message)
+    assert.ok(data.toolsUsed.includes('move_token'), message)
+    assert.ok(data.engine?.events?.some(event => event.type === 'entity.moved'), message)
+    assert.equal(data.newGameState.currentRoomId, '2', message)
+    assert.deepEqual(data.newGameState.player.position, { x: 9, y: 2 }, message)
+    assert.equal(data.debug?.targetResolution?.status, 'resolved', message)
+    assert.equal(data.debug?.targetResolution?.target?.roomId, '2', message)
+    assert.notEqual(data.newGameState.currentRoomId, '7', message)
+  }
+})
+
+test('DM API blocks unresolved movement intents before default narration', async t => {
+  const cases = [
+    ['je pars vers la cachette secrete', baseGameState(), /destination|repere concret|destinations claires/i],
+    ['je sors du quai de chargement', loadingDockGameState(), /sortie claire|Verger|Tas de dechets|Sol de la boulangerie/i],
+  ]
+
+  for (const [index, [message, gameState, narrativePattern]] of cases.entries()) {
+    const sessionId = `api-unresolved-move-${process.pid}-${Date.now()}-${index}`
+    t.after(() => cleanupSession(sessionId))
+
+    const { response, data } = await postDm({
+      message,
+      clientRequestId: `client-${sessionId}`,
+      sessionId,
+      gameState,
+      history: [],
+    })
+
+    assert.equal(response.status, 200, message)
+    assert.deepEqual(data.toolsUsed, [], message)
+    assert.ok(data.debug?.refusalCode?.startsWith('UNRESOLVED_MOVE'), message)
+    assert.equal(data.turnTrace?.refusalCode, data.debug?.refusalCode, message)
+    assert.equal(data.turnTrace?.actions?.[0]?.toolName, 'unresolved_intent', message)
+    assert.equal(data.turnTrace?.actions?.[0]?.executed, false, message)
+    assert.equal(data.usage?.llm.calls, 0, message)
+    assert.equal(data.usage?.llmRoute, 'none', message)
+    assert.match(data.narrative, narrativePattern, message)
+    assert.doesNotMatch(data.narrative, /facade de la boulangerie grince|porte laterale bat doucement/i, message)
+  }
+})
+
 test('DM API reconciles explicit room corrections through canonical movement', async t => {
   for (const [index, message] of ['non je suis au verger', 'bouge mon token dans le verger'].entries()) {
     const sessionId = `api-location-reconcile-${process.pid}-${Date.now()}-${index}`

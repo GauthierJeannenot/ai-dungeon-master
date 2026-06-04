@@ -126,6 +126,11 @@ test('game action language does not turn status questions into attacks', () => {
   assert.equal(intent.requiresEngine, false)
 })
 
+test('game action language does not treat casual va as movement', () => {
+  const intent = actions.classifyPlayerAction('ca va ?', baseGameState())
+  assert.notEqual(intent.kind, 'move')
+})
+
 test('game action language routes explicit room corrections to state reconciliation', () => {
   const state = baseGameState({ currentRoomId: '7' })
   const cases = [
@@ -189,6 +194,19 @@ test('game action language routes coordinate phrases with vais as movement', () 
   assert.equal(intent.kind, 'move')
   assert.equal(intent.primitive, 'move')
   assert.equal(intent.requiresEngine, true)
+})
+
+test('game action language treats aller voir a distant landmark as movement', () => {
+  for (const message of [
+    'tres bien je vais aller voir les dryades dans ce cas',
+    'je me dirige vers les dryades',
+    'je sors du quai de chargement',
+  ]) {
+    const intent = actions.classifyPlayerAction(message, baseGameState())
+    assert.equal(intent.kind, 'move', message)
+    assert.equal(intent.primitive, 'move', message)
+    assert.equal(intent.requiresEngine, true, message)
+  }
 })
 
 test('game action language routes dying player acceptance to death save', () => {

@@ -19,6 +19,7 @@ import {
   isWorldObjectUsable,
   ownedRecipeHalfIds,
 } from './world-action-effects'
+import { buildLocationIndex, type LocationDestination } from './location-index'
 
 export interface SceneSurfaceObject {
   id: string
@@ -77,7 +78,7 @@ export interface SceneSurfaceInventoryItem {
 
 export interface SceneSurfaceTarget {
   id: string
-  type: 'object' | 'npc' | 'inventory'
+  type: 'object' | 'npc' | 'inventory' | 'room'
   name: string
   aliases: string[]
   kinds: CanonicalPlayerActionKind[]
@@ -487,9 +488,17 @@ function deriveSceneSurfaceAffordances(
 function buildTargets(
   objects: SceneSurfaceObject[],
   npcs: SceneSurfaceNpc[],
-  inventory: SceneSurfaceInventoryItem[]
+  inventory: SceneSurfaceInventoryItem[],
+  destinations: LocationDestination[]
 ): SceneSurfaceTarget[] {
   return [
+    ...destinations.map(destination => ({
+      id: destination.id,
+      type: destination.type === 'room' ? 'room' as const : 'npc' as const,
+      name: destination.name,
+      aliases: destination.aliases,
+      kinds: ['move'] as CanonicalPlayerActionKind[],
+    })),
     ...objects.map(object => ({
       id: object.id,
       type: 'object' as const,
@@ -579,6 +588,8 @@ export function buildSceneSurface(gameState: GameState): SceneSurface {
     type: item.type,
     relevant: item.type === 'potion' || /recette|cle|note|fragment|papier/i.test(item.name),
   }))
+  const destinations = buildLocationIndex(gameState)
+    .filter(destination => destination.current || destination.adjacent || destination.known || destination.visited || destination.viaObjectId)
   const surfaceBase = {
     currentRoomId,
     currentRoom,
@@ -590,7 +601,7 @@ export function buildSceneSurface(gameState: GameState): SceneSurface {
     inventory,
   }
   const affordances = deriveSceneSurfaceAffordances(surfaceBase, gameState)
-  const targets = buildTargets(objects, npcs, inventory)
+  const targets = buildTargets(objects, npcs, inventory, destinations)
   const narratableFacts = narratableFactsForSurface(surfaceBase)
   return {
     ...surfaceBase,

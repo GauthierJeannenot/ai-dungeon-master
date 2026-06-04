@@ -68,6 +68,7 @@ function baseGameState(overrides = {}) {
 }
 
 const sceneSurface = loadTsModule('lib/scene-surface.ts')
+const locationIndex = loadTsModule('lib/location-index.ts')
 
 test('scene surface exposes the narrated front door from the initial room', () => {
   const state = baseGameState()
@@ -93,6 +94,21 @@ test('scene surface exposes the narrated front door from the initial room', () =
   })
   assert.ok(openDoor.aliases.includes('pousser'))
   assert.ok(openDoor.preconditions.length > 0)
+})
+
+test('location index exposes adjacent npc destinations as movement targets', () => {
+  const state = baseGameState()
+  const resolution = locationIndex.resolveLocationDestination('je me dirige vers les dryades', state)
+  const surface = sceneSurface.buildSceneSurface(state)
+
+  assert.equal(resolution.status, 'resolved')
+  assert.equal(resolution.target.roomId, '2')
+  assert.deepEqual(resolution.canonicalAction, { kind: 'move', tokenId: 'player', toCell: { x: 9, y: 2 } })
+  assert.ok(surface.targets.some(target =>
+    target.type === 'npc' &&
+    target.kinds.includes('move') &&
+    target.aliases.includes('dryades')
+  ))
 })
 
 test('initial narrative cannot mention a door without a matching scene affordance', () => {

@@ -46,6 +46,14 @@ import { buildEngineResolutionView, derivePlayerAffordances } from '@/lib/world-
 import { buildWorldActionInput, resolveWorldActionTargets } from '@/lib/world-target-resolver'
 import { buildSceneSurface, summarizeSceneSurfaceForDebug } from '@/lib/scene-surface'
 import { buildActionPlan, summarizeActionPlanForDebug, type ActionPlan } from '@/lib/action-plan'
+import { resolveLocationDestination, summarizeLocationResolution, type LocationResolution } from '@/lib/location-index'
+import {
+  hasDestinationCue,
+  hasNamedRouteMovementVerb,
+  hasSpecificExplorationCue,
+  isExitCurrentRoomIntent,
+  isVagueExplorationMoveText,
+} from '@/lib/natural-language'
 import {
   detectUnsupportedNarratedWorldFacts,
   type NarratedWorldFact,
@@ -2192,16 +2200,6 @@ function roomNameForChoice(gameState: GameState, roomId: string): string {
     `salle ${roomId}`
 }
 
-function isVagueExplorationMoveText(text: string): boolean {
-  return /\b(change de piece|changer de piece|changes? de piece|explores? encore|explorer encore|continue|continuer|j explore|j'explore|explores?|explorer|j avance|avances?|avancer|plus loin|je cherche une autre salle|autre piece|autre salle)\b/.test(text)
-}
-
-function hasSpecificExplorationCue(text: string): boolean {
-  return isDoorTraversalIntent(text) ||
-    /\(?\s*\d{1,2}\s*[,;]\s*\d{1,2}\s*\)?/.test(text) ||
-    /\b(odeur|fumet|origine|bruit|son|voix|chant|fours?|fournee|cuisine|reserve|reserves|escalier|etage|haut|bas|bureau|appartement|quai|chargement|verger|pommier|dechets?|champignons?|dehors|exterieur|sortie|gauche|droite|grammy|grukk|mac|treant|porte|portes?|seuil|battants?)\b/.test(text)
-}
-
 function contextualSensoryRoomIdForExplorationMove(text: string, gameState: GameState): string | null {
   const currentRoomId = gameState.currentRoomId
   if (!currentRoomId) return null
@@ -2264,6 +2262,78 @@ function buildAmbiguousExplorationMoveNarrative(gameState: GameState): string {
   return `${exitText} Donne-moi un repere concret, comme l'odeur des fours, l'escalier, le bureau ou le quai, et je te fais avancer sans tricher avec la carte.`
 }
 
+function locationChoicesForNarrative(gameState: GameState, limit = 5): string[] {
+  return buildSceneSurface(gameState).exits
+    .map(exit => exit.name)
+    .filter(Boolean)
+    .slice(0, limit)
+}
+
+function buildUnresolvedMoveNarrative(message: string, gameState: GameState, resolution: LocationResolution): string {
+  const roomName = getCurrentRoomName(gameState) ?? 'la zone actuelle'
+  const text = normalizeFrenchText(message)
+  if (resolution.status === 'ambiguous') {
+    const candidates = resolution.candidates
+      .map(candidate => candidate.name)
+      .filter(Boolean)
+      .slice(0, 4)
+    return `Je vois que tu veux te deplacer, mais plusieurs destinations peuvent correspondre: ${candidates.join(', ')}. Precise laquelle, et je te fais avancer proprement.`
+  }
+
+  if (resolution.status === 'current' && resolution.target) {
+    if (isExitCurrentRoomIntent(text)) {
+      const choices = locationChoicesForNarrative(gameState)
+      return choices.length > 0
+        ? `Tu veux quitter ${resolution.target.name}, mais il faut choisir une sortie claire: ${choices.join(', ')}.`
+        : `Tu veux quitter ${resolution.target.name}, mais aucune sortie claire n'est declaree ici.`
+    }
+    return `Tu es deja du cote de ${resolution.target.name}. Dis-moi ce que tu fais ici: parler, fouiller, ouvrir quelque chose, ou repartir vers une autre issue.`
+  }
+
+  const choices = locationChoicesForNarrative(gameState)
+  const choiceText = choices.length > 0
+    ? ` Depuis ${roomName}, les destinations claires sont: ${choices.join(', ')}.`
+    : ` Depuis ${roomName}, je n'ai pas de sortie claire a proposer.`
+  return `Je vois une intention de deplacement, mais je n'ai pas de destination assez claire pour te faire avancer.${choiceText} Donne un repere concret, et je l'executerai sans inventer de trajet.`
+}
+
+function unresolvedEngineIntentResolution(
+  message: string,
+  gameState: GameState,
+  actionIntent: GameActionIntent
+): { code: string; narrative: string; detail: Record<string, unknown> } | null {
+  if (actionIntent.kind === 'move') {
+    const resolution = resolveLocationDestination(message, gameState)
+    if (resolution.status === 'resolved' && resolution.canonicalAction) return null
+    return {
+      code: resolution.status === 'ambiguous' ? 'UNRESOLVED_MOVE_AMBIGUOUS' : 'UNRESOLVED_MOVE_TARGET',
+      narrative: buildUnresolvedMoveNarrative(message, gameState, resolution),
+      detail: summarizeLocationResolution(resolution),
+    }
+  }
+
+  if (isCanonicalWorldActionKind(actionIntent.kind) || actionIntent.kind === 'interact') {
+    const surface = buildSceneSurface(gameState)
+    const targets = surface.targets
+      .filter(target => target.kinds.includes(actionIntent.kind as CanonicalPlayerActionKind))
+      .map(target => target.name)
+      .slice(0, 5)
+    return {
+      code: 'UNRESOLVED_ACTION_TARGET',
+      narrative: targets.length > 0
+        ? `Je vois l'action, mais pas la cible exacte. Ici, les cibles possibles sont: ${targets.join(', ')}.`
+        : "Je vois l'action, mais aucune cible claire ne correspond ici. Reformule avec un objet, une personne ou une issue concrete.",
+      detail: {
+        status: 'not_found',
+        actionKind: actionIntent.kind,
+        candidates: targets,
+      },
+    }
+  }
+
+  return null
+}
+
 function contextualRoomIdFromRecentDm(
   message: string,
   gameState: GameState,
@@ -2293,13 +2363,14 @@ function parseNamedRoomMove(message: string, gameState: GameState): { x: number;
   const text = normalizeFrenchText(message)
   if (referencesLocalObjectInsteadOfRoom(text) && !isDoorTraversalIntent(text)) return null
 
-  const hasMovementVerb = /\b(vers|vais|aller|va |deplace|rends|rejoins?|rejoint|entre|entrer|rentres?|rentrer|retournes?|retourner|montes?|monter|grimpes?|grimpe|empruntes?|prends|suis|suivre|aventure|aventurer|continue|continuer|avances?|avancer|explores?|explorer|ouvres?|ouvrir|pousses?|pousser|forces?|forcer|enfonces?|enfoncer|defonces?|defoncer|detruis|detruire|casses?|casser|exploses?|exploser|deboites?|deboiter|franchis|franchir|passes?|passer|investig\w*|inspect\w*|examin\w*|fouill\w*|cherch\w*|trouv\w*|denich\w*|traqu\w*|pist\w*)\b/.test(text)
-  if (!hasMovementVerb) return null
+  if (!hasNamedRouteMovementVerb(text)) return null
 
   const relativeRoomId = relativeRoomIdForExplorationMove(text, gameState)
   const sensoryRoomId = contextualSensoryRoomIdForExplorationMove(text, gameState)
   const uniqueVagueRoomId = uniqueVagueExplorationRoomId(text, gameState)
-  if (!relativeRoomId && !sensoryRoomId && !uniqueVagueRoomId && !/\b(salle|piece|bureau|appartement|boulangerie|quai|verger|mac|treant|pommier|etage|haut|escalier|four|fours?|odeur|bruit|cuisine|reserve|reserves|portes?|entree|seuil|battants?|batiment|interieur|dedans|dehors|exterieur|sortie)\b/.test(text)) {
+  const destinationResolution = resolveLocationDestination(message, gameState)
+  const hasLocationResolution = destinationResolution.status !== 'not_found'
+  if (!relativeRoomId && !sensoryRoomId && !uniqueVagueRoomId && !hasDestinationCue(text) && !hasLocationResolution) {
     return null
   }
 
@@ -2310,7 +2381,10 @@ function parseNamedRoomMove(message: string, gameState: GameState): { x: number;
     return cell
   }
 
-  const targetRoomId = sensoryRoomId ?? uniqueVagueRoomId ?? relativeRoomId ?? findAdventureRoomIdByAlias(text)
+  const destinationRoomId = destinationResolution.status === 'resolved'
+    ? destinationResolution.target?.roomId ?? null
+    : null
+  const targetRoomId = destinationRoomId ?? sensoryRoomId ?? uniqueVagueRoomId ?? relativeRoomId ?? findAdventureRoomIdByAlias(text)
   if (!targetRoomId || targetRoomId === gameState.currentRoomId) return null
 
   return centerCellForRoom(targetRoomId)
@@ -2903,6 +2977,12 @@ function buildDmTurnDebug(
     ? resolveLocationReconcileRoomId(message)
     : null
   const reconcileCell = reconcileRoomId ? centerCellForRoom(reconcileRoomId) : null
+  const moveLocationResolution = actionIntent.kind === 'move'
+    ? resolveLocationDestination(message, gameState)
+    : null
+  const moveCanonicalAction = moveLocationResolution?.status === 'resolved'
+    ? moveLocationResolution.canonicalAction ?? null
+    : null
   const sceneSurface = buildSceneSurface(gameState)
   return {
     actionIntent: {
@@ -2916,11 +2996,13 @@ function buildDmTurnDebug(
       ? plannedAction ?? buildWorldActionInput(message, gameState, actionIntent.kind)
       : actionIntent.kind === 'state_reconcile' && reconcileCell
         ? { kind: 'move', tokenId: 'player', toCell: reconcileCell }
-        : plannedAction,
+        : moveCanonicalAction ?? plannedAction,
     targetResolution: actionPlan?.targetResolution
       ? actionPlan.targetResolution as unknown as Record<string, unknown>
       : isWorldAction
         ? resolveWorldActionTargets(message, gameState, actionIntent.kind) as unknown as Record<string, unknown>
+        : moveLocationResolution
+          ? summarizeLocationResolution(moveLocationResolution)
         : actionIntent.kind === 'state_reconcile'
           ? {
               kind: 'room',
@@ -3039,6 +3121,9 @@ type EngineFirstResolution = {
   sawMcpToolError: boolean
   mcpErrorResult?: unknown
   actionExecutions: TurnTraceActionExecution[]
+  refusalCode?: string | null
+  skipFinalNarration?: boolean
+  narratorSource?: DMTurnUsage['narrator']
 }
 
 function toolActionExecution(
@@ -3561,11 +3646,23 @@ async function resolveServerFirstAction(
     } else if (actionIntent.kind === 'move') {
       if (isAmbiguousExplorationMove(message, gameState)) {
         const draftNarrative = buildAmbiguousExplorationMoveNarrative(gameState)
+        const exits = currentRoomExitIds(gameState)
+        const refusalCode = 'UNRESOLVED_MOVE_AMBIGUOUS'
+        const detail = {
+          status: 'ambiguous',
+          reason: 'The player asked to leave or continue from a multi-exit room without naming a destination.',
+          candidates: exits.map(roomId => ({
+            roomId,
+            name: roomNameForChoice(gameState, roomId),
+          })),
+        }
         logEvent('info', 'dm.cost.engine_first.ambiguous_move', {
           requestId,
           sessionId,
           actionIntent,
-          exits: currentRoomExitIds(gameState),
+          refusalCode,
+          detail,
+          exits,
           durationMs: Date.now() - startedAt,
           draftNarrative,
           gameState: summarizeGameState(gameState),
@@ -3576,7 +3673,23 @@ async function resolveServerFirstAction(
           toolsUsed: [],
           draftNarrative,
           sawMcpToolError: false,
-          actionExecutions: [],
+          actionExecutions: [
+            toolActionExecution('rule', 'unresolved_intent', {
+              message,
+              actionIntent: {
+                kind: actionIntent.kind,
+                primitive: actionIntent.primitive,
+                reason: actionIntent.reason,
+              },
+            }, {
+              success: false,
+              code: refusalCode,
+              detail,
+            }, 1, false),
+          ],
+          refusalCode,
+          skipFinalNarration: true,
+          narratorSource: 'rule',
         }
       }
 
@@ -3619,6 +3732,43 @@ async function resolveServerFirstAction(
   }
 
   if (!toolName || !input) {
+    const unresolved = unresolvedEngineIntentResolution(message, gameState, actionIntent)
+    if (unresolved) {
+      logEvent('info', 'dm.cost.engine_first.unresolved_intent_blocked', {
+        requestId,
+        sessionId,
+        actionIntent,
+        refusalCode: unresolved.code,
+        detail: unresolved.detail,
+        draftNarrative: unresolved.narrative,
+        durationMs: Date.now() - startedAt,
+        gameState: summarizeGameState(gameState),
+      })
+      return {
+        handled: true,
+        gameState,
+        toolsUsed: [],
+        draftNarrative: unresolved.narrative,
+        sawMcpToolError: false,
+        actionExecutions: [
+          toolActionExecution('rule', 'unresolved_intent', {
+            message,
+            actionIntent: {
+              kind: actionIntent.kind,
+              primitive: actionIntent.primitive,
+              reason: actionIntent.reason,
+            },
+          }, {
+            success: false,
+            code: unresolved.code,
+            detail: unresolved.detail,
+          }, 1, false),
+        ],
+        refusalCode: unresolved.code,
+        skipFinalNarration: true,
+        narratorSource: 'rule',
+      }
+    }
     return { handled: false, gameState, toolsUsed: [], draftNarrative: '', sawMcpToolError: false, actionExecutions: [] }
   }
 
@@ -4717,6 +4867,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     let maxTokensRetryInjected = false
     let sawMcpToolError = false
     let latestMcpErrorResult: unknown
+    let engineFirstRefusalCode: string | null = null
     let lastEndTurnNarrative = ''
 
     const engineFirst = await resolveServerFirstAction(message, currentGameState, sessionId, requestId, recentHistory, actionIntent)
@@ -4725,6 +4876,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       narrative = engineFirst.draftNarrative
       sawMcpToolError = engineFirst.sawMcpToolError
       latestMcpErrorResult = engineFirst.mcpErrorResult
+      engineFirstRefusalCode = engineFirst.refusalCode ?? null
+      if (engineFirst.narratorSource) narratorSource = engineFirst.narratorSource
       toolsUsed.push(...engineFirst.toolsUsed)
       actionExecutions.push(...engineFirst.actionExecutions)
       logRoomStateAnomaly(currentGameState, requestId, sessionId, 'after-engine-first')
@@ -4736,12 +4889,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       toolsUsed.length > 0 &&
       toolsUsed.every(toolName => DIRECTOR_LOCAL_FINAL_TOOLS.has(toolName)) &&
       actionIntent.kind !== 'state_reconcile' &&
+      engineFirst.skipFinalNarration !== true &&
       actionIntent.kind !== 'social' &&
       actionIntent.kind !== 'interact'
     const engineFirstVisibleDraft = engineFirst.handled && Boolean(engineFirst.draftNarrative.trim())
     const needsLlmIteration = !engineFirst.handled
     const needsFinalNarrationHistory = engineFirst.handled &&
       actionIntent.kind !== 'state_reconcile' &&
+      engineFirst.skipFinalNarration !== true &&
       !sawMcpToolError &&
       (
         NARRATION_MODE === 'quality'
@@ -5462,7 +5617,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       narratorSource = 'rule'
     }
 
-    const directorDecision = !sawMcpToolError && actionIntent.kind !== 'state_reconcile'
+    const directorDecision = !sawMcpToolError && actionIntent.kind !== 'state_reconcile' && engineFirst.skipFinalNarration !== true
       ? buildDirectorDecision({
         playerMessage: message,
         actionIntent,
@@ -5496,14 +5651,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       })
     }
 
-    const localEngineNarrative = !sawMcpToolError && actionIntent.kind !== 'state_reconcile'
+    const localEngineNarrative = !sawMcpToolError && actionIntent.kind !== 'state_reconcile' && engineFirst.skipFinalNarration !== true
       ? buildLocalEngineNarrative(currentGameState, toolsUsed, newCombatLogEntries, newWorldEvents)
       : null
     const directorNarrative = directorDecision?.narrative ?? null
     const draftNarrative = directorNarrative || localEngineNarrative || narrative || ''
     const hasPlayerVisibleDraft = Boolean(draftNarrative.trim())
     const shouldPolishEngineFirstDraft = engineFirst.handled && hasPlayerVisibleDraft && narratorSource !== 'llm'
-    const shouldTryFinalLlmNarration = !sawMcpToolError && actionIntent.kind !== 'state_reconcile' && (
+    const shouldTryFinalLlmNarration = !sawMcpToolError && actionIntent.kind !== 'state_reconcile' && engineFirst.skipFinalNarration !== true && (
       NARRATION_MODE === 'quality'
         ? (toolsUsed.length > 0 || shouldPolishEngineFirstDraft)
         : (toolsUsed.length > 0 && !directorNarrative && !localEngineNarrative && directorDecision?.shouldUseLlmNarrator !== false)
@@ -5631,7 +5786,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       narrative = serverCorrection
     }
 
-    const refusalCode = mcpErrorCode(latestMcpErrorResult)
+    const refusalCode = engineFirstRefusalCode ?? mcpErrorCode(latestMcpErrorResult)
     const worldDiff = buildWorldDebugDiff(worldDebugBeforeTurn, currentGameState.world, newWorldEvents)
 
     const turnUsage: DMTurnUsage = {

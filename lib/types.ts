@@ -97,6 +97,7 @@ export interface SceneMemory {
 export interface WorldRoomState {
   id: string
   name: string
+  aliases?: string[]
   description?: string
   tags?: string[]
   exits?: string[]

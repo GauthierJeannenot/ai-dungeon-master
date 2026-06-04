@@ -6,6 +6,7 @@ import {
   normalizeFrenchText,
   referencesLocalObjectInsteadOfRoom,
 } from './dm-intent'
+import { hasGoToMovementIntent, hasMovementVerb } from './natural-language'
 
 export type GameActionKind =
   | 'attack'
@@ -489,9 +490,9 @@ export function classifyPlayerAction(message: string, gameState: GameState): Gam
   }
 
   const attackIntent = obviousAttackIntent
-  const directMovementIntent = /\b(deplaces?|deplacer|avances?|avancer|bouges?|bouger|aller|vers|entres?|entrer|rentres?|retournes?|retourner|rejoins?|rejoindre|retrouves?|retrouver|rends|traverses?|approches?|explores?|explorer|aventures?|aventurer|continues?|continuer|plus loin|montes?|monter|grimpes?|grimpe|empruntes?|prends|fuis|fuite|recules?|glisses?|glisser)\b/.test(text)
+  const directMovementIntent = hasMovementVerb(text)
   const doorMovementIntent = isDoorTraversalIntent(text)
-  const goToMovementIntent = /\b(vais|va)\b(?=.{0,80}\b(vers|au|aux|a la|a l|dans|voir|parler|rejoindre|retrouver|retourner|salle|piece|bureau|appartement|boulangerie|quai|verger|pommier)\b)/.test(text)
+  const goToMovementIntent = hasGoToMovementIntent(text)
   const coordinateMovementIntent =
     /\(?\s*\d{1,2}\s*[,;]\s*\d{1,2}\s*\)?/.test(text) &&
     /\b(va|vais|aller|deplaces?|deplacer|avances?|avancer|bouges?|bouger|marche|case|coordonnees?)\b/.test(text)
@@ -512,7 +513,7 @@ export function classifyPlayerAction(message: string, gameState: GameState): Gam
     (referencesLocalObjectInsteadOfRoom(text) || /\b(four|fours|rouleaux?|couteaux?|objets? magiques?|potions?)\b/.test(text))
   const asksOnlyForDescription = /\b(observe|regarde|inspecte|ecoute|vois|voir|decris|decrit|quoi|qu'est-ce|est-ce tout)\b/.test(text)
 
-  if (asksOnlyForDescription && !localObjectIntent && !/\b(deplace|attaque|frappe|combat|ouvres?|ouvrir|enfonces?|enfoncer|portes?|gobelins?|ennemis?|monstres?)\b/.test(text)) {
+  if (asksOnlyForDescription && !movementIntent && !localObjectIntent && !/\b(deplace|attaque|frappe|combat|ouvres?|ouvrir|enfonces?|enfoncer|portes?|gobelins?|ennemis?|monstres?)\b/.test(text)) {
     return intent(text, {
       kind: 'observe',
       primitive: 'narrate',
