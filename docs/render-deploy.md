@@ -63,4 +63,4 @@ Render free is simple, not durable:
 - no persistent disk on the free web service;
 - sessions can be lost server-side.
 
-The browser blackbox logger still helps because it republishes recent client actions after a refresh. For a truly durable free-ish deployment, use the Oracle VPS path. For a truly simple durable deployment, use a small paid VPS.
+The browser blackbox logger still helps because it republishes recent client actions after a refresh. For a truly durable deployment, use a host with persistent storage, such as Fly.io with a volume or a small paid VPS.
