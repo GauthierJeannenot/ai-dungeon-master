@@ -125,7 +125,7 @@ function mockCanonicalKind(text: string, gameState: GameState): CanonicalPlayerA
   if (/\b(fuis|fuir|fuite|retraite|bats en retraite|deguerpis)\b/.test(text)) return 'flee'
   if (/\b(aides?|aider|assistes?|assister|coup de main)\b/.test(text)) return 'help'
   if (/\b(stabilises?|stabiliser|premiers secours|medecine|soignes?|soigner)\b/.test(text)) return 'stabilize'
-  if (/\b(utilises?|utiliser|actives?|activer|touches?|toucher|manipules?|manipuler)\b/.test(text)) return 'use_object'
+  if (/\b(utilises?|utiliser|actives?|activer|declenches?|declencher|actionnes?|actionner|demarres?|demarrer|touches?|toucher|manipules?|manipuler)\b/.test(text)) return 'use_object'
   if (/\b(fouilles?|fouiller|cherches?|chercher|inspectes?|inspecter)\b/.test(text) && !maybeDirectQuestion(text)) return 'search'
   if (/\b(regardes?|regarder|observes?|observer|examines?|examiner|decris|decrire|ecoutes?|ecouter)\b/.test(text)) return 'examine'
   if (gameState.phase === 'combat' && /\b(passe|attends?|attendre|patiente|ne fais rien)\b/.test(text)) return 'wait'
@@ -133,7 +133,7 @@ function mockCanonicalKind(text: string, gameState: GameState): CanonicalPlayerA
 }
 
 function hasMockMoveIntent(text: string): boolean {
-  return /\b(va|vais|aller|deplaces?|deplacer|diriges?|diriger|avances?|avancer|bouges?|bouger|marche|pars|partir|sors|sortir|quittes?|quitter|suis|suivre|approches?|approcher|explores?|explorer|continue|continuer|rentre|entrer|monte|monter|descends?|descendre)\b/.test(text)
+  return /\b(va|vais|aller|deplaces?|deplacer|diriges?|diriger|avances?|avancer|bouges?|bouger|marche|pars|partir|sors|sortir|quittes?|quitter|retournes?|retourner|reviens|revenir|suis|suivre|approches?|approcher|explores?|explorer|continue|continuer|rentre|entrer|monte|monter|descends?|descendre)\b/.test(text)
 }
 
 function recentPortalFollowupRoomId(text: string, gameState: GameState): string | null {
@@ -281,12 +281,53 @@ function normalizeAffordanceAction(
   if (kind === 'use_item') action.itemType = 'healing_potion'
   if (kind === 'wait') action.reason = 'Le joueur attend et passe son tour.'
 
+  if (kind === 'show_item' || kind === 'give_item') {
+    const item = inventoryItemFromText(message, gameState)
+    if (item) {
+      action.itemId = item.id
+      action.itemName = item.name
+    }
+  }
+
   if ((kind === 'talk' || kind === 'ask' || kind === 'persuade' || kind === 'threaten' || kind === 'help') && !action.targetName) {
     const npc = onePresentNpc(gameState)
     if (npc) action.targetName = npc.name
   }
 
   return action
+}
+
+function inventoryItemFromText(message: string, gameState: GameState): GameState['player']['inventory'][number] | null {
+  const text = normalizeFrenchText(message)
+  const explicitPotion = /\b(potion|fiole|soin)\b/.test(text)
+  const explicitRecipe = /\b(recette|fragment|moitie|parchemin|papier)\b/.test(text)
+  const matches = gameState.player.inventory.filter(item => {
+    const haystacks = [
+      item.id,
+      item.name,
+      item.type,
+      item.description ?? '',
+      item.type === 'potion' ? 'potion fiole soin potion de soin' : '',
+      item.id.includes('recipe') || normalizeFrenchText(item.name).includes('recette') ? 'recette fragment moitie parchemin papier' : '',
+    ].map(normalizeFrenchText)
+    return haystacks.some(haystack => {
+      if (!haystack) return false
+      return haystack.split(/[^a-z0-9']+/).some(token => token.length >= 3 && text.includes(token)) ||
+        text.includes(haystack)
+    })
+  })
+  if (matches.length === 1) return matches[0]
+  if (explicitPotion) {
+    const potions = gameState.player.inventory.filter(item => item.type === 'potion')
+    if (potions.length === 1) return potions[0]
+  }
+  if (explicitRecipe) {
+    const recipes = gameState.player.inventory.filter(item =>
+      item.id.includes('recipe') || normalizeFrenchText(item.name).includes('recette')
+    )
+    if (recipes.length === 1) return recipes[0]
+  }
+  return null
 }
 
 function bestAffordanceForKind(
@@ -340,6 +381,21 @@ function buildMockWorldActionOutput(
       )?.targetId
     : undefined
   const selectedScore = selectedAffordance ? targetSpecificityScore(text, selectedAffordance) : 0
+  const explicitlyNamesRecipeButNoRecipeTarget =
+    kind === 'take' &&
+    selectedScore === 0 &&
+    /\b(recette|fragment|moitie|papier|parchemin)\b/.test(text)
+  if (explicitlyNamesRecipeButNoRecipeTarget) {
+    return output({
+      intentKind: kind,
+      confidence: 0.78,
+      requiresClarification: false,
+      canonicalAction: { kind, targetName: 'recette' },
+      improvisation: null,
+      targetHints: { targetName: 'recette', targetType: 'object' },
+      reasoningSummary: 'Objet nomme explicitement mais non afforde; le moteur doit produire le refus canonique plutot que prendre un autre objet.',
+    })
+  }
   const repeatsRecentTakenObject =
     kind === 'take' &&
     Boolean(recentTakenTargetId) &&
@@ -410,6 +466,10 @@ function isEnemyLocationQuestion(text: string): boolean {
 
 function isAttack(text: string): boolean {
   return /\b(attaques?|attaquer|attques?|attquer|attque|ataques?|ataquer|frappes?|frapper|tapes?|taper|coup|charges?|charger|acheves?|achever|tuer|gorge)\b/.test(text)
+}
+
+function isCombatRepeatAttack(text: string): boolean {
+  return /\b(recommences?|recommencer|encore|a nouveau|meme chose|continue|vas y|vas-y)\b/.test(text)
 }
 
 function isImprovisedTool(text: string): boolean {
@@ -549,6 +609,22 @@ export function interpretPlayerIntentMock(params: {
     })
   }
 
+  if (gameState.phase === 'combat' && gameState.currentTurn === 'player' && isCombatRepeatAttack(text)) {
+    return output({
+      intentKind: 'attack',
+      confidence: 0.82,
+      requiresClarification: false,
+      canonicalAction: {
+        kind: 'attack',
+        targetHint: 'nearest',
+        weaponOrSpell: 'longsword',
+      },
+      improvisation: null,
+      targetHints: { targetHint: 'nearest' },
+      reasoningSummary: 'Continuation en combat interpretee comme repetition de l attaque precedente.',
+    })
+  }
+
   if (gameState.phase === 'combat' && gameState.currentTurn === 'player' && isAttack(text)) {
     return output({
       intentKind: 'attack',
@@ -563,6 +639,12 @@ export function interpretPlayerIntentMock(params: {
       targetHints: { targetHint: 'nearest' },
       reasoningSummary: 'Attaque en combat, typo toleree.',
     })
+  }
+
+  const earlyWorldKind = mockCanonicalKind(text, gameState)
+  if (earlyWorldKind === 'combine_recipe') {
+    const worldOutput = buildMockWorldActionOutput(message, gameState, earlyWorldKind)
+    if (worldOutput) return worldOutput
   }
 
   if (isEnemyLocationQuestion(text)) {
@@ -614,7 +696,7 @@ export function interpretPlayerIntentMock(params: {
     })
   }
 
-  const worldKind = mockCanonicalKind(text, gameState)
+  const worldKind = earlyWorldKind
   if (worldKind && worldKind !== 'take') {
     const worldOutput = buildMockWorldActionOutput(message, gameState, worldKind)
     if (worldOutput) return worldOutput
