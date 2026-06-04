@@ -1,0 +1,43 @@
+# Fly.io configuration for AI Dungeon Master.
+#
+# Rename `app` if you pick a different name during `fly launch`. The app keeps
+# its current architecture (persistent container + MCP stdio subprocess), so a
+# single machine with a persistent volume is used rather than serverless.
+
+app = "ai-dungeon-master"
+primary_region = "cdg"   # Paris — change to your nearest region
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8080"
+  GAME_SESSION_STORE_DIR = "/data/sessions"
+  # Persist server logs to the volume (optional). Remove if you don't want them.
+  APP_LOG_PERSIST_ENABLED = "true"
+
+# Persistent disk for game sessions (and optional logs). Created once via:
+#   fly volumes create data --region cdg --size 1
+[mounts]
+  source = "data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # Scale-to-zero is safe: MCP state rehydrates from the session store / posted
+  # gameState on the next request. Saves free-tier hours when idle.
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "20s"
+    method = "GET"
+    path = "/api/health"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

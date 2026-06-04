@@ -1,0 +1,24 @@
+# Dependencies (reinstalled inside the image)
+node_modules
+
+# Build artifacts (regenerated during the image build)
+.next
+mcp-server/dist
+
+# Local runtime state (sessions/logs live on the Fly volume, not the image)
+.data
+
+# VCS / tooling
+.git
+.github
+.claude
+.vscode
+
+# Local env files — secrets are injected via `fly secrets set`
+.env
+.env*.local
+
+# Misc
+npm-debug.log*
+*.log
+README*.md
