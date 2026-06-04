@@ -171,6 +171,33 @@ test('director prefers accented player attack over earlier enemy attacks', () =>
   assert.match(decision.narrative ?? '', /Ton attaque accroche Gobelin test/)
 })
 
+test('director narrates movement as fiction instead of grid bookkeeping', () => {
+  const decision = buildDirectorDecision({
+    playerMessage: 'je vais en (11,13)',
+    actionIntent: baseIntent({ kind: 'move', primitive: 'move' }),
+    gameState: baseGameState({
+      currentRoomId: '1',
+      player: {
+        ...baseGameState().player,
+        position: { x: 11, y: 13 },
+      },
+    }),
+    toolsUsed: ['move_token'],
+    newCombatLogEntries: [{
+      id: 'log-1',
+      round: 0,
+      turn: 'player',
+      action: 'Heros se deplace',
+      mechanicalDetail: 'Deplacement (4,13) -> (11,13)',
+      timestamp: Date.now(),
+    }],
+  })
+
+  assert.equal(decision.shouldUseLlmNarrator, false)
+  assert.match(decision.narrative ?? '', /portes de la boulangerie/)
+  assert.doesNotMatch(decision.narrative ?? '', /case|decor se replace/i)
+})
+
 test('director keeps social scenes eligible for LLM narration', () => {
   const decision = buildDirectorDecision({
     playerMessage: 'je negocie avec le gobelin',

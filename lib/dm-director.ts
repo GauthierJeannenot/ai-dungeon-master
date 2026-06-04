@@ -217,14 +217,28 @@ function attackOutcome(entry: CombatLogEntry): {
 }
 
 function buildMoveNarrative(gameState: GameState): string {
-  const position = gameState.player.position
-  const name = roomName(gameState)
   const tail = worldPressureTail(gameState)
-  if (gameState.currentRoomId) {
-    return `Tu gagnes ${name}, case ${position.x},${position.y}. Le decor se replace autour de toi, assez net pour choisir ton prochain risque.${tail}`
+
+  switch (gameState.currentRoomId) {
+    case '1':
+      return `Tu te places devant les portes de la boulangerie. Le bois vermoulu travaille sous le vent, et l'odeur de pomme chaude couvre mal l'humidite de la pierre.${tail}`
+    case '2':
+      return `Tu passes sous les branches du verger. Les pommes trop rouges pendent au-dessus de toi, immobiles, comme si elles attendaient que tu fasses le premier faux pas.${tail}`
+    case '3':
+      return `Tu contournes la facade jusqu'au tas de dechets. Sous la farine rance et les gravats, quelque chose de plus froid remue l'air pres du sol.${tail}`
+    case '4':
+      return `Tu entres dans le vestibule. La poussiere garde des traces fraiches vers les fours, et la maison semble retenir son souffle autour de toi.${tail}`
+    case '5':
+      return `Tu gagnes le bureau. Les registres moisis s'empilent dans l'ombre, mais un tiroir mal ferme attire l'oeil plus vite que le reste.${tail}`
+    case '7':
+      return `Tu rejoins le quai de chargement. La porte laterale bat doucement contre son rail, laissant passer une haleine de farine humide et de four eteint.${tail}`
+    case '8':
+      return `Tu avances sur le sol de la boulangerie. Les fours noirs bordent la piece comme des gueules fermees, et chaque planche craque trop fort sous ton poids.${tail}`
+    case '9':
+      return `Tu montes dans l'appartement de Grammy. L'air y colle aux rideaux, charge de fourrure, de viande sechee et d'un silence beaucoup trop recent.${tail}`
   }
 
-  return `Tu te deplaces vers la case ${position.x},${position.y}. Hors des salles balisees, le batiment garde ses distances et la prochaine decision doit te ramener vers un lieu clair.${tail}`
+  return `Tu avances hors des reperes nets de la carte. La boulangerie reste proche, mais le prochain pas devra retrouver une prise claire.${tail}`
 }
 
 function buildAttackNarrative(gameState: GameState, entries: CombatLogEntry[]): string | null {
