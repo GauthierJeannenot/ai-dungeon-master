@@ -297,12 +297,12 @@ function inferAnaphoricNpcTarget(
   if (uniqueAffordedName) return { name: uniqueAffordedName, source: 'unique_affordance' }
   if (affordedNames.length > 1) return { source: 'none', ambiguous: [...new Set(affordedNames)] }
 
-  const knownNpcNames = Object.values(gameState.world.npcs)
-    .filter(npc => npc.roomId === gameState.currentRoomId && npc.known)
+  const presentNpcNames = Object.values(gameState.world.npcs)
+    .filter(npc => npc.roomId === gameState.currentRoomId)
     .map(npc => npc.name)
-  const uniquePresentNpcName = uniqueOrUndefined(knownNpcNames)
+  const uniquePresentNpcName = uniqueOrUndefined(presentNpcNames)
   if (uniquePresentNpcName) return { name: uniquePresentNpcName, source: 'unique_present_npc' }
-  if (knownNpcNames.length > 1) return { source: 'none', ambiguous: [...new Set(knownNpcNames)] }
+  if (presentNpcNames.length > 1) return { source: 'none', ambiguous: [...new Set(presentNpcNames)] }
   return { source: 'none' }
 }
 

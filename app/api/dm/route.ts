@@ -1231,6 +1231,76 @@ function buildOralFallbackNarrative(gameState: GameState, toolsUsed: string[]): 
   return buildDirectiveSceneNarrative(gameState)
 }
 
+const SOCIAL_ACTION_KINDS = new Set<GameActionKind>([
+  'talk',
+  'ask',
+  'persuade',
+  'threaten',
+  'show_item',
+  'give_item',
+  'social',
+])
+
+const SOCIAL_EVENT_TYPES = new Set<EngineEvent['type']>([
+  'npc.disposition_changed',
+  'npc.information_revealed',
+  'item.shown',
+  'item.given',
+  'alarm.raised',
+  'action.blocked',
+])
+
+function isSocialNarrationContext(
+  actionIntent: GameActionIntent,
+  toolsUsed: string[],
+  newWorldEvents: EngineEvent[] = []
+): boolean {
+  return SOCIAL_ACTION_KINDS.has(actionIntent.kind) ||
+    toolsUsed.some(toolName => /^world\.(talk|ask|persuade|threaten|show_item|give_item)$/.test(toolName)) ||
+    newWorldEvents.some(event => SOCIAL_EVENT_TYPES.has(event.type))
+}
+
+function visibleNpcInCurrentRoom(gameState: GameState): WorldState['npcs'][string] | null {
+  if (!gameState.currentRoomId || !gameState.world?.npcs) return null
+  const npcs = Object.values(gameState.world.npcs)
+    .filter(npc => npc.roomId === gameState.currentRoomId)
+  return npcs.length === 1 ? npcs[0] : null
+}
+
+function npcForSocialEvent(gameState: GameState, event: EngineEvent | undefined): WorldState['npcs'][string] | null {
+  const targetId = typeof event?.targetId === 'string' ? event.targetId : null
+  if (targetId && gameState.world?.npcs?.[targetId]) return gameState.world.npcs[targetId]
+  return visibleNpcInCurrentRoom(gameState)
+}
+
+function buildSocialFallbackNarrative(
+  gameState: GameState,
+  actionIntent: GameActionIntent,
+  toolsUsed: string[],
+  newWorldEvents: EngineEvent[] = []
+): string | null {
+  if (!isSocialNarrationContext(actionIntent, toolsUsed, newWorldEvents)) return null
+
+  const latestSocialEvent = [...newWorldEvents].reverse().find(event => SOCIAL_EVENT_TYPES.has(event.type))
+  if (latestSocialEvent?.summary) {
+    const followUp = latestSocialEvent.type === 'npc.information_revealed'
+      ? "Tu as maintenant une piste exploitable."
+      : latestSocialEvent.type === 'npc.disposition_changed'
+        ? "L'echange reste ouvert, mais son attitude a vraiment change."
+        : latestSocialEvent.type === 'alarm.raised'
+          ? "La tension monte aussitot autour de vous."
+          : "La conversation garde une prise concrete."
+    return `${latestSocialEvent.summary} ${followUp}`
+  }
+
+  const npc = npcForSocialEvent(gameState, latestSocialEvent)
+  if (npc) {
+    return `${npc.name} reste face a toi, assez proche pour que tes mots comptent. Pose ta question, formule ta demande, ou change d'approche.`
+  }
+
+  return "La conversation ne trouve pas encore d'interlocuteur clair. Nomme la personne a qui tu parles, et je garde l'echange dans la scene."
+}
+
 function splitIntoSentences(text: string): string[] {
   const sentences: string[] = []
   let start = 0
@@ -4908,13 +4978,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       : 'none'
     if (iterationLlmRoute === 'blocked') {
       llmRoute = mergeLlmRoute(llmRoute, 'blocked')
-      narrative = buildDirectiveSceneNarrative(currentGameState)
-      narratorSource = 'fallback'
+      const socialFallbackNarrative = buildSocialFallbackNarrative(currentGameState, actionIntent, toolsUsed)
+      narrative = socialFallbackNarrative ?? buildDirectiveSceneNarrative(currentGameState)
+      narratorSource = socialFallbackNarrative ? 'rule' : 'fallback'
       logEvent('warn', 'dm.llm_router.blocked_before_iteration', {
         requestId,
         sessionId,
         actionIntent,
         requestCallCount: usageLog.length + 1,
+        socialFallbackNarrative,
       })
     } else {
       llmRoute = mergeLlmRoute(llmRoute, iterationLlmRoute)
@@ -5426,13 +5498,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       const fallbackLlmRoute = selectFinalNarrationLlmRoute(actionIntent, toolsUsed, usageLog.length + 1, sessionId)
       if (fallbackLlmRoute === 'blocked') {
         llmRoute = mergeLlmRoute(llmRoute, 'blocked')
-        narrative = buildDirectiveSceneNarrative(currentGameState)
-        narratorSource = 'fallback'
+        const socialFallbackNarrative = buildSocialFallbackNarrative(currentGameState, actionIntent, toolsUsed)
+        narrative = socialFallbackNarrative ?? buildDirectiveSceneNarrative(currentGameState)
+        narratorSource = socialFallbackNarrative ? 'rule' : 'fallback'
         logEvent('warn', 'dm.final_fallback.blocked_by_budget', {
           requestId,
           sessionId,
           iterations,
           requestCallCount: usageLog.length + 1,
+          socialFallbackNarrative,
         })
       } else {
         llmRoute = mergeLlmRoute(llmRoute, fallbackLlmRoute)
@@ -5668,7 +5742,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       const finalLlmRoute = selectFinalNarrationLlmRoute(actionIntent, toolsUsed, usageLog.length + 1, sessionId)
       if (finalLlmRoute === 'blocked') {
         llmRoute = mergeLlmRoute(llmRoute, 'blocked')
-        const fallbackNarrative = draftNarrative || buildOralFallbackNarrative(currentGameState, toolsUsed)
+        const socialFallbackNarrative = buildSocialFallbackNarrative(currentGameState, actionIntent, toolsUsed, newWorldEvents)
+        const fallbackNarrative = draftNarrative || socialFallbackNarrative || buildOralFallbackNarrative(currentGameState, toolsUsed)
         logEvent('warn', 'dm.final_narration.blocked_by_budget', {
           requestId,
           sessionId,
@@ -5676,9 +5751,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           toolsUsed: [...new Set(toolsUsed)],
           discardedDraftNarrative: narrative,
           fallbackNarrative,
+          socialFallbackNarrative,
         })
         narrative = fallbackNarrative
-        narratorSource = 'fallback'
+        narratorSource = (socialFallbackNarrative || isSocialNarrationContext(actionIntent, toolsUsed, newWorldEvents)) ? 'local' : 'fallback'
       } else {
         llmRoute = mergeLlmRoute(llmRoute, finalLlmRoute)
         const finalNarrative = await generateFinalNarration({
@@ -5699,7 +5775,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           narrative = finalNarrative
           narratorSource = 'llm'
         } else {
-          const fallbackNarrative = draftNarrative || buildOralFallbackNarrative(currentGameState, toolsUsed)
+          const socialFallbackNarrative = buildSocialFallbackNarrative(currentGameState, actionIntent, toolsUsed, newWorldEvents)
+          const fallbackNarrative = draftNarrative || socialFallbackNarrative || buildOralFallbackNarrative(currentGameState, toolsUsed)
           logEvent('warn', 'dm.final_narration.fallback_after_tool_mutation', {
             requestId,
             sessionId,
@@ -5707,9 +5784,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             toolsUsed: [...new Set(toolsUsed)],
             discardedDraftNarrative: narrative,
             fallbackNarrative,
+            socialFallbackNarrative,
           })
           narrative = fallbackNarrative
-          narratorSource = 'fallback'
+          narratorSource = (socialFallbackNarrative || isSocialNarrationContext(actionIntent, toolsUsed, newWorldEvents)) ? 'local' : 'fallback'
         }
       }
     } else if (directorNarrative) {
@@ -5737,7 +5815,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         narrativeLength: narrative.length,
       })
     } else if (toolsUsed.length > 0 && !sawMcpToolError) {
-      const fallbackNarrative = draftNarrative || buildOralFallbackNarrative(currentGameState, toolsUsed)
+      const socialFallbackNarrative = buildSocialFallbackNarrative(currentGameState, actionIntent, toolsUsed, newWorldEvents)
+      const fallbackNarrative = draftNarrative || socialFallbackNarrative || buildOralFallbackNarrative(currentGameState, toolsUsed)
       logEvent('warn', 'dm.final_narration.director_fallback_without_llm', {
         requestId,
         sessionId,
@@ -5746,9 +5825,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         toolsUsed: [...new Set(toolsUsed)],
         discardedDraftNarrative: narrative,
         fallbackNarrative,
+        socialFallbackNarrative,
       })
       narrative = fallbackNarrative
-      narratorSource = 'fallback'
+      narratorSource = (socialFallbackNarrative || isSocialNarrationContext(actionIntent, toolsUsed, newWorldEvents)) ? 'local' : 'fallback'
     }
 
     const oralNarrative = normalizeNarrativeForOralPlayback(narrative, currentGameState, toolsUsed)

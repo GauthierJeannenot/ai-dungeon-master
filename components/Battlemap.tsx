@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { GameState, MonsterState, PlayerState } from '@/lib/types'
+import { centerCellForAdventureRoom } from '@/lib/adventure-map'
+import type { GameState, MonsterState, PlayerState, WorldNpcDisposition } from '@/lib/types'
 
 interface BattlemapProps {
   gameState: GameState
@@ -9,9 +10,18 @@ interface BattlemapProps {
 }
 
 interface TooltipState {
-  entity: PlayerState | MonsterState
+  entity: PlayerState | MonsterState | MapNpcToken
   x: number
   y: number
+}
+
+interface MapNpcToken {
+  id: string
+  name: string
+  disposition: WorldNpcDisposition
+  faction?: string
+  roomId: string
+  position: { x: number; y: number }
 }
 
 function getHPColor(current: number, max: number): string {
@@ -48,6 +58,10 @@ export default function Battlemap({ gameState, cellSize = 48 }: BattlemapProps) 
     Object.entries(gameState.monsters).forEach(([id, m]) => {
       newPositions[id] = m.position
     })
+    const npcTokens = deriveNpcTokens(gameState)
+    npcTokens.forEach(npc => {
+      newPositions[`npc:${npc.id}`] = npc.position
+    })
 
     const newAnimating = new Set<string>()
     Object.entries(newPositions).forEach(([id, pos]) => {
@@ -64,11 +78,11 @@ export default function Battlemap({ gameState, cellSize = 48 }: BattlemapProps) 
 
     setPrevPositions(newPositions)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gameState.player.position, gameState.monsters])
+  }, [gameState.player.position, gameState.monsters, gameState.world?.npcs, gameState.currentRoomId])
 
   const handleTokenClick = useCallback((
     e: React.MouseEvent,
-    entity: PlayerState | MonsterState
+    entity: PlayerState | MonsterState | MapNpcToken
   ) => {
     e.stopPropagation()
     const rect = containerRef.current?.getBoundingClientRect()
@@ -81,12 +95,13 @@ export default function Battlemap({ gameState, cellSize = 48 }: BattlemapProps) 
   }, [])
 
   const aliveMonsters = Object.values(gameState.monsters).filter(m => m.isAlive)
+  const npcTokens = deriveNpcTokens(gameState)
 
   // Taille fixe de la carte : 17 cols × 15 rows (calée sur battlemap.png ~880×800px)
   const MAP_COLS = 17
   const MAP_ROWS = 15
-  const gridCols = Math.max(MAP_COLS, ...aliveMonsters.map(m => m.position.x + 2), gameState.player.position.x + 2)
-  const gridRows = Math.max(MAP_ROWS, ...aliveMonsters.map(m => m.position.y + 2), gameState.player.position.y + 2)
+  const gridCols = Math.max(MAP_COLS, ...aliveMonsters.map(m => m.position.x + 2), ...npcTokens.map(npc => npc.position.x + 2), gameState.player.position.x + 2)
+  const gridRows = Math.max(MAP_ROWS, ...aliveMonsters.map(m => m.position.y + 2), ...npcTokens.map(npc => npc.position.y + 2), gameState.player.position.y + 2)
 
   return (
     <div
@@ -144,6 +159,17 @@ export default function Battlemap({ gameState, cellSize = 48 }: BattlemapProps) 
           />
         ))}
 
+        {/* NPC tokens */}
+        {npcTokens.map(npc => (
+          <TokenNpc
+            key={npc.id}
+            npc={npc}
+            cellSize={cellSize}
+            isAnimating={animating.has(`npc:${npc.id}`)}
+            onClick={(e) => handleTokenClick(e, npc)}
+          />
+        ))}
+
         {/* Player token */}
         <TokenPlayer
           player={gameState.player}
@@ -164,6 +190,69 @@ export default function Battlemap({ gameState, cellSize = 48 }: BattlemapProps) 
       </div>
     </div>
   )
+}
+
+function deriveNpcTokens(gameState: GameState): MapNpcToken[] {
+  const currentRoomId = gameState.currentRoomId
+  if (!currentRoomId || !gameState.world?.npcs) return []
+
+  const occupiedMonsterNames = new Set(
+    Object.values(gameState.monsters)
+      .filter(monster => monster.isAlive)
+      .map(monster => monster.name.toLowerCase())
+  )
+  const center = centerCellForAdventureRoom(currentRoomId) ?? gameState.player.position
+  const offsets = [
+    { x: -1, y: 0 },
+    { x: 1, y: 0 },
+    { x: 0, y: -1 },
+    { x: 0, y: 1 },
+    { x: -1, y: -1 },
+    { x: 1, y: 1 },
+  ]
+
+  return Object.values(gameState.world.npcs)
+    .filter(npc => npc.roomId === currentRoomId)
+    .filter(npc => npc.disposition !== 'hostile' || !occupiedMonsterNames.has(npc.name.toLowerCase()))
+    .map((npc, index) => {
+      const offset = offsets[index % offsets.length]
+      return {
+        id: npc.id,
+        name: npc.name,
+        disposition: npc.disposition,
+        faction: npc.faction,
+        roomId: npc.roomId,
+        position: {
+          x: Math.max(0, center.x + offset.x),
+          y: Math.max(0, center.y + offset.y),
+        },
+      }
+    })
+}
+
+function npcTokenStyle(disposition: WorldNpcDisposition): { background: string; shadow: string; ring: string; label: string } {
+  if (disposition === 'helpful') {
+    return {
+      background: 'radial-gradient(circle at 35% 35%, #86efac, #15803d)',
+      shadow: 'shadow-green-900/60',
+      ring: 'ring-emerald-300',
+      label: 'Allie',
+    }
+  }
+  if (disposition === 'hostile') {
+    return {
+      background: 'radial-gradient(circle at 35% 35%, #fb7185, #9f1239)',
+      shadow: 'shadow-rose-900/60',
+      ring: 'ring-rose-300',
+      label: 'Hostile',
+    }
+  }
+  return {
+    background: 'radial-gradient(circle at 35% 35%, #d1d5db, #4b5563)',
+    shadow: 'shadow-stone-900/60',
+    ring: 'ring-stone-300',
+    label: disposition === 'wary' ? 'Mefiant' : disposition === 'offended' ? 'Froisse' : 'Neutre',
+  }
 }
 
 function TokenPlayer({
@@ -277,15 +366,58 @@ function TokenMonster({
   )
 }
 
+function TokenNpc({
+  npc, cellSize, isAnimating, onClick
+}: {
+  npc: MapNpcToken
+  cellSize: number
+  isAnimating: boolean
+  onClick: (e: React.MouseEvent) => void
+}) {
+  const px = npc.position.x * cellSize + cellSize / 2
+  const py = npc.position.y * cellSize + cellSize / 2
+  const r = cellSize * 0.34
+  const abbrev = npc.name.slice(0, 2).toUpperCase()
+  const style = npcTokenStyle(npc.disposition)
+
+  return (
+    <div
+      className="absolute pointer-events-auto cursor-pointer"
+      style={{
+        left: px - r,
+        top: py - r,
+        width: r * 2,
+        height: r * 2,
+        transition: isAnimating ? 'left 0.4s ease, top 0.4s ease' : undefined,
+      }}
+      onClick={onClick}
+    >
+      <div className={`relative w-full h-full rounded-full flex items-center justify-center font-bold text-white select-none ring-1 ${style.ring} shadow-lg ${style.shadow}`}
+        style={{ background: style.background }}
+      >
+        <span style={{ fontSize: cellSize * 0.24 }}>{abbrev}</span>
+      </div>
+
+      <div
+        className="absolute -bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap text-stone-200 font-medium"
+        style={{ fontSize: Math.max(9, cellSize * 0.17) }}
+      >
+        {npc.name}
+      </div>
+    </div>
+  )
+}
+
 function EntityTooltip({
   entity, x, y
 }: {
-  entity: PlayerState | MonsterState
+  entity: PlayerState | MonsterState | MapNpcToken
   x: number
   y: number
 }) {
   const isMonster = 'isAlive' in entity
-  const stats = entity.stats
+  const isNpc = 'disposition' in entity
+  const stats = !isNpc ? entity.stats : null
 
   return (
     <div
@@ -298,25 +430,33 @@ function EntityTooltip({
       }}
     >
       <div className="font-bold text-amber-400 mb-1">{entity.name}</div>
+      {isNpc && (
+        <div className="text-stone-300 text-xs mb-2">
+          PNJ {npcTokenStyle(entity.disposition).label.toLowerCase()}
+          {entity.faction ? ` | ${entity.faction}` : ''}
+        </div>
+      )}
       {isMonster && (
         <div className="text-stone-400 text-xs mb-2">
           {getHPDescription(entity.hp.current, entity.hp.max)}
         </div>
       )}
-      {!isMonster && (
+      {!isMonster && !isNpc && (
         <div className="text-stone-300 text-xs mb-2">
           HP: {entity.hp.current}/{entity.hp.max} | CA: {entity.ac}
         </div>
       )}
-      <div className="grid grid-cols-3 gap-1 text-xs text-stone-300">
-        {(['str', 'dex', 'con', 'int', 'wis', 'cha'] as const).map(s => (
-          <div key={s} className="text-center">
-            <div className="text-stone-500 uppercase text-[10px]">{s}</div>
-            <div className="font-mono">{stats[s]}</div>
-          </div>
-        ))}
-      </div>
-      {entity.conditions.length > 0 && (
+      {stats && (
+        <div className="grid grid-cols-3 gap-1 text-xs text-stone-300">
+          {(['str', 'dex', 'con', 'int', 'wis', 'cha'] as const).map(s => (
+            <div key={s} className="text-center">
+              <div className="text-stone-500 uppercase text-[10px]">{s}</div>
+              <div className="font-mono">{stats[s]}</div>
+            </div>
+          ))}
+        </div>
+      )}
+      {!isNpc && entity.conditions.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1">
           {entity.conditions.map(c => (
             <span key={c} className="px-1.5 py-0.5 bg-purple-900/60 text-purple-300 rounded text-[10px]">

@@ -111,6 +111,28 @@ test('location index exposes adjacent npc destinations as movement targets', () 
   ))
 })
 
+test('scene surface exposes present npcs even before they were known', () => {
+  const state = baseGameState({
+    currentRoomId: '2',
+    roomsVisited: ['1', '2'],
+    player: {
+      ...baseGameState().player,
+      position: { x: 9, y: 2 },
+    },
+  })
+  const surface = sceneSurface.buildSceneSurface(state)
+
+  const dryad = surface.npcs.find(npc => npc.id === 'dryad_orchard')
+  assert.ok(dryad)
+  assert.equal(dryad.known, true)
+  assert.equal(dryad.disposition, 'neutral')
+  assert.ok(surface.affordances.some(action =>
+    action.id === 'world-talk-dryad_orchard' &&
+    action.kind === 'talk' &&
+    action.enabled
+  ))
+})
+
 test('initial narrative cannot mention a door without a matching scene affordance', () => {
   const state = baseGameState()
   const narrative = sceneSurface.buildInitialSceneNarrative(state)

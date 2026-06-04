@@ -545,14 +545,14 @@ export function buildSceneSurface(gameState: GameState): SceneSurface {
     .map(object => toSceneObject(object, currentRoomId))
     .sort((a, b) => a.name.localeCompare(b.name, 'fr'))
   const npcs = Object.values(world?.npcs ?? {})
-    .filter(npc => npc.roomId === currentRoomId && npc.known)
+    .filter(npc => npc.roomId === currentRoomId)
     .map(npc => ({
       id: npc.id,
       name: npc.name,
       aliases: npc.aliases ?? [],
       roomId: npc.roomId,
       disposition: npc.disposition,
-      known: Boolean(npc.known),
+      known: true,
       faction: npc.faction,
       goals: npc.goals ?? [],
       tags: npc.tags ?? [],

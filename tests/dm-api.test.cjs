@@ -54,6 +54,8 @@ const { POST } = require(path.join(process.cwd(), 'app/api/dm/route.ts'))
 const { closeMCPClient } = require(path.join(process.cwd(), 'lib/mcp-client.ts'))
 const { deleteSession } = require(path.join(process.cwd(), 'lib/session-store.ts'))
 
+const DEFAULT_SCENE_NARRATIVE_PATTERN = /facade de la boulangerie grince|dans le verger, les branches|au quai de chargement, la porte laterale|dans l'entree, les traces|au sol de la boulangerie|dans l'appartement de grammy/i
+
 test.after(() => {
   restoreTsRequire()
   fs.rmSync(sessionStoreDir, { recursive: true, force: true })
@@ -722,6 +724,8 @@ test('DM API canonical talk changes NPC disposition through world event', async 
   assert.equal(data.newGameState.world.npcs.mac.disposition, 'helpful')
   assert.ok(data.engine?.events?.some(event => event.type === 'npc.disposition_changed' && event.targetId === 'mac'))
   assert.equal(data.usage?.llmRoute, 'rich')
+  assert.notEqual(data.usage?.narrator, 'fallback')
+  assert.doesNotMatch(data.narrative, DEFAULT_SCENE_NARRATIVE_PATTERN)
 })
 
 test('DM API canonical ask reveals information without forcing disposition change', async t => {
@@ -740,4 +744,6 @@ test('DM API canonical ask reveals information without forcing disposition chang
   assert.ok(data.toolsUsed.includes('resolve_player_action'))
   assert.equal(data.newGameState.world.npcs.mac.disposition, 'neutral')
   assert.ok(data.engine?.events?.some(event => event.type === 'npc.information_revealed' && event.targetId === 'mac'))
+  assert.notEqual(data.usage?.narrator, 'fallback')
+  assert.doesNotMatch(data.narrative, DEFAULT_SCENE_NARRATIVE_PATTERN)
 })
