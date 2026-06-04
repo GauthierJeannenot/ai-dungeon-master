@@ -3,7 +3,6 @@ import Anthropic from '@anthropic-ai/sdk'
 import crypto from 'crypto'
 import fs from 'fs/promises'
 import path from 'path'
-import { loadContextFiles } from '@/lib/context-loader'
 import { callMCPTool, listMCPTools } from '@/lib/mcp-client'
 import { loadSession, saveSession } from '@/lib/session-store'
 import { acquireSessionLock } from '@/lib/session-lock'
@@ -26,7 +25,6 @@ import {
 } from '@/lib/dm-intent'
 import {
   classifyPlayerAction,
-  describeGameActionLanguageForPrompt,
   isAnaphoricCombatAttackText,
   type GameActionConfidence,
   type GameActionIntent,
@@ -34,7 +32,6 @@ import {
   type GameActionPrimitive,
 } from '@/lib/game-actions'
 import { buildDirectorDecision } from '@/lib/dm-director'
-import { sanitizeAdventureModuleToolContracts } from '@/lib/dm-module-sanitizer'
 import {
   logAnthropicUsage,
   logAnthropicUsageSummary,
@@ -56,7 +53,6 @@ import {
 } from '@/lib/natural-language'
 import {
   detectUnsupportedNarratedWorldFacts,
-  type NarratedWorldFact,
 } from '@/lib/narrative-world-contract'
 import { normalizeLlmToolInput } from '@/lib/tool-input-normalizer'
 import { actionExecution, buildTurnTrace } from '@/lib/turn-trace'
@@ -67,6 +63,36 @@ import {
   type IntentInterpreterInputSummary,
   type IntentInterpreterOutput,
 } from '@/lib/intent-interpreter'
+import { buildNarrationSystemBlocks, buildSystemBlocks, type DmPromptBuildOptions } from '@/lib/dm-prompts'
+import { buildWorldDebugDiff } from '@/lib/world-debug'
+import {
+  buildDownedPlayerFinalNarrationInstruction,
+  buildEngineTruthPacket,
+  formatEngineTruthPacket,
+  type EngineTruthPacket,
+} from '@/lib/engine-truth-packet'
+import {
+  buildContextualNoFallbackNarrative,
+  buildDebugStateNarrative,
+  buildDryadOffenseNarrative,
+  buildLocationReconcileNarrative,
+  buildLocationReconcileNeedsTargetNarrative,
+  buildLocationReconcileSameRoomNarrative,
+  buildDirectiveSceneNarrative,
+  buildMcpRuleErrorNarrative,
+  buildOralFallbackNarrative,
+  buildPlayerDownNarrative,
+  buildQuestGuidanceNarrative,
+  buildSocialFallbackNarrative,
+  detectDryadInformationRequest,
+  detectDryadOffense,
+  getCurrentRoomName,
+  isSocialNarrationContext,
+  looksLikeGenericSceneFallback,
+  normalizeNarrativeForOralPlayback,
+  resolveLocationReconcileRoomId,
+  trimIncompleteTrailingSentence,
+} from '@/lib/dm-narration-guards'
 
 export const maxDuration = 60
 
@@ -606,6 +632,14 @@ function serializeGameState(gameState: GameState): string {
   return JSON.stringify(compact)
 }
 
+function dmPromptBuildOptions(): DmPromptBuildOptions {
+  return {
+    moduleContextMaxChars: MODULE_CONTEXT_MAX_CHARS,
+    serializeGameState,
+    textBlockWithPromptCache,
+  }
+}
+
 // ── Compression de l'historique ───────────────────────────────────────────────
 // Appel séparé à Haiku pour résumer les anciens échanges en un paragraphe court.
 // Le résumé est renvoyé au client qui le stocke et le renvoie à chaque requête.
@@ -780,265 +814,6 @@ function historyToAnthropicMessages(turns: ConversationTurn[]): Anthropic.Messag
 }
 
 // ── System prompts ────────────────────────────────────────────────────────────
-interface AdventureRoomSection {
-  id: string
-  text: string
-}
-
-function extractAdventureRoomSections(adventureModule: string): AdventureRoomSection[] {
-  const headingRegex = /^## Salle\s+(\d+)[^\n]*$/gim
-  const headings: Array<{ id: string; index: number }> = []
-  let match: RegExpExecArray | null
-
-  while ((match = headingRegex.exec(adventureModule)) !== null) {
-    headings.push({ id: match[1], index: match.index })
-  }
-
-  return headings.map((heading, index) => {
-    const nextHeading = headings[index + 1]?.index ?? adventureModule.length
-    return {
-      id: heading.id,
-      text: adventureModule.slice(heading.index, nextHeading).trim(),
-    }
-  })
-}
-
-function adventureOverview(adventureModule: string): string {
-  const firstRoomIndex = adventureModule.search(/^## Salle\s+\d+/im)
-  return (firstRoomIndex >= 0 ? adventureModule.slice(0, firstRoomIndex) : adventureModule).trim()
-}
-
-function compactAdventureOverview(adventureModule: string): string {
-  const overview = adventureOverview(adventureModule)
-  const mapIndex = overview.search(/^## Carte des salles/im)
-  return (mapIndex >= 0 ? overview.slice(0, mapIndex) : overview).trim()
-}
-
-function roomContainsCell(section: AdventureRoomSection, cell: { x: number; y: number }): boolean {
-  const zone = section.text.match(/\*\*Zone\*\*\s*:\s*x:(\d+)-(\d+),?\s*y:(\d+)-(\d+)/i)
-  if (!zone) return false
-
-  const minX = Number(zone[1])
-  const maxX = Number(zone[2])
-  const minY = Number(zone[3])
-  const maxY = Number(zone[4])
-
-  return cell.x >= minX && cell.x <= maxX && cell.y >= minY && cell.y <= maxY
-}
-
-function inferAdventureRoomId(sections: AdventureRoomSection[], cell: { x: number; y: number }): string | null {
-  return sections.find(section => roomContainsCell(section, cell))?.id ?? null
-}
-
-function limitModuleContext(text: string): string {
-  if (MODULE_CONTEXT_MAX_CHARS <= 0 || text.length <= MODULE_CONTEXT_MAX_CHARS) {
-    return text
-  }
-
-  return `${text.slice(0, MODULE_CONTEXT_MAX_CHARS).trimEnd()}\n\n[contexte module tronque a ${MODULE_CONTEXT_MAX_CHARS} caracteres]`
-}
-
-function selectAdventureModuleContext(adventureModule: string, gameState: GameState): string {
-  const safeAdventureModule = sanitizeAdventureModuleToolContracts(adventureModule)
-  const sections = extractAdventureRoomSections(safeAdventureModule)
-  const sectionById = new Map(sections.map(section => [section.id, section]))
-  const inferredPlayerRoomId = inferAdventureRoomId(sections, gameState.player.position)
-  const selectedRoomIds = new Set<string>()
-
-  if (gameState.currentRoomId) selectedRoomIds.add(gameState.currentRoomId)
-  if (inferredPlayerRoomId) selectedRoomIds.add(inferredPlayerRoomId)
-
-  for (const roomId of gameState.roomsVisited.slice(-2)) {
-    selectedRoomIds.add(roomId)
-  }
-
-  for (const monster of Object.values(gameState.monsters)) {
-    if (!monster.isAlive) continue
-    const monsterRoomId = inferAdventureRoomId(sections, monster.position)
-    if (monsterRoomId) selectedRoomIds.add(monsterRoomId)
-  }
-
-  if (selectedRoomIds.size === 0 && sectionById.has('1')) {
-    selectedRoomIds.add('1')
-  }
-
-  const activeMonsters = Object.values(gameState.monsters)
-    .filter(monster => monster.isAlive)
-    .map(monster => `- ${monster.name} (${monster.type}) a (${monster.position.x},${monster.position.y})`)
-
-  const parts = [
-    compactAdventureOverview(safeAdventureModule),
-    [
-      'ETAT MODULE:',
-      `- salle actuelle serveur: ${gameState.currentRoomId ?? 'inconnue'}`,
-      `- salle inferree depuis la position joueur: ${inferredPlayerRoomId ?? 'inconnue'}`,
-      `- salles visitees recentes: ${gameState.roomsVisited.slice(-4).join(', ') || 'aucune'}`,
-      `- salles incluses ci-dessous: ${Array.from(selectedRoomIds).join(', ') || 'aucune'}`,
-    ].join('\n'),
-  ]
-
-  if (activeMonsters.length > 0) {
-    parts.push(`MONSTRES VIVANTS:\n${activeMonsters.join('\n')}`)
-  }
-
-  for (const roomId of selectedRoomIds) {
-    const section = sectionById.get(roomId)
-    if (section) parts.push(section.text)
-  }
-
-  return limitModuleContext(parts.join('\n\n---\n\n'))
-}
-
-function buildStaticPrompt(): string {
-  const ctx = loadContextFiles()
-
-  return `# CONTRAINTE ABSOLUE — LIS CECI EN PREMIER
-
-Tu résous EXACTEMENT et UNIQUEMENT l'action écrite par le joueur dans CE message.
-PAS d'anticipation. PAS d'enchaînement. PAS de "et ensuite logiquement...".
-
-Exemples INTERDITS :
-- "un ami crie à la porte" → NE PAS le faire entrer, NE PAS le déplacer, NE PAS explorer.
-- "j'avance vers la porte" → NE PAS ouvrir la porte, NE PAS entrer dans la pièce.
-- "j'attaque le gobelin" → NE PAS résoudre le tour du monstre ensuite.
-
-Après ta réponse : STOP total. Tu attends le prochain message du joueur.
-
----
-
-Tu es un Dungeon Master de D&D 5e. Tu narres en français, au présent, de façon brève et dense (1-2 phrases par défaut, 3 seulement si un résultat mécanique complexe l'exige).
-
-FORMAT ORAL:
-- La réponse doit pouvoir être lue telle quelle à voix haute.
-- Français naturel et correct: accents, accords simples, phrases propres. Pas de franglais gratuit.
-- Reste dans la fiction. Pas d'excuse, pas de commentaire méta, pas de mention du système, des prompts, du moteur, des tools, de MCP ou de l'IA.
-- Pas de Markdown, pas de liste, pas de titre, pas de didascalie entre parenthèses.
-- Ne donne pas de coordonnées ni d'ID technique sauf si le joueur les demande explicitement.
-- Ne termine pas par un menu d'options. Une question courte et naturelle est permise seulement si elle sert vraiment la scène.
-- Si une action est impossible ou refusée par les règles, formule-le en fiction et en une phrase.
-- Ne déclare jamais "fin de quête", "fin de campagne", "objectif accompli" ou une conclusion alternative sauf si le joueur demande explicitement d'arrêter.
-- Si le joueur annonce un plan long, accepte l'intention mais ne saute pas des heures ou des jours: narre seulement la prochaine minute jouable.
-
-RYTHME DE TABLE:
-- Court ne veut pas dire sec: vise 2-5 phrases courtes avec un mouvement, une réaction ou une information utile.
-- Évite les réponses purement atmosphériques. Chaque réponse doit faire avancer la scène, même légèrement.
-- Ajoute une pression active seulement si elle est soutenue par l'etat, le module, l'historique recent ou le dernier resultat mecanique.
-- Termine par une affordance jouable concrete: une prise, une piste, un risque ou une reaction visible; jamais par un evenement qui resout la prochaine action a la place du joueur.
-- Si un PNJ répond, donne une réplique savoureuse ou une décision visible, pas seulement une description.
-- Si le joueur semble perdu, relance par un événement de scène ou une piste évidente, sans lui donner d'ordre.
-- Termine sur une tension jouable, pas sur une formule froide. Évite "que fais-tu ?" et "vous allez où ?".
-- Si le joueur critique le style, la longueur, le système ou un bug, ne réponds pas à la critique et ne t'excuse pas: applique la correction silencieusement puis reprends la scène en fiction.
-
-VOIX ET STYLE:
-- Écris comme un conteur de table vif: concret, oral, légèrement malicieux, jamais administratif.
-- Le joueur doit comprendre ce qui est intéressant maintenant: danger, objectif, piste ou conséquence.
-- Les PNJ veulent quelque chose. Fais-les interrompre, marchander, provoquer ou révéler une information exploitable.
-- Bannis les phrases molles: "tu restes dans...", "aucun ennemi visible...", "c'est ton tour", "à toi de jouer", "choisis:", "quelque chose semble...".
-- Si la scène se tasse, injecte un fait nouveau plutôt qu'une description immobile.
-
-PERSONNAGE:
-${ctx.playerCharacter}
-
-RÈGLES JOUEUR:
-${ctx.playerRules}
-
-RÈGLES DM:
-${ctx.dmRules}
-
-MODULE:
-Le contexte de module pertinent est fourni dans le bloc dynamique "CONTEXTE MODULE PERTINENT".
-
-LANGAGE D'ACTIONS MOTEUR:
-${describeGameActionLanguageForPrompt()}
-
-RÈGLES MÉCANIQUES:
-- Tout calcul (attaque, dégâts, déplacement, HP, sauvegarde) → tools MCP obligatoires.
-- Test de caractéristique ou compétence (Persuasion, Intimidation, Athlétisme, Perception, forcer une porte, chercher, mentir, négocier) → roll_ability_check. N'utilise resolve_saving_throw que pour résister à un danger, sort, poison, piège ou effet subi.
-- Boire une potion de soin → use_healing_potion obligatoire. Ne fais jamais seulement roll_dice pour une potion: l'outil doit aussi appliquer les PV et consommer l'objet/action.
-- Ouvrir/fouiller un tiroir, coffre, armoire, livre ou objet local ne déplace jamais le pion. move_token sert seulement à changer de case/salle ou franchir une porte/seuil.
-- Les tools MCP refusent les actions illégales (mauvais tour, cible morte, hors portée, déplacement trop long). Si un tool renvoie une erreur, narre sobrement pourquoi l'action échoue ou demande une action valide.
-- Déplacement explicite du joueur → move_token AVANT de narrer.
-- Début de combat / rencontre de salle → start_encounter en un seul tool seulement si le trigger du module est atteint, narre, STOP. Ne jamais inventer d'IDs de monstres.
-- Rencontres connues: bakery_floor_goblins (salle 8), loading_dock_patrol (salle 7), grammy_apartment_guards (salle 9), violet_fungus_heap (salle 3).
-- Salle 7: entrer discrètement par le quai ne déclenche pas la patrouille; elle apparaît seulement si le joueur l'affronte, fait du bruit, se montre ou rate une approche.
-- Salle 8: entrer sur le sol de la boulangerie ne déclenche pas seul les gobelins. Ils tombent des poutres si le joueur touche/manipule les objets enchantés ou ouvre un four, ou s'il les provoque explicitement.
-- Salle 2: les dryades du verger ne sont pas une rencontre de combat prédéfinie. Si elles sont offensées, elles esquivent, lancent des pommes pourries et mettent la pression; ne déclenche pas start_encounter pour elles.
-- Tour joueur en combat → resolve_player_attack ou saving_throw, puis STOP. Pour une cible spatiale ("a ma droite", "le plus proche"), utilise resolve_player_attack avec targetHint.
-- Si le joueur nomme une cible ("Grukk", "Chef Grukk", "hobgobelin"), resolve_player_attack doit recevoir targetName ou targetId. Ne remplace jamais une cible nommée par "nearest".
-- Joueur à 0 PV en combat → il est inconscient: pas d'attaque, pas de mouvement, pas de défense active. S'il tente/attend/continue au tour joueur, utilise roll_death_save, puis STOP.
-- Si le joueur passe/attend son tour en combat → pass_turn, puis STOP.
-- Ne jamais appeler next_turn : outil interne réservé au serveur.
-- Tour monstre → ne résous pas toi-même. Le serveur joue les monstres automatiquement, puis tu narres le résultat.
-- Fin de combat avec adversaires encore actifs → end_combat avec force=true seulement si fuite, reddition ou accord narratif crédible.
-- HP monstres : vigoureux / légèrement blessé / gravement blessé / à l'agonie.
-
-CONTRAT ETAT/NARRATION:
-- Si l'etat indique exploration avec 0 monstre vivant, tu ne peux pas narrer des ennemis presents dans la salle, qui entrent, attaquent, degainent, reperent le heros ou bloquent son chemin.
-- Pour faire apparaitre une rencontre reelle, appelle start_encounter avant de narrer sa presence.
-- Si ce sont seulement des bruits, rumeurs ou mouvements hors champ, dis-le explicitement: aucun ennemi n'est encore sur la carte et le combat n'est pas engage.
-- Si tu detectes que ta narration contredirait l'etat moteur, corrige silencieusement et reste dans la fiction. Ne montre jamais le diagnostic au joueur.`
-}
-
-function buildDynamicPrompt(gameState: GameState, summaryContext: string | undefined): string {
-  const parts: string[] = [`ÉTAT DU JEU: ${serializeGameState(gameState)}`]
-  const ctx = loadContextFiles()
-  parts.push(`CONTEXTE MODULE PERTINENT:\n${selectAdventureModuleContext(ctx.adventureModule, gameState)}`)
-
-  if (summaryContext) {
-    parts.push(`RÉSUMÉ DE LA SESSION (échanges précédents compressés):\n${summaryContext}`)
-  }
-  return parts.join('\n\n')
-}
-
-function buildSystemBlocks(
-  gameState: GameState,
-  summaryContext: string | undefined
-): Anthropic.TextBlockParam[] {
-  return [
-    textBlockWithPromptCache(buildStaticPrompt()),
-    {
-      type: 'text',
-      text: buildDynamicPrompt(gameState, summaryContext),
-    },
-  ]
-}
-
-function buildNarrationStaticPrompt(): string {
-  return `Tu es le Dungeon Master d'une partie D&D 5e en français.
-Narre uniquement la conséquence immédiate de l'action du joueur.
-Respecte strictement les résultats mécaniques fournis: jets, dégâts, morts, positions, tour courant.
-Ne lance aucun dé, n'invente aucun nouvel ennemi, ne résous aucun tour futur.
-Salle 2: les dryades du verger ne sont pas une rencontre de combat prédéfinie. Si elles sont offensées, elles esquivent, lancent des pommes pourries et mettent la pression; ne déclenche pas de combat contre un autre monstre.
-Joueur à 0 PV: il est inconscient. Ne lui propose pas d'attaque ou de mouvement; un tour joueur inconscient sert à lancer roll_death_save.
-Si currentTurn=player et que le joueur est inconscient, la main visible correspond au jet de mort: ne dis pas que les ennemis vont agir maintenant ni que c'est à eux de frapper.
-Réponse brève: 2-5 phrases courtes, au présent, style vivant mais clair.
-Tutoiement strict pour le joueur: utilise tu/te/ton/ta/tes, jamais vous/votre/vos.
-Français naturel et correct: accents, accords simples, phrases propres. Pas de franglais gratuit.
-Format vocal: pas de Markdown, pas de liste, pas de titre, pas de parenthèse, pas d'excuse, pas de commentaire méta, pas de mention du système, des prompts, du moteur, des tools, de MCP ou de l'IA.
-Ne donne pas de coordonnées ni d'ID technique sauf si le joueur les demande explicitement.
-Ne termine pas par un menu d'options. Évite "que fais-tu ?" et "vous allez où ?"; préfère une tension concrète ou une piste en fiction.
-Ne déclare pas de fin de quête/campagne ni de conclusion alternative sauf demande explicite. Pas de time-skip: seulement la prochaine minute jouable.
-Donne de l'élan: un mouvement, une réplique, une menace, une opportunité ou une information exploitable. Évite les sorties qui ne font que décrire une ambiance.
-Écris comme un conteur de table vif: concret, oral, légèrement malicieux, jamais administratif.
-Bannis les phrases molles: "tu restes dans...", "aucun ennemi visible...", "c'est ton tour", "à toi de jouer", "choisis:", "quelque chose semble...".
-Les PNJ veulent quelque chose. Fais-les interrompre, marchander, provoquer ou révéler une information exploitable.
-Si le joueur semble perdu, relance par un événement de scène ou une piste évidente, sans lui donner d'ordre.
-Si le joueur critique le style, la longueur, le système ou un bug, ne réponds pas à la critique: applique la correction silencieusement et reprends la scène en fiction.`
-}
-
-function buildNarrationSystemBlocks(
-  gameState: GameState,
-  summaryContext: string | undefined
-): Anthropic.TextBlockParam[] {
-  return [
-    textBlockWithPromptCache(buildNarrationStaticPrompt()),
-    {
-      type: 'text',
-      text: buildDynamicPrompt(gameState, summaryContext),
-    },
-  ]
-}
-
 async function syncMCPState(gameState: GameState, sessionId: string | undefined): Promise<GameState> {
   const startedAt = Date.now()
   logEvent('debug', 'dm.mcp_sync.start', {
@@ -1098,561 +873,9 @@ function mcpErrorCode(result: unknown): string | null {
     : null
 }
 
-function buildMcpRuleErrorNarrative(errorResult: unknown, gameState: GameState, toolsUsed: string[] = []): string {
-  const code = mcpErrorCode(errorResult)
-  const roomName = getCurrentRoomName(gameState)
-  const detail = isObjectRecord(errorResult) && isObjectRecord(errorResult.detail) ? errorResult.detail : {}
-  const concreteAffordances = () => buildSceneSurface(gameState).affordances
-    .filter(affordance => affordance.enabled)
-    .map(affordance => affordance.target?.name ?? affordance.label)
-    .filter(Boolean)
-    .slice(0, 4)
-
-  if (code === 'ACTION_ALREADY_USED') {
-    if (gameState.phase === 'combat') {
-      return gameState.currentTurn === 'player'
-        ? "Ton elan arrive trop tard: ton action est deja depensee. Une nouvelle ouverture revient, mais il faut choisir un geste net."
-        : "Ton elan arrive trop tard: ton action est deja depensee. Les adversaires reprennent l'initiative dans la cohue."
-    }
-    return "Ton geste arrive trop tard: l'ouverture que tu visais s'est deja refermee."
-  }
-
-  if (code === 'ROOM_EVENT_LOCATION_MISMATCH' && toolsUsed.includes('move_token')) {
-    return roomName
-      ? `Tu arrives dans ${roomName}. Le decor reagit mal a ton irruption, mais rien de plus ne se declenche encore.`
-      : "Tu avances. Le decor reagit mal a ton irruption, mais rien de plus ne se declenche encore."
-  }
-
-  if (code === 'TURN_ACTION_REQUIRED') {
-    return "Pas encore: il te reste une vraie action a poser avant de laisser filer ton tour."
-  }
-
-  if (code === 'ACTION_NOT_AFFORDED') {
-    if (gameState.player.hp.current <= 0 || gameState.player.conditions.includes('unconscious')) {
-      return buildPlayerDownNarrative(gameState)
-    }
-    const options = concreteAffordances()
-    return options.length > 0
-      ? `L'etat moteur ne valide pas cette action maintenant. Les prises concretes ici sont: ${options.join(', ')}.`
-      : "L'etat moteur ne valide pas cette action maintenant. Donne l'effet voulu, et je le rattache a une action ou une improvisation persistante."
-  }
-
-  if (code === 'WORLD_OBJECT_AMBIGUOUS') {
-    const candidates = Array.isArray(detail.candidates)
-      ? detail.candidates
-          .map(candidate => isObjectRecord(candidate) && typeof candidate.name === 'string' ? candidate.name : null)
-          .filter((name): name is string => Boolean(name))
-      : []
-    return candidates.length > 0
-      ? `Il y a plusieurs cibles possibles ici: ${candidates.slice(0, 4).join(', ')}. Dis laquelle tu vises, et je resous le geste.`
-      : "Il y a plusieurs cibles possibles ici. Precise laquelle tu vises, et je resous le geste."
-  }
-
-  if (code === 'WORLD_OBJECT_NOT_AFFORDED') {
-    const surface = buildSceneSurface(gameState)
-    const visibleTargets = surface.objects
-      .filter(object => object.actionKinds.length > 0)
-      .map(object => object.name)
-      .slice(0, 4)
-    return visibleTargets.length > 0
-      ? `La cible n'est pas claire dans la scene actuelle. Tu peux viser ${visibleTargets.join(', ')}.`
-      : "Je ne vois pas de cible manipulable ici pour ce geste. Donne un objet concret ou change d'approche."
-  }
-
-  if (code === 'NOT_CURRENT_TURN' || code === 'PLAYER_TURN_REQUIRED') {
-    return "Pas maintenant: le rythme du combat ne te laisse pas cette ouverture."
-  }
-
-  if (code === 'CELL_OCCUPIED') {
-    return "Tu t'elances, mais la place est deja prise; il faut trouver une autre ligne ou bousculer la situation."
-  }
-
-  if (code === 'MOVE_TOO_FAR' || code === 'OUT_OF_BOUNDS') {
-    return "Tu cherches l'angle, mais ce mouvement est trop court ou trop risque pour aboutir maintenant."
-  }
-
-  if (isObjectRecord(errorResult) && typeof errorResult.error === 'string') {
-    const options = concreteAffordances()
-    return options.length > 0
-      ? `Cette action est refusee par l'etat actuel. Tu peux plutot t'appuyer sur: ${options.join(', ')}.`
-      : "Cette action est refusee par l'etat actuel; il me faut une cible ou un effet plus exploitable pour la resoudre."
-  }
-
-  return "Cette action n'a pas abouti dans l'etat actuel; je garde le monde en place au lieu d'inventer une consequence."
-}
-
 function hasCompletedCurrentAction(gameState: GameState | undefined | null): boolean {
   if (!gameState || gameState.phase !== 'combat' || !gameState.currentTurn) return false
   return Boolean(gameState.actionUsed?.[gameState.currentTurn])
-}
-
-type OralNarrativeGuardResult = {
-  narrative: string
-  changed: boolean
-  fallbackUsed: boolean
-  reasons: string[]
-  removedLineCount: number
-  originalLength: number
-  finalLength: number
-}
-
-function getCurrentRoomName(gameState: GameState): string | null {
-  return ADVENTURE_ROOMS.find(room => room.id === gameState.currentRoomId)?.name ?? null
-}
-
-function buildDirectiveSceneNarrative(gameState: GameState): string {
-  if (gameState.phase === 'combat') {
-    if (gameState.player.hp.current <= 0) {
-      return buildPlayerDownNarrative(gameState)
-    }
-
-    const alive = aliveMonsters(gameState)
-    const aliveNames = Array.from(new Set(alive.map(monster => monster.name)))
-    const threatVerb = alive.length <= 1 ? 'tient' : 'tiennent'
-    const pressureVerb = alive.length <= 1 ? 'garde' : 'gardent'
-    const namedThreats = alive.length > aliveNames.length
-      ? `${alive.length} adversaires, dont ${aliveNames.join(', ')}`
-      : alive.length === 0
-      ? "le danger"
-      : aliveNames.length === 1
-        ? aliveNames[0]
-        : `${aliveNames.slice(0, -1).join(', ')} et ${aliveNames[aliveNames.length - 1]}`
-    const lastKill = [...gameState.combatLog].reverse().find(entry =>
-      /\bMORT\b/.test(entry.mechanicalDetail ?? '') &&
-      /\battaque\b/i.test(entry.action)
-    )
-    const killedName = lastKill?.action.match(/attaque (.+?) avec/i)?.[1]
-    const killSentence = killedName ? `${killedName} tombe pour de bon. ` : ''
-
-    return gameState.currentTurn === 'player'
-      ? `${killSentence}Le combat ne lache pas: ${namedThreats} ${threatVerb} encore la salle, mais une ouverture se dessine dans la cohue.`
-      : `${killSentence}Le combat ne lache pas: ${namedThreats} ${pressureVerb} la pression, et chaque pas compte.`
-    return gameState.currentTurn === 'player'
-      ? "Le combat se resserre autour de toi. L'ennemi le plus proche baisse sa garde une fraction de seconde, tandis qu'une échappée s'ouvre près du décor."
-      : "Le combat continue sans pause. Quelque chose heurte le sol derrière toi, et l'air se charge d'une menace immédiate."
-  }
-
-  switch (gameState.currentRoomId) {
-    case '1':
-      return "La façade de la boulangerie grince sous le vent. Derrière la grande porte, un choc sourd répond presque à ton souffle; sur le flanc, le quai de chargement reste entrouvert dans l'ombre."
-    case '2':
-      return "Dans le verger, les branches se referment comme des doigts au-dessus de toi. Une pomme tombe seule dans l'herbe, puis roule vers le mur de la boulangerie où la piste devient plus fraîche."
-    case '3':
-      return "Le tas de déchets soupire sous les gravats, avec une odeur aigre de cave humide. Un éclat métallique dépasse près de ta botte, tandis que la boulangerie craque plus loin."
-    case '4':
-      return "Dans l'entrée, les traces les plus fraîches rayent la poussière vers les fours. Au-dessus, l'appartement de Grammy laisse filtrer une odeur de fourrure et de viande sèche."
-    case '5':
-      return "Le bureau semble mort, mais un tiroir mal fermé tremble encore contre le bois. Entre deux registres moisis, un papier plus récent dépasse, taché de sucre et de boue."
-    case '7':
-      return "Au quai de chargement, la porte latérale bat doucement contre son rail. De l'autre côté, les fours claquent dans le noir comme des mâchoires mal réglées."
-    case '8':
-      return "Au sol de la boulangerie, les fours claquent et les poutres grincent au-dessus de toi. La réserve pue la farine rance, et quelque chose vient de faire tomber un moule derrière une table renversée."
-    case '9':
-      return "Dans l'appartement de Grammy, l'odeur de fourrure et de viande séchée colle aux rideaux. Un trophée mal fixé pivote sur le mur, comme si quelqu'un venait juste de le frôler."
-    default:
-      return "La piste se brouille, mais elle n'est pas morte. Un courant d'air froid file le long du sol et désigne une ouverture que tu n'avais pas remarquée."
-  }
-}
-
-function buildOralFallbackNarrative(gameState: GameState, toolsUsed: string[]): string {
-  const roomName = getCurrentRoomName(gameState)
-
-  if (gameState.phase === 'combat' && gameState.player.hp.current <= 0) {
-    return buildPlayerDownNarrative(gameState)
-  }
-
-  if (toolsUsed.includes('start_encounter')) {
-    return buildDirectiveSceneNarrative(gameState)
-  }
-
-  if (toolsUsed.includes('move_token')) {
-    return roomName
-      ? `Tu arrives dans ${roomName}; un detail exploitable accroche aussitot ton attention.`
-      : "Tu avances; le decor change assez pour t'offrir une prise claire."
-  }
-
-  if (gameState.phase === 'combat') {
-    return gameState.currentTurn === 'player'
-      ? "Le combat se resserre autour de toi; l'ouverture est à toi."
-      : "Le combat continue dans une tension brutale."
-  }
-
-  const options = buildSceneSurface(gameState).affordances
-    .filter(affordance => affordance.enabled)
-    .map(affordance => affordance.target?.name ?? affordance.label)
-    .filter(Boolean)
-    .slice(0, 4)
-  return options.length > 0
-    ? `Rien de nouveau n'est tranche par le moteur. Les prises concretes ici sont: ${options.join(', ')}.`
-    : "Rien de nouveau n'est tranche par le moteur; precise la cible ou l'effet voulu."
-}
-
-function looksLikeGenericSceneFallback(text: string): boolean {
-  const normalized = normalizeFrenchText(text)
-  return [
-    /\bla piece gronde\b/,
-    /\bla scene (?:avance|progresse)\b/,
-    /\bun detail concret\b/,
-    /\bla facade de la boulangerie grince\b/,
-    /\bdans le verger, les branches se referment\b/,
-    /\bau quai de chargement, la porte laterale\b/,
-    /\bau sol de la boulangerie, les fours claquent\b/,
-    /\bdans l'appartement de grammy, l'odeur\b/,
-    /\bla piste se brouille\b/,
-  ].some(pattern => pattern.test(normalized))
-}
-
-function buildContextualNoFallbackNarrative(
-  gameState: GameState,
-  actionIntent: GameActionIntent,
-  intentInterpreter?: IntentInterpreterTurnResult
-): string {
-  const clarification = intentInterpreter?.output?.clarificationQuestion
-  if (clarification) return clarification
-
-  const surface = buildSceneSurface(gameState)
-  const npc = surface.npcs[0]
-  if (npc && ['talk', 'ask', 'persuade', 'threaten', 'social'].includes(actionIntent.kind)) {
-    return `${npc.name} te fixe et attend quelque chose de plus net: une question, une offre, une menace, ou un objet a montrer.`
-  }
-
-  const enabledAffordances = surface.affordances
-    .filter(affordance => affordance.enabled)
-    .map(affordance => affordance.target?.name ?? affordance.label)
-    .filter(Boolean)
-    .slice(0, 4)
-  if (enabledAffordances.length > 0) {
-    return `Je comprends l'intention, mais il me manque une cible nette. Ici, les prises claires sont: ${enabledAffordances.join(', ')}.`
-  }
-
-  return "Je comprends l'intention, mais je ne veux pas inventer une consequence sans fait moteur. Precise la cible ou l'effet voulu, et je le resous proprement."
-}
-
-const SOCIAL_ACTION_KINDS = new Set<GameActionKind>([
-  'talk',
-  'ask',
-  'persuade',
-  'threaten',
-  'show_item',
-  'give_item',
-  'social',
-])
-
-const SOCIAL_EVENT_TYPES = new Set<EngineEvent['type']>([
-  'npc.disposition_changed',
-  'npc.information_revealed',
-  'item.shown',
-  'item.given',
-  'alarm.raised',
-  'action.blocked',
-])
-
-function isSocialNarrationContext(
-  actionIntent: GameActionIntent,
-  toolsUsed: string[],
-  newWorldEvents: EngineEvent[] = []
-): boolean {
-  return SOCIAL_ACTION_KINDS.has(actionIntent.kind) ||
-    toolsUsed.some(toolName => /^world\.(talk|ask|persuade|threaten|show_item|give_item)$/.test(toolName)) ||
-    newWorldEvents.some(event => SOCIAL_EVENT_TYPES.has(event.type))
-}
-
-function visibleNpcInCurrentRoom(gameState: GameState): WorldState['npcs'][string] | null {
-  if (!gameState.currentRoomId || !gameState.world?.npcs) return null
-  const npcs = Object.values(gameState.world.npcs)
-    .filter(npc => npc.roomId === gameState.currentRoomId)
-  return npcs.length === 1 ? npcs[0] : null
-}
-
-function npcForSocialEvent(gameState: GameState, event: EngineEvent | undefined): WorldState['npcs'][string] | null {
-  const targetId = typeof event?.targetId === 'string' ? event.targetId : null
-  if (targetId && gameState.world?.npcs?.[targetId]) return gameState.world.npcs[targetId]
-  return visibleNpcInCurrentRoom(gameState)
-}
-
-function buildSocialFallbackNarrative(
-  gameState: GameState,
-  actionIntent: GameActionIntent,
-  toolsUsed: string[],
-  newWorldEvents: EngineEvent[] = []
-): string | null {
-  if (!isSocialNarrationContext(actionIntent, toolsUsed, newWorldEvents)) return null
-
-  const latestSocialEvent = [...newWorldEvents].reverse().find(event => SOCIAL_EVENT_TYPES.has(event.type))
-  if (latestSocialEvent?.summary) {
-    const followUp = latestSocialEvent.type === 'npc.information_revealed'
-      ? "Tu as maintenant une piste exploitable."
-      : latestSocialEvent.type === 'npc.disposition_changed'
-        ? "L'echange reste ouvert, mais son attitude a vraiment change."
-        : latestSocialEvent.type === 'alarm.raised'
-          ? "La tension monte aussitot autour de vous."
-          : "La conversation garde une prise concrete."
-    return `${latestSocialEvent.summary} ${followUp}`
-  }
-
-  const npc = npcForSocialEvent(gameState, latestSocialEvent)
-  if (npc) {
-    return `${npc.name} reste face a toi, assez proche pour que tes mots comptent. Pose ta question, formule ta demande, ou change d'approche.`
-  }
-
-  return "La conversation ne trouve pas encore d'interlocuteur clair. Nomme la personne a qui tu parles, et je garde l'echange dans la scene."
-}
-
-function splitIntoSentences(text: string): string[] {
-  const sentences: string[] = []
-  let start = 0
-  let index = 0
-  let inQuote = false
-
-  while (index < text.length) {
-    const char = text[index]
-    if (char === '"' || char === '«' || char === '“') {
-      inQuote = char === '"' ? !inQuote : true
-      index++
-      continue
-    }
-
-    if (char === '»' || char === '”') {
-      inQuote = false
-      index++
-      continue
-    }
-
-    if (!'.!?'.includes(char)) {
-      index++
-      continue
-    }
-
-    let end = index + 1
-    while (end < text.length && '.!?'.includes(text[end])) end++
-    let closesQuote = false
-    while (end < text.length && /["»”]/.test(text[end])) {
-      closesQuote = true
-      end++
-    }
-    if (inQuote && !closesQuote) {
-      index = end
-      continue
-    }
-    if (closesQuote) inQuote = false
-
-    const whitespaceMatch = text.slice(end).match(/^\s+/)
-    const nextIndex = end + (whitespaceMatch?.[0].length ?? 0)
-    const nextChar = text[nextIndex]
-    const startsNewSentence = !nextChar || /["'«“A-ZÀÂÄÉÈÊËÎÏÔÖÙÛÜÇ]/.test(nextChar)
-
-    if (startsNewSentence) {
-      const sentence = text.slice(start, end).trim()
-      if (sentence) sentences.push(sentence)
-      start = nextIndex
-      index = nextIndex
-      continue
-    }
-
-    index = end
-  }
-
-  const tail = text.slice(start).trim()
-  if (tail) sentences.push(tail)
-  return sentences
-}
-
-function trimIncompleteTrailingSentence(text: string): { text: string; changed: boolean } {
-  const trimmed = text.trim()
-  if (!trimmed) return { text: '', changed: text !== '' }
-  if (/[.!?…]["'»”]?$/.test(trimmed)) return { text: trimmed, changed: trimmed !== text }
-
-  for (let index = trimmed.length - 1; index >= 0; index--) {
-    if (!'.!?…'.includes(trimmed[index])) continue
-
-    let end = index + 1
-    while (end < trimmed.length && /["'»”]/.test(trimmed[end])) end++
-    const complete = trimmed.slice(0, end).trim()
-    return { text: complete, changed: complete !== trimmed }
-  }
-
-  return { text: '', changed: true }
-}
-
-function lineLooksLikeMetaCommentary(line: string): boolean {
-  const normalized = normalizeFrenchText(line)
-  if (!normalized) return false
-
-  const containsPositionCoordinates = /\(\s*\d{1,2}\s*,\s*\d{1,2}\s*\)/.test(line) &&
-    /\b(actuellement|position|coordonnees?|salle|tu es)\b/.test(normalized)
-  if (containsPositionCoordinates) return true
-
-  if (/^\s*(?:[-*+]|\d+[.)])\s+/.test(line)) return true
-
-  return [
-    /\b(debug|moteur|mcp|tool|tools|outil|llm|prompt|systeme|etat moteur|contrat)\b/,
-    /\b(action mecanique|resultats? mecaniques?|mutation de l'etat|etat attendu|dernier message du joueur)\b/,
-    /\b(je comprends le systeme|en attente de ton action|tu as entierement raison|tu as raison|vous avez raison)\b/,
-    /\b(tu es actuellement|tu es a\s+(?:en\s+)?salle\s+\d+|salle\s+\d+\s+[-:])\b/,
-    /\b(excuse-moi|desole|erreur de ma part|j'aurais du|j aurais du|je vais corriger|merci de cette correction)\b/,
-    /\b(je dois clarifier|non, ce message n'est pas|ce message n'est pas|on continue|laissez-moi recommencer|plus de substance)\b/,
-    /\b(que fais-tu|que faites-vous|qu[' ]?allez-vous faire|qu[' ]?en est-il|ou veux-tu aller ensuite|vous allez ou|tu vas ou|ou allez-vous|qu[' ]?est-ce que tu fais|deplacement,\s*attaque|attaque,\s*test|roleplay pur)\b/,
-    /\b(c'est ton tour|c est ton tour|c'est a toi|c est a toi|a toi de jouer|aucun ennemi visible|tu restes dans|quelque chose semble)\b|\bchoisis\s*:|\bchoisissez\s*:/,
-    /\b(appeler\s+\w+|move_token|start_encounter|resolve_player_attack|pass_turn|roll_dice)\b/,
-    /\b(fin de quete|fin de campagne|quete alternative|objectif accompli|mission accomplie)\b/,
-    /\b(heures suivantes|jours suivants|semaines suivantes|premiere fournee|faire fortune)\b/,
-  ].some(pattern => pattern.test(normalized))
-}
-
-function isMetaOnlyNarrative(text: string): boolean {
-  const lines = text
-    .split('\n')
-    .map(line => line.trim())
-    .filter(Boolean)
-
-  return lines.length > 0 && lines.every(lineLooksLikeMetaCommentary)
-}
-
-function looksLikeEnglishDrift(fragment: string): boolean {
-  const normalized = normalizeFrenchText(fragment)
-  const englishMarkers = normalized.match(/\b(eyes|shine|genuine|really|guys|friend|quest|campaign|with|the|you|your)\b/g)
-  return (englishMarkers?.length ?? 0) >= 2
-}
-
-function hasMixedSecondPersonAddress(fragment: string): boolean {
-  const normalized = normalizeFrenchText(fragment)
-  return /\b(tu|te|toi|ton|ta|tes)\b|t'/.test(normalized) &&
-    /\b(vous|votre|vos)\b/.test(normalized)
-}
-
-function normalizeSecondPersonAddress(fragment: string): { text: string; changed: boolean } {
-  if (!hasMixedSecondPersonAddress(fragment)) return { text: fragment, changed: false }
-
-  let text = fragment
-    .replace(/\b[Vv]otre\b/g, match => match[0] === 'V' ? 'Ton' : 'ton')
-    .replace(/\b[Vv]os\b/g, match => match[0] === 'V' ? 'Tes' : 'tes')
-    .replace(/\b[Vv]ous\b/g, match => match[0] === 'V' ? 'Tu' : 'tu')
-
-  const verbFixes: Array<[RegExp, string]> = [
-    [/\btu etes\b/gi, 'tu es'],
-    [/\btu avez\b/gi, 'tu as'],
-    [/\btu allez\b/gi, 'tu vas'],
-    [/\btu faites\b/gi, 'tu fais'],
-    [/\btu pouvez\b/gi, 'tu peux'],
-    [/\btu voulez\b/gi, 'tu veux'],
-    [/\btu voyez\b/gi, 'tu vois'],
-    [/\btu entendez\b/gi, 'tu entends'],
-    [/\btu sentez\b/gi, 'tu sens'],
-    [/\btu devez\b/gi, 'tu dois'],
-    [/\btu approchez\b/gi, 'tu approches'],
-    [/\btu avancez\b/gi, 'tu avances'],
-    [/\btu entrez\b/gi, 'tu entres'],
-    [/\btu ouvrez\b/gi, 'tu ouvres'],
-    [/\btu attaquez\b/gi, 'tu attaques'],
-  ]
-  for (const [pattern, replacement] of verbFixes) {
-    text = text.replace(pattern, replacement)
-  }
-
-  return { text, changed: text !== fragment }
-}
-
-function normalizeNarrativeForOralPlayback(
-  narrative: string,
-  gameState: GameState,
-  toolsUsed: string[]
-): OralNarrativeGuardResult {
-  const reasons = new Set<string>()
-  const original = narrative.trim()
-
-  let text = original
-    .replace(/\r\n/g, '\n')
-    .replace(/```[\s\S]*?```/g, () => {
-      reasons.add('code_block_removed')
-      return ' '
-    })
-
-  const formattingCleaned = text
-    .replace(/`([^`]+)`/g, '$1')
-    .replace(/\*\*([^*]+)\*\*/g, '$1')
-    .replace(/\*([^*]+)\*/g, '$1')
-    .replace(/_{1,2}([^_]+)_{1,2}/g, '$1')
-    .replace(/^#{1,6}\s+/gm, '')
-    .replace(/^>\s+/gm, '')
-
-  if (formattingCleaned !== text) {
-    reasons.add('markdown_removed')
-    text = formattingCleaned
-  }
-
-  const withoutParentheticals = text.replace(/\s*\([^)]{0,180}\)/g, match => {
-    reasons.add('parenthetical_removed')
-    return /[.!?]\s*$/.test(match) ? '. ' : ' '
-  })
-  if (withoutParentheticals !== text) text = withoutParentheticals
-
-  let removedLineCount = 0
-  const keptLines = text
-    .split('\n')
-    .map(line => line.trim())
-    .filter(line => {
-      if (!line) return false
-      if (!lineLooksLikeMetaCommentary(line)) return true
-
-      removedLineCount++
-      reasons.add('meta_line_removed')
-      return false
-    })
-
-  text = keptLines
-    .join(' ')
-    .replace(/\s+/g, ' ')
-    .replace(/\s+([,.!?;:])/g, '$1')
-    .replace(/([!?]){2,}/g, '$1')
-    .trim()
-
-  const secondPerson = normalizeSecondPersonAddress(text)
-  if (secondPerson.changed) {
-    text = secondPerson.text
-    reasons.add('second_person_normalized')
-  }
-
-  let sentences = splitIntoSentences(text)
-  const filteredSentences = sentences.filter(sentence => {
-    if (!lineLooksLikeMetaCommentary(sentence) && !looksLikeEnglishDrift(sentence)) return true
-
-    reasons.add(looksLikeEnglishDrift(sentence) ? 'non_french_sentence_removed' : 'meta_sentence_removed')
-    return false
-  })
-  if (filteredSentences.length !== sentences.length) {
-    text = filteredSentences.join(' ').trim()
-    sentences = splitIntoSentences(text)
-  }
-
-  const completeText = trimIncompleteTrailingSentence(text)
-  if (completeText.changed) {
-    text = completeText.text
-    sentences = splitIntoSentences(text)
-    reasons.add('incomplete_tail_removed')
-  }
-
-  if (text.length > ORAL_NARRATION_MAX_CHARS && sentences.length > ORAL_NARRATION_MAX_SENTENCES) {
-    text = sentences.slice(0, ORAL_NARRATION_MAX_SENTENCES).join(' ')
-    reasons.add('sentence_limit_applied')
-  }
-
-  let fallbackUsed = false
-  if (!text || normalizeFrenchText(text).length < 12) {
-    text = buildOralFallbackNarrative(gameState, toolsUsed)
-    fallbackUsed = true
-    reasons.add('fallback_used')
-  }
-
-  const finalNarrative = text.trim()
-  return {
-    narrative: finalNarrative,
-    changed: finalNarrative !== original,
-    fallbackUsed,
-    reasons: [...reasons],
-    removedLineCount,
-    originalLength: original.length,
-    finalLength: finalNarrative.length,
-  }
 }
 
 type RequiredMechanicalAction = {
@@ -2161,123 +1384,6 @@ function isPlayerDeathResolved(gameState: GameState): boolean {
 function detectPlayerDownStatusQuestion(message: string): boolean {
   const text = normalizeFrenchText(message)
   return /\b(mort|mort en fait|inconscient|zero pv|0 pv|peux rien faire|peux pas|me defendre|attaquer|taper|frapper|redonner la main|rendre la main|bloque|bloquee|bloques|aucun sens|quel combat|comprends pas|comprends rien|pas clair)\b/.test(text)
-}
-
-function buildPlayerDownNarrative(gameState: GameState): string {
-  const deathSaves = gameState.player.deathSaves ?? { successes: 0, failures: 0 }
-
-  if (deathSaves.dead) {
-    return "Cette fois, oui: le dernier souffle quitte ta poitrine. Les gobelins reculent d'un pas, surpris par le silence soudain, et la boulangerie retombe dans une chaleur noire."
-  }
-
-  if (deathSaves.stable) {
-    return "Tu n'es pas mort, mais tu ne peux plus agir: ta respiration s'accroche à un fil stable. Les gobelins te traînent hors du passage, persuadés que tu ne leur poseras plus de problème tout de suite."
-  }
-
-  const saveText = `${deathSaves.successes} succès, ${deathSaves.failures} échec${deathSaves.failures > 1 ? 's' : ''}`
-
-  if (gameState.phase === 'combat' && gameState.currentTurn === 'player') {
-    return `Tu n'es pas mort, mais tu es à zéro PV et inconscient: pas d'attaque, pas de parade, pas de mouvement héroïque. Là, ton seul vrai levier est le jet de mort; pour l'instant tu as ${saveText}.`
-  }
-
-  if (gameState.phase !== 'combat') {
-    return `Tu es à zéro PV et hors combat pour l'instant: pas d'attaque, pas de parade, pas de mouvement héroïque. Ton corps tient encore, mais la suite appartient aux conséquences de la scène.`
-  }
-
-  return `Tu es à zéro PV et inconscient, donc tu ne peux pas agir pendant que l'initiative tourne encore. Dès que ton tour revient, le prochain vrai levier sera le jet de mort; pour l'instant tu as ${saveText}.`
-}
-
-function buildQuestGuidanceNarrative(gameState: GameState): string {
-  if (gameState.phase === 'combat') {
-    return gameState.currentTurn === 'player'
-      ? "Là, tout se joue dans les deux prochaines secondes: une ouverture apparaît sur le flanc de l'ennemi, mais elle ne restera pas longtemps."
-      : "L'ennemi a l'initiative de l'instant. Le sol craque sous ses appuis, et tu sens venir le prochain mouvement."
-  }
-
-  switch (gameState.currentRoomId) {
-    case '1':
-      return "La mission reste simple dans son absurdité: retrouver la recette de Grammy. Mac bruisse au bord du chemin; le verger peut parler, mais la bâtisse garde la vraie prise."
-    case '2':
-      return "La dryade fait tourner une pomme entre ses doigts. \"La recette est coupée en deux, soldat: une moitié dort dans le bureau, l'autre dans l'appartement de Grammy. Et si tu veux éviter de tomber nez à nez avec les gobelins, le quai de chargement mord moins fort que l'entrée.\""
-    case '4':
-      return "Dans l'entrée, les traces gobelines filent vers les fours, mais les vrais papiers de Grammy ne sentent pas la farine: le bureau et l'appartement gardent de meilleurs secrets."
-    case '5':
-      return "Le bureau est exactement le genre d'endroit où Grammy aurait caché une moitié de recette. Un tiroir résiste sous les papiers, et la poussière autour de la poignée a été dérangée récemment."
-    case '7':
-      return "Le quai de chargement donne un angle discret sur le sol de la boulangerie. De là, tu peux entrer sans annoncer ta présence à tout ce qui traîne près des fours."
-    case '8':
-      return "Le sol de la boulangerie est le cœur dangereux du bâtiment. Les gobelins cherchent la même recette que toi, et les portes vers le bureau et l'appartement deviennent soudain beaucoup plus importantes."
-    case '9':
-      return "L'appartement de Grammy a tout d'une tanière occupée, mais c'est aussi là qu'une moitié de recette peut encore survivre. Quelqu'un a remué les affaires anciennes, récemment."
-    default:
-      return "La piste principale tient toujours: deux moitiés de recette, l'une côté papiers, l'autre côté appartement. Le bâtiment grince comme s'il n'aimait pas qu'on s'en souvienne."
-  }
-}
-
-function detectDryadInformationRequest(message: string, gameState: GameState): boolean {
-  if (gameState.phase !== 'exploration' || gameState.currentRoomId !== '2') return false
-  const text = normalizeFrenchText(message)
-  const talksToDryads = /\b(dryades?|fees?|elles|vous|renseigne\w*|renseignement\w*|aide[rz]?|aider|parle|demande)\b/.test(text)
-  const asksQuest = /\b(recette|tarte|grammy|chercher|trouver|ou aller|ou je vais|direction|renseignement\w*|info\w*|indice\w*|aide[rz]?|sauriez|savez)\b/.test(text)
-  return talksToDryads && asksQuest
-}
-
-function buildDryadInformationNarrative(): string {
-  return "La dryade retient sa pomme pourrie juste avant de la lancer. \"D'accord, soldat: la recette de Grammy est en deux morceaux. La première moitié dort dans le bureau, sous la poussière; la seconde est dans l'appartement, là où les gobelins se prennent pour des rois. Passe par le quai de chargement si tu veux les surprendre.\""
-}
-
-function detectDryadOffense(message: string, gameState: GameState): boolean {
-  if (gameState.phase !== 'exploration' || gameState.currentRoomId !== '2') return false
-  const text = normalizeFrenchText(message)
-  const targetsDryads = /\b(dryades?|fees?|fées?|filles?|creatures?|elles|branche|branches)\b/.test(text)
-  const hostileOrRude = /\b(attaque|attaquer|frappe|frapper|menace|menacer|intimide|intimider|insulte|insulter|crie|crier|hurle|hurler|provoque|provoquer|lance|jette|menacant|hostile)\b/.test(text)
-  return targetsDryads && hostileOrRude
-}
-
-function buildDryadOffenseNarrative(): string {
-  return "La dryade visée disparaît derrière un rideau de feuilles avant que ton geste ne porte. Une pomme pourrie explose à tes pieds, puis deux autres sifflent depuis les branches; leurs rires ne sont plus joueurs du tout. Le verger entier semble se pencher vers toi."
-}
-
-function buildDebugStateNarrative(gameState: GameState): string {
-  const debugRoomName = getCurrentRoomName(gameState) ?? 'une zone non identifiee'
-  const debugPosition = gameState.player.position
-  const debugAlive = aliveMonsters(gameState)
-  const activeText = debugAlive.length > 0
-    ? `${debugAlive.length} ennemi${debugAlive.length > 1 ? 's' : ''} actif${debugAlive.length > 1 ? 's' : ''}: ${debugAlive.map(monster => `${monster.name} en x ${monster.position.x}, y ${monster.position.y}`).join('; ')}.`
-    : "Aucun ennemi actif dans l'etat serveur."
-  const turnText = gameState.phase === 'combat'
-    ? `Combat round ${gameState.round}, tour: ${gameState.currentTurn ?? 'personne'}.`
-    : `Phase: ${gameState.phase}.`
-  return `Cote serveur, tu as ${gameState.player.hp.current}/${gameState.player.hp.max} PV et ton pion est dans ${debugRoomName}, case x ${debugPosition.x}, y ${debugPosition.y}. ${turnText} ${activeText} Si l'ecran montre autre chose, l'affichage client est en retard.`
-  const roomName = getCurrentRoomName(gameState) ?? 'une zone non identifiée'
-  const position = gameState.player.position
-  const aliveCount = countAliveMonsters(gameState)
-  const monsterText = aliveCount > 0
-    ? `${aliveCount} ennemi${aliveCount > 1 ? 's' : ''} actif${aliveCount > 1 ? 's' : ''} existe${aliveCount > 1 ? 'nt' : ''} dans l'état de jeu.`
-    : "Aucun ennemi actif n'existe dans l'état de jeu."
-
-  return `Côté serveur, ton pion est dans ${roomName}, case x ${position.x}, y ${position.y}. ${monsterText} Si l'écran montre autre chose, l'affichage client est en retard.`
-}
-
-function resolveLocationReconcileRoomId(message: string): string | null {
-  return findAdventureRoomIdByAlias(normalizeFrenchText(message))
-}
-
-function buildLocationReconcileNeedsTargetNarrative(): string {
-  const roomNames = ADVENTURE_ROOMS.map(room => room.name).join(', ')
-  return `Je peux te replacer, mais il me faut une salle claire: ${roomNames}.`
-}
-
-function buildLocationReconcileSameRoomNarrative(gameState: GameState): string {
-  const roomName = getCurrentRoomName(gameState) ?? 'la zone actuelle'
-  const { x, y } = gameState.player.position
-  return `Cote moteur, tu es deja dans ${roomName}, case x ${x}, y ${y}. Je garde cette position et je repars de la scene actuelle.`
-}
-
-function buildLocationReconcileNarrative(gameState: GameState, targetRoomId: string): string {
-  const targetRoomName = ADVENTURE_ROOMS.find(room => room.id === targetRoomId)?.name ?? 'la salle cible'
-  const { x, y } = gameState.player.position
-  return `Ok, je te replace dans ${targetRoomName}, case x ${x}, y ${y}. ${buildDirectiveSceneNarrative(gameState)}`
 }
 
 function parseCoordinateMove(message: string, gameState: GameState): { x: number; y: number } | null {
@@ -3616,93 +2722,6 @@ function buildDmTurnDebug(
   }
 }
 
-function objectWorldDebug(object: WorldState['objects'][string]): Record<string, unknown> {
-  return {
-    visible: object.visible,
-    discovered: object.discovered,
-    opened: object.opened,
-    locked: object.locked,
-    taken: object.taken,
-    used: object.used,
-    disarmed: object.disarmed,
-  }
-}
-
-function npcWorldDebug(npc: WorldState['npcs'][string]): Record<string, unknown> {
-  return {
-    roomId: npc.roomId,
-    disposition: npc.disposition,
-    known: npc.known,
-    memory: npc.memory ?? {},
-  }
-}
-
-function questWorldDebug(quest: WorldState['quests'][string]): Record<string, unknown> {
-  return {
-    progress: quest.progress,
-    goal: quest.goal,
-    completed: quest.completed,
-    flags: quest.flags ?? {},
-  }
-}
-
-function alarmWorldDebug(alarm: WorldState['alarms'][string]): Record<string, unknown> {
-  return {
-    level: alarm.level,
-    raised: alarm.raised,
-    reason: alarm.reason,
-  }
-}
-
-function fictionFactWorldDebug(fact: WorldState['fictionFacts'][string]): Record<string, unknown> {
-  return {
-    text: fact.text,
-    roomId: fact.roomId,
-    status: fact.status,
-    source: fact.source,
-    tags: fact.tags ?? [],
-    expires: fact.expires,
-  }
-}
-
-function debugRecordsChanged(before: Record<string, unknown>, after: Record<string, unknown>): boolean {
-  return JSON.stringify(before) !== JSON.stringify(after)
-}
-
-function diffWorldRecords<T>(
-  beforeRecords: Record<string, T> | undefined,
-  afterRecords: Record<string, T> | undefined,
-  summarize: (value: T) => Record<string, unknown>
-): Record<string, { before: Record<string, unknown>; after: Record<string, unknown> }> | undefined {
-  const diff: Record<string, { before: Record<string, unknown>; after: Record<string, unknown> }> = {}
-  for (const id of new Set([...Object.keys(beforeRecords ?? {}), ...Object.keys(afterRecords ?? {})])) {
-    const before = beforeRecords?.[id] ? summarize(beforeRecords[id]) : {}
-    const after = afterRecords?.[id] ? summarize(afterRecords[id]) : {}
-    if (debugRecordsChanged(before, after)) diff[id] = { before, after }
-  }
-  return Object.keys(diff).length > 0 ? diff : undefined
-}
-
-function buildWorldDebugDiff(
-  beforeWorld: WorldState | undefined,
-  afterWorld: WorldState | undefined,
-  events: EngineEvent[]
-): DMDebugTurnView['worldDiff'] {
-  if (!beforeWorld && !afterWorld) return { events }
-  const beforeFlags = beforeWorld?.flags ?? {}
-  const afterFlags = afterWorld?.flags ?? {}
-  const flagsChanged = debugRecordsChanged(beforeFlags, afterFlags)
-  return {
-    events,
-    objects: diffWorldRecords(beforeWorld?.objects, afterWorld?.objects, objectWorldDebug),
-    npcs: diffWorldRecords(beforeWorld?.npcs, afterWorld?.npcs, npcWorldDebug),
-    quests: diffWorldRecords(beforeWorld?.quests, afterWorld?.quests, questWorldDebug),
-    alarms: diffWorldRecords(beforeWorld?.alarms, afterWorld?.alarms, alarmWorldDebug),
-    fictionFacts: diffWorldRecords(beforeWorld?.fictionFacts, afterWorld?.fictionFacts, fictionFactWorldDebug),
-    ...(flagsChanged ? { flags: { before: beforeFlags, after: afterFlags } } : {}),
-  }
-}
-
 function canonicalPlayerActionInput(action: Record<string, unknown>): Record<string, unknown> {
   return { action }
 }
@@ -5004,166 +4023,6 @@ function formatCombatLogEntries(entries: CombatLogEntry[]): string {
   }).join('\n')
 }
 
-interface EngineTruthPacket {
-  actionIntent: {
-    kind: GameActionKind
-    primitive: GameActionPrimitive
-    reason: string
-    confidence: GameActionConfidence
-    requiresEngine: boolean
-  }
-  intentInterpreter?: {
-    used: boolean
-    model: string | null
-    output: IntentInterpreterOutput | null
-    fallbackReason: string | null
-  }
-  toolsUsed: string[]
-  state: ReturnType<typeof summarizeGameState>
-  sceneSurface: Record<string, unknown>
-  events: EngineEvent[]
-  affordances: PlayerAffordance[]
-  combatLog: Array<Pick<CombatLogEntry, 'round' | 'turn' | 'action' | 'mechanicalDetail'>>
-  allowedFacts: string[]
-  narrativeFactContract: {
-    supportedEventTypes: string[]
-    riskyFactKinds: Array<NarratedWorldFact['kind']>
-  }
-}
-
-function formatPosition(position: { x: number; y: number }): string {
-  return `(${position.x},${position.y})`
-}
-
-function formatDeathSavesForTruth(gameState: GameState): string {
-  const saves = gameState.player.deathSaves ?? { successes: 0, failures: 0 }
-  return `successes=${saves.successes}, failures=${saves.failures}, stable=${Boolean(saves.stable)}, dead=${Boolean(saves.dead)}`
-}
-
-function buildDownedPlayerFinalNarrationInstruction(gameState: GameState): string | undefined {
-  if (gameState.player.hp.current > 0) return undefined
-
-  const saves = gameState.player.deathSaves ?? { successes: 0, failures: 0 }
-  if (saves.dead) {
-    return 'CONTRAINTE KO: Le joueur est mort selon le paquet moteur. Narre la consequence immediate de la mort; ne propose ni attaque, ni mouvement, ni jet de mort.'
-  }
-  if (saves.stable) {
-    return 'CONTRAINTE KO: Le joueur est stable mais inconscient. Narre une consequence immediate de scene; ne propose ni attaque, ni mouvement, ni nouvelle action heroique.'
-  }
-  if (gameState.phase === 'combat' && gameState.currentTurn === 'player') {
-    return 'CONTRAINTE KO: currentTurn=player signifie que le prochain levier jouable est un jet de mort. Ne dis jamais que les ennemis vont agir maintenant, que c est a eux de frapper, ou que le joueur peut attaquer/se deplacer.'
-  }
-  if (gameState.phase === 'combat') {
-    return 'CONTRAINTE KO: Le joueur est inconscient pendant que l initiative tourne. Ne propose ni attaque, ni mouvement, ni defense active; rappelle seulement une consequence immediate soutenue par les logs.'
-  }
-
-  return 'CONTRAINTE KO: Le joueur est a 0 PV hors combat. Ne propose ni attaque, ni mouvement heroique; garde la suite sur les consequences immediates de la scene.'
-}
-
-function buildEngineTruthPacket(
-  actionIntent: GameActionIntent,
-  toolsUsed: string[],
-  gameState: GameState,
-  newCombatLogEntries: CombatLogEntry[],
-  newWorldEvents: EngineEvent[] = [],
-  intentInterpreter?: IntentInterpreterTurnResult
-): EngineTruthPacket {
-  const engineResolution = buildEngineResolutionView(gameState, newCombatLogEntries, newWorldEvents)
-  const sceneSurface = buildSceneSurface(gameState)
-  const sceneSurfaceDebug = summarizeSceneSurfaceForDebug(sceneSurface)
-  const aliveMonsters = Object.values(gameState.monsters)
-    .filter(monster => monster.isAlive)
-    .map(monster => ({
-      id: monster.id,
-      name: monster.name,
-      hp: `${monster.hp.current}/${monster.hp.max}`,
-      position: formatPosition(monster.position),
-    }))
-
-  const allowedFacts = [
-    `phase=${gameState.phase}`,
-    `currentTurn=${gameState.currentTurn ?? 'none'}`,
-    `round=${gameState.round}`,
-    `playerHp=${gameState.player.hp.current}/${gameState.player.hp.max}`,
-    `playerConditions=${gameState.player.conditions.join(',') || 'none'}`,
-    `playerDeathSaves=${formatDeathSavesForTruth(gameState)}`,
-    `playerCanAct=${gameState.player.hp.current > 0 && !gameState.player.conditions.includes('unconscious')}`,
-    `playerPosition=${formatPosition(gameState.player.position)}`,
-    `currentRoomId=${gameState.currentRoomId ?? 'unknown'}`,
-    ...(gameState.currentRoomId && gameState.world?.rooms?.[gameState.currentRoomId]
-      ? [
-          `currentRoomName=${gameState.world.rooms[gameState.currentRoomId].name}`,
-          `currentRoomTags=${gameState.world.rooms[gameState.currentRoomId].tags?.join(',') || 'none'}`,
-          `currentRoomExits=${gameState.world.rooms[gameState.currentRoomId].exits?.join(',') || 'none'}`,
-        ]
-      : []),
-    `worldFlags=${JSON.stringify(gameState.world?.flags ?? {})}`,
-    `aliveMonsters=${aliveMonsters.length}`,
-    ...sceneSurface.narratableFacts.map(fact => `sceneSurface=${fact}`),
-    ...sceneSurface.objects
-      .map(object => `worldObject=${object.id} name=${object.name} kind=${object.kind} visible=${object.visible} discovered=${object.discovered} opened=${Boolean(object.opened)} locked=${Boolean(object.locked)} taken=${Boolean(object.taken)} used=${Boolean(object.used)} disarmed=${Boolean(object.disarmed)} readable=${object.readable} distance=${object.distance} portal=${JSON.stringify(object.portal ?? null)}`),
-    ...sceneSurface.npcs
-      .map(npc => `worldNpc=${npc.id} name=${npc.name} disposition=${npc.disposition} known=${Boolean(npc.known)} faction=${npc.faction ?? 'none'} goals=${JSON.stringify(npc.goals ?? [])}`),
-    ...Object.values(gameState.world?.quests ?? {})
-      .map(quest => `quest=${quest.id} progress=${quest.progress}/${quest.goal} completed=${Boolean(quest.completed)} flags=${JSON.stringify(quest.flags ?? {})}`),
-    ...Object.entries(gameState.world?.alarms ?? {})
-      .map(([alarmId, alarm]) => `alarm=${alarmId} raised=${alarm.raised} level=${alarm.level} clock=${alarm.clock ? `${alarm.clock.value}:${JSON.stringify(alarm.clock.thresholds ?? {})}` : 'none'} reason=${alarm.reason ?? 'none'}`),
-    `narrativeFactContract=${JSON.stringify({
-      supportedEventTypes: [...new Set(engineResolution.events.map(event => event.type))],
-      riskyFactKinds: ['recipe_acquired', 'recipe_completed', 'object_discovered', 'object_opened', 'npc_convinced', 'trap_triggered', 'trap_disarmed', 'alarm_negated', 'item_used_negated', 'player_dead', 'player_unconscious'],
-    })}`,
-    ...engineResolution.events.map(event => `event=${event.type} outcome=${event.outcome ?? 'none'} summary=${event.summary}`),
-    ...engineResolution.affordances.map(action => `affordance=${action.kind} enabled=${action.enabled} tool=${action.toolName ?? 'none'} reason=${action.reason}`),
-    ...aliveMonsters.map(monster => `monster=${monster.name} id=${monster.id} hp=${monster.hp} position=${monster.position}`),
-  ]
-
-  const downedInstruction = buildDownedPlayerFinalNarrationInstruction(gameState)
-  if (downedInstruction) allowedFacts.push(downedInstruction)
-  const eventTypes = engineResolution.events.map(event => event.type)
-  if (eventTypes.includes('item.used')) {
-    allowedFacts.push('CONTRAINTE POTION: Une potion a bien ete consommee et appliquee par le moteur ce tour-ci. Ne dis jamais que la fiole etait vide, inutile, sans effet, ou vide depuis le debut.')
-    if (gameState.player.hp.current <= 0) {
-      allowedFacts.push('CONTRAINTE ORDRE DES EVENTS: Narre la sequence comme potion appliquee, puis riposte ou consequence mecanique, puis KO. Le KO ne retro-annule pas la potion.')
-    }
-  }
-
-  return {
-    actionIntent: {
-      kind: actionIntent.kind,
-      primitive: actionIntent.primitive,
-      reason: actionIntent.reason,
-      confidence: actionIntent.confidence,
-      requiresEngine: actionIntent.requiresEngine,
-    },
-    intentInterpreter: intentInterpreter ? {
-      used: intentInterpreter.used,
-      model: intentInterpreter.model,
-      output: intentInterpreter.output,
-      fallbackReason: intentInterpreter.fallbackReason,
-    } : undefined,
-    toolsUsed: [...new Set(toolsUsed)],
-    state: summarizeGameState(gameState),
-    sceneSurface: sceneSurfaceDebug,
-    events: engineResolution.events,
-    affordances: engineResolution.affordances,
-    combatLog: newCombatLogEntries.map(entry => ({
-      round: entry.round,
-      turn: entry.turn,
-      action: entry.action,
-      mechanicalDetail: entry.mechanicalDetail,
-    })),
-    allowedFacts,
-    narrativeFactContract: {
-      supportedEventTypes: [...new Set(engineResolution.events.map(event => event.type))],
-      riskyFactKinds: ['recipe_acquired', 'recipe_completed', 'object_discovered', 'object_opened', 'npc_convinced', 'trap_triggered', 'trap_disarmed', 'alarm_negated', 'item_used_negated', 'player_dead', 'player_unconscious'],
-    },
-  }
-}
-
-function formatEngineTruthPacket(packet: EngineTruthPacket): string {
-  return JSON.stringify(packet, null, 2)
-}
-
 function buildLocalEngineNarrative(
   gameState: GameState,
   toolsUsed: string[],
@@ -5299,7 +4158,7 @@ async function generateFinalNarration(
     const response = await createLlmMessage({
       model: MODEL,
       max_tokens: maxTokensForLlmRoute(llmRoute),
-      system: buildNarrationSystemBlocks(gameState, summaryContext),
+      system: buildNarrationSystemBlocks(gameState, summaryContext, dmPromptBuildOptions()),
       messages: [{ role: 'user', content: finalPrompt }],
     }, {
       requestId,
@@ -5691,7 +4550,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const historyMessages = historyToAnthropicMessages(recentHistory)
 
     // ── Construction des messages pour l'appel LLM ──────────────────────────
-    const systemBlocks = buildSystemBlocks(currentGameState, activeSummary)
+    const systemBlocks = buildSystemBlocks(currentGameState, activeSummary, dmPromptBuildOptions())
     const llmTools = withToolPromptCache(selectToolsForLlm(mcpTools, currentGameState, actionIntent))
     const messages: Anthropic.MessageParam[] = [
       ...historyMessages,
@@ -6204,7 +5063,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         const finalResponse = await createLlmMessage({
           model: MODEL,
           max_tokens: maxTokensForLlmRoute(fallbackLlmRoute),
-          system: buildNarrationSystemBlocks(currentGameState!, activeSummary),
+          system: buildNarrationSystemBlocks(currentGameState!, activeSummary, dmPromptBuildOptions()),
           messages: [{ role: 'user', content: message }],
         }, {
           requestId,
@@ -6557,7 +5416,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       narratorSource = 'rule'
     }
 
-    const oralNarrative = normalizeNarrativeForOralPlayback(narrative, currentGameState, toolsUsed)
+    const oralNarrative = normalizeNarrativeForOralPlayback(narrative, currentGameState, toolsUsed, { maxSentences: ORAL_NARRATION_MAX_SENTENCES, maxChars: ORAL_NARRATION_MAX_CHARS })
     if (oralNarrative.changed) {
       logEvent(oralNarrative.fallbackUsed ? 'warn' : 'info', 'dm.narrative.oral_guard.applied', {
         requestId,
