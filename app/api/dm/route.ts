@@ -17,7 +17,7 @@ import {
   inferAdventureRoomId as inferMappedAdventureRoomId,
   relativeAdventureRoomIdForText,
 } from '@/lib/adventure-map'
-import { DMRequest, DMResponse, GameState, ConversationTurn, CombatLogEntry, MonsterState, type CanonicalPlayerActionKind, type DMDebugTurnView, type DMTurnUsage, type EngineEvent, type PlayerAffordance, type TurnTraceActionExecution, type WorldState } from '@/lib/types'
+import { DMRequest, DMResponse, GameState, ConversationTurn, CombatLogEntry, MonsterState, type CanonicalPlayerActionKind, type DMTurnUsage, type EngineEvent, type PlayerAffordance, type TurnTraceActionExecution, type WorldState } from '@/lib/types'
 import {
   isDoorTraversalIntent,
   normalizeFrenchText,
@@ -38,6 +38,15 @@ import {
   selectIterationLlmRoute,
   selectToolsForLlm,
 } from '@/lib/turn-pipeline'
+import { buildTurnDebugStage } from '@/lib/turn-debug-stage'
+import {
+  ensureFlexibleInterpreterOutput,
+  intentFromInterpreterOutput,
+  interpreterCanonicalAction,
+  shouldExecuteInterpreterActionDirectly,
+  unresolvedIntentFromInterpreter,
+  type IntentInterpreterTurnResult,
+} from '@/lib/turn-intent-action'
 import { buildDirectorDecision } from '@/lib/dm-director'
 import {
   logAnthropicUsage,
@@ -47,8 +56,8 @@ import {
 } from '@/lib/anthropic-usage'
 import { logEvent, summarizeGameState } from '@/lib/server-logger'
 import { buildEngineResolutionView, derivePlayerAffordances } from '@/lib/world-engine'
-import { buildWorldActionInput, resolveWorldActionTargets } from '@/lib/world-target-resolver'
-import { buildSceneSurface, summarizeSceneSurfaceForDebug } from '@/lib/scene-surface'
+import { buildWorldActionInput } from '@/lib/world-target-resolver'
+import { buildSceneSurface } from '@/lib/scene-surface'
 import { buildActionPlan, summarizeActionPlanForDebug, type ActionPlan } from '@/lib/action-plan'
 import { resolveLocationDestination, summarizeLocationResolution, type LocationResolution } from '@/lib/location-index'
 import {
@@ -64,13 +73,10 @@ import {
 import { normalizeLlmToolInput } from '@/lib/tool-input-normalizer'
 import { actionExecution, buildTurnTrace } from '@/lib/turn-trace'
 import {
-  buildImproviseOutput,
   buildIntentInterpreterInputSummary,
-  improvisationTypeForText,
   interpretPlayerIntentMock,
   validateIntentInterpreterOutput,
   type IntentInterpreterInputSummary,
-  type IntentInterpreterOutput,
 } from '@/lib/intent-interpreter'
 import { buildNarrationSystemBlocks, buildSystemBlocks, type DmPromptBuildOptions } from '@/lib/dm-prompts'
 import { buildWorldDebugDiff } from '@/lib/world-debug'
@@ -1700,130 +1706,6 @@ function playerActionKindFromToolUse(toolName: string, input: unknown): Canonica
   return null
 }
 
-interface IntentInterpreterTurnResult {
-  used: boolean
-  model: string | null
-  inputSummary: IntentInterpreterInputSummary | null
-  output: IntentInterpreterOutput | null
-  fallbackReason: string | null
-}
-
-function numericConfidenceToActionConfidence(value: number): GameActionConfidence {
-  if (value >= 0.8) return 'high'
-  if (value >= 0.55) return 'medium'
-  return 'low'
-}
-
-function primitiveForInterpretedKind(kind: CanonicalPlayerActionKind): GameActionPrimitive {
-  if (kind === 'attack') return 'resolve_attack'
-  if (kind === 'move') return 'move'
-  if (kind === 'use_item') return 'use_item'
-  if (kind === 'ability_check' || kind === 'social' || kind === 'death_save') return 'check'
-  if (kind === 'wait') return 'wait'
-  if (kind === 'observe') return 'narrate'
-  return 'world_action'
-}
-
-function suggestedToolsForInterpretedKind(kind: CanonicalPlayerActionKind): string[] {
-  if (kind === 'attack') return ['resolve_player_action', 'resolve_player_attack']
-  if (kind === 'move') return ['resolve_player_action', 'move_token']
-  if (kind === 'ability_check' || kind === 'social') return ['resolve_player_action', 'roll_ability_check']
-  if (kind === 'death_save') return ['resolve_player_action', 'roll_death_save']
-  if (kind === 'use_item') return ['resolve_player_action', 'use_healing_potion']
-  if (kind === 'wait') return ['resolve_player_action', 'pass_turn']
-  if (kind === 'observe') return []
-  return ['resolve_player_action']
-}
-
-function normalizeInterpreterCanonicalAction(action: Record<string, unknown>): Record<string, unknown> | null {
-  const rawKind = typeof action.kind === 'string' ? action.kind : null
-  if (!rawKind) return null
-
-  if (rawKind === 'traverse') {
-    const viaObjectId = typeof action.viaObjectId === 'string'
-      ? action.viaObjectId
-      : typeof action.targetId === 'string'
-        ? action.targetId
-        : undefined
-    const viaObjectName = typeof action.viaObjectName === 'string'
-      ? action.viaObjectName
-      : typeof action.targetName === 'string'
-        ? action.targetName
-        : undefined
-    if (viaObjectId || viaObjectName) {
-      return {
-        kind: 'open',
-        traverse: true,
-        ...(viaObjectId ? { targetId: viaObjectId } : {}),
-        ...(viaObjectName ? { targetName: viaObjectName } : {}),
-      }
-    }
-
-    const targetRoomId = typeof action.targetRoomId === 'string'
-      ? action.targetRoomId
-      : typeof action.toRoomId === 'string'
-        ? action.toRoomId
-        : typeof action.roomId === 'string'
-          ? action.roomId
-          : null
-    const toCell = targetRoomId ? centerCellForRoom(targetRoomId) : null
-    return toCell ? { kind: 'move', tokenId: 'player', toCell } : null
-  }
-
-  if (rawKind === 'move' && !isObjectRecord(action.toCell)) {
-    const targetRoomId = typeof action.targetRoomId === 'string'
-      ? action.targetRoomId
-      : typeof action.toRoomId === 'string'
-        ? action.toRoomId
-        : typeof action.roomId === 'string'
-          ? action.roomId
-          : null
-    const toCell = targetRoomId ? centerCellForRoom(targetRoomId) : null
-    if (toCell) return { ...action, tokenId: typeof action.tokenId === 'string' ? action.tokenId : 'player', toCell }
-  }
-
-  return action
-}
-
-function interpreterCanonicalAction(output: IntentInterpreterOutput | null | undefined): Record<string, unknown> | null {
-  if (!output || output.requiresClarification || !isObjectRecord(output.canonicalAction)) return null
-  const normalizedAction = normalizeInterpreterCanonicalAction(output.canonicalAction)
-  if (!normalizedAction) return null
-  const kind = normalizedAction.kind
-  if (typeof kind !== 'string') return null
-  if (!PLAYER_ACTION_KINDS.has(kind as CanonicalPlayerActionKind)) return null
-  return normalizedAction
-}
-
-function interpretedActionTargetsPortal(action: Record<string, unknown>, gameState: GameState): boolean {
-  const kind = typeof action.kind === 'string' ? action.kind : null
-  if (!kind || !['open', 'unlock', 'force', 'use_object'].includes(kind)) return false
-  if (action.traverse === true) return true
-
-  const targetId = typeof action.targetId === 'string' ? action.targetId : null
-  const targetName = typeof action.targetName === 'string' ? normalizeFrenchText(action.targetName) : null
-  if (!targetId && !targetName) return false
-
-  return buildSceneSurface(gameState).objects.some(object => {
-    if (!object.portal?.otherRoomIds.length) return false
-    if (targetId && object.id === targetId) return true
-    if (!targetName) return false
-    const haystack = [object.name, ...object.aliases, ...object.tags].map(normalizeFrenchText).join(' ')
-    return haystack.includes(targetName) || targetName.includes(normalizeFrenchText(object.name))
-  })
-}
-
-function shouldExecuteInterpreterActionDirectly(action: Record<string, unknown>, gameState: GameState): boolean {
-  const kind = action.kind
-  if (typeof kind !== 'string') return false
-  if (kind === 'social' || kind === 'ability_check') return false
-  if (kind === 'search') return false
-  if (interpretedActionTargetsPortal(action, gameState)) return false
-  if (kind === 'move') return isObjectRecord(action.toCell)
-  if (kind === 'attack') return gameState.phase === 'combat' && gameState.currentTurn === 'player'
-  return PLAYER_ACTION_KINDS.has(kind as CanonicalPlayerActionKind)
-}
-
 function intentInterpreterFastPathReason(
   message: string,
   gameState: GameState,
@@ -1848,149 +1730,6 @@ function intentInterpreterFastPathReason(
   }
 
   return null
-}
-
-function intentFromInterpreterOutput(
-  message: string,
-  output: IntentInterpreterOutput | null | undefined
-): GameActionIntent | null {
-  if (!output) return null
-  const normalizedText = normalizeFrenchText(message)
-
-  if (output.requiresClarification) {
-    return {
-      kind: 'unknown',
-      primitive: 'narrate',
-      reason: 'intent-interpreter-clarification',
-      requiresEngine: false,
-      suggestedTools: [],
-      confidence: numericConfidenceToActionConfidence(output.confidence),
-      normalizedText,
-    }
-  }
-
-  if (output.intentKind === 'guidance') {
-    return {
-      kind: 'guidance',
-      primitive: 'narrate',
-      reason: 'intent-interpreter-guidance',
-      requiresEngine: false,
-      suggestedTools: [],
-      confidence: numericConfidenceToActionConfidence(output.confidence),
-      normalizedText,
-    }
-  }
-
-  if (output.intentKind === 'query_state') {
-    return {
-      kind: 'query_state',
-      primitive: 'query_state',
-      reason: 'intent-interpreter-query-state',
-      requiresEngine: false,
-      suggestedTools: [],
-      confidence: numericConfidenceToActionConfidence(output.confidence),
-      normalizedText,
-    }
-  }
-
-  if (['question', 'query', 'status_question', 'meta_question'].includes(output.intentKind)) {
-    return {
-      kind: 'observe',
-      primitive: 'narrate',
-      reason: `intent-interpreter-${output.intentKind}`,
-      requiresEngine: false,
-      suggestedTools: [],
-      confidence: numericConfidenceToActionConfidence(output.confidence),
-      normalizedText,
-    }
-  }
-
-  const canonicalAction = interpreterCanonicalAction(output)
-  const actionKind = canonicalAction?.kind
-  if (typeof actionKind !== 'string') return null
-  const kind = actionKind as CanonicalPlayerActionKind
-  const primitive = primitiveForInterpretedKind(kind)
-  const requiresEngine = primitive !== 'narrate'
-  return {
-    kind,
-    primitive,
-    reason: `intent-interpreter-${output.intentKind || kind}`,
-    requiresEngine,
-    suggestedTools: suggestedToolsForInterpretedKind(kind),
-    confidence: numericConfidenceToActionConfidence(output.confidence),
-    normalizedText,
-  }
-}
-
-function unresolvedIntentFromInterpreter(message: string, output: IntentInterpreterOutput | null | undefined): GameActionIntent {
-  return {
-    kind: 'unknown',
-    primitive: 'narrate',
-    reason: output?.intentKind
-      ? `intent-interpreter-unresolved-${output.intentKind}`
-      : 'intent-interpreter-unresolved',
-    requiresEngine: false,
-    suggestedTools: [],
-    confidence: output ? numericConfidenceToActionConfidence(output.confidence) : 'low',
-    normalizedText: normalizeFrenchText(message),
-  }
-}
-
-// Meta intents (questions, guidance, state queries) already reach the narrator
-// cleanly via intentFromInterpreterOutput — they must NEVER be rewritten into an
-// improvisation. Only kinds that map to a non-null narrate intent belong here;
-// anything else (e.g. a bare "observe" with no canonical action) must be allowed
-// to fall through to the improvise rewrite so it never hits a canned dead-end.
-const META_INTERPRETER_INTENT_KINDS = new Set<string>([
-  'guidance',
-  'query_state',
-  'query',
-  'question',
-  'status_question',
-  'meta_question',
-])
-
-// Movement-style intents have dedicated handling (coordinate moves, traversal,
-// portal prompts) and must not be converted to improvisations either.
-const MOVEMENT_INTERPRETER_INTENT_KINDS = new Set<string>(['move', 'movement', 'traverse'])
-const MOVEMENT_INTERPRETER_ACTION_KINDS = new Set<string>([
-  'move',
-  'traverse',
-  'open',
-  'unlock',
-  'force',
-  'use_object',
-])
-
-function isMovementInterpreterOutput(output: IntentInterpreterOutput): boolean {
-  const intentKind = typeof output.intentKind === 'string' ? output.intentKind.toLowerCase() : ''
-  if (MOVEMENT_INTERPRETER_INTENT_KINDS.has(intentKind)) return true
-  const action = isObjectRecord(output.canonicalAction) ? output.canonicalAction : null
-  const kind = action && typeof action.kind === 'string' ? action.kind : null
-  return Boolean(kind && MOVEMENT_INTERPRETER_ACTION_KINDS.has(kind))
-}
-
-// Hard guarantee against canned "default prompt" dead-ends: any non-meta,
-// non-movement turn that the interpreter could not resolve into a real engine
-// action (or that it flagged for clarification) is rewritten as an improvise
-// action. That routes it through resolve_player_action + live LLM narration
-// instead of the canned clarification / no-fallback narrative builders.
-function ensureFlexibleInterpreterOutput(
-  output: IntentInterpreterOutput | null,
-  message: string,
-  gameState: GameState
-): IntentInterpreterOutput | null {
-  if (!output) return output
-  const intentKind = typeof output.intentKind === 'string' ? output.intentKind.toLowerCase() : ''
-  if (META_INTERPRETER_INTENT_KINDS.has(intentKind)) return output
-  if (isMovementInterpreterOutput(output)) return output
-  if (interpreterCanonicalAction(output)) return output
-
-  const improviseType = improvisationTypeForText(normalizeFrenchText(message))
-  return {
-    ...buildImproviseOutput(message, gameState, improviseType),
-    source: output.source,
-  }
 }
 
 function parseJsonObjectFromLlmText(text: string): unknown {
@@ -2556,85 +2295,6 @@ function parseWorldActionInput(
   const kind = actionKind ?? classifyPlayerAction(message, gameState).kind
   if (!isCanonicalWorldActionKind(kind)) return null
   return buildWorldActionInput(message, gameState, kind)
-}
-
-function buildDmTurnDebug(
-  message: string,
-  gameState: GameState,
-  actionIntent: GameActionIntent,
-  intentInterpreter?: IntentInterpreterTurnResult
-): DMDebugTurnView {
-  const isWorldAction = isCanonicalWorldActionKind(actionIntent.kind)
-  const actionPlan = buildActionPlan(message, gameState, actionIntent.kind)
-  const plannedAction = actionPlan?.steps.find(step => step.action)?.action ?? null
-  const interpretedCanonicalAction = interpreterCanonicalAction(intentInterpreter?.output)
-  const reconcileRoomId = actionIntent.kind === 'state_reconcile'
-    ? resolveLocationReconcileRoomId(message)
-    : null
-  const reconcileCell = reconcileRoomId ? centerCellForRoom(reconcileRoomId) : null
-  const moveLocationResolution = actionIntent.kind === 'move'
-    ? resolveLocationDestination(message, gameState)
-    : null
-  const moveCanonicalAction = moveLocationResolution?.status === 'resolved'
-    ? moveLocationResolution.canonicalAction ?? null
-    : null
-  const sceneSurface = buildSceneSurface(gameState)
-  return {
-    actionIntent: {
-      kind: actionIntent.kind,
-      primitive: actionIntent.primitive,
-      reason: actionIntent.reason,
-      confidence: actionIntent.confidence,
-      requiresEngine: actionIntent.requiresEngine,
-    },
-    parsedAction: interpretedCanonicalAction ?? (isWorldAction
-      ? plannedAction ?? buildWorldActionInput(message, gameState, actionIntent.kind)
-      : actionIntent.kind === 'state_reconcile' && reconcileCell
-        ? { kind: 'move', tokenId: 'player', toCell: reconcileCell }
-        : moveCanonicalAction ?? plannedAction),
-    targetResolution: actionIntent.kind === 'move' && moveLocationResolution
-      ? summarizeLocationResolution(moveLocationResolution)
-      : actionPlan?.targetResolution
-      ? actionPlan.targetResolution as unknown as Record<string, unknown>
-      : interpretedCanonicalAction
-        ? {
-            status: 'interpreted',
-            targetHints: intentInterpreter?.output?.targetHints ?? {},
-            reasoningSummary: intentInterpreter?.output?.reasoningSummary,
-          }
-      : isWorldAction
-        ? resolveWorldActionTargets(message, gameState, actionIntent.kind) as unknown as Record<string, unknown>
-        : actionIntent.kind === 'state_reconcile'
-          ? {
-              kind: 'room',
-              status: reconcileRoomId ? 'resolved' : 'missing_target',
-              roomId: reconcileRoomId,
-              roomName: reconcileRoomId ? ADVENTURE_ROOMS.find(room => room.id === reconcileRoomId)?.name ?? null : null,
-              toCell: reconcileCell,
-            }
-          : null,
-    actionPlan: actionPlan
-      ? summarizeActionPlanForDebug(actionPlan)
-      : interpretedCanonicalAction
-        ? {
-            id: 'intent-interpreter-direct',
-            source: 'intent_interpreter',
-            reason: intentInterpreter?.output?.reasoningSummary ?? 'Action canonique proposee par Intent Interpreter.',
-            steps: [{
-              id: 'intent-interpreter-direct-step-1',
-              toolName: 'resolve_player_action',
-              action: interpretedCanonicalAction,
-              reason: 'Execution via facade canonique resolve_player_action.',
-            }],
-          }
-        : null,
-    sceneSurface: summarizeSceneSurfaceForDebug(sceneSurface),
-    intentInterpreterInputSummary: intentInterpreter?.inputSummary as unknown as Record<string, unknown> ?? null,
-    intentInterpreterOutput: intentInterpreter?.output as unknown as Record<string, unknown> ?? null,
-    intentInterpreterModel: intentInterpreter?.model ?? null,
-    intentInterpreterUsed: intentInterpreter?.used ?? false,
-    intentInterpreterFallbackReason: intentInterpreter?.fallbackReason ?? null,
-  }
 }
 
 function canonicalPlayerActionInput(action: Record<string, unknown>): Record<string, unknown> {
@@ -4335,7 +3995,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const interpretedActionIntent = intentFromInterpreterOutput(message, intentInterpreter.output)
     const actionIntent = interpretedActionIntent ??
       (intentInterpreter.used ? unresolvedIntentFromInterpreter(message, intentInterpreter.output) : preliminaryActionIntent)
-    const turnDebug = buildDmTurnDebug(message, currentGameState, actionIntent, intentInterpreter)
+    const turnDebug = buildTurnDebugStage(message, currentGameState, actionIntent, intentInterpreter)
     const requiredMechanicalAction = requiredMechanicalActionFromIntent(actionIntent)
     logEvent('info', 'dm.action.intent', {
       requestId,

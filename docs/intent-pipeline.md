@@ -179,6 +179,13 @@ La politique de tour vit dans `lib/turn-pipeline.ts`:
 - fusion des routes LLM.
 
 `app/api/dm/route.ts` reste l'enveloppe HTTP/session/MCP, mais la politique n'est plus enfermee dans la route.
+
+Extraction actuelle:
+
+- `lib/turn-pipeline.ts`: politique de routing et budget LLM;
+- `lib/turn-intent-action.ts`: conversion de la sortie Intent Interpreter en intention/action canonique;
+- `lib/turn-debug-stage.ts`: construction de la vue debug `TurnTrace` par tour.
+
 La prochaine extraction doit sortir l'orchestration complete en stages:
 
 1. `intentStage`;
