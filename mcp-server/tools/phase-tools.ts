@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { rollDice, getAbilityModifier, d20WithModifier } from '../dice'
 import * as gs from '../game-state'
 import * as rules from '../rules'
-import { MonsterState } from '../../lib/types'
+import { MonsterState, MonsterDisposition } from '../../lib/types'
 import { EncounterMonsterSpec, ENCOUNTERS, getEncounter } from '../../lib/adventure-map'
 
 // Monster stat blocks — Monster Manual 2025 (XMM)
@@ -169,6 +169,7 @@ const MONSTER_TEMPLATES: Record<string, Omit<MonsterState, 'id' | 'name' | 'posi
     attackBonus: 6,  // avec Poigne du druide (Shillelagh)
     damageDice: '1d8+3',  // gourdin + Shillelagh
     speed: 30,
+    disposition: 'neutral',  // non hostile tant que le joueur ne l'attaque pas
     // Charme féerique : JS SAG DD 14 ou charmé 24h — géré par DM AI via apply_condition
     // Résistance magie : Avantage sur JS contre sorts
   },
@@ -185,6 +186,7 @@ const MONSTER_TEMPLATES: Record<string, Omit<MonsterState, 'id' | 'name' | 'posi
     attackBonus: 6,
     damageDice: '3d6+4',  // coup (contondants)
     speed: 20,
+    disposition: 'neutral',  // non hostile tant que le joueur ne l'attaque pas
     // Vulnérabilité : feu × 2
     // Fausse apparence : ressemble à un pommier ordinaire
   },
@@ -192,7 +194,13 @@ const MONSTER_TEMPLATES: Record<string, Omit<MonsterState, 'id' | 'name' | 'posi
 
 let monsterIdCounter = 0
 
-function createMonster(monsterType: string, cell: { x: number; y: number }, name?: string, hpOverride?: number): MonsterState {
+function createMonster(
+  monsterType: string,
+  cell: { x: number; y: number },
+  name?: string,
+  hpOverride?: number,
+  disposition?: MonsterDisposition,
+): MonsterState {
   const normalizedType = monsterType.toLowerCase()
   const id = `${normalizedType}_${Date.now()}_${monsterIdCounter++}`
   const template = MONSTER_TEMPLATES[normalizedType]
@@ -212,6 +220,7 @@ function createMonster(monsterType: string, cell: { x: number; y: number }, name
       damageDice: '1d6',
       speed: 30,
       isAlive: true,
+      disposition: disposition ?? 'hostile',
     }
   }
 
@@ -223,6 +232,7 @@ function createMonster(monsterType: string, cell: { x: number; y: number }, name
     hp: { current: maxHp, max: maxHp },
     position: cell,
     isAlive: true,
+    disposition: disposition ?? template.disposition ?? 'hostile',
   }
 }
 
@@ -385,7 +395,9 @@ export function registerPhaseTools(server: McpServer): void {
 
         const spawnedMonsters: MonsterState[] = []
         for (const spec of encounterMonsters) {
-          const monster = createMonster(spec.monsterType, spec.cell, spec.name, spec.hpOverride)
+          // Une rencontre démarre un combat: les monstres sont hostiles, même si
+          // leur template par défaut est neutre (ex: dryade provoquée).
+          const monster = createMonster(spec.monsterType, spec.cell, spec.name, spec.hpOverride, 'hostile')
           gs.spawnMonster(monster)
           spawnedMonsters.push(monster)
         }
@@ -583,21 +595,22 @@ export function registerPhaseTools(server: McpServer): void {
   // Spawns a monster from the template library onto the grid
   server.tool(
     'spawn_monster',
-    'Spawns a monster on the grid. Uses built-in stat blocks for known types.',
+    'Places a creature token on the grid WITHOUT starting combat. Use this during exploration/narration to introduce NPCs or creatures the player notices or meets (e.g. neutral dryads, an awakened tree). Set disposition="neutral" or "friendly" for non-hostile creatures: no combat starts and they will not act against the player unless the player attacks them (then use start_encounter). Uses built-in stat blocks for known types.',
     {
       monsterType: z.string().describe('Monster type key: goblin, goblin_minion, goblin_boss, hobgoblin, hobgoblin_captain, skeleton, zombie, violet_fungus, wolf, bandit, dryad, awakened_tree'),
       cell: z.object({ x: z.number().int().min(0), y: z.number().int().min(0) }).describe('Grid position to spawn at'),
       name: z.string().optional().describe('Custom name override (e.g. "Gobelin Chef")'),
       hpOverride: z.number().int().positive().optional().describe('Override max HP'),
+      disposition: z.enum(['hostile', 'neutral', 'friendly']).optional().describe('Attitude toward the player. Defaults to the template attitude (dryad/awakened_tree are neutral, others hostile). Use neutral/friendly to introduce a creature in narration without starting combat.'),
     },
-    async ({ monsterType, cell, name, hpOverride }) => {
+    async ({ monsterType, cell, name, hpOverride, disposition }) => {
       try {
         rules.validateSpawn(cell)
       } catch (err) {
         return rules.ruleErrorResult(err)
       }
 
-      const createdMonster = createMonster(monsterType, cell, name, hpOverride)
+      const createdMonster = createMonster(monsterType, cell, name, hpOverride, disposition)
       gs.spawnMonster(createdMonster)
       return {
         content: [{ type: 'text', text: JSON.stringify(createdMonster) }],

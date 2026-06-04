@@ -855,9 +855,10 @@ RÈGLES MÉCANIQUES:
 - HP monstres : vigoureux / légèrement blessé / gravement blessé / à l'agonie.
 
 CONTRAT ETAT/NARRATION:
-- Si l'etat indique exploration avec 0 monstre vivant, tu ne peux pas narrer des ennemis presents dans la salle, qui entrent, attaquent, degainent, reperent le heros ou bloquent son chemin.
-- Pour faire apparaitre une rencontre reelle, appelle start_encounter avant de narrer sa presence.
-- Si ce sont seulement des bruits, rumeurs ou mouvements hors champ, dis-le explicitement: aucun ennemi n'est encore sur la carte et le combat n'est pas engage.
+- Si l'etat indique exploration avec 0 monstre vivant, tu ne peux pas narrer des creatures presentes dans la salle, qui apparaissent, entrent, attaquent, degainent, reperent le heros ou bloquent son chemin SANS d'abord les poser sur la carte avec un tool.
+- Pour faire apparaitre des creatures PACIFIQUES (PNJ neutres: dryades du verger, Mac l'arbre eveille, marchand, temoin...) que le joueur rencontre ou remarque, appelle spawn_monster avec disposition="neutral" AVANT de les narrer. Cela ne declenche aucun combat: elles restent neutres tant que le joueur ne les attaque pas.
+- Pour faire apparaitre une rencontre HOSTILE reelle (combat engage), appelle start_encounter avant de narrer sa presence.
+- Si ce sont seulement des bruits, rumeurs ou mouvements hors champ, dis-le explicitement: aucune creature n'est encore sur la carte et le combat n'est pas engage.
 - Si tu detectes que ta narration contredirait l'etat moteur, corrige silencieusement et reste dans la fiction. Ne montre jamais le diagnostic au joueur.`
 }
 
@@ -1416,7 +1417,7 @@ function selectToolsForLlm(
   }
 
   if (actionIntent.kind === 'move') {
-    return pickTools(allTools, ['resolve_player_action', 'move_token', 'start_encounter', 'get_entity_stats'])
+    return pickTools(allTools, ['resolve_player_action', 'move_token', 'start_encounter', 'spawn_monster', 'get_entity_stats'])
   }
 
   if (actionIntent.kind === 'attack' || actionIntent.kind === 'encounter') {
@@ -1424,7 +1425,7 @@ function selectToolsForLlm(
   }
 
   if (actionIntent.kind === 'interact') {
-    return pickTools(allTools, ['resolve_player_action', 'trigger_room_event', 'roll_ability_check', 'start_encounter', 'use_healing_potion', 'get_entity_stats'])
+    return pickTools(allTools, ['resolve_player_action', 'trigger_room_event', 'roll_ability_check', 'start_encounter', 'spawn_monster', 'use_healing_potion', 'get_entity_stats'])
   }
 
   if (actionIntent.kind === 'use_item') {
@@ -1432,14 +1433,14 @@ function selectToolsForLlm(
   }
 
   if (actionIntent.kind === 'social' || actionIntent.kind === 'ability_check') {
-    return pickTools(allTools, ['resolve_player_action', 'roll_ability_check', 'get_entity_stats'])
+    return pickTools(allTools, ['resolve_player_action', 'roll_ability_check', 'spawn_monster', 'get_entity_stats'])
   }
 
   if (actionIntent.kind === 'observe' || actionIntent.kind === 'guidance' || actionIntent.kind === 'query_state' || actionIntent.kind === 'unknown') {
-    return pickTools(allTools, ['get_entity_stats'])
+    return pickTools(allTools, ['spawn_monster', 'get_entity_stats'])
   }
 
-  return pickTools(allTools, LLM_TOOL_SETS.explorationDefault)
+  return pickTools(allTools, [...LLM_TOOL_SETS.explorationDefault, 'spawn_monster'])
 }
 
 function aliveMonsters(gameState: GameState): MonsterState[] {
@@ -1540,6 +1541,10 @@ function detectNarrativeStateContractIssue(
     /\b(silhouettes?|formes?)\s+vertes?\b/.test(text)
   if (!mentionsEnemies) return null
 
+  // Les créatures narrées sont gagées par le moteur si on vient de les poser sur la grille
+  // (spawn_monster pour des PNJ neutres) ou d'ouvrir une rencontre (start_encounter).
+  if (toolsUsed.includes('spawn_monster') || toolsUsed.includes('start_encounter')) return null
+
   const narratesJustDefeatedEnemy = toolsUsed.includes('resolve_player_attack') &&
     /\b(meurt|mort|morte|dernier cri|s'effondre|s'ecroule|tombe|inerte|cadavre|corps|transperce|abat|abattu|sang)\b/.test(text)
   if (narratesJustDefeatedEnemy) return null
@@ -1566,8 +1571,9 @@ function detectNarrativeStateContractIssue(
 
   return {
     reason: 'enemy_presence_without_engine_state',
+    // spawn_monster (PNJ neutre, pas de combat) ou start_encounter (hostile, combat).
     matchedTriggers,
-    suggestedTools: ['start_encounter'],
+    suggestedTools: ['spawn_monster', 'start_encounter'],
   }
 }
 
@@ -3452,6 +3458,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     let turnBoundaryReached = false
     let primaryActionToolUsed: string | null = null
     let mechanicalRetryInjected = false
+    let narrativeContractRetryInjected = false
+    let keepNarrativeDespiteContract = false
+    let preservedRichNarrative = ''
     let maxTokensRetryInjected = false
     let sawMcpToolError = false
     let latestMcpErrorResult: unknown
@@ -3623,6 +3632,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           iterations < MAX_TOOL_ITERATIONS
         ) {
           mechanicalRetryInjected = true
+          // Garde la meilleure narration riche au cas où la relance produirait
+          // une sortie faible/vide (sinon on retomberait sur la description canned).
+          if (responseText.trim()) preservedRichNarrative = narrative
           narrative = narrativeBeforeResponse
           lastEndTurnNarrative = ''
           logEvent('warn', 'anomaly.intent_without_required_tool', {
@@ -3650,11 +3662,36 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           detectNarrativeStateContractIssue(responseText, currentGameState, toolsUsed) ??
           detectNarrativeRoomContractIssue(responseText, currentGameState, toolsUsed)
         if (narrativeStateIssue) {
-          narrative = narrativeBeforeResponse
-          lastEndTurnNarrative = buildNarrativeStateCorrection(currentGameState)
-          narrative = narrative
-            ? `${narrative}\n\n${lastEndTurnNarrative}`
-            : lastEndTurnNarrative
+          // Re-prompt une fois: demande au LLM de gager sa narration par un tool moteur.
+          // Des créatures qui apparaissent peuvent être posées sur la grille SANS combat
+          // via spawn_monster (PNJ neutres: dryades, arbre éveillé), ou via start_encounter
+          // si elles sont hostiles et engagent le combat.
+          if (!narrativeContractRetryInjected && iterations < MAX_TOOL_ITERATIONS) {
+            narrativeContractRetryInjected = true
+            if (responseText.trim()) preservedRichNarrative = narrative
+            narrative = narrativeBeforeResponse
+            lastEndTurnNarrative = ''
+            logEvent('warn', 'anomaly.narrative_state_contract', {
+              requestId,
+              sessionId,
+              iteration: iterations,
+              issue: narrativeStateIssue,
+              toolsUsed,
+              message,
+              responseText,
+              resolution: 'reprompt',
+              gameState: summarizeGameState(currentGameState),
+            })
+            messages.push({ role: 'assistant', content: response.content })
+            messages.push({
+              role: 'user',
+              content: `SYSTEM INTERNE, a ne jamais citer au joueur: Ta narration introduit un element non gage par l'etat moteur (${narrativeStateIssue.matchedTriggers.join(', ')}). Tu dois l'ancrer avec un tool avant de narrer. Si des creatures apparaissent et restent pacifiques (PNJ: dryades, arbre eveille Mac...), appelle spawn_monster avec disposition="neutral" pour les poser sur la grille SANS declencher de combat. Si elles sont hostiles et engagent reellement le combat, appelle start_encounter. Si c'est un changement de lieu, appelle move_token. Puis re-narre la scene. La reponse visible doit rester orale, sans meta, sans liste, sans Markdown et sans mention d'outil.`,
+            })
+            continue
+          }
+          // Relance epuisee: on GARDE la narration riche du LLM plutot que la description
+          // canned (choix de conception "re-prompt puis garder").
+          keepNarrativeDespiteContract = true
           logEvent('warn', 'anomaly.narrative_state_contract', {
             requestId,
             sessionId,
@@ -3663,7 +3700,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             toolsUsed,
             message,
             responseText,
-            serverCorrection: lastEndTurnNarrative,
+            resolution: 'kept_narrative',
             gameState: summarizeGameState(currentGameState),
           })
           break
@@ -4192,7 +4229,25 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       narratorSource = 'fallback'
     }
 
-    const oralNarrative = normalizeNarrativeForOralPlayback(narrative, currentGameState, toolsUsed)
+    let oralNarrative = normalizeNarrativeForOralPlayback(narrative, currentGameState, toolsUsed)
+    // Si le garde oral allait retomber sur la description canned mais qu'on a conservé
+    // une narration riche d'une itération précédente (relance mécanique/contrat),
+    // on la restaure plutôt que de perdre une bonne narration ("re-prompt puis garder").
+    if (oralNarrative.fallbackUsed && preservedRichNarrative.trim()) {
+      const preservedOral = normalizeNarrativeForOralPlayback(preservedRichNarrative, currentGameState, toolsUsed)
+      if (!preservedOral.fallbackUsed) {
+        logEvent('info', 'dm.narrative.preserved_rich_restored', {
+          requestId,
+          sessionId,
+          discardedFallback: oralNarrative.narrative,
+          restoredNarrative: preservedOral.narrative,
+        })
+        narrative = preservedRichNarrative
+        oralNarrative = preservedOral
+        narratorSource = 'llm'
+        keepNarrativeDespiteContract = true
+      }
+    }
     if (oralNarrative.changed) {
       logEvent(oralNarrative.fallbackUsed ? 'warn' : 'info', 'dm.narrative.oral_guard.applied', {
         requestId,
@@ -4208,9 +4263,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       narrative = oralNarrative.narrative
     }
 
-    const finalNarrativeStateIssue =
-      detectNarrativeStateContractIssue(narrative, currentGameState, toolsUsed) ??
-      detectNarrativeRoomContractIssue(narrative, currentGameState, toolsUsed)
+    const finalNarrativeStateIssue = keepNarrativeDespiteContract
+      ? null
+      : detectNarrativeStateContractIssue(narrative, currentGameState, toolsUsed) ??
+        detectNarrativeRoomContractIssue(narrative, currentGameState, toolsUsed)
     if (finalNarrativeStateIssue) {
       const serverCorrection = buildNarrativeStateCorrection(currentGameState)
       logEvent('warn', 'anomaly.final_narrative_state_contract', {

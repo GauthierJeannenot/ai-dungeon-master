@@ -66,7 +66,13 @@ export interface MonsterState {
   initiative?: number
   isAlive: boolean
   xpAwarded?: boolean
+  // Attitude envers le joueur. Absent => 'hostile' (rétrocompatible).
+  // 'neutral'/'friendly' = créature présente sur la grille sans déclencher de combat
+  // tant que le joueur ne l'attaque pas.
+  disposition?: MonsterDisposition
 }
+
+export type MonsterDisposition = 'hostile' | 'neutral' | 'friendly'
 
 export interface CombatLogEntry {
   id: string

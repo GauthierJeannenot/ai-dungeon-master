@@ -358,6 +358,54 @@ test('MCP rules reject out-of-bounds monster spawns and encounter cells', async 
   })
 })
 
+test('MCP spawn_monster places neutral creatures without starting combat', async () => {
+  await withMcpClient(async client => {
+    const baseState = await callTool(client, 'get_game_state')
+    await callTool(client, 'replace_game_state', { gameState: baseState })
+
+    // Dryade: template non hostile => disposition neutral par défaut, pas de combat.
+    const dryad = await callTool(client, 'spawn_monster', {
+      monsterType: 'dryad',
+      cell: { x: 6, y: 6 },
+    })
+    assert.equal(dryad.disposition, 'neutral')
+    assert.equal(dryad.isAlive, true)
+
+    // Gobelin: hostile par défaut.
+    const goblin = await callTool(client, 'spawn_monster', {
+      monsterType: 'goblin',
+      cell: { x: 7, y: 6 },
+    })
+    assert.equal(goblin.disposition, 'hostile')
+
+    // Override explicite.
+    const friendly = await callTool(client, 'spawn_monster', {
+      monsterType: 'goblin',
+      cell: { x: 8, y: 6 },
+      disposition: 'friendly',
+    })
+    assert.equal(friendly.disposition, 'friendly')
+
+    // Aucun combat déclenché par spawn_monster.
+    const stateAfter = await callTool(client, 'get_game_state')
+    assert.equal(stateAfter.phase, 'exploration')
+  })
+})
+
+test('MCP start_encounter forces hostile disposition even for neutral templates', async () => {
+  await withMcpClient(async client => {
+    const baseState = await callTool(client, 'get_game_state')
+    await callTool(client, 'replace_game_state', { gameState: baseState })
+
+    const encounter = await callTool(client, 'start_encounter', {
+      playerCell: { x: 4, y: 6 },
+      monsters: [{ monsterType: 'dryad', cell: { x: 5, y: 6 }, name: 'Dryade enragée' }],
+    })
+    assert.equal(encounter.spawnedMonsters[0].disposition, 'hostile')
+    assert.equal(encounter.combat.phase, 'combat')
+  })
+})
+
 test('MCP rules reject attacks outside the active turn and range', async () => {
   await withMcpClient(async client => {
     const baseState = await callTool(client, 'get_game_state')
