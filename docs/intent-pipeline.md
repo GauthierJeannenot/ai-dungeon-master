@@ -53,6 +53,8 @@ Les regex sont utiles pour les fast-paths tres surs:
 - coordonnees simples;
 - passer son tour evident.
 
+Elles ne doivent pas router le langage naturel general. Une fois l'Intent Interpreter appele, sa sortie fait foi: action canonique, clarification, query/guidance, ou absence de plan. Le serveur ne doit pas retomber silencieusement sur `classifyPlayerAction` pour "sauver" une phrase naturelle.
+
 Elles ne suffisent pas pour le coeur du jeu:
 
 - les joueurs parlent mal, vite, avec des fautes;
@@ -115,6 +117,13 @@ Clarifier quand:
 - un pronom ne peut pas etre resolu;
 - l'effet voulu est trop vague pour muter le monde.
 
+Ne pas clarifier quand:
+
+- une seule affordance correspond clairement;
+- le dernier event moteur donne la cible, par exemple porte ouverte puis "tu ne m'as pas deplace";
+- un portail explicite est utilise, par exemple escalier/etage, porte, seuil: cela doit produire un deplacement moteur si la transition est valide;
+- une action rejetee peut etre resolue par le moteur en `action.blocked`.
+
 Refuser quand:
 
 - l'action contredit l'etat moteur;
@@ -137,6 +146,8 @@ Si le pipeline ne produit aucun event utile:
 - il doit payer une narration finale LLM si possible;
 - sinon il demande une clarification contextuelle;
 - il ne doit pas ressortir une boucle d'ambiance comme "la piece gronde".
+
+Les erreurs de regle doivent rester observables: si un tool canonique refuse sans event exploitable, la route reflete un `action.blocked` dans le TurnTrace/world log pour eviter un refus invisible.
 
 Le budget LLM est donc soft par defaut. Un blocage dur n'est actif que si `LLM_HARD_BUDGET_ENABLED=true`.
 
@@ -166,6 +177,7 @@ Champs utiles:
 ## Limites restantes
 
 - Le mock local reste heuristique: il sert aux tests sans cle LLM, pas a remplacer le LLM cheap en prod.
+- `classifyPlayerAction` existe encore comme legacy/fast-path mecanique, mais ne doit plus redevenir le cerveau general du tour.
 - Les creations d'entites completes au runtime restent limitees; `fictionFacts` couvre les faits fictionnels, pas encore un systeme generique d'objets/PNJ complexes.
 - Les clarifications peuvent encore etre trop sobres; elles doivent rester meilleures qu'un faux texte d'ambiance.
 - Les garde-fous narratifs detectent les contradictions les plus dangereuses, pas toute la semantique possible du francais.

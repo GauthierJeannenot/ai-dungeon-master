@@ -51,6 +51,7 @@ export function createInitialWorldState(): WorldState {
       '8': {
         id: '8',
         name: 'Sol de la boulangerie',
+        aliases: ['fours', 'four', 'reserve', 'reserves', 'cuisine', 'origine de l odeur', 'odeur des fours', 'odeur de brule'],
         description: 'Le coeur brulant du batiment, entre fours enchantes et outils trop agites.',
         tags: ['bakery_floor', 'danger'],
         exits: ['4', '5', '7', '9'],

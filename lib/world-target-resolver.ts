@@ -96,7 +96,7 @@ function extractWorldItemName(message: string): string | undefined {
 
 function wantsPortalTraversal(message: string): boolean {
   const text = normalizeFrenchText(message)
-  return /\b(pousses?|pousser|rentres?|rentrer|entres?|entrer|franchis|franchir|passes?|passer|traverses?|traverser|dedans|interieur|a l interieur|dans le batiment|boulangerie)\b/.test(text)
+  return /\b(pousses?|pousser|rentres?|rentrer|entres?|entrer|franchis|franchir|passes?|passer|traverses?|traverser|dedans|interieur|a l interieur|dans le batiment)\b/.test(text)
 }
 
 function hasAnaphoricObjectReference(message: string): boolean {

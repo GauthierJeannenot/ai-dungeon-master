@@ -1102,6 +1102,11 @@ function buildMcpRuleErrorNarrative(errorResult: unknown, gameState: GameState, 
   const code = mcpErrorCode(errorResult)
   const roomName = getCurrentRoomName(gameState)
   const detail = isObjectRecord(errorResult) && isObjectRecord(errorResult.detail) ? errorResult.detail : {}
+  const concreteAffordances = () => buildSceneSurface(gameState).affordances
+    .filter(affordance => affordance.enabled)
+    .map(affordance => affordance.target?.name ?? affordance.label)
+    .filter(Boolean)
+    .slice(0, 4)
 
   if (code === 'ACTION_ALREADY_USED') {
     if (gameState.phase === 'combat') {
@@ -1126,7 +1131,10 @@ function buildMcpRuleErrorNarrative(errorResult: unknown, gameState: GameState, 
     if (gameState.player.hp.current <= 0 || gameState.player.conditions.includes('unconscious')) {
       return buildPlayerDownNarrative(gameState)
     }
-    return "Ton intention cherche une prise, mais la scene ne l'offre pas encore: il faut un geste plus direct ou un angle plus clair."
+    const options = concreteAffordances()
+    return options.length > 0
+      ? `L'etat moteur ne valide pas cette action maintenant. Les prises concretes ici sont: ${options.join(', ')}.`
+      : "L'etat moteur ne valide pas cette action maintenant. Donne l'effet voulu, et je le rattache a une action ou une improvisation persistante."
   }
 
   if (code === 'WORLD_OBJECT_AMBIGUOUS') {
@@ -1164,10 +1172,13 @@ function buildMcpRuleErrorNarrative(errorResult: unknown, gameState: GameState, 
   }
 
   if (isObjectRecord(errorResult) && typeof errorResult.error === 'string') {
-    return "Ton geste se bloque: la situation ne le permet pas encore."
+    const options = concreteAffordances()
+    return options.length > 0
+      ? `Cette action est refusee par l'etat actuel. Tu peux plutot t'appuyer sur: ${options.join(', ')}.`
+      : "Cette action est refusee par l'etat actuel; il me faut une cible ou un effet plus exploitable pour la resoudre."
   }
 
-  return "Ton geste se bloque: il faut une ouverture plus claire."
+  return "Cette action n'a pas abouti dans l'etat actuel; je garde le monde en place au lieu d'inventer une consequence."
 }
 
 function hasCompletedCurrentAction(gameState: GameState | undefined | null): boolean {
@@ -1266,7 +1277,14 @@ function buildOralFallbackNarrative(gameState: GameState, toolsUsed: string[]): 
       : "Le combat continue dans une tension brutale."
   }
 
-  return buildDirectiveSceneNarrative(gameState)
+  const options = buildSceneSurface(gameState).affordances
+    .filter(affordance => affordance.enabled)
+    .map(affordance => affordance.target?.name ?? affordance.label)
+    .filter(Boolean)
+    .slice(0, 4)
+  return options.length > 0
+    ? `Rien de nouveau n'est tranche par le moteur. Les prises concretes ici sont: ${options.join(', ')}.`
+    : "Rien de nouveau n'est tranche par le moteur; precise la cible ou l'effet voulu."
 }
 
 function looksLikeGenericSceneFallback(text: string): boolean {
@@ -2520,9 +2538,10 @@ function parseNamedRoomMove(message: string, gameState: GameState): { x: number;
   const relativeRoomId = relativeRoomIdForExplorationMove(text, gameState)
   const sensoryRoomId = contextualSensoryRoomIdForExplorationMove(text, gameState)
   const uniqueVagueRoomId = uniqueVagueExplorationRoomId(text, gameState)
+  const recentPortalRoomId = recentPortalFollowupRoomId(text, gameState)
   const destinationResolution = resolveLocationDestination(message, gameState)
   const hasLocationResolution = destinationResolution.status !== 'not_found'
-  if (!relativeRoomId && !sensoryRoomId && !uniqueVagueRoomId && !hasDestinationCue(text) && !hasLocationResolution) {
+  if (!relativeRoomId && !sensoryRoomId && !uniqueVagueRoomId && !recentPortalRoomId && !hasDestinationCue(text) && !hasLocationResolution) {
     return null
   }
 
@@ -2536,7 +2555,7 @@ function parseNamedRoomMove(message: string, gameState: GameState): { x: number;
   const destinationRoomId = destinationResolution.status === 'resolved'
     ? destinationResolution.target?.roomId ?? null
     : null
-  const targetRoomId = destinationRoomId ?? sensoryRoomId ?? uniqueVagueRoomId ?? relativeRoomId ?? findAdventureRoomIdByAlias(text)
+  const targetRoomId = destinationRoomId ?? sensoryRoomId ?? uniqueVagueRoomId ?? recentPortalRoomId ?? relativeRoomId ?? findAdventureRoomIdByAlias(text)
   if (!targetRoomId || targetRoomId === gameState.currentRoomId) return null
 
   return centerCellForRoom(targetRoomId)
@@ -2549,6 +2568,23 @@ function parseContextualRoomMove(
 ): { x: number; y: number } | null {
   const targetRoomId = contextualRoomIdFromRecentDm(message, gameState, recentHistory)
   return targetRoomId ? centerCellForRoom(targetRoomId) : null
+}
+
+function recentPortalFollowupRoomId(text: string, gameState: GameState): string | null {
+  if (!gameState.currentRoomId || !gameState.world) return null
+  const asksToFinishPortalMove =
+    /\b(?:tu ne m[' ]?as pas deplace|tu m[' ]?as pas deplace|pas deplace|pas bouge|j[' ]?entre|je rentre|je franchis|je passe|j[' ]?y vais|vas y|go|dedans|interieur)\b/.test(text)
+  if (!asksToFinishPortalMove) return null
+
+  const recentPortalEvent = [...gameState.world.eventLog].reverse().find(event =>
+    ['door.opened', 'object.opened', 'object.used'].includes(event.type) &&
+    typeof event.targetId === 'string' &&
+    Boolean(gameState.world?.objects[event.targetId]?.portal?.roomIds.includes(gameState.currentRoomId ?? ''))
+  )
+  if (!recentPortalEvent?.targetId) return null
+
+  const portal = gameState.world.objects[recentPortalEvent.targetId]
+  return portal.portal?.roomIds.find(roomId => roomId !== gameState.currentRoomId) ?? null
 }
 
 function cellFromToolInput(value: unknown): { x: number; y: number } | null {
@@ -2738,18 +2774,90 @@ function suggestedToolsForInterpretedKind(kind: CanonicalPlayerActionKind): stri
   return ['resolve_player_action']
 }
 
+function normalizeInterpreterCanonicalAction(action: Record<string, unknown>): Record<string, unknown> | null {
+  const rawKind = typeof action.kind === 'string' ? action.kind : null
+  if (!rawKind) return null
+
+  if (rawKind === 'traverse') {
+    const viaObjectId = typeof action.viaObjectId === 'string'
+      ? action.viaObjectId
+      : typeof action.targetId === 'string'
+        ? action.targetId
+        : undefined
+    const viaObjectName = typeof action.viaObjectName === 'string'
+      ? action.viaObjectName
+      : typeof action.targetName === 'string'
+        ? action.targetName
+        : undefined
+    if (viaObjectId || viaObjectName) {
+      return {
+        kind: 'open',
+        traverse: true,
+        ...(viaObjectId ? { targetId: viaObjectId } : {}),
+        ...(viaObjectName ? { targetName: viaObjectName } : {}),
+      }
+    }
+
+    const targetRoomId = typeof action.targetRoomId === 'string'
+      ? action.targetRoomId
+      : typeof action.toRoomId === 'string'
+        ? action.toRoomId
+        : typeof action.roomId === 'string'
+          ? action.roomId
+          : null
+    const toCell = targetRoomId ? centerCellForRoom(targetRoomId) : null
+    return toCell ? { kind: 'move', tokenId: 'player', toCell } : null
+  }
+
+  if (rawKind === 'move' && !isObjectRecord(action.toCell)) {
+    const targetRoomId = typeof action.targetRoomId === 'string'
+      ? action.targetRoomId
+      : typeof action.toRoomId === 'string'
+        ? action.toRoomId
+        : typeof action.roomId === 'string'
+          ? action.roomId
+          : null
+    const toCell = targetRoomId ? centerCellForRoom(targetRoomId) : null
+    if (toCell) return { ...action, tokenId: typeof action.tokenId === 'string' ? action.tokenId : 'player', toCell }
+  }
+
+  return action
+}
+
 function interpreterCanonicalAction(output: IntentInterpreterOutput | null | undefined): Record<string, unknown> | null {
   if (!output || output.requiresClarification || !isObjectRecord(output.canonicalAction)) return null
-  const kind = output.canonicalAction.kind
+  const normalizedAction = normalizeInterpreterCanonicalAction(output.canonicalAction)
+  if (!normalizedAction) return null
+  const kind = normalizedAction.kind
   if (typeof kind !== 'string') return null
   if (!PLAYER_ACTION_KINDS.has(kind as CanonicalPlayerActionKind)) return null
-  return output.canonicalAction
+  return normalizedAction
+}
+
+function interpretedActionTargetsPortal(action: Record<string, unknown>, gameState: GameState): boolean {
+  const kind = typeof action.kind === 'string' ? action.kind : null
+  if (!kind || !['open', 'unlock', 'force', 'use_object'].includes(kind)) return false
+  if (action.traverse === true) return true
+
+  const targetId = typeof action.targetId === 'string' ? action.targetId : null
+  const targetName = typeof action.targetName === 'string' ? normalizeFrenchText(action.targetName) : null
+  if (!targetId && !targetName) return false
+
+  return buildSceneSurface(gameState).objects.some(object => {
+    if (!object.portal?.otherRoomIds.length) return false
+    if (targetId && object.id === targetId) return true
+    if (!targetName) return false
+    const haystack = [object.name, ...object.aliases, ...object.tags].map(normalizeFrenchText).join(' ')
+    return haystack.includes(targetName) || targetName.includes(normalizeFrenchText(object.name))
+  })
 }
 
 function shouldExecuteInterpreterActionDirectly(action: Record<string, unknown>, gameState: GameState): boolean {
   const kind = action.kind
   if (typeof kind !== 'string') return false
   if (kind === 'social' || kind === 'ability_check') return false
+  if (kind === 'search') return false
+  if (interpretedActionTargetsPortal(action, gameState)) return false
   if (kind === 'move') return isObjectRecord(action.toCell)
   if (kind === 'attack') return gameState.phase === 'combat' && gameState.currentTurn === 'player'
   return PLAYER_ACTION_KINDS.has(kind as CanonicalPlayerActionKind)
@@ -2766,14 +2874,6 @@ function intentInterpreterFastPathReason(
   if (preliminaryIntent.reason === 'player-death-save-intent') return 'player-death-save-intent'
   if (preliminaryIntent.reason === 'healing-potion-intent') return 'healing-potion-intent'
   if (preliminaryIntent.reason === 'player-pass-turn-intent') return 'player-pass-turn-intent'
-  if (
-    preliminaryIntent.confidence === 'high' &&
-    isCanonicalWorldActionKind(preliminaryIntent.kind) &&
-    preliminaryIntent.kind !== 'improvise' &&
-    preliminaryIntent.reason.startsWith('world-')
-  ) {
-    return `canonical-world-action:${preliminaryIntent.kind}`
-  }
 
   const text = normalizeFrenchText(message)
   const coordinateMoveIntent =
@@ -2791,7 +2891,6 @@ function intentInterpreterFastPathReason(
 
 function intentFromInterpreterOutput(
   message: string,
-  fallbackIntent: GameActionIntent,
   output: IntentInterpreterOutput | null | undefined
 ): GameActionIntent | null {
   if (!output) return null
@@ -2833,6 +2932,18 @@ function intentFromInterpreterOutput(
     }
   }
 
+  if (['question', 'query', 'status_question', 'meta_question'].includes(output.intentKind)) {
+    return {
+      kind: 'observe',
+      primitive: 'narrate',
+      reason: `intent-interpreter-${output.intentKind}`,
+      requiresEngine: false,
+      suggestedTools: [],
+      confidence: numericConfidenceToActionConfidence(output.confidence),
+      normalizedText,
+    }
+  }
+
   const canonicalAction = interpreterCanonicalAction(output)
   const actionKind = canonicalAction?.kind
   if (typeof actionKind !== 'string') return null
@@ -2847,6 +2958,20 @@ function intentFromInterpreterOutput(
     suggestedTools: suggestedToolsForInterpretedKind(kind),
     confidence: numericConfidenceToActionConfidence(output.confidence),
     normalizedText,
+  }
+}
+
+function unresolvedIntentFromInterpreter(message: string, output: IntentInterpreterOutput | null | undefined): GameActionIntent {
+  return {
+    kind: 'unknown',
+    primitive: 'narrate',
+    reason: output?.intentKind
+      ? `intent-interpreter-unresolved-${output.intentKind}`
+      : 'intent-interpreter-unresolved',
+    requiresEngine: false,
+    suggestedTools: [],
+    confidence: output ? numericConfidenceToActionConfidence(output.confidence) : 'low',
+    normalizedText: normalizeFrenchText(message),
   }
 }
 
@@ -2876,7 +3001,9 @@ function buildIntentInterpreterPrompt(summary: IntentInterpreterInputSummary): s
     'Retourne uniquement un objet JSON valide conforme au schema demande. Pas de prose.',
     'Tu interpretes une intention joueur pour un moteur de JDR. Tu proposes, tu ne mutes rien.',
     'Si une action creative plausible sort des actions prevues, prefere canonicalAction.kind="improvise" avec un type improvisation.',
-    'Si la cible est vraiment ambigue, requiresClarification=true et pose une question courte.',
+    'Si une seule affordance, sortie, PNJ ou cible contextuelle correspond clairement, choisis-la au lieu de clarifier.',
+    'Si le joueur veut franchir une porte, un seuil, un escalier ou une sortie, propose une action canonique supportee: open/force/use_object avec traverse=true, ou move avec targetRoomId.',
+    'Si la cible est vraiment ambigue entre plusieurs options plausibles, requiresClarification=true et pose une question courte.',
     'Ne transforme pas une question en attaque ou en rencontre.',
     'Schema attendu: intentKind, confidence, requiresClarification, clarificationQuestion, canonicalAction, improvisation, targetHints, reasoningSummary.',
     `Resume moteur:\n${JSON.stringify(summary, null, 2)}`,
@@ -3198,7 +3325,7 @@ function summarizeMcpResultForNarration(toolName: string, result: unknown): stri
   if (isObjectRecord(result)) {
     if (typeof result.mechanicalSummary === 'string') return result.mechanicalSummary
     if (isObjectRecord(result.result) && typeof result.result.mechanicalSummary === 'string') return result.result.mechanicalSummary
-    if (typeof result.error === 'string') return "Ton geste se bloque: ce n'est pas possible dans la situation actuelle."
+    if (typeof result.error === 'string') return "L'action est refusee par une regle moteur; aucun fait de monde n'est invente."
     if (typeof result.reason === 'string') return result.reason
   }
 
@@ -3444,7 +3571,9 @@ function buildDmTurnDebug(
       : actionIntent.kind === 'state_reconcile' && reconcileCell
         ? { kind: 'move', tokenId: 'player', toCell: reconcileCell }
         : moveCanonicalAction ?? plannedAction),
-    targetResolution: actionPlan?.targetResolution
+    targetResolution: actionIntent.kind === 'move' && moveLocationResolution
+      ? summarizeLocationResolution(moveLocationResolution)
+      : actionPlan?.targetResolution
       ? actionPlan.targetResolution as unknown as Record<string, unknown>
       : interpretedCanonicalAction
         ? {
@@ -3454,8 +3583,6 @@ function buildDmTurnDebug(
           }
       : isWorldAction
         ? resolveWorldActionTargets(message, gameState, actionIntent.kind) as unknown as Record<string, unknown>
-        : moveLocationResolution
-          ? summarizeLocationResolution(moveLocationResolution)
         : actionIntent.kind === 'state_reconcile'
           ? {
               kind: 'room',
@@ -3792,6 +3919,12 @@ async function resolveServerFirstAction(
   if (intentInterpreter?.output?.requiresClarification) {
     const draftNarrative = intentInterpreter.output.clarificationQuestion ??
       "Je vois l'intention, mais il me manque une cible claire. Precise qui ou quoi tu vises, et je l'applique proprement."
+    const moveClarification = actionIntent.kind === 'move' || /move|movement|deplacement/i.test(intentInterpreter.output.intentKind)
+    const refusalCode = moveClarification
+      ? /ambigue|plusieurs|plusieurs issues|plusieurs destinations/i.test(`${intentInterpreter.output.clarificationQuestion ?? ''} ${intentInterpreter.output.reasoningSummary}`)
+        ? 'UNRESOLVED_MOVE_AMBIGUOUS'
+        : 'UNRESOLVED_MOVE_TARGET'
+      : 'INTENT_CLARIFICATION_REQUIRED'
     const detail = {
       status: 'clarification_required',
       intentKind: intentInterpreter.output.intentKind,
@@ -3824,11 +3957,55 @@ async function resolveServerFirstAction(
           intentInterpreter: intentInterpreter.output,
         }, {
           success: false,
-          code: 'INTENT_CLARIFICATION_REQUIRED',
+          code: refusalCode,
           detail,
         }, 1, false),
       ],
-      refusalCode: 'INTENT_CLARIFICATION_REQUIRED',
+      refusalCode,
+      skipFinalNarration: true,
+      narratorSource: 'rule',
+    }
+  }
+
+  if (intentInterpreter?.used && actionIntent.reason.startsWith('intent-interpreter-unresolved')) {
+    const draftNarrative = buildContextualNoFallbackNarrative(gameState, actionIntent, intentInterpreter)
+    const detail = {
+      status: 'unresolved_by_intent_interpreter',
+      intentKind: intentInterpreter.output?.intentKind ?? null,
+      targetHints: intentInterpreter.output?.targetHints ?? {},
+      reasoningSummary: intentInterpreter.output?.reasoningSummary ?? null,
+    }
+    logEvent('info', 'dm.cost.engine_first.intent_interpreter.unresolved', {
+      requestId,
+      sessionId,
+      actionIntent,
+      intentInterpreter: intentInterpreter.output,
+      durationMs: Date.now() - startedAt,
+      draftNarrative,
+      gameState: summarizeGameState(gameState),
+    })
+    return {
+      handled: true,
+      gameState,
+      toolsUsed: [],
+      draftNarrative,
+      sawMcpToolError: false,
+      actionExecutions: [
+        toolActionExecution('rule', 'unresolved_intent', {
+          message,
+          actionIntent: {
+            kind: actionIntent.kind,
+            primitive: actionIntent.primitive,
+            reason: actionIntent.reason,
+          },
+          intentInterpreter: intentInterpreter.output,
+        }, {
+          success: false,
+          code: 'INTENT_INTERPRETER_UNRESOLVED',
+          detail,
+        }, 1, false),
+      ],
+      refusalCode: 'INTENT_INTERPRETER_UNRESOLVED',
       skipFinalNarration: true,
       narratorSource: 'rule',
     }
@@ -5374,8 +5551,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       inputMode,
       clientRequestId,
     })
-    const interpretedActionIntent = intentFromInterpreterOutput(message, preliminaryActionIntent, intentInterpreter.output)
-    const actionIntent = interpretedActionIntent ?? preliminaryActionIntent
+    const interpretedActionIntent = intentFromInterpreterOutput(message, intentInterpreter.output)
+    const actionIntent = interpretedActionIntent ??
+      (intentInterpreter.used ? unresolvedIntentFromInterpreter(message, intentInterpreter.output) : preliminaryActionIntent)
     const turnDebug = buildDmTurnDebug(message, currentGameState, actionIntent, intentInterpreter)
     const requiredMechanicalAction = requiredMechanicalActionFromIntent(actionIntent)
     logEvent('info', 'dm.action.intent', {
@@ -6180,7 +6358,34 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     const newCombatLogEntries = currentGameState.combatLog.slice(combatLogStartLength)
-    const newWorldEvents = currentGameState.world?.eventLog.slice(worldEventStartLength) ?? []
+    let newWorldEvents = currentGameState.world?.eventLog.slice(worldEventStartLength) ?? []
+    if (sawMcpToolError && currentGameState.world && !newWorldEvents.some(event => event.type === 'action.blocked')) {
+      const code = mcpErrorCode(latestMcpErrorResult) ?? 'MCP_RULE_ERROR'
+      const summary = isObjectRecord(latestMcpErrorResult) && typeof latestMcpErrorResult.error === 'string'
+        ? latestMcpErrorResult.error
+        : 'Action refusee par une regle moteur.'
+      const blockedEvent: EngineEvent = {
+        id: `route-blocked-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        type: 'action.blocked',
+        summary,
+        actorId: 'player',
+        outcome: 'blocked',
+        visibleToPlayer: true,
+        metadata: {
+          code,
+          reflectedByRoute: true,
+          actionKind: actionIntent.kind,
+        },
+      }
+      currentGameState = {
+        ...currentGameState,
+        world: {
+          ...currentGameState.world,
+          eventLog: [...currentGameState.world.eventLog, blockedEvent],
+        },
+      }
+      newWorldEvents = [...newWorldEvents, blockedEvent]
+    }
 
     if (sawMcpToolError) {
       const ruleNarrative = buildMcpRuleErrorNarrative(latestMcpErrorResult, currentGameState, toolsUsed)

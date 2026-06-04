@@ -36,7 +36,7 @@ const ROOM_FALLBACK_ALIASES: Record<string, string[]> = {
   '4': ['entree', 'hall', 'vestibule', 'interieur', 'boulangerie'],
   '5': ['bureau', 'paperasse', 'registres'],
   '7': ['quai', 'chargement', 'dock', 'quai de chargement', 'porte laterale'],
-  '8': ['sol de la boulangerie', 'fours', 'four', 'reserve', 'reserves', 'cuisine'],
+  '8': ['sol de la boulangerie', 'fours', 'four', 'reserve', 'reserves', 'cuisine', 'odeur', 'origine de l odeur', 'odeur des fours', 'odeur de brule'],
   '9': ['appartement', 'appartement de grammy', 'etage', 'haut', 'escaliers', 'escalier', 'grukk'],
 }
 

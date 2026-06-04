@@ -672,6 +672,62 @@ test('DM API resolves the narrated initial front door through scene surface affo
   }
 })
 
+test('DM API does not over-clarify portal followups that are clear from recent engine events', async t => {
+  const sessionId = `api-portal-followup-${process.pid}-${Date.now()}`
+  t.after(() => cleanupSession(sessionId))
+
+  const opened = await postDm({
+    message: "j'ouvre les portes de la boulangerie",
+    clientRequestId: `client-open-${sessionId}`,
+    sessionId,
+    gameState: baseGameState(),
+    history: [],
+  })
+
+  assert.equal(opened.response.status, 200)
+  assert.ok(opened.data.toolsUsed.includes('resolve_player_action'))
+  assert.ok(opened.data.engine?.events?.some(event => event.type === 'door.opened' && event.targetId === 'front_double_door'))
+  assert.equal(opened.data.engine?.events?.some(event => event.type === 'entity.moved'), false)
+  assert.equal(opened.data.newGameState.currentRoomId, '1')
+
+  const moved = await postDm({
+    message: "tu ne m'as pas deplace",
+    clientRequestId: `client-move-${sessionId}`,
+    sessionId,
+    gameState: opened.data.newGameState,
+    history: [
+      { role: 'player', content: "j'ouvre les portes de la boulangerie" },
+      { role: 'dm', content: opened.data.narrative },
+    ],
+  })
+
+  assert.equal(moved.response.status, 200)
+  assert.ok(moved.data.toolsUsed.includes('resolve_player_action'))
+  assert.ok(moved.data.engine?.events?.some(event => event.type === 'entity.moved'))
+  assert.equal(moved.data.debug?.refusalCode, null)
+  assert.equal(moved.data.newGameState.currentRoomId, '4')
+  assert.doesNotMatch(moved.data.narrative, /destination assez claire|repere concret|precise/i)
+})
+
+test('DM API treats portal fixtures like stairs as movement, not just object use', async t => {
+  const sessionId = `api-stairs-move-${process.pid}-${Date.now()}`
+  t.after(() => cleanupSession(sessionId))
+
+  const { response, data } = await postDm({
+    message: "je me dirige vers l'etage",
+    clientRequestId: `client-${sessionId}`,
+    sessionId,
+    gameState: bakeryEntranceGameState(),
+    history: [],
+  })
+
+  assert.equal(response.status, 200)
+  assert.ok(data.toolsUsed.includes('resolve_player_action'))
+  assert.ok(data.engine?.events?.some(event => event.type === 'entity.moved'))
+  assert.equal(data.newGameState.currentRoomId, '9')
+  assert.notEqual(data.usage?.narrator, 'fallback')
+})
+
 test('DM API returns a useful ambiguity instead of moving through an unspecified interior door', async t => {
   const sessionId = `api-ambiguous-door-${process.pid}-${Date.now()}`
   t.after(() => cleanupSession(sessionId))

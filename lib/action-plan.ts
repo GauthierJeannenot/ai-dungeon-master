@@ -42,7 +42,7 @@ export interface ActionPlan {
   blocked?: ActionPlanBlocked
 }
 
-const TRAVERSAL_ACTION_KINDS = new Set(['open', 'unlock', 'force'])
+const TRAVERSAL_ACTION_KINDS = new Set(['open', 'unlock', 'force', 'use_object'])
 
 function canonicalPlayerActionInput(action: Record<string, unknown>): Record<string, unknown> {
   return { action }
@@ -50,7 +50,7 @@ function canonicalPlayerActionInput(action: Record<string, unknown>): Record<str
 
 function wantsPortalTraversal(message: string): boolean {
   const text = normalizeFrenchText(message)
-  return /\b(pousses?|pousser|rentres?|rentrer|entres?|entrer|franchis|franchir|passes?|passer|traverses?|traverser|dedans|interieur|a l interieur|dans le batiment|boulangerie)\b/.test(text)
+  return /\b(pousses?|pousser|rentres?|rentrer|entres?|entrer|franchis|franchir|passes?|passer|traverses?|traverser|dedans|interieur|a l interieur|dans le batiment)\b/.test(text)
 }
 
 function withoutTraverse(action: Record<string, unknown>): Record<string, unknown> {
@@ -192,9 +192,12 @@ function buildTraversalPlan(
 
   const destinationRoomId = portalTarget.object ? portalDestinationRoomId(portalTarget.object) : null
   const portalAlreadyTraversable = portalTarget.object?.opened === true && portalTarget.object.locked !== true
-  const moveStep = destinationRoomId ? buildMoveStep(destinationRoomId, !portalAlreadyTraversable) : null
+  const shouldUsePortalBeforeMoving = firstKind === 'use_object'
+  const moveStep = destinationRoomId
+    ? buildMoveStep(destinationRoomId, shouldUsePortalBeforeMoving || !portalAlreadyTraversable)
+    : null
   const steps = moveStep
-    ? portalAlreadyTraversable
+    ? portalAlreadyTraversable && !shouldUsePortalBeforeMoving
       ? [moveStep]
       : [firstStep, moveStep]
     : [firstStep]
@@ -208,7 +211,9 @@ function buildTraversalPlan(
     source: 'portal_traversal',
     reason: moveStep
       ? portalAlreadyTraversable
-        ? 'Intention de franchissement: le portail est deja ouvert, le plan devient un deplacement canonique.'
+        ? shouldUsePortalBeforeMoving
+          ? 'Intention de franchissement: utiliser le portail puis appliquer un deplacement canonique.'
+          : 'Intention de franchissement: le portail est deja ouvert, le plan devient un deplacement canonique.'
         : 'Intention composite: manipuler un portail puis le franchir seulement si la mutation reussit.'
       : 'Intention de franchissement sans destination unique; le moteur doit refuser ou demander une cible.',
     steps,
@@ -234,7 +239,14 @@ export function buildActionPlan(
   if (!worldAction) return null
 
   const targetResolution = resolveWorldActionTargets(message, gameState, kind)
-  if (worldAction.traverse === true && TRAVERSAL_ACTION_KINDS.has(actionKind(worldAction) ?? '')) {
+  const worldActionKind = actionKind(worldAction)
+  const portalObject = TRAVERSAL_ACTION_KINDS.has(worldActionKind ?? '')
+    ? uniquePortalObject(message, gameState, kind, worldAction).object
+    : undefined
+  if (
+    TRAVERSAL_ACTION_KINDS.has(worldActionKind ?? '') &&
+    (worldAction.traverse === true || (worldActionKind === 'use_object' && Boolean(portalObject)))
+  ) {
     return buildTraversalPlan(message, gameState, kind, worldAction, targetResolution)
   }
 

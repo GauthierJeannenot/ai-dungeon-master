@@ -469,15 +469,21 @@ function resolveWorldObjectTarget({
   const surface = buildSceneSurface(gs.getState())
   const surfaceObjectIds = new Set(surface.objects.map(object => object.id))
   const candidates = Object.values(world.objects).filter(object => {
+    const explicitTakenTakeTarget = Boolean(
+      onlyTakeable &&
+      targetId &&
+      object.id === targetId &&
+      object.taken
+    )
     if (targetId && object.id !== targetId) return false
-    if (!includeHidden && !surfaceObjectIds.has(object.id)) return false
+    if (!includeHidden && !surfaceObjectIds.has(object.id) && !explicitTakenTakeTarget) return false
     if (includeHidden && !objectIsOnSceneSurface(object, roomId) && object.roomId !== roomId) return false
-    if (object.taken) return false
+    if (object.taken && !explicitTakenTakeTarget) return false
     if (kinds && !kinds.includes(object.kind)) return false
     if (onlyOpenable && !isWorldObjectOpenable(object)) return false
     if (onlyOpenable && !targetId && !targetName && object.opened) return false
-    if (onlyTakeable && !isWorldObjectTakeable(object)) return false
-    if (!includeHidden && !object.visible && !object.discovered) return false
+    if (onlyTakeable && !isWorldObjectTakeable(object) && !explicitTakenTakeTarget) return false
+    if (!includeHidden && !object.visible && !object.discovered && !explicitTakenTakeTarget) return false
     if (!objectMatchesTarget(object, targetName)) return false
     return true
   })

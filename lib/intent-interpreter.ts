@@ -1,8 +1,10 @@
 import { z } from 'zod'
+import { centerCellForAdventureRoom } from './adventure-map'
 import { normalizeFrenchText } from './dm-intent'
 import { analyzeFictionImprovisation } from './fiction-intent'
+import { resolveLocationDestination } from './location-index'
 import { buildSceneSurface, summarizeSceneSurfaceForDebug } from './scene-surface'
-import type { ConversationTurn, GameState } from './types'
+import type { CanonicalPlayerActionKind, ConversationTurn, GameState, PlayerAffordance } from './types'
 
 export const INTENT_INTERPRETER_SCHEMA_VERSION = 1
 
@@ -99,6 +101,298 @@ function output(fields: Omit<IntentInterpreterOutput, 'schemaVersion' | 'source'
 
 function maybeDirectQuestion(text: string): boolean {
   return /\b(ou|quoi|qui|comment|pourquoi|quel|quelle|quels|quelles|est ce que|peux tu|peux-tu|je peux|puis je|puis-je)\b/.test(text)
+}
+
+function wantsTraversal(text: string): boolean {
+  return /\b(pousses?|pousser|rentres?|rentrer|entres?|entrer|franchis|franchir|passes?|passer|traverses?|traverser|dedans|interieur|batiment|boulangerie)\b/.test(text)
+}
+
+function mockCanonicalKind(text: string, gameState: GameState): CanonicalPlayerActionKind | null {
+  if (/\b(lis|lire|lecture|dechiffres?|dechiffrer|etudies?|etudier)\b/.test(text)) return 'read'
+  if (/\b(assembles?|assembler|combines?|combiner|reconstitues?|reconstituer|complete|completer)\b/.test(text) && /\b(recette|fragments?|morceaux?|moities?)\b/.test(text)) return 'combine_recipe'
+  if (/\b(crochettes?|crochetes?|crocheter|deverrouilles?|deverrouiller|serrure)\b/.test(text)) return 'unlock'
+  if (/\b(desamorces?|desamorcer|desactives?|desactiver|neutralises?|neutraliser)\b/.test(text)) return 'disarm'
+  if (/\b(forces?|forcer|enfonces?|enfoncer|defonces?|defoncer|detruis|detruire|casses?|casser|exploses?|exploser)\b/.test(text)) return 'force'
+  if (/\b(ouvres?|ouvrir|entrouvres?|pousses?|pousser|rentres?|rentrer|entres?|entrer|interieur|dedans|batiment)\b/.test(text)) return 'open'
+  if (/\b(prends?|prendre|ramasses?|ramasser|recuperes?|recuperer|attrapes?|attraper|empoches?|empocher)\b/.test(text)) return 'take'
+  if (/\b(montres?|montrer|presente|presentes|brandis)\b/.test(text)) return 'show_item'
+  if (/\b(donnes?|donner|offres?|offrir|remets?|remettre|confies?|confier)\b/.test(text)) return 'give_item'
+  if (/\b(menaces?|menacer|intimides?|intimider|rends toi|rendez vous|soumission)\b/.test(text)) return 'threaten'
+  if (/\b(persuades?|persuader|convaincs?|convaincre|negocies?|negocier|rassures?|rassurer)\b/.test(text)) return 'persuade'
+  if (/\b(parles?|parler|discutes?|discuter|salut|bonjour|bonsoir|hello)\b/.test(text)) return 'talk'
+  if (/\b(demandes?|demander|questionnes?|questionner|interroges?|interroger)\b/.test(text)) return 'ask'
+  if (/\b(caches?|cacher|planques?|planquer|discretion|furtif|faufiles?|faufiler)\b/.test(text)) return 'hide'
+  if (/\b(fuis|fuir|fuite|retraite|bats en retraite|deguerpis)\b/.test(text)) return 'flee'
+  if (/\b(aides?|aider|assistes?|assister|coup de main)\b/.test(text)) return 'help'
+  if (/\b(stabilises?|stabiliser|premiers secours|medecine|soignes?|soigner)\b/.test(text)) return 'stabilize'
+  if (/\b(utilises?|utiliser|actives?|activer|touches?|toucher|manipules?|manipuler)\b/.test(text)) return 'use_object'
+  if (/\b(fouilles?|fouiller|cherches?|chercher|inspectes?|inspecter)\b/.test(text) && !maybeDirectQuestion(text)) return 'search'
+  if (/\b(regardes?|regarder|observes?|observer|examines?|examiner|decris|decrire|ecoutes?|ecouter)\b/.test(text)) return 'examine'
+  if (gameState.phase === 'combat' && /\b(passe|attends?|attendre|patiente|ne fais rien)\b/.test(text)) return 'wait'
+  return null
+}
+
+function hasMockMoveIntent(text: string): boolean {
+  return /\b(va|vais|aller|deplaces?|deplacer|diriges?|diriger|avances?|avancer|bouges?|bouger|marche|pars|partir|sors|sortir|quittes?|quitter|suis|suivre|approches?|approcher|explores?|explorer|continue|continuer|rentre|entrer|monte|monter|descends?|descendre)\b/.test(text)
+}
+
+function recentPortalFollowupRoomId(text: string, gameState: GameState): string | null {
+  if (!gameState.currentRoomId || !gameState.world) return null
+  const asksToFinishPortalMove =
+    /\b(?:tu ne m[' ]?as pas deplace|tu m[' ]?as pas deplace|pas deplace|pas bouge|j[' ]?entre|je rentre|je franchis|je passe|j[' ]?y vais|vas y|go|dedans|interieur)\b/.test(text)
+  if (!asksToFinishPortalMove) return null
+
+  const recentPortalEvent = [...gameState.world.eventLog].reverse().find(event =>
+    ['door.opened', 'object.opened', 'object.used'].includes(event.type) &&
+    typeof event.targetId === 'string' &&
+    Boolean(gameState.world?.objects[event.targetId]?.portal?.roomIds.includes(gameState.currentRoomId ?? ''))
+  )
+  if (!recentPortalEvent?.targetId) return null
+
+  const portal = gameState.world.objects[recentPortalEvent.targetId]
+  return portal.portal?.roomIds.find(roomId => roomId !== gameState.currentRoomId) ?? null
+}
+
+function buildMockMoveOutput(message: string, gameState: GameState): IntentInterpreterOutput | null {
+  const text = normalizeFrenchText(message)
+  if (!hasMockMoveIntent(text)) return null
+
+  const recentPortalRoomId = recentPortalFollowupRoomId(text, gameState)
+  const recentPortalCell = recentPortalRoomId ? centerCellForAdventureRoom(recentPortalRoomId) : null
+  if (recentPortalRoomId && recentPortalCell) {
+    return output({
+      intentKind: 'move',
+      confidence: 0.84,
+      requiresClarification: false,
+      canonicalAction: {
+        kind: 'move',
+        tokenId: 'player',
+        toCell: recentPortalCell,
+      },
+      improvisation: null,
+      targetHints: {
+        targetId: recentPortalRoomId,
+        targetName: gameState.world?.rooms?.[recentPortalRoomId]?.name,
+        targetType: 'room',
+      },
+      reasoningSummary: 'Correction de deplacement rattachee au dernier portail ouvert/utilise.',
+    })
+  }
+
+  const resolution = resolveLocationDestination(message, gameState)
+  if (resolution.status === 'resolved' && resolution.target?.roomId) {
+    const toCell = centerCellForAdventureRoom(resolution.target.roomId)
+    if (toCell) {
+      return output({
+        intentKind: 'move',
+        confidence: 0.86,
+        requiresClarification: false,
+        canonicalAction: {
+          kind: 'move',
+          tokenId: 'player',
+          toCell,
+        },
+        improvisation: null,
+        targetHints: {
+          targetId: resolution.target.roomId,
+          targetName: resolution.target.name,
+          targetType: 'room',
+        },
+        reasoningSummary: 'Destination resolue par la surface de localisation; le moteur validera le deplacement.',
+      })
+    }
+  }
+
+  if (resolution.status === 'ambiguous') {
+    const candidates = resolution.candidates.map(candidate => candidate.name).filter(Boolean).slice(0, 4)
+    return output({
+      intentKind: 'move',
+      confidence: 0.74,
+      requiresClarification: true,
+      clarificationQuestion: candidates.length > 0
+        ? `Plusieurs issues peuvent correspondre: ${candidates.join(', ')}. Laquelle tu prends ?`
+        : 'Je vois que tu veux bouger, mais la direction est ambigue. Tu vas vers quel repere ?',
+      canonicalAction: null,
+      improvisation: null,
+      targetHints: { candidates },
+      reasoningSummary: 'Intention de mouvement reconnue, destination ambigue.',
+    })
+  }
+
+  const surface = buildSceneSurface(gameState)
+  const exitNames = surface.exits.map(exit => exit.name).filter(Boolean).slice(0, 4)
+  return output({
+    intentKind: 'move',
+    confidence: 0.62,
+    requiresClarification: true,
+    clarificationQuestion: exitNames.length > 0
+      ? `Je vois que tu veux changer de position, mais il faut un repere concret: ${exitNames.join(', ')}.`
+      : 'Je vois que tu veux bouger, mais je ne vois pas de destination claire depuis ici.',
+    canonicalAction: null,
+    improvisation: null,
+    targetHints: { candidates: exitNames },
+    reasoningSummary: 'Intention de mouvement reconnue sans destination resolue.',
+  })
+}
+
+function haystackForAffordance(affordance: PlayerAffordance): string {
+  return [
+    affordance.id,
+    affordance.label,
+    affordance.target?.id,
+    affordance.target?.name,
+    ...(affordance.aliases ?? []),
+  ].filter((value): value is string => Boolean(value)).map(normalizeFrenchText).join(' ')
+}
+
+function targetSpecificityScore(text: string, affordance: PlayerAffordance): number {
+  const haystack = haystackForAffordance(affordance)
+  let score = 0
+  for (const token of text.split(/[^a-z0-9']+/).filter(part => part.length >= 3)) {
+    if (haystack.includes(token)) score += token.length
+  }
+  return score
+}
+
+function normalizeAffordanceAction(
+  affordance: PlayerAffordance | null,
+  kind: CanonicalPlayerActionKind,
+  message: string,
+  gameState: GameState
+): Record<string, unknown> {
+  if (kind === 'search') return { kind: 'search', query: message }
+
+  const action: Record<string, unknown> = { kind }
+  const target = affordance?.target
+  if (target?.type === 'object' || target?.type === 'inventory') {
+    action.targetId = target.id
+    if (target.name) action.targetName = target.name
+  } else if (target?.type === 'npc') {
+    action.targetName = target.name
+  }
+
+  if ((kind === 'open' || kind === 'unlock' || kind === 'force') && wantsTraversal(normalizeFrenchText(message))) {
+    action.traverse = true
+  }
+
+  if (kind === 'talk' || kind === 'ask' || kind === 'persuade') action.topic = message
+  if (kind === 'threaten') action.demand = message
+  if (kind === 'stabilize') action.targetId = 'player'
+  if (kind === 'use_item') action.itemType = 'healing_potion'
+  if (kind === 'wait') action.reason = 'Le joueur attend et passe son tour.'
+
+  if ((kind === 'talk' || kind === 'ask' || kind === 'persuade' || kind === 'threaten' || kind === 'help') && !action.targetName) {
+    const npc = onePresentNpc(gameState)
+    if (npc) action.targetName = npc.name
+  }
+
+  return action
+}
+
+function bestAffordanceForKind(
+  kind: CanonicalPlayerActionKind,
+  text: string,
+  gameState: GameState,
+  includeBlocked = false
+): PlayerAffordance | null {
+  const surface = buildSceneSurface(gameState)
+  const candidates = surface.affordances.filter(affordance =>
+    affordance.kind === kind &&
+    (includeBlocked || affordance.enabled)
+  )
+  if (candidates.length === 0) return null
+  const scored = candidates
+    .map(affordance => ({ affordance, score: targetSpecificityScore(text, affordance) }))
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score
+      const aRoom = a.affordance.target?.type === 'room' ? 1 : 0
+      const bRoom = b.affordance.target?.type === 'room' ? 1 : 0
+      return aRoom - bRoom
+    })
+  if (scored[0]?.score > 0) return scored[0].affordance
+  const recentTargetId = [...(gameState.world?.eventLog ?? [])].reverse().find(event =>
+    typeof event.targetId === 'string' &&
+    ['object.taken', 'room.object_discovered', 'object.opened', 'door.opened', 'clue.read'].includes(event.type)
+  )?.targetId
+  const recentAffordance = recentTargetId
+    ? candidates.find(candidate => candidate.target?.id === recentTargetId)
+    : null
+  if (recentAffordance) return recentAffordance
+  if (kind === 'examine' || kind === 'search' || kind === 'hide' || kind === 'flee' || kind === 'combine_recipe' || kind === 'wait') {
+    return candidates[0]
+  }
+  return candidates.length === 1 ? candidates[0] : null
+}
+
+function buildMockWorldActionOutput(
+  message: string,
+  gameState: GameState,
+  kind: CanonicalPlayerActionKind
+): IntentInterpreterOutput | null {
+  const text = normalizeFrenchText(message)
+  const affordance = bestAffordanceForKind(kind, text, gameState)
+  const blockedAffordance = affordance ? null : bestAffordanceForKind(kind, text, gameState, true)
+  const selectedAffordance = affordance ?? blockedAffordance
+  const recentTakenTargetId = kind === 'take'
+    ? [...(gameState.world?.eventLog ?? [])].reverse().find(event =>
+        event.type === 'object.taken' &&
+        typeof event.targetId === 'string'
+      )?.targetId
+    : undefined
+  const selectedScore = selectedAffordance ? targetSpecificityScore(text, selectedAffordance) : 0
+  const repeatsRecentTakenObject =
+    kind === 'take' &&
+    Boolean(recentTakenTargetId) &&
+    selectedScore === 0 &&
+    /\b(encore|de nouveau|recette|fragment|papier|parchemin|la|le|l')\b/.test(text)
+  if ((!selectedAffordance && recentTakenTargetId) || repeatsRecentTakenObject) {
+    return output({
+      intentKind: kind,
+      confidence: 0.76,
+      requiresClarification: false,
+      canonicalAction: { kind, targetId: recentTakenTargetId },
+      improvisation: null,
+      targetHints: { targetId: recentTakenTargetId, targetType: 'object' },
+      reasoningSummary: 'Anaphore/repetition rattachee au dernier objet pris; le moteur produira le refus canonique si necessaire.',
+    })
+  }
+  const action = normalizeAffordanceAction(selectedAffordance, kind, message, gameState)
+  if (!selectedAffordance && ['open', 'take', 'unlock', 'force', 'read', 'disarm', 'use_object', 'show_item', 'give_item'].includes(kind)) {
+    const surface = buildSceneSurface(gameState)
+    const candidates = surface.affordances
+      .filter(candidate => candidate.kind === kind)
+      .map(candidate => candidate.target?.name ?? candidate.label)
+      .filter(Boolean)
+      .slice(0, 4)
+    return output({
+      intentKind: kind,
+      confidence: 0.62,
+      requiresClarification: true,
+      clarificationQuestion: candidates.length > 0
+        ? `Tu veux ${kind}, mais je dois savoir quelle cible tu vises: ${candidates.join(', ')}.`
+        : `Tu veux ${kind}, mais je ne vois pas de cible claire ici.`,
+      canonicalAction: null,
+      improvisation: null,
+      targetHints: { candidates },
+      reasoningSummary: 'Le mock a reconnu une famille d action mais pas une cible unique.',
+    })
+  }
+
+  return output({
+    intentKind: kind,
+    confidence: affordance ? 0.86 : 0.72,
+    requiresClarification: false,
+    canonicalAction: action,
+    improvisation: null,
+    targetHints: selectedAffordance?.target
+      ? {
+          targetId: selectedAffordance.target.id,
+          targetName: selectedAffordance.target.name,
+          targetType: selectedAffordance.target.type,
+        }
+      : {},
+    reasoningSummary: `Action ${kind} proposee depuis la SceneSurface; le moteur validera la cible.`,
+  })
 }
 
 function isGuidanceRequest(text: string): boolean {
@@ -298,8 +592,11 @@ export function interpretPlayerIntentMock(params: {
     })
   }
 
-  if (presentNpc && /\b(salut|bonjour|bonsoir|hello|je suis|je viens|je cherche|je veux|recuperer|recupere|trouver|trouve|recette|grammy|aide|information|infos?)\b/.test(text)) {
-    const npcSpeechKind = maybeDirectQuestion(text) || /\b(recette|grammy|trouver|trouve|chercher|cherche|recuperer|information|infos?)\b/.test(text)
+  if (presentNpc && /\b(salut|bonjour|bonsoir|hello|je suis|je viens|je cherche|je veux|recuperer|recupere|trouver|trouve|recette|grammy|aide|information|infos?|parles?|parler|discutes?|discuter)\b/.test(text)) {
+    const explicitTalk = /\b(parles?|parler|discutes?|discuter)\b/.test(text)
+    const npcSpeechKind = explicitTalk
+      ? 'talk'
+      : maybeDirectQuestion(text) || /\b(recette|grammy|trouver|trouve|chercher|cherche|recuperer|information|infos?)\b/.test(text)
       ? 'ask'
       : 'talk'
     return output({
@@ -317,6 +614,15 @@ export function interpretPlayerIntentMock(params: {
     })
   }
 
+  const worldKind = mockCanonicalKind(text, gameState)
+  if (worldKind && worldKind !== 'take') {
+    const worldOutput = buildMockWorldActionOutput(message, gameState, worldKind)
+    if (worldOutput) return worldOutput
+  }
+
+  const moveOutput = buildMockMoveOutput(message, gameState)
+  if (moveOutput) return moveOutput
+
   if (isImprovisedTool(text)) return buildImproviseOutput(message, gameState, 'improvised_tool_object')
   if (isDistraction(text)) return buildImproviseOutput(message, gameState, 'distraction_noise')
   if (isPhysicalTrick(text) || isMagicEnvironmental(text)) return buildImproviseOutput(message, gameState, 'environmental_change')
@@ -324,6 +630,11 @@ export function interpretPlayerIntentMock(params: {
   const fiction = analyzeFictionImprovisation(message)
   if (fiction.improvisable) {
     return buildImproviseOutput(message, gameState, improvisationTypeForText(text), confidenceLabel(0.78) === 'high' ? 0.82 : 0.78)
+  }
+
+  if (worldKind) {
+    const worldOutput = buildMockWorldActionOutput(message, gameState, worldKind)
+    if (worldOutput) return worldOutput
   }
 
   if (maybeDirectQuestion(text)) {
@@ -341,10 +652,11 @@ export function interpretPlayerIntentMock(params: {
   return output({
     intentKind: 'pass_through',
     confidence: 0.35,
-    requiresClarification: false,
+    requiresClarification: true,
+    clarificationQuestion: "Je ne suis pas sur de l'effet voulu. Tu vises quoi, et tu veux obtenir quoi exactement ?",
     canonicalAction: null,
     improvisation: null,
     targetHints: {},
-    reasoningSummary: 'Le mock ne voit pas de plan fiable; le pipeline conserve le routage existant.',
+    reasoningSummary: 'Le mock ne voit pas de plan fiable; le pipeline doit clarifier au lieu de retomber sur le routage regex.',
   })
 }
