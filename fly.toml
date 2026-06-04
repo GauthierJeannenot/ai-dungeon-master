@@ -15,6 +15,7 @@ primary_region = "cdg"   # Paris — change to your nearest region
   GAME_SESSION_STORE_DIR = "/data/sessions"
   # Persist server logs to the volume (optional). Remove if you don't want them.
   APP_LOG_PERSIST_ENABLED = "true"
+  APP_LOG_PERSIST_DIR = "/data/logs"
 
 # Persistent disk for game sessions (and optional logs). Created once via:
 #   fly volumes create data --region cdg --size 1

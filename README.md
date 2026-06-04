@@ -276,6 +276,7 @@ APP_LOG_OBJECT_KEY_LIMIT=80
 APP_LOG_BUFFER_ENABLED=true
 APP_LOG_BUFFER_LIMIT=1000
 APP_LOG_PERSIST_ENABLED=true
+APP_LOG_PERSIST_DIR=/data/logs
 APP_LOG_PERSIST_MAX_BYTES=20000000
 APP_DEBUG_LOG_PUBLIC_READ=true
 ```
@@ -286,11 +287,11 @@ Les logs sont conserves a trois niveaux :
 
 - stdout/stderr hebergeur, avec le prefixe `[ai-dm:<event>]`
 - buffer memoire rapide, utile pendant que le process tourne
-- fichier JSONL local (`.data/logs/server.jsonl` en local, ou le chemin `APP_LOG_PERSIST_DIR` si un volume persistant est monte)
+- fichier JSONL local (`.data/logs/server.jsonl` en local, `/data/logs/server.jsonl` sur Fly, ou le chemin `APP_LOG_PERSIST_DIR` si un volume persistant est monte)
 
 Sans aucune configuration hebergeur/GitHub supplementaire, le navigateur garde aussi une boite noire de playtest dans `localStorage` et la republie au serveur via `/api/debug/client-logs`. Les entrees recentes restent dans le navigateur meme apres une sync reussie, afin qu'un simple refresh puisse les republier si Fly/une autre plateforme a servi les logs depuis une machine differente ou a perdu le buffer serveur. Apres un redeploiement, il suffit de rafraichir ou de rejouer depuis le meme navigateur pour revoir les dernieres actions sous l'evenement `client.blackbox.entry` dans `/api/debug/logs`.
 
-Si vous avez deja un volume monte, `APP_LOG_PERSIST_DIR=/chemin/du/volume` permet de forcer le repertoire. Ce n'est pas requis pour la boite noire navigateur.
+Sur Fly, `fly.toml` force `APP_LOG_PERSIST_DIR=/data/logs` pour que le fichier JSONL soit conserve sur le volume monte. Si vous avez un autre volume, `APP_LOG_PERSIST_DIR=/chemin/du/volume` permet de forcer le repertoire. Ce n'est pas requis pour la boite noire navigateur.
 
 Lecture via CLI hebergeur :
 

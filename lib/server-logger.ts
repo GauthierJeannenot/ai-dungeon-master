@@ -50,6 +50,10 @@ function defaultPersistDir(): string {
     return path.join('/data', 'ai-dungeon-master', 'logs')
   }
 
+  if (process.env.FLY_APP_NAME || process.env.FLY_MACHINE_ID || process.env.FLY_REGION) {
+    return path.join('/data', 'logs')
+  }
+
   return path.join(/* turbopackIgnore: true */ process.cwd(), '.data', 'logs')
 }
 
