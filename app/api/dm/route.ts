@@ -2112,6 +2112,8 @@ function buildIntentInterpreterPrompt(summary: IntentInterpreterInputSummary): s
     'Si la cible est vraiment ambigue entre plusieurs options plausibles, requiresClarification=true et pose une question courte.',
     'Ne transforme pas une question en attaque ou en rencontre.',
     'Schema attendu: intentKind, confidence, requiresClarification, clarificationQuestion, canonicalAction, improvisation, targetHints, reasoningSummary.',
+    'targetHints est un OBJET (jamais un tableau) avec des champs optionnels: targetName, targetId, targetType, targetHint, candidates (candidates est un tableau de chaines). S il y a plusieurs cibles possibles, mets-les dans targetHints.candidates.',
+    'reasoningSummary est une seule phrase de 240 caracteres maximum.',
     `Resume moteur:\n${JSON.stringify(summary, null, 2)}`,
   ].join('\n\n')
 }

@@ -18,6 +18,33 @@ export const IntentImprovisationTypeSchema = z.enum([
   'non_mechanical_flavor',
 ])
 
+const REASONING_SUMMARY_MAX = 240
+
+// LLMs sometimes return targetHints as an array of candidate strings (or a bare
+// string) instead of the structured object. Coerce those shapes into the
+// expected object so a benign format drift never collapses the whole turn to a
+// mock clarification.
+function coerceTargetHints(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    const candidates = value.filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0)
+    return candidates.length > 0 ? { candidates } : {}
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    return trimmed.length > 0 ? { targetHint: trimmed } : {}
+  }
+  if (value === null || value === undefined) return {}
+  return value
+}
+
+// reasoningSummary is meant to be a short, non-technical note. The LLM
+// occasionally overruns the 240-char cap; truncate instead of failing.
+function coerceReasoningSummary(value: unknown): unknown {
+  if (typeof value !== 'string') return value
+  const trimmed = value.trim()
+  return trimmed.length > REASONING_SUMMARY_MAX ? `${trimmed.slice(0, REASONING_SUMMARY_MAX - 1)}…` : trimmed
+}
+
 export const IntentInterpreterOutputSchema = z.object({
   schemaVersion: z.literal(INTENT_INTERPRETER_SCHEMA_VERSION).default(INTENT_INTERPRETER_SCHEMA_VERSION),
   intentKind: z.string().min(1),
@@ -32,14 +59,17 @@ export const IntentInterpreterOutputSchema = z.object({
     usesFactIds: z.array(z.string()).optional(),
     tags: z.array(z.string()).optional(),
   }).nullable().optional(),
-  targetHints: z.object({
-    targetName: z.string().optional(),
-    targetId: z.string().optional(),
-    targetType: z.string().optional(),
-    targetHint: z.string().optional(),
-    candidates: z.array(z.string()).optional(),
-  }).default({}),
-  reasoningSummary: z.string().max(240),
+  targetHints: z.preprocess(
+    coerceTargetHints,
+    z.object({
+      targetName: z.string().optional(),
+      targetId: z.string().optional(),
+      targetType: z.string().optional(),
+      targetHint: z.string().optional(),
+      candidates: z.array(z.string()).optional(),
+    }),
+  ).default({}),
+  reasoningSummary: z.preprocess(coerceReasoningSummary, z.string().max(240)),
   source: z.enum(['mock', 'llm', 'fallback']).default('mock'),
 }).strict()
 

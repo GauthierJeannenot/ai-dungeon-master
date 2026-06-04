@@ -114,6 +114,39 @@ test('intent interpreter validates strict JSON shape', () => {
   assert.equal(output.canonicalAction.kind, 'improvise')
 })
 
+test('intent interpreter coerces array targetHints and overlong reasoningSummary instead of failing', () => {
+  const longReason = 'x'.repeat(400)
+  const output = validateIntentInterpreterOutput({
+    schemaVersion: 1,
+    intentKind: 'attack',
+    confidence: 0.7,
+    requiresClarification: false,
+    canonicalAction: { kind: 'attack' },
+    improvisation: null,
+    targetHints: ['gobelin', 'mac', ''],
+    reasoningSummary: longReason,
+  }, 'llm')
+
+  assert.deepEqual(output.targetHints, { candidates: ['gobelin', 'mac'] })
+  assert.ok(output.reasoningSummary.length <= 240)
+  assert.equal(output.source, 'llm')
+})
+
+test('intent interpreter coerces a bare string targetHints into a targetHint field', () => {
+  const output = validateIntentInterpreterOutput({
+    schemaVersion: 1,
+    intentKind: 'attack',
+    confidence: 0.7,
+    requiresClarification: false,
+    canonicalAction: { kind: 'attack' },
+    improvisation: null,
+    targetHints: 'nearest',
+    reasoningSummary: 'cible la plus proche',
+  }, 'llm')
+
+  assert.deepEqual(output.targetHints, { targetHint: 'nearest' })
+})
+
 test('intent interpreter routes prod-like social and question intents without false combat', () => {
   const peace = interpret("arretez de m'attaquer on fait la paix", combatGameState())
   assert.equal(peace.intentKind, 'social_deescalation')
