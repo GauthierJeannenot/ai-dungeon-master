@@ -1494,6 +1494,7 @@ const TOOL_INTENT_SATISFIERS: Record<string, string[]> = {
   'player-death-save-intent': ['resolve_player_action', 'roll_death_save'],
   'healing-potion-intent': ['resolve_player_action', 'use_healing_potion'],
   'ability-check-intent': ['resolve_player_action', 'roll_ability_check'],
+  'state-reconcile-location': ['resolve_player_action', 'move_token'],
   'local-object-interaction-intent': ['resolve_player_action', 'trigger_room_event', 'roll_ability_check', 'start_encounter', 'use_healing_potion'],
   'exploration-movement-intent': ['resolve_player_action', 'move_token', 'trigger_room_event', 'start_encounter', 'end_combat'],
   'encounter-or-attack-intent': ['resolve_player_action', 'start_encounter', 'resolve_player_attack'],
@@ -1550,6 +1551,7 @@ function selectToolsForLlm(
     if (actionIntent.kind === 'wait') return pickTools(allTools, ['resolve_player_action'])
     if (actionIntent.kind === 'death_save') return pickTools(allTools, ['resolve_player_action'])
     if (actionIntent.kind === 'use_item') return pickTools(allTools, ['resolve_player_action'])
+    if (actionIntent.kind === 'state_reconcile') return pickTools(allTools, ['resolve_player_action'])
     if (isCanonicalWorldActionKind(actionIntent.kind)) return pickTools(allTools, ['resolve_player_action', 'get_entity_stats'])
     if (actionIntent.kind === 'social') return pickTools(allTools, ['resolve_player_action', 'get_entity_stats'])
     if (actionIntent.kind === 'ability_check') return pickTools(allTools, ['resolve_player_action'])
@@ -1566,6 +1568,10 @@ function selectToolsForLlm(
 
   if (actionIntent.kind === 'move') {
     return pickTools(allTools, LLM_TOOL_SETS.explorationMovement)
+  }
+
+  if (actionIntent.kind === 'state_reconcile') {
+    return pickTools(allTools, ['resolve_player_action'])
   }
 
   if (actionIntent.kind === 'attack' || actionIntent.kind === 'encounter') {
@@ -1909,7 +1915,7 @@ function detectNarrativeRoomContractIssue(
   const narratesTransition = /\b(tu|vous)\s+(?:te|vous)?\s*(?:approches?|approchez|avances?|avancez|entres?|entrez|passes?|passez|traverses?|traversez|arrives?|arrivez|remontes?|remontez|retournes?|retournez|descends?|descendez|montes?|montez)\b/.test(text) ||
     /\b(tu|vous)\s+(?:l[' ]?)?(?:ouvres?|ouvrez|pousses?|poussez|franchis|franchissez)\b/.test(text) ||
     /\b(?:te|vous)\s+voila\s+(?:dans|pres de|devant)\b/.test(text) ||
-    /\b(?:tu|vous)\s+etes\s+(?:dans|pres de|devant|au fond de)\b/.test(text)
+    /\b(?:tu|vous)\s+(?:es|etes)\s+(?:au|aux|a la|dans|pres de|devant|au fond de)\b/.test(text)
 
   if (!narratesTransition) return null
 
@@ -2073,6 +2079,27 @@ function buildDebugStateNarrative(gameState: GameState): string {
     : "Aucun ennemi actif n'existe dans l'état de jeu."
 
   return `Côté serveur, ton pion est dans ${roomName}, case x ${position.x}, y ${position.y}. ${monsterText} Si l'écran montre autre chose, l'affichage client est en retard.`
+}
+
+function resolveLocationReconcileRoomId(message: string): string | null {
+  return findAdventureRoomIdByAlias(normalizeFrenchText(message))
+}
+
+function buildLocationReconcileNeedsTargetNarrative(): string {
+  const roomNames = ADVENTURE_ROOMS.map(room => room.name).join(', ')
+  return `Je peux te replacer, mais il me faut une salle claire: ${roomNames}.`
+}
+
+function buildLocationReconcileSameRoomNarrative(gameState: GameState): string {
+  const roomName = getCurrentRoomName(gameState) ?? 'la zone actuelle'
+  const { x, y } = gameState.player.position
+  return `Cote moteur, tu es deja dans ${roomName}, case x ${x}, y ${y}. Je garde cette position et je repars de la scene actuelle.`
+}
+
+function buildLocationReconcileNarrative(gameState: GameState, targetRoomId: string): string {
+  const targetRoomName = ADVENTURE_ROOMS.find(room => room.id === targetRoomId)?.name ?? 'la salle cible'
+  const { x, y } = gameState.player.position
+  return `Ok, je te replace dans ${targetRoomName}, case x ${x}, y ${y}. ${buildDirectiveSceneNarrative(gameState)}`
 }
 
 function parseCoordinateMove(message: string, gameState: GameState): { x: number; y: number } | null {
@@ -2872,6 +2899,10 @@ function buildDmTurnDebug(
   const isWorldAction = isCanonicalWorldActionKind(actionIntent.kind)
   const actionPlan = buildActionPlan(message, gameState, actionIntent.kind)
   const plannedAction = actionPlan?.steps.find(step => step.action)?.action ?? null
+  const reconcileRoomId = actionIntent.kind === 'state_reconcile'
+    ? resolveLocationReconcileRoomId(message)
+    : null
+  const reconcileCell = reconcileRoomId ? centerCellForRoom(reconcileRoomId) : null
   const sceneSurface = buildSceneSurface(gameState)
   return {
     actionIntent: {
@@ -2883,12 +2914,22 @@ function buildDmTurnDebug(
     },
     parsedAction: isWorldAction
       ? plannedAction ?? buildWorldActionInput(message, gameState, actionIntent.kind)
-      : plannedAction,
+      : actionIntent.kind === 'state_reconcile' && reconcileCell
+        ? { kind: 'move', tokenId: 'player', toCell: reconcileCell }
+        : plannedAction,
     targetResolution: actionPlan?.targetResolution
       ? actionPlan.targetResolution as unknown as Record<string, unknown>
       : isWorldAction
         ? resolveWorldActionTargets(message, gameState, actionIntent.kind) as unknown as Record<string, unknown>
-        : null,
+        : actionIntent.kind === 'state_reconcile'
+          ? {
+              kind: 'room',
+              status: reconcileRoomId ? 'resolved' : 'missing_target',
+              roomId: reconcileRoomId,
+              roomName: reconcileRoomId ? ADVENTURE_ROOMS.find(room => room.id === reconcileRoomId)?.name ?? null : null,
+              toCell: reconcileCell,
+            }
+          : null,
     actionPlan: actionPlan ? summarizeActionPlanForDebug(actionPlan) : null,
     sceneSurface: summarizeSceneSurfaceForDebug(sceneSurface),
   }
@@ -3177,6 +3218,120 @@ async function resolveServerFirstAction(
   const startedAt = Date.now()
   let toolName: string | null = null
   let input: Record<string, unknown> | null = null
+
+  if (actionIntent.kind === 'state_reconcile') {
+    const targetRoomId = resolveLocationReconcileRoomId(message)
+
+    if (!targetRoomId) {
+      const draftNarrative = buildLocationReconcileNeedsTargetNarrative()
+      logEvent('info', 'dm.cost.engine_first.location_reconcile.needs_target', {
+        requestId,
+        sessionId,
+        actionIntent,
+        durationMs: Date.now() - startedAt,
+        draftNarrative,
+        gameState: summarizeGameState(gameState),
+      })
+      return {
+        handled: true,
+        gameState,
+        toolsUsed: [],
+        draftNarrative,
+        sawMcpToolError: false,
+        actionExecutions: [],
+      }
+    }
+
+    const targetCell = centerCellForRoom(targetRoomId)
+    if (!targetCell) {
+      const draftNarrative = buildLocationReconcileNeedsTargetNarrative()
+      logEvent('warn', 'dm.cost.engine_first.location_reconcile.invalid_target', {
+        requestId,
+        sessionId,
+        actionIntent,
+        targetRoomId,
+        durationMs: Date.now() - startedAt,
+        draftNarrative,
+        gameState: summarizeGameState(gameState),
+      })
+      return {
+        handled: true,
+        gameState,
+        toolsUsed: [],
+        draftNarrative,
+        sawMcpToolError: false,
+        actionExecutions: [],
+      }
+    }
+
+    const inferredRoomId = inferMappedAdventureRoomId(gameState.player.position)
+    if (gameState.currentRoomId === targetRoomId && inferredRoomId === targetRoomId) {
+      const draftNarrative = buildLocationReconcileSameRoomNarrative(gameState)
+      logEvent('info', 'dm.cost.engine_first.location_reconcile.same_room', {
+        requestId,
+        sessionId,
+        actionIntent,
+        targetRoomId,
+        inferredRoomId,
+        durationMs: Date.now() - startedAt,
+        draftNarrative,
+        gameState: summarizeGameState(gameState),
+      })
+      return {
+        handled: true,
+        gameState,
+        toolsUsed: [],
+        draftNarrative,
+        sawMcpToolError: false,
+        actionExecutions: [],
+      }
+    }
+
+    const reconcileInput = canonicalPlayerActionInput({
+      kind: 'move',
+      tokenId: 'player',
+      toCell: targetCell,
+    })
+    logEvent('info', 'dm.cost.engine_first.location_reconcile.start', {
+      requestId,
+      sessionId,
+      actionIntent,
+      targetRoomId,
+      inferredRoomId,
+      input: reconcileInput,
+      gameState: summarizeGameState(gameState),
+    })
+
+    const result = await callMCPTool('resolve_player_action', reconcileInput, sessionId)
+    const sawMcpToolError = isMcpErrorResult(result)
+    const nextGameState = await callMCPTool('get_game_state', {}, sessionId) as GameState
+    const draftNarrative = sawMcpToolError
+      ? summarizeMcpResultForNarration('resolve_player_action', result)
+      : buildLocationReconcileNarrative(nextGameState, targetRoomId)
+    const resolvedToolsUsed = toolsUsedForResolvedTool('resolve_player_action', result)
+
+    logEvent(sawMcpToolError ? 'warn' : 'info', 'dm.cost.engine_first.location_reconcile.complete', {
+      requestId,
+      sessionId,
+      durationMs: Date.now() - startedAt,
+      actionIntent,
+      targetRoomId,
+      input: reconcileInput,
+      result,
+      draftNarrative,
+      gameState: summarizeGameState(nextGameState),
+    })
+
+    return {
+      handled: true,
+      gameState: nextGameState,
+      toolsUsed: resolvedToolsUsed,
+      draftNarrative,
+      sawMcpToolError,
+      mcpErrorResult: sawMcpToolError ? result : undefined,
+      actionExecutions: [toolActionExecution('engine_first', 'resolve_player_action', reconcileInput, result, 1)],
+    }
+  }
 
   if (actionIntent.kind === 'query_state') {
     const draftNarrative = buildDebugStateNarrative(gameState)
@@ -4580,11 +4735,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       !sawMcpToolError &&
       toolsUsed.length > 0 &&
       toolsUsed.every(toolName => DIRECTOR_LOCAL_FINAL_TOOLS.has(toolName)) &&
+      actionIntent.kind !== 'state_reconcile' &&
       actionIntent.kind !== 'social' &&
       actionIntent.kind !== 'interact'
     const engineFirstVisibleDraft = engineFirst.handled && Boolean(engineFirst.draftNarrative.trim())
     const needsLlmIteration = !engineFirst.handled
     const needsFinalNarrationHistory = engineFirst.handled &&
+      actionIntent.kind !== 'state_reconcile' &&
       !sawMcpToolError &&
       (
         NARRATION_MODE === 'quality'
@@ -5305,7 +5462,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       narratorSource = 'rule'
     }
 
-    const directorDecision = !sawMcpToolError
+    const directorDecision = !sawMcpToolError && actionIntent.kind !== 'state_reconcile'
       ? buildDirectorDecision({
         playerMessage: message,
         actionIntent,
@@ -5339,14 +5496,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       })
     }
 
-    const localEngineNarrative = !sawMcpToolError
+    const localEngineNarrative = !sawMcpToolError && actionIntent.kind !== 'state_reconcile'
       ? buildLocalEngineNarrative(currentGameState, toolsUsed, newCombatLogEntries, newWorldEvents)
       : null
     const directorNarrative = directorDecision?.narrative ?? null
     const draftNarrative = directorNarrative || localEngineNarrative || narrative || ''
     const hasPlayerVisibleDraft = Boolean(draftNarrative.trim())
     const shouldPolishEngineFirstDraft = engineFirst.handled && hasPlayerVisibleDraft && narratorSource !== 'llm'
-    const shouldTryFinalLlmNarration = !sawMcpToolError && (
+    const shouldTryFinalLlmNarration = !sawMcpToolError && actionIntent.kind !== 'state_reconcile' && (
       NARRATION_MODE === 'quality'
         ? (toolsUsed.length > 0 || shouldPolishEngineFirstDraft)
         : (toolsUsed.length > 0 && !directorNarrative && !localEngineNarrative && directorDecision?.shouldUseLlmNarrator !== false)

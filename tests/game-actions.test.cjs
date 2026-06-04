@@ -126,6 +126,24 @@ test('game action language does not turn status questions into attacks', () => {
   assert.equal(intent.requiresEngine, false)
 })
 
+test('game action language routes explicit room corrections to state reconciliation', () => {
+  const state = baseGameState({ currentRoomId: '7' })
+  const cases = [
+    'non je suis au verger',
+    'bouge mon token dans le verger',
+    'je suis dans le bureau',
+    'il faut me bouger',
+  ]
+
+  for (const message of cases) {
+    const intent = actions.classifyPlayerAction(message, state)
+    assert.equal(intent.kind, 'state_reconcile', message)
+    assert.equal(intent.primitive, 'move', message)
+    assert.equal(intent.reason, 'state-reconcile-location', message)
+    assert.deepEqual(intent.suggestedTools, ['resolve_player_action'], message)
+  }
+})
+
 test('game action language routes local objects to canonical world actions', () => {
   const intent = actions.classifyPlayerAction("j'ouvre le tiroir du bureau", baseGameState({ currentRoomId: '5' }))
   assert.equal(intent.kind, 'open')

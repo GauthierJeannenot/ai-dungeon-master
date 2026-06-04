@@ -36,6 +36,7 @@ export type GameActionKind =
   | 'social'
   | 'wait'
   | 'death_save'
+  | 'state_reconcile'
   | 'query_state'
   | 'guidance'
   | 'encounter'
@@ -112,8 +113,29 @@ export function detectDirectiveGuidanceRequest(message: string): boolean {
   return /\b(quoi maintenant|je fais quoi|on fait quoi|que faire|quoi faire|quelle suite|prochaine action|tu proposes quoi|tu me proposes quoi|guide moi|aide moi|je suis perdu|on est perdu|quelle direction|ou aller|ou je vais|par ou|donne moi une piste|je comprends pas|je comprends rien|comprends pas|comprends rien|pas compris|j'ai pas compris|j ai pas compris|j'y comprends rien|j y comprends rien|pas clair|objectif|c'est quoi le but|c est quoi le but|c'est quoi l'action|c est quoi l action)\b/.test(text)
 }
 
+export function detectLocationReconcileIntent(message: string): boolean {
+  const text = normalizeFrenchText(message)
+  const referencesKnownRoom = /\b(verger|pommiers?|pommier|arbres?|quai|chargement|dock|bureau|appartement|etage|haut|boulangerie|four|cuisine|dechets?|tas|champignons?|entree|hall|exterieur|dehors|sortie)\b/.test(text)
+  const tokenCorrection = /\b(token|jeton|pion|position|place|replace|repositionne|corrige|bouges?|bouger|deplaces?|deplacer|mets|met moi|remets|remet moi|il faut me bouger)\b/.test(text)
+  const selfCorrection = /\b(non|nan|nope|attends?|attend|en fait|plutot|je suis|j suis|suis au|suis a la|suis dans|je devrais etre|j devrais etre|cense etre)\b/.test(text)
+  const explicitNeedsMove = /\bil faut me bouger\b/.test(text)
+
+  return explicitNeedsMove || (referencesKnownRoom && (tokenCorrection || selfCorrection))
+}
+
 export function classifyPlayerAction(message: string, gameState: GameState): GameActionIntent {
   const text = normalizeFrenchText(message)
+
+  if (detectLocationReconcileIntent(message)) {
+    return intent(text, {
+      kind: 'state_reconcile',
+      primitive: 'move',
+      reason: 'state-reconcile-location',
+      requiresEngine: true,
+      suggestedTools: ['resolve_player_action'],
+      confidence: 'high',
+    })
+  }
 
   if (detectDebugStateQuestion(message)) {
     return intent(text, {
@@ -586,10 +608,11 @@ export function classifyPlayerAction(message: string, gameState: GameState): Gam
 export function describeGameActionLanguageForPrompt(): string {
   return [
     'Le joueur peut dire n importe quoi, mais le moteur ne connait qu un petit langage d actions.',
-    'Primitives: attack, move, examine, read, search, open, take, unlock, force, disarm, talk, ask, persuade, threaten, show_item, give_item, hide, help, flee, stabilize, use_object, combine_recipe, interact, use_item, ability_check, social, wait, death_save, query_state, observe.',
+    'Primitives: attack, move, examine, read, search, open, take, unlock, force, disarm, talk, ask, persuade, threaten, show_item, give_item, hide, help, flee, stabilize, use_object, combine_recipe, interact, use_item, ability_check, social, wait, death_save, state_reconcile, query_state, observe.',
     'Quand le tool resolve_player_action est disponible, utilise-le comme facade canonique pour toute action joueur qui mute le monde.',
     'Ton role: traduire l intention vers une primitive autorisee, appeler le tool correspondant si un etat doit changer, puis narrer seulement les evenements renvoyes par le moteur.',
     'N invente jamais une nouvelle primitive ad hoc. Si l intention est creative, ramene-la a use_object, ability_check ou social avec une cible et un risque clairs.',
+    'Si le joueur corrige sa salle ou la position de son token, traite cela comme state_reconcile: move canonique si la salle est explicite, clarification sinon.',
     'Si aucune primitive n est claire, clarifie en fiction au lieu de muter le state.',
   ].join('\n')
 }

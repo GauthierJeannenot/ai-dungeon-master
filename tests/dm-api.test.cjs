@@ -187,6 +187,17 @@ function bakeryFloorGameState() {
   })
 }
 
+function loadingDockGameState() {
+  return baseGameState({
+    player: {
+      ...baseGameState().player,
+      position: { x: 4, y: 6 },
+    },
+    roomsVisited: ['1', '4', '7'],
+    currentRoomId: '7',
+  })
+}
+
 function lowHpPotionCombatGameState() {
   const state = combatGameState()
   return {
@@ -375,6 +386,59 @@ test('DM API resolves sensory movement toward smell origin from room 4', async t
   assert.equal(data.newGameState.currentRoomId, '8')
   assert.equal(data.newGameState.phase, 'exploration')
   assert.deepEqual(data.newGameState.player.position, { x: 9, y: 7 })
+})
+
+test('DM API reconciles explicit room corrections through canonical movement', async t => {
+  for (const [index, message] of ['non je suis au verger', 'bouge mon token dans le verger'].entries()) {
+    const sessionId = `api-location-reconcile-${process.pid}-${Date.now()}-${index}`
+    t.after(() => cleanupSession(sessionId))
+
+    const { response, data } = await postDm({
+      message,
+      clientRequestId: `client-${sessionId}`,
+      sessionId,
+      gameState: loadingDockGameState(),
+      history: [],
+    })
+
+    assert.equal(response.status, 200, message)
+    assert.ok(data.toolsUsed.includes('resolve_player_action'), message)
+    assert.ok(data.toolsUsed.includes('move_token'), message)
+    assert.ok(data.engine?.events?.some(event => event.type === 'entity.moved'), message)
+    assert.equal(data.newGameState.currentRoomId, '2', message)
+    assert.deepEqual(data.newGameState.player.position, { x: 9, y: 2 }, message)
+    assert.equal(data.turnTrace?.intent?.kind, 'state_reconcile', message)
+    assert.equal(data.turnTrace?.targetResolution?.status, 'resolved', message)
+    assert.equal(data.turnTrace?.targetResolution?.roomId, '2', message)
+    assert.ok(data.turnTrace?.actions.some(action => action.toolName === 'resolve_player_action' && action.executed), message)
+    assert.match(data.narrative, /verger/i, message)
+    assert.doesNotMatch(data.narrative, /quai/i, message)
+    assert.equal(data.usage?.llm.calls, 0, message)
+    assert.equal(data.usage?.llmRoute, 'none', message)
+  }
+})
+
+test('DM API refuses location reconciliation without a target room instead of teleporting', async t => {
+  const sessionId = `api-location-reconcile-missing-${process.pid}-${Date.now()}`
+  t.after(() => cleanupSession(sessionId))
+
+  const { response, data } = await postDm({
+    message: 'il faut me bouger',
+    clientRequestId: `client-${sessionId}`,
+    sessionId,
+    gameState: loadingDockGameState(),
+    history: [],
+  })
+
+  assert.equal(response.status, 200)
+  assert.deepEqual(data.toolsUsed, [])
+  assert.equal(data.newGameState.currentRoomId, '7')
+  assert.deepEqual(data.newGameState.player.position, { x: 4, y: 6 })
+  assert.equal(data.turnTrace?.intent?.kind, 'state_reconcile')
+  assert.equal(data.turnTrace?.targetResolution?.status, 'missing_target')
+  assert.match(data.narrative, /salle claire|verger|quai/i)
+  assert.equal(data.usage?.llm.calls, 0)
+  assert.equal(data.usage?.llmRoute, 'none')
 })
 
 test('DM API resolves the narrated initial front door through scene surface affordances', async t => {
