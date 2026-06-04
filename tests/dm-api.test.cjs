@@ -200,6 +200,40 @@ test('DM API resolves a combat attack through MCP in mock mode', async t => {
   assert.equal(data.usage?.llmRoute, 'none')
 })
 
+test('DM API retries the narrative-state contract so an implied encounter is materialized', async t => {
+  const sessionId = `api-contract-${process.pid}-${Date.now()}`
+  t.after(() => cleanupSession(sessionId))
+
+  // Reproduit le bug de prod: "je provoque les gobelins de la boulangerie" est classe
+  // "unknown" (requiresEngine=false), donc start_encounter n'est PAS dans le set d'outils
+  // initial. Le LLM (mock) narre l'arrivee des gobelins sans tool -> le contrat
+  // narration/etat doit declencher un retry qui rend start_encounter disponible et pousse
+  // le LLM a l'appeler, au lieu de remplacer la reponse par une scene neutre hors-sujet.
+  // Le verbe "provoque" satisfait aussi le garde-fou roomEncounterTriggerReason de la salle 8.
+  const { response, data } = await postDm({
+    message: 'je provoque les gobelins de la boulangerie',
+    clientRequestId: `client-${sessionId}`,
+    sessionId,
+    gameState: baseGameState({
+      currentRoomId: '8',
+      roomsVisited: ['1', '8'],
+      player: { ...baseGameState().player, position: { x: 9, y: 6 } },
+    }),
+    history: [],
+  })
+
+  assert.equal(response.status, 200)
+  assert.ok(
+    data.toolsUsed.includes('start_encounter'),
+    `expected start_encounter to be called after the contract retry, got: ${JSON.stringify(data.toolsUsed)}`
+  )
+  assert.equal(data.newGameState.phase, 'combat')
+  assert.ok(
+    Object.values(data.newGameState.monsters).some(monster => monster.isAlive),
+    'expected at least one live monster after the encounter was materialized'
+  )
+})
+
 test('DM API routes open social scenes through rich mock LLM narration', async t => {
   const sessionId = `api-social-${process.pid}-${Date.now()}`
   t.after(() => cleanupSession(sessionId))

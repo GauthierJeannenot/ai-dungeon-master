@@ -315,15 +315,46 @@ function createMockLlmMessage(params: MessageCreateParams, context: LlmCallConte
     return mockTextMessage('[Mock] Les adversaires agissent avant que vous puissiez reprendre l’initiative.')
   }
 
+  // Simule un LLM qui, rappele a l'ordre par le contrat narration/etat, materialise
+  // enfin le changement via le tool suggere (rendu disponible par le retry) au lieu
+  // de re-narrer dans le vide.
+  const nudgedForNarrativeContract = params.messages.some(message =>
+    message.role === 'user' &&
+    typeof message.content === 'string' &&
+    message.content.includes('materialiser ce changement')
+  )
+  if (nudgedForNarrativeContract) {
+    if (gameState.phase === 'exploration' && toolAvailable('start_encounter', context.tools)) {
+      return mockToolMessage('start_encounter', {
+        encounterId: 'bakery_floor_goblins',
+        playerCell: { x: 9, y: 6 },
+        reason: 'Le joueur va au contact: les gobelins de la boulangerie surgissent vraiment.',
+      })
+    }
+    if (toolAvailable('move_token', context.tools)) {
+      return mockToolMessage('move_token', { tokenId: 'player', toCell: { x: 10, y: 13 } })
+    }
+  }
+
   if (gameState.phase === 'combat' && /passe|attend|attends|patient|ne fais rien/.test(text) && toolAvailable('pass_turn', context.tools)) {
     return mockToolMessage('pass_turn', { reason: 'Le joueur attend.' })
   }
 
-  if (gameState.phase === 'exploration' && /gobelin|combat|debarque|perisse|fuyez|attaque/.test(text) && toolAvailable('start_encounter', context.tools)) {
-    return mockToolMessage('start_encounter', {
-      encounterId: 'bakery_floor_goblins',
-      reason: 'Le joueur provoque bruyamment les gobelins du sol de la boulangerie.',
-    })
+  // Intention d'aller au contact d'ennemis pendant l'exploration.
+  const wantsEnemyContact = /gobelin|combat|debarque|perisse|fuyez|attaque|provoque|rencontre|au contact|les rejoindre|vais vers eux|vais a eux/.test(text)
+  if (gameState.phase === 'exploration' && wantsEnemyContact) {
+    if (toolAvailable('start_encounter', context.tools)) {
+      return mockToolMessage('start_encounter', {
+        encounterId: 'bakery_floor_goblins',
+        playerCell: { x: 9, y: 6 },
+        reason: 'Le joueur provoque les gobelins du sol de la boulangerie.',
+      })
+    }
+    // Reproduit la faille reelle: quand l'intent est classe "narrate"/"unknown",
+    // start_encounter n'est pas dans le set d'outils initial, donc le LLM narre
+    // l'arrivee des gobelins sans appeler de tool. Le contrat narration/etat doit
+    // alors declencher un retry qui rend le tool disponible.
+    return mockTextMessage("Tu t'avances vers eux et trois gobelins surgissent devant toi, lames au clair.")
   }
 
   const coordinateMatch = text.match(/\(?\s*(\d{1,2})\s*[,;]\s*(\d{1,2})\s*\)?/)
@@ -3329,6 +3360,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     let turnBoundaryReached = false
     let primaryActionToolUsed: string | null = null
     let mechanicalRetryInjected = false
+    let narrativeContractRetryInjected = false
     let maxTokensRetryInjected = false
     let sawMcpToolError = false
     let latestMcpErrorResult: unknown
@@ -3386,7 +3418,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     // ── Construction des messages pour l'appel LLM ──────────────────────────
     const systemBlocks = buildSystemBlocks(currentGameState, activeSummary)
-    const llmTools = withToolPromptCache(selectToolsForLlm(mcpTools, currentGameState, actionIntent))
+    let llmTools = withToolPromptCache(selectToolsForLlm(mcpTools, currentGameState, actionIntent))
     const messages: Anthropic.MessageParam[] = [
       ...historyMessages,
       { role: 'user', content: message },
@@ -3522,6 +3554,44 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           detectNarrativeStateContractIssue(responseText, currentGameState, toolsUsed) ??
           detectNarrativeRoomContractIssue(responseText, currentGameState, toolsUsed)
         if (narrativeStateIssue) {
+          // La narration decrit un changement d'etat (deplacement de salle, apparition
+          // d'ennemis, resolution de combat) que le LLM n'a pas materialise via un tool.
+          // Plutot que de jeter sa narration et de repondre par une scene neutre hors-sujet,
+          // on lui donne une seconde chance : on rend les tools suggeres disponibles (ils ne
+          // sont souvent pas dans le set initial quand l'intent etait classe "narrate") et on
+          // lui demande de les appeler pour que l'etat moteur rattrape la fiction. La
+          // correction serveur generique ne sert que de fallback si ce retry echoue.
+          if (!narrativeContractRetryInjected && iterations < MAX_TOOL_ITERATIONS) {
+            narrativeContractRetryInjected = true
+            narrative = narrativeBeforeResponse
+            lastEndTurnNarrative = ''
+
+            const expandedToolNames = Array.from(new Set([
+              ...llmTools.map(tool => tool.name),
+              ...narrativeStateIssue.suggestedTools,
+            ]))
+            llmTools = withToolPromptCache(pickTools(mcpTools, expandedToolNames))
+
+            logEvent('warn', 'anomaly.narrative_state_contract.retry', {
+              requestId,
+              sessionId,
+              iteration: iterations,
+              issue: narrativeStateIssue,
+              toolsUsed,
+              message,
+              responseText,
+              expandedTools: llmTools.map(tool => tool.name),
+              gameState: summarizeGameState(currentGameState),
+            })
+
+            messages.push({ role: 'assistant', content: response.content })
+            messages.push({
+              role: 'user',
+              content: `SYSTEM INTERNE, a ne jamais citer au joueur: Ta narration decrit un changement d'etat du jeu (deplacement vers une autre salle, apparition ou presence d'ennemis, ou resolution d'un combat) qui n'a PAS ete applique au moteur. Tu DOIS d'abord appeler un tool MCP adapte (${narrativeStateIssue.suggestedTools.join(', ')}) pour materialiser ce changement, PUIS narrer la consequence. Si aucun changement d'etat n'est reellement justifie, reste sur la scene actuelle sans inventer de transition de salle ni d'ennemi. La reponse visible doit rester orale, sans meta, sans liste, sans Markdown et sans mention d'outil.`,
+            })
+            continue
+          }
+
           narrative = narrativeBeforeResponse
           lastEndTurnNarrative = buildNarrativeStateCorrection(currentGameState)
           narrative = narrative
