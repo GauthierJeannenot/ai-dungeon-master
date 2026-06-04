@@ -31,14 +31,43 @@ function turnFromMessage(message) {
   return text ? { message: text, category: 'regression' } : null
 }
 
+function turnFromTrace(trace) {
+  if (!trace || typeof trace !== 'object') return null
+  const message = trace.input && typeof trace.input.raw === 'string'
+    ? trace.input.raw
+    : typeof trace.playerMessage === 'string'
+      ? trace.playerMessage
+      : undefined
+  const turn = turnFromMessage(message)
+  if (!turn) return null
+
+  const toolsUsed = Array.isArray(trace.toolsUsed) ? trace.toolsUsed.filter(tool => typeof tool === 'string') : []
+  const eventTypes = Array.isArray(trace.engineEvents)
+    ? trace.engineEvents
+        .map(event => event && typeof event === 'object' ? event.type : undefined)
+        .filter(type => typeof type === 'string')
+    : []
+
+  return {
+    ...turn,
+    expectTools: toolsUsed.length > 0 ? [...new Set(toolsUsed)] : undefined,
+    expectEvents: eventTypes.length > 0 ? [...new Set(eventTypes)] : undefined,
+    expectTargetResolution: trace.targetResolution ? undefined : false,
+    traceId: typeof trace.traceId === 'string' ? trace.traceId : undefined,
+  }
+}
+
 function turnFromEntry(entry) {
   if (typeof entry === 'string') return turnFromMessage(entry)
   if (!entry || typeof entry !== 'object') return null
+  if (entry.schemaVersion === 1 && entry.input) return turnFromTrace(entry)
+  if (entry.turnTrace) return turnFromTrace(entry.turnTrace)
   if (typeof entry.message === 'string') return turnFromMessage(entry.message)
   if (typeof entry.content === 'string' && entry.role === 'player') return turnFromMessage(entry.content)
 
   const payload = entry.payload && typeof entry.payload === 'object' ? entry.payload : entry
   const event = typeof entry.event === 'string' ? entry.event : ''
+  if (event === 'dm.turn.trace' && payload.turnTrace) return turnFromTrace(payload.turnTrace)
   if (
     (event === 'client.dm.request' || event === 'dm.request.start' || event === 'dm.action.intent') &&
     typeof payload.message === 'string'
@@ -67,7 +96,22 @@ function extractTurns(input) {
   if (Array.isArray(input.history)) return input.history.map(turnFromEntry).filter(Boolean)
   if (Array.isArray(input.logs)) return input.logs.map(turnFromEntry).filter(Boolean)
   if (Array.isArray(input.entries)) return input.entries.map(turnFromEntry).filter(Boolean)
+  if (Array.isArray(input.turnTraces)) return input.turnTraces.map(turnFromTrace).filter(Boolean)
   return []
+}
+
+function readInputFile(filePath) {
+  const raw = fs.readFileSync(filePath, 'utf8')
+  try {
+    return JSON.parse(raw)
+  } catch {
+    const entries = raw
+      .split(/\r?\n/)
+      .map(line => line.trim())
+      .filter(Boolean)
+      .map(line => JSON.parse(line))
+    return { entries }
+  }
 }
 
 function buildFixture(input, sourcePath) {
@@ -91,7 +135,7 @@ function main() {
   }
 
   const absoluteInput = path.resolve(inputPath)
-  const input = JSON.parse(fs.readFileSync(absoluteInput, 'utf8'))
+  const input = readInputFile(absoluteInput)
   const fixture = buildFixture(input, absoluteInput)
 
   const outputPath = option('--output', undefined)
@@ -124,4 +168,14 @@ function main() {
   }
 }
 
-main()
+if (require.main === module) {
+  main()
+}
+
+module.exports = {
+  buildFixture,
+  extractTurns,
+  readInputFile,
+  turnFromEntry,
+  turnFromTrace,
+}

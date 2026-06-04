@@ -169,6 +169,7 @@ export interface WorldAlarmState {
 }
 
 export interface WorldState {
+  schemaVersion?: number
   rooms: Record<string, WorldRoomState>
   objects: Record<string, WorldObjectState>
   npcs: Record<string, WorldNpcState>
@@ -327,6 +328,15 @@ export interface PlayerAffordance {
   enabled: boolean
   reason: string
   toolName?: string
+  aliases?: string[]
+  preconditions?: string[]
+  blockedReason?: string
+  target?: {
+    id: string
+    type: 'object' | 'npc' | 'inventory' | 'room' | 'self' | 'system'
+    name?: string
+  }
+  canonicalAction?: Record<string, unknown>
 }
 
 export interface EngineResolutionView {
@@ -393,6 +403,59 @@ export interface DMTurnUsage {
   llmRoute: 'none' | 'short' | 'rich' | 'blocked'
 }
 
+export interface TurnTraceActionExecution {
+  id: string
+  source:
+    | 'engine_first'
+    | 'action_plan'
+    | 'llm_tool'
+    | 'llm_tool_blocked'
+    | 'auto'
+    | 'rule'
+  toolName: string
+  input?: Record<string, unknown>
+  result?: unknown
+  executed: boolean
+  succeeded: boolean
+  errorCode?: string | null
+}
+
+export interface TurnTrace {
+  schemaVersion: 1
+  traceId: string
+  requestId: string
+  clientRequestId?: string
+  sessionId?: string
+  startedAt: string
+  completedAt: string
+  status: 'completed' | 'error'
+  input: {
+    raw: string
+    inputMode?: string
+  }
+  intent?: DMDebugTurnView['actionIntent']
+  parsedAction?: Record<string, unknown> | null
+  targetResolution?: Record<string, unknown> | null
+  actionPlan?: Record<string, unknown> | null
+  sceneSurface?: Record<string, unknown> | null
+  actions: TurnTraceActionExecution[]
+  toolsUsed: string[]
+  engineEvents: EngineEvent[]
+  affordances: PlayerAffordance[]
+  worldDiff?: DMDebugTurnView['worldDiff']
+  enemyReactions: Array<Record<string, unknown>>
+  narrativeFacts: Array<{ kind: string; trigger: string }>
+  contradictions: Array<{
+    reason: string
+    fact?: Record<string, unknown>
+    suggestedTools?: string[]
+  }>
+  finalNarration: string
+  narrator: DMTurnUsage['narrator']
+  llmRoute: DMTurnUsage['llmRoute']
+  refusalCode?: string | null
+}
+
 // API request/response types
 export interface DMRequest {
   message: string
@@ -415,6 +478,7 @@ export interface DMResponse {
   toolsUsed: string[]
   engine?: EngineResolutionView
   debug?: DMDebugTurnView
+  turnTrace?: TurnTrace
   usage?: DMTurnUsage
   // Nouveau résumé retourné si une compression a eu lieu pendant cette requête
   summaryContext?: string

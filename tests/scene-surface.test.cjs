@@ -82,6 +82,17 @@ test('scene surface exposes the narrated front door from the initial room', () =
   assert.ok(surface.exits.some(exit => exit.roomId === '4' && exit.viaObjectId === 'front_double_door'))
   assert.equal(surface.affordances.find(action => action.id === 'world-open-front_double_door')?.enabled, true)
   assert.equal(surface.affordances.find(action => action.id === 'world-force-front_double_door')?.enabled, true)
+
+  const openDoor = surface.affordances.find(action => action.id === 'world-open-front_double_door')
+  assert.equal(openDoor.target.id, 'front_double_door')
+  assert.equal(openDoor.target.type, 'object')
+  assert.deepEqual(openDoor.canonicalAction, {
+    kind: 'open',
+    targetId: 'front_double_door',
+    targetName: 'double porte de la boulangerie',
+  })
+  assert.ok(openDoor.aliases.includes('pousser'))
+  assert.ok(openDoor.preconditions.length > 0)
 })
 
 test('initial narrative cannot mention a door without a matching scene affordance', () => {

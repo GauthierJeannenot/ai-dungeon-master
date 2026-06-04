@@ -76,12 +76,34 @@ test('session store sanitizes ids consistently and leaves no temp file after sav
     gameState: gameState(),
     history: [{ role: 'player', content: 'hello' }],
     summaryContext: 'summary',
+    turnTraces: [{
+      schemaVersion: 1,
+      traceId: 'turn-test',
+      requestId: 'dm-test',
+      startedAt: '2026-01-01T00:00:00.000Z',
+      completedAt: '2026-01-01T00:00:01.000Z',
+      status: 'completed',
+      input: { raw: 'hello' },
+      actions: [],
+      toolsUsed: [],
+      engineEvents: [],
+      affordances: [],
+      enemyReactions: [],
+      narrativeFacts: [],
+      contradictions: [],
+      finalNarration: 'ok',
+      narrator: 'fallback',
+      llmRoute: 'none',
+    }],
   })
 
   const loaded = await sessionStore.loadSession('unsafe_session_id')
+  assert.equal(loaded.schemaVersion, 1)
   assert.equal(loaded.sessionId, 'unsafe_session_id')
   assert.equal(loaded.history.length, 1)
   assert.equal(loaded.summaryContext, 'summary')
+  assert.equal(loaded.turnTraces.length, 1)
+  assert.equal(loaded.turnTraces[0].traceId, 'turn-test')
 
   const files = fs.readdirSync(sessionStoreDir)
   assert.deepEqual(files, ['unsafe_session_id.json'])

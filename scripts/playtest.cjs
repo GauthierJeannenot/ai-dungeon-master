@@ -851,6 +851,8 @@ async function run() {
       missingExpectedEvents: [],
       missingExpectedAffordances: [],
       missingDebugViews: [],
+      missingTurnTraces: [],
+      contradictoryTurnTraces: [],
       missingWorldDebugDiffs: [],
       missingTargetResolutions: [],
       unexpectedTools: [],
@@ -933,6 +935,13 @@ async function run() {
               changedQuests: Object.keys(data.debug.worldDiff?.quests ?? {}),
               changedAlarms: Object.keys(data.debug.worldDiff?.alarms ?? {}),
             } : undefined,
+            turnTrace: data.turnTrace ? {
+              traceId: data.turnTrace.traceId,
+              actionCount: data.turnTrace.actions?.length ?? 0,
+              contradictionReasons: data.turnTrace.contradictions?.map?.(issue => issue.reason) ?? [],
+              narrativeFactKinds: data.turnTrace.narrativeFacts?.map?.(fact => fact.kind) ?? [],
+              enemyReactionCount: data.turnTrace.enemyReactions?.length ?? 0,
+            } : undefined,
             narrator: usage?.narrator ?? 'unknown',
             llmRoute: usage?.llmRoute ?? 'unknown',
             llmCalls: usage?.llm?.calls ?? 0,
@@ -962,6 +971,12 @@ async function run() {
           }
           if (status < 400 && !data.debug) {
             report.quality.missingDebugViews.push(turnReport)
+          }
+          if (status < 400 && (turn.category === 'world' || turn.category === 'regression' || turn.category === 'fuzz' || turn.category === 'social') && !data.turnTrace) {
+            report.quality.missingTurnTraces.push(turnReport)
+          }
+          if (status < 400 && data.turnTrace?.contradictions?.length > 0) {
+            report.quality.contradictoryTurnTraces.push(turnReport)
           }
           if (status < 400 && (turn.category === 'world' || turn.category === 'regression' || turn.category === 'fuzz') && !data.debug?.worldDiff) {
             report.quality.missingWorldDebugDiffs.push(turnReport)
@@ -1072,6 +1087,12 @@ async function run() {
   }
   if (report.quality.missingDebugViews.length > 0) {
     report.targetViolations.push(`${report.quality.missingDebugViews.length} turns missed structured debug views`)
+  }
+  if (report.quality.missingTurnTraces.length > 0) {
+    report.targetViolations.push(`${report.quality.missingTurnTraces.length} turns missed canonical turn traces`)
+  }
+  if (report.quality.contradictoryTurnTraces.length > 0) {
+    report.targetViolations.push(`${report.quality.contradictoryTurnTraces.length} turns kept unsupported narrated facts in turn traces`)
   }
   if (report.quality.missingWorldDebugDiffs.length > 0) {
     report.targetViolations.push(`${report.quality.missingWorldDebugDiffs.length} world turns missed world debug diffs`)

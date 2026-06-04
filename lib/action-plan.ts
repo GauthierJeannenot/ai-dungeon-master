@@ -253,10 +253,12 @@ export function summarizeActionPlanForDebug(plan: ActionPlan): Record<string, un
     source: plan.source,
     reason: plan.reason,
     blocked: plan.blocked,
+    targetResolution: plan.targetResolution,
     steps: plan.steps.map(step => ({
       id: step.id,
       toolName: step.toolName,
       action: step.action,
+      targetResolution: step.targetResolution,
       dependsOnPreviousSuccess: Boolean(step.dependsOnPreviousSuccess),
       reason: step.reason,
     })),

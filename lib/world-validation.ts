@@ -265,6 +265,10 @@ function validateEventTarget(event: EngineEvent, index: number, world: WorldStat
 export function validateWorldState(world: WorldState): WorldValidationResult {
   const issues: WorldValidationIssue[] = []
 
+  if (world.schemaVersion !== undefined && world.schemaVersion !== 1) {
+    issues.push(issue('WORLD_SCHEMA_VERSION_INVALID', 'schemaVersion', 'World schemaVersion must be 1 when provided.'))
+  }
+
   validateKeyedEntity(issues, 'rooms', world.rooms)
   validateKeyedEntity(issues, 'objects', world.objects)
   validateKeyedEntity(issues, 'npcs', world.npcs)

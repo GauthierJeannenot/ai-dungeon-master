@@ -53,11 +53,13 @@ test('world validation catches broken room, containment, and recipe invariants',
   world.objects.recipe_half_office.roomId = 'missing-room'
   world.objects.front_double_door.portal = { roomIds: ['1', 'missing-room'] }
   world.quests.grammy_recipe.goal = 3
+  world.schemaVersion = 999
 
   const result = validateWorldState(world)
   const codes = result.issues.map(issue => issue.code)
 
   assert.equal(result.ok, false)
+  assert.ok(codes.includes('WORLD_SCHEMA_VERSION_INVALID'))
   assert.ok(codes.includes('ROOM_EXIT_UNKNOWN'))
   assert.ok(codes.includes('OBJECT_CONTAINS_UNKNOWN'))
   assert.ok(codes.includes('OBJECT_ROOM_UNKNOWN'))

@@ -18,7 +18,7 @@ import {
   inferAdventureRoomId as inferMappedAdventureRoomId,
   relativeAdventureRoomIdForText,
 } from '@/lib/adventure-map'
-import { DMRequest, DMResponse, GameState, ConversationTurn, CombatLogEntry, MonsterState, type CanonicalPlayerActionKind, type DMDebugTurnView, type DMTurnUsage, type EngineEvent, type PlayerAffordance, type WorldState } from '@/lib/types'
+import { DMRequest, DMResponse, GameState, ConversationTurn, CombatLogEntry, MonsterState, type CanonicalPlayerActionKind, type DMDebugTurnView, type DMTurnUsage, type EngineEvent, type PlayerAffordance, type TurnTraceActionExecution, type WorldState } from '@/lib/types'
 import {
   isDoorTraversalIntent,
   normalizeFrenchText,
@@ -51,6 +51,7 @@ import {
   type NarratedWorldFact,
 } from '@/lib/narrative-world-contract'
 import { normalizeLlmToolInput } from '@/lib/tool-input-normalizer'
+import { actionExecution, buildTurnTrace } from '@/lib/turn-trace'
 
 export const maxDuration = 60
 
@@ -2996,6 +2997,42 @@ type EngineFirstResolution = {
   draftNarrative: string
   sawMcpToolError: boolean
   mcpErrorResult?: unknown
+  actionExecutions: TurnTraceActionExecution[]
+}
+
+function toolActionExecution(
+  source: TurnTraceActionExecution['source'],
+  toolName: string,
+  input: Record<string, unknown> | undefined,
+  result: unknown,
+  sequence: number,
+  executed = true
+): TurnTraceActionExecution {
+  return actionExecution({
+    id: `${source}-${sequence}-${toolName}`,
+    source,
+    toolName,
+    input,
+    result,
+    executed,
+  })
+}
+
+function appendAutoToolExecutions(
+  executions: TurnTraceActionExecution[],
+  toolNames: string[],
+  result: Record<string, unknown>
+): void {
+  for (const toolName of toolNames) {
+    executions.push(actionExecution({
+      id: `auto-${executions.length + 1}-${toolName}`,
+      source: 'auto',
+      toolName,
+      result,
+      executed: true,
+      succeeded: true,
+    }))
+  }
 }
 
 function actionPlanStepSucceeded(result: unknown): boolean {
@@ -3026,6 +3063,7 @@ async function executeActionPlan(
   const toolsUsed: string[] = []
   const draftNarratives: string[] = []
   const stepSummaries: Array<Record<string, unknown>> = []
+  const actionExecutions: TurnTraceActionExecution[] = []
 
   logEvent('info', 'dm.cost.engine_first.plan.start', {
     requestId,
@@ -3073,6 +3111,7 @@ async function executeActionPlan(
     sawMcpToolError = sawMcpToolError || stepError
     if (stepError) mcpErrorResult = result
     toolsUsed.push(...toolsUsedForResolvedTool(step.toolName, result))
+    actionExecutions.push(toolActionExecution('action_plan', step.toolName, step.input, result, actionExecutions.length + 1))
 
     const stepNarrative = summarizeMcpResultForNarration(step.toolName, result)
     if (stepNarrative.trim()) draftNarratives.push(stepNarrative)
@@ -3123,6 +3162,7 @@ async function executeActionPlan(
     draftNarrative,
     sawMcpToolError,
     mcpErrorResult,
+    actionExecutions,
   }
 }
 
@@ -3154,6 +3194,7 @@ async function resolveServerFirstAction(
       toolsUsed: [],
       draftNarrative,
       sawMcpToolError: false,
+      actionExecutions: [],
     }
   }
 
@@ -3181,6 +3222,7 @@ async function resolveServerFirstAction(
         toolsUsed: [],
         draftNarrative,
         sawMcpToolError: false,
+        actionExecutions: [],
       }
     }
   }
@@ -3200,6 +3242,7 @@ async function resolveServerFirstAction(
       toolsUsed: [],
       draftNarrative,
       sawMcpToolError: false,
+      actionExecutions: [],
     }
   }
 
@@ -3218,6 +3261,7 @@ async function resolveServerFirstAction(
       toolsUsed: [],
       draftNarrative,
       sawMcpToolError: false,
+      actionExecutions: [],
     }
   }
 
@@ -3237,6 +3281,7 @@ async function resolveServerFirstAction(
       toolsUsed: [],
       draftNarrative,
       sawMcpToolError: false,
+      actionExecutions: [],
     }
   }
 
@@ -3269,6 +3314,9 @@ async function resolveServerFirstAction(
     })
 
     const abilityResult = await callMCPTool('resolve_player_action', abilityInput, sessionId)
+    const actionExecutions = [
+      toolActionExecution('engine_first', 'resolve_player_action', abilityInput, abilityResult, 1),
+    ]
     let sawMcpToolError = isMcpErrorResult(abilityResult)
     let nextGameState = await callMCPTool('get_game_state', {}, sessionId) as GameState
     const toolsUsed = toolsUsedForResolvedTool('resolve_player_action', abilityResult)
@@ -3288,6 +3336,10 @@ async function resolveServerFirstAction(
         reason: `${abilityCheckToResolve.label} reussie: les adversaires acceptent de parlementer.`,
       }, sessionId)
       toolsUsed.push('end_combat')
+      actionExecutions.push(toolActionExecution('auto', 'end_combat', {
+        force: true,
+        reason: `${abilityCheckToResolve.label} reussie: les adversaires acceptent de parlementer.`,
+      }, endCombatResult, actionExecutions.length + 1))
       const endCombatError = isMcpErrorResult(endCombatResult)
       sawMcpToolError = sawMcpToolError || endCombatError
       if (!endCombatError) {
@@ -3314,6 +3366,7 @@ async function resolveServerFirstAction(
       draftNarrative,
       sawMcpToolError,
       mcpErrorResult: sawMcpToolError ? abilityResult : undefined,
+      actionExecutions,
     }
   }
 
@@ -3368,6 +3421,7 @@ async function resolveServerFirstAction(
           toolsUsed: [],
           draftNarrative,
           sawMcpToolError: false,
+          actionExecutions: [],
         }
       }
 
@@ -3410,7 +3464,7 @@ async function resolveServerFirstAction(
   }
 
   if (!toolName || !input) {
-    return { handled: false, gameState, toolsUsed: [], draftNarrative: '', sawMcpToolError: false }
+    return { handled: false, gameState, toolsUsed: [], draftNarrative: '', sawMcpToolError: false, actionExecutions: [] }
   }
 
   logEvent('info', 'dm.cost.engine_first.start', {
@@ -3447,6 +3501,7 @@ async function resolveServerFirstAction(
     draftNarrative,
     sawMcpToolError,
     mcpErrorResult: sawMcpToolError ? result : undefined,
+    actionExecutions: [toolActionExecution('engine_first', toolName, input, result, 1)],
   }
 }
 
@@ -4354,6 +4409,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     let requestHistory = storedSession?.history ?? history
     let requestSummaryContext = storedSession?.summaryContext ?? summaryContext
     const toolsUsed: string[] = []
+    const actionExecutions: TurnTraceActionExecution[] = []
+    const storedTurnTraces = storedSession?.turnTraces ?? []
+    const traceId = `turn-${requestId}`
     logEvent('info', 'dm.state.resolved', {
       requestId,
       sessionId,
@@ -4361,6 +4419,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       historySource: storedSession?.history ? 'stored-session' : history.length > 0 ? 'client-bootstrap' : 'empty',
       historyLength: requestHistory.length,
       hasSummary: Boolean(requestSummaryContext),
+      storedTurnTraceCount: storedTurnTraces.length,
       gameState: summarizeGameState(currentGameState),
     })
 
@@ -4419,6 +4478,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         if (npcTurns.resolvedTurns > 0) {
           currentGameState = npcTurns.gameState
           toolsUsed.push(...npcTurns.toolsUsed)
+          appendAutoToolExecutions(actionExecutions, npcTurns.toolsUsed, {
+            stage: 'pre_llm_auto_npc',
+            resolvedTurns: npcTurns.resolvedTurns,
+            summaries: npcTurns.summaries,
+          })
         }
         logEvent('info', 'dm.combat.pre_llm_auto_npc.complete', {
           requestId,
@@ -4507,6 +4571,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       sawMcpToolError = engineFirst.sawMcpToolError
       latestMcpErrorResult = engineFirst.mcpErrorResult
       toolsUsed.push(...engineFirst.toolsUsed)
+      actionExecutions.push(...engineFirst.actionExecutions)
       logRoomStateAnomaly(currentGameState, requestId, sessionId, 'after-engine-first')
     }
 
@@ -4751,6 +4816,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
               toolName: toolUse.name,
               result,
             })
+            actionExecutions.push(toolActionExecution(
+              'llm_tool_blocked',
+              toolUse.name,
+              isObjectRecord(toolUse.input) ? toolUse.input : { rawInput: toolUse.input },
+              result,
+              actionExecutions.length + 1,
+              false
+            ))
             toolResults.push({
               type: 'tool_result',
               tool_use_id: toolUse.id,
@@ -4779,6 +4852,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
               primaryActionToolUsed,
               result,
             })
+            actionExecutions.push(toolActionExecution(
+              'llm_tool_blocked',
+              toolUse.name,
+              isObjectRecord(toolUse.input) ? toolUse.input : { rawInput: toolUse.input },
+              result,
+              actionExecutions.length + 1,
+              false
+            ))
             toolResults.push({
               type: 'tool_result',
               tool_use_id: toolUse.id,
@@ -4805,6 +4886,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
               input: toolUse.input,
               result,
             })
+            actionExecutions.push(toolActionExecution(
+              'llm_tool_blocked',
+              toolUse.name,
+              isObjectRecord(toolUse.input) ? toolUse.input : { rawInput: toolUse.input },
+              result,
+              actionExecutions.length + 1,
+              false
+            ))
             toolResults.push({
               type: 'tool_result',
               tool_use_id: toolUse.id,
@@ -4842,6 +4931,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
               result: affordanceValidationError,
               gameState: summarizeGameState(currentGameState),
             })
+            actionExecutions.push(toolActionExecution(
+              'llm_tool_blocked',
+              toolUse.name,
+              toolInput,
+              affordanceValidationError,
+              actionExecutions.length + 1,
+              false
+            ))
             toolResults.push({
               type: 'tool_result',
               tool_use_id: toolUse.id,
@@ -4865,6 +4962,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
                 result: validationError,
                 gameState: summarizeGameState(currentGameState),
               })
+              actionExecutions.push(toolActionExecution(
+                'llm_tool_blocked',
+                toolUse.name,
+                toolInput,
+                validationError,
+                actionExecutions.length + 1,
+                false
+              ))
               toolResults.push({
                 type: 'tool_result',
                 tool_use_id: toolUse.id,
@@ -4887,6 +4992,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           try {
             const result = await callMCPTool(toolUse.name, toolInput, sessionId)
             const mcpResultIsError = isMcpErrorResult(result)
+            actionExecutions.push(toolActionExecution('llm_tool', toolUse.name, toolInput, result, actionExecutions.length + 1))
             logEvent('info', 'dm.tool_use.ok', {
               requestId,
               sessionId,
@@ -4941,6 +5047,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
               toolName: toolUse.name,
               err,
             })
+            actionExecutions.push(toolActionExecution(
+              'llm_tool',
+              toolUse.name,
+              toolInput,
+              { error: errMsg },
+              actionExecutions.length + 1
+            ))
             toolResults.push({
               type: 'tool_result',
               tool_use_id: toolUse.id,
@@ -5083,6 +5196,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       if (autoEnd.ended) {
         currentGameState = autoEnd.gameState
         toolsUsed.push('end_combat')
+        appendAutoToolExecutions(actionExecutions, ['end_combat'], { stage: 'auto_end_combat_if_won' })
       }
     } catch (err) {
       logEvent('error', 'dm.combat.auto_end.error', {
@@ -5097,6 +5211,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       if (autoEndPlayer.ended) {
         currentGameState = autoEndPlayer.gameState
         toolsUsed.push('end_combat')
+        appendAutoToolExecutions(actionExecutions, ['end_combat'], { stage: 'auto_end_combat_if_player_resolved' })
       }
     } catch (err) {
       logEvent('error', 'dm.combat.auto_end_player_resolved.error', {
@@ -5112,6 +5227,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         if (autoAdvance.advanced) {
           currentGameState = autoAdvance.gameState
           toolsUsed.push('next_turn')
+          appendAutoToolExecutions(actionExecutions, ['next_turn'], { stage: 'auto_advance_completed_turn' })
         }
       } catch (err) {
         logEvent('error', 'dm.turn.auto_advance.error', {
@@ -5127,6 +5243,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       if (npcTurns.resolvedTurns > 0) {
         currentGameState = npcTurns.gameState
         toolsUsed.push(...npcTurns.toolsUsed)
+        appendAutoToolExecutions(actionExecutions, npcTurns.toolsUsed, {
+          stage: 'auto_npc',
+          resolvedTurns: npcTurns.resolvedTurns,
+          summaries: npcTurns.summaries,
+        })
       }
     } catch (err) {
       logEvent('error', 'dm.combat.auto_npc.error', {
@@ -5141,6 +5262,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       if (autoEndPlayer.ended) {
         currentGameState = autoEndPlayer.gameState
         toolsUsed.push('end_combat')
+        appendAutoToolExecutions(actionExecutions, ['end_combat'], { stage: 'auto_end_player_resolved_after_npc' })
       }
     } catch (err) {
       logEvent('error', 'dm.combat.auto_end_player_resolved_after_npc.error', {
@@ -5155,6 +5277,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       if (autoEnd.ended) {
         currentGameState = autoEnd.gameState
         toolsUsed.push('end_combat')
+        appendAutoToolExecutions(actionExecutions, ['end_combat'], { stage: 'auto_end_after_npc' })
       }
     } catch (err) {
       logEvent('error', 'dm.combat.auto_end_after_npc.error', {
@@ -5351,6 +5474,51 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       narrative = serverCorrection
     }
 
+    const refusalCode = mcpErrorCode(latestMcpErrorResult)
+    const worldDiff = buildWorldDebugDiff(worldDebugBeforeTurn, currentGameState.world, newWorldEvents)
+
+    const turnUsage: DMTurnUsage = {
+      llm: summarizeAnthropicUsage(usageLog),
+      operations: usageLog.map(entry => entry.operation),
+      narrator: narratorSource,
+      llmRoute,
+    }
+
+    const turnTrace = buildTurnTrace({
+      traceId,
+      requestId,
+      clientRequestId,
+      sessionId,
+      startedAt: new Date(requestStartedAt),
+      completedAt: new Date(),
+      playerMessage: message,
+      inputMode,
+      debug: {
+        ...turnDebug,
+        refusalCode,
+        worldDiff,
+      },
+      actions: actionExecutions,
+      toolsUsed: [...new Set(toolsUsed)],
+      gameState: currentGameState,
+      engineEvents: engineTruthPacket.events,
+      affordances: engineTruthPacket.affordances,
+      worldDiff,
+      newCombatLogEntries,
+      finalNarration: narrative || 'Le Dungeon Master reflechit...',
+      narrator: turnUsage.narrator,
+      llmRoute: turnUsage.llmRoute,
+      refusalCode,
+    })
+
+    logEvent(turnTrace.contradictions.length > 0 ? 'warn' : 'info', 'dm.turn.trace', {
+      requestId,
+      clientRequestId,
+      sessionId,
+      traceId: turnTrace.traceId,
+      turnTrace,
+    })
+
     const persistedHistory = [
       ...(activeSummary ? recentHistory.slice(-HISTORY_KEEP_RECENT) : requestHistory),
       { role: 'player', content: message } satisfies ConversationTurn,
@@ -5362,6 +5530,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         gameState: currentGameState,
         history: persistedHistory,
         summaryContext: activeSummary,
+        turnTraces: [...storedTurnTraces, turnTrace],
       })
     } catch (err) {
       logEvent('error', 'dm.session.persist.error', {
@@ -5370,13 +5539,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         historyLength: persistedHistory.length,
         err,
       })
-    }
-
-    const turnUsage: DMTurnUsage = {
-      llm: summarizeAnthropicUsage(usageLog),
-      operations: usageLog.map(entry => entry.operation),
-      narrator: narratorSource,
-      llmRoute,
     }
 
     const dmResponse: DMResponse = {
@@ -5389,9 +5551,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       },
       debug: {
         ...turnDebug,
-        refusalCode: mcpErrorCode(latestMcpErrorResult),
-        worldDiff: buildWorldDebugDiff(worldDebugBeforeTurn, currentGameState.world, newWorldEvents),
+        refusalCode,
+        worldDiff,
       },
+      turnTrace,
       usage: turnUsage,
       // Renvoie le nouveau résumé au client seulement si une compression a eu lieu
       summaryContext: newSummary,
@@ -5436,6 +5599,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       cacheReadInputTokens: turnUsage.llm.cacheReadInputTokens,
       toolsUsed: [...new Set(toolsUsed)],
       engineEventTypes: engineTruthPacket.events.map(event => event.type),
+      traceId: turnTrace.traceId,
+      turnTraceActionCount: turnTrace.actions.length,
+      turnTraceContradictions: turnTrace.contradictions.map(issue => issue.reason),
       playerAffordances: engineTruthPacket.affordances.map(action => ({
         kind: action.kind,
         enabled: action.enabled,
@@ -5457,6 +5623,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       voice: clientMeta?.voice,
       iterations,
       toolsUsed: [...new Set(toolsUsed)],
+      traceId: turnTrace.traceId,
+      turnTraceActionCount: turnTrace.actions.length,
+      turnTraceContradictionCount: turnTrace.contradictions.length,
       narrativeLength: dmResponse.narrative.length,
       narrative: dmResponse.narrative,
       compressedHistory: Boolean(newSummary),

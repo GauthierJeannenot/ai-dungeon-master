@@ -327,3 +327,17 @@ curl -X DELETE -H "Authorization: Bearer un-token-long-aleatoire" \
 L'endpoint `GET /api/debug/logs` retourne les logs persistants si le fichier JSONL existe, sinon les logs recents gardes en memoire par le process Node. Pendant le debug live, la lecture est publique par defaut pour permettre une surveillance externe sans acces Railway; remettez `APP_DEBUG_LOG_PUBLIC_READ=false` ou retirez ce mode apres la session. `DELETE /api/debug/logs` reste protege par `APP_DEBUG_LOG_TOKEN` et efface a la fois le buffer memoire et le fichier JSONL local. Utilisez de preference le header `Authorization: Bearer ...`. Le parametre `?token=` est desactive par defaut; activez-le seulement pour depannage manuel avec `APP_DEBUG_LOG_TOKEN_QUERY_ENABLED=true`, car il peut fuiter dans des historiques navigateur/proxy.
 
 Les logs incluent notamment `requestId`, `sessionId`, appels Anthropic, usage tokens/cout estime, appels MCP, erreurs de regles, resume compact du `GameState`, persistance session et durees. Les valeurs ressemblant a des secrets/tokens sont masquees automatiquement.
+
+Chaque tour DM produit aussi un `TurnTrace` canonique sous l'evenement `dm.turn.trace`. Il regroupe l'input brut, l'intent, l'actionPlan, la resolution de cible, les appels d'outils executes ou bloques, les `EngineEvent`, le diff monde, les reactions ennemies derivees, les facts narratifs detectes, les contradictions restantes et la narration finale. Pour ne lire que ces traces :
+
+```bash
+curl "https://votre-app.example.com/api/debug/logs?traces=true&limit=100"
+curl "https://votre-app.example.com/api/debug/logs?traces=true&sessionId=ma-session&limit=100"
+```
+
+Pour transformer des logs ou traces exportees en regression locale :
+
+```bash
+node scripts/replay-session-log.cjs --input logs.json --output tests/fixtures/ma-session-regression.json
+node scripts/replay-session-log.cjs --input logs.jsonl --playtest --mode mock --narration-mode quality
+```

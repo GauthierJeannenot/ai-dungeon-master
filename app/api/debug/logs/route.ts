@@ -100,6 +100,13 @@ function parseLevel(req: NextRequest): LogLevel | undefined {
   return rawLevel && VALID_LEVELS.has(rawLevel as LogLevel) ? rawLevel as LogLevel : undefined
 }
 
+function extractTurnTraces(entries: ReturnType<typeof getLogEvents>['entries']): unknown[] {
+  return entries
+    .filter(entry => entry.event === 'dm.turn.trace')
+    .map(entry => entry.payload.turnTrace)
+    .filter(Boolean)
+}
+
 export async function GET(req: NextRequest): Promise<NextResponse> {
   if (!PUBLIC_READ_ENABLED) {
     const unauthorized = authorize(req)
@@ -108,6 +115,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   const limit = parseLimit(req)
   const logRead = req.nextUrl.searchParams.get('logRead') === 'true'
+  const tracesOnly = req.nextUrl.searchParams.get('traces') === 'true'
   const result = getLogEvents({
     limit,
     after: parseAfter(req),
@@ -137,12 +145,16 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       clientRequestId: req.nextUrl.searchParams.get('clientRequestId') ?? undefined,
       sessionId: req.nextUrl.searchParams.get('sessionId') ?? undefined,
       logRead,
+      tracesOnly,
     },
   })
 
+  const turnTraces = tracesOnly ? extractTurnTraces(result.entries) : undefined
+
   return jsonResponse({
-    logs: result.entries,
-    count: result.entries.length,
+    logs: tracesOnly ? [] : result.entries,
+    turnTraces,
+    count: tracesOnly ? turnTraces?.length ?? 0 : result.entries.length,
     totalBuffered: result.totalBuffered,
     totalPersisted: result.totalPersisted,
     bufferLimit: result.bufferLimit,

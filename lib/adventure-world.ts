@@ -2,6 +2,7 @@ import type { WorldState } from './types'
 
 export function createInitialWorldState(): WorldState {
   return {
+    schemaVersion: 1,
     rooms: {
       '1': {
         id: '1',

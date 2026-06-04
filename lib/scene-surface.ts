@@ -102,7 +102,38 @@ function unique<T>(values: T[]): T[] {
 }
 
 function affordance(fields: PlayerAffordance): PlayerAffordance {
-  return fields
+  return {
+    ...fields,
+    aliases: fields.aliases ?? [],
+    preconditions: fields.preconditions ?? [fields.reason],
+    blockedReason: fields.enabled ? fields.blockedReason : fields.blockedReason ?? fields.reason,
+    canonicalAction: fields.canonicalAction ?? inferCanonicalAction(fields),
+  }
+}
+
+function inferCanonicalAction(fields: PlayerAffordance): Record<string, unknown> {
+  const action: Record<string, unknown> = { kind: fields.kind }
+  if (fields.target) {
+    action.targetId = fields.target.id
+    if (fields.target.name) action.targetName = fields.target.name
+  }
+  return action
+}
+
+function objectTarget(object: Pick<SceneSurfaceObject, 'id' | 'name'>): PlayerAffordance['target'] {
+  return { id: object.id, type: 'object', name: object.name }
+}
+
+function npcTarget(npc: Pick<SceneSurfaceNpc, 'id' | 'name'>): PlayerAffordance['target'] {
+  return { id: npc.id, type: 'npc', name: npc.name }
+}
+
+function objectCanonicalAction(kind: CanonicalPlayerActionKind, object: Pick<SceneSurfaceObject, 'id' | 'name'>): Record<string, unknown> {
+  return { kind, targetId: object.id, targetName: object.name }
+}
+
+function npcCanonicalAction(kind: CanonicalPlayerActionKind, npc: Pick<SceneSurfaceNpc, 'id' | 'name'>): Record<string, unknown> {
+  return { kind, npcTargetId: npc.id, npcTargetName: npc.name }
 }
 
 export function objectSurfaceRoomIds(object: Pick<WorldObjectState, 'roomId' | 'portal'>): string[] {
@@ -212,6 +243,9 @@ function deriveSceneSurfaceAffordances(
     enabled: true,
     reason: 'Examiner produit un event moteur sans inventer de decouverte cachee.',
     toolName: 'resolve_player_action',
+    target: { id: surfaceBase.currentRoomId ?? 'current-room', type: 'room', name: surfaceBase.currentRoom?.name ?? 'zone actuelle' },
+    aliases: ['regarder', 'observer', 'examiner'],
+    canonicalAction: { kind: 'examine' },
   }))
 
   affordances.push(affordance({
@@ -223,6 +257,9 @@ function deriveSceneSurfaceAffordances(
       ? 'Des elements non reveles peuvent etre recherches par le moteur.'
       : 'Une fouille peut confirmer qu aucun element cache connu du moteur n est trouve.',
     toolName: 'resolve_player_action',
+    target: { id: surfaceBase.currentRoomId ?? 'current-room', type: 'room', name: surfaceBase.currentRoom?.name ?? 'zone actuelle' },
+    aliases: ['fouiller', 'chercher', 'inspecter'],
+    canonicalAction: { kind: 'search' },
   }))
 
   for (const object of surfaceBase.objects) {
@@ -234,6 +271,9 @@ function deriveSceneSurfaceAffordances(
         enabled: true,
         reason: 'Indice lisible visible ou deja revele.',
         toolName: 'resolve_player_action',
+        target: objectTarget(object),
+        aliases: ['lire', ...object.aliases],
+        canonicalAction: objectCanonicalAction('read', object),
       }))
     }
 
@@ -249,6 +289,9 @@ function deriveSceneSurfaceAffordances(
             ? 'Portail visible depuis la scene courante et pas encore ouvert.'
             : 'Objet visible et pas encore ouvert.',
         toolName: 'resolve_player_action',
+        target: objectTarget(object),
+        aliases: ['ouvrir', 'pousser', ...object.aliases],
+        canonicalAction: objectCanonicalAction('open', object),
       }))
     }
 
@@ -260,6 +303,9 @@ function deriveSceneSurfaceAffordances(
         enabled: true,
         reason: 'Objet verrouille et visible; un test moteur peut l ouvrir.',
         toolName: 'resolve_player_action',
+        target: objectTarget(object),
+        aliases: ['crocheter', 'deverrouiller', ...object.aliases],
+        canonicalAction: objectCanonicalAction('unlock', object),
       }))
     }
 
@@ -273,6 +319,9 @@ function deriveSceneSurfaceAffordances(
           ? 'Objet verrouille et visible; le forcer peut ouvrir mais augmente le risque d alarme.'
           : 'Objet visible; le forcer est possible mais bruyant et risqué.',
         toolName: 'resolve_player_action',
+        target: objectTarget(object),
+        aliases: ['forcer', 'casser', 'detruire', 'defoncer', ...object.aliases],
+        canonicalAction: objectCanonicalAction('force', object),
       }))
     }
 
@@ -284,6 +333,9 @@ function deriveSceneSurfaceAffordances(
         enabled: true,
         reason: 'Objet decouvert, visible, et pas encore pris.',
         toolName: 'resolve_player_action',
+        target: objectTarget(object),
+        aliases: ['prendre', 'ramasser', 'recuperer', ...object.aliases],
+        canonicalAction: objectCanonicalAction('take', object),
       }))
     }
 
@@ -295,6 +347,9 @@ function deriveSceneSurfaceAffordances(
         enabled: true,
         reason: 'Objet de salle visible avec une interaction moteur explicite.',
         toolName: 'resolve_player_action',
+        target: objectTarget(object),
+        aliases: ['utiliser', 'activer', ...object.aliases],
+        canonicalAction: objectCanonicalAction('use_object', object),
       }))
     }
 
@@ -306,6 +361,9 @@ function deriveSceneSurfaceAffordances(
         enabled: true,
         reason: 'Piege visible et pas encore desamorce.',
         toolName: 'resolve_player_action',
+        target: objectTarget(object),
+        aliases: ['desamorcer', 'neutraliser', ...object.aliases],
+        canonicalAction: objectCanonicalAction('disarm', object),
       }))
     }
   }
@@ -318,6 +376,9 @@ function deriveSceneSurfaceAffordances(
       enabled: true,
       reason: 'Indice lisible visible ou deja revele.',
       toolName: 'resolve_player_action',
+      target: { id: object.id, type: 'inventory', name: object.name },
+      aliases: ['lire', ...(object.aliases ?? [])],
+      canonicalAction: objectCanonicalAction('read', { id: object.id, name: object.name }),
     }))
   }
 
@@ -330,6 +391,9 @@ function deriveSceneSurfaceAffordances(
         enabled: true,
         reason: `PNJ present; disposition actuelle: ${npc.disposition}.`,
         toolName: 'resolve_player_action',
+        target: npcTarget(npc),
+        aliases: ['parler', 'discuter', ...npc.aliases],
+        canonicalAction: npcCanonicalAction('talk', npc),
       }),
       affordance({
         id: `world-ask-${npc.id}`,
@@ -338,6 +402,9 @@ function deriveSceneSurfaceAffordances(
         enabled: true,
         reason: 'Demander une information produit un event social explicite.',
         toolName: 'resolve_player_action',
+        target: npcTarget(npc),
+        aliases: ['demander', 'questionner', ...npc.aliases],
+        canonicalAction: npcCanonicalAction('ask', npc),
       }),
       affordance({
         id: `world-persuade-${npc.id}`,
@@ -348,6 +415,9 @@ function deriveSceneSurfaceAffordances(
           ? 'Le PNJ est deja utile; demander une information suffit.'
           : 'Changer une disposition doit passer par un check moteur.',
         toolName: 'resolve_player_action',
+        target: npcTarget(npc),
+        aliases: ['convaincre', 'persuader', ...npc.aliases],
+        canonicalAction: npcCanonicalAction('persuade', npc),
       }),
       affordance({
         id: `world-threaten-${npc.id}`,
@@ -358,6 +428,9 @@ function deriveSceneSurfaceAffordances(
           ? 'Menacer un allie utile serait incoherent sans intention plus claire.'
           : 'Une menace doit produire un check social et un event de disposition/alerte.',
         toolName: 'resolve_player_action',
+        target: npcTarget(npc),
+        aliases: ['menacer', 'intimider', ...npc.aliases],
+        canonicalAction: npcCanonicalAction('threaten', npc),
       }),
       affordance({
         id: `world-show-item-${npc.id}`,
@@ -368,6 +441,9 @@ function deriveSceneSurfaceAffordances(
           ? 'Un objet d inventaire peut etre montre sans quitter l inventaire.'
           : 'Aucun objet en inventaire a montrer.',
         toolName: 'resolve_player_action',
+        target: npcTarget(npc),
+        aliases: ['montrer', 'presenter', ...npc.aliases],
+        canonicalAction: npcCanonicalAction('show_item', npc),
       }),
       affordance({
         id: `world-give-item-${npc.id}`,
@@ -378,6 +454,9 @@ function deriveSceneSurfaceAffordances(
           ? 'Donner un objet mute l inventaire et la relation.'
           : 'Aucun objet en inventaire a donner.',
         toolName: 'resolve_player_action',
+        target: npcTarget(npc),
+        aliases: ['donner', 'offrir', ...npc.aliases],
+        canonicalAction: npcCanonicalAction('give_item', npc),
       })
     )
   }
@@ -397,6 +476,9 @@ function deriveSceneSurfaceAffordances(
         ? 'Les deux fragments sont acquis par le moteur.'
         : 'Il manque encore un fragment de recette.',
     toolName: 'resolve_player_action',
+    target: { id: 'grammy_recipe', type: 'system', name: 'recette de Grammy' },
+    aliases: ['assembler la recette', 'combiner la recette', 'recette complete'],
+    canonicalAction: { kind: 'combine_recipe' },
   }))
 
   return affordances
@@ -612,10 +694,27 @@ export function summarizeSceneSurfaceForDebug(surface: SceneSurface): Record<str
     })),
     enabledAffordances: surface.affordances
       .filter(affordance => affordance.enabled)
-      .map(affordance => ({ id: affordance.id, kind: affordance.kind, reason: affordance.reason })),
+      .map(affordance => ({
+        id: affordance.id,
+        kind: affordance.kind,
+        target: affordance.target,
+        aliases: affordance.aliases,
+        preconditions: affordance.preconditions,
+        canonicalAction: affordance.canonicalAction,
+        reason: affordance.reason,
+      })),
     blockedAffordances: surface.affordances
       .filter(affordance => !affordance.enabled)
-      .map(affordance => ({ id: affordance.id, kind: affordance.kind, reason: affordance.reason })),
+      .map(affordance => ({
+        id: affordance.id,
+        kind: affordance.kind,
+        target: affordance.target,
+        aliases: affordance.aliases,
+        preconditions: affordance.preconditions,
+        blockedReason: affordance.blockedReason,
+        canonicalAction: affordance.canonicalAction,
+        reason: affordance.reason,
+      })),
   }
 }
 
