@@ -19,7 +19,7 @@ const clients = new Map<string, ClientEntry>()
 let lastCleanup = 0
 
 function normalizeSessionId(sessionId: string | undefined): string {
-  const normalized = sessionId?.trim().slice(0, 128)
+  const normalized = sessionId?.trim().replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 128)
   return normalized || DEFAULT_SESSION_ID
 }
 

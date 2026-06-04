@@ -29,6 +29,12 @@ export interface EncounterDefinition {
   monsters: EncounterMonsterSpec[]
 }
 
+export interface AdventureTransition {
+  fromRoomId: string
+  toRoomId: string
+  pattern?: RegExp
+}
+
 export const ADVENTURE_ROOMS: AdventureRoom[] = [
   { id: '1', name: 'Entrée extérieure', zone: { minX: 3, maxX: 16, minY: 13, maxY: 14 } },
   { id: '2', name: 'Verger de pommiers', zone: { minX: 3, maxX: 15, minY: 1, maxY: 2 } },
@@ -84,6 +90,48 @@ export const ENCOUNTERS: Record<string, EncounterDefinition> = {
   },
 }
 
+export const NAMED_LOCATION_CELLS: Array<{ id: string; pattern: RegExp; cell: GridCell }> = [
+  { id: 'mac', pattern: /\b(mac|treant|grand pommier|pommier anime|pommier eveille)\b/, cell: { x: 7, y: 13 } },
+]
+
+export const ROOM_NAVIGATION_ALIASES: Array<{ roomId: string; pattern: RegExp }> = [
+  { roomId: '5', pattern: /\b(bureau|bureau de grammy)\b/ },
+  { roomId: '9', pattern: /\b(appartement|appartement de grammy|etage|a l etage|en haut|escalier)\b/ },
+  { roomId: '8', pattern: /\b(sol de la boulangerie|boulangerie|four|cuisine)\b/ },
+  { roomId: '7', pattern: /\b(quai|chargement|dock)\b/ },
+  { roomId: '2', pattern: /\b(verger|pommiers?|pommier|arbres?)\b/ },
+  { roomId: '3', pattern: /\b(dechets?|tas|champignons?|fungus)\b/ },
+  { roomId: '4', pattern: /\b(entree|hall)\b/ },
+  { roomId: '1', pattern: /\b(exterieur|dehors|sortie)\b/ },
+]
+
+export const ROOM_CONTEXT_ALIASES: Array<{ roomId: string; pattern: RegExp }> = [
+  { roomId: '8', pattern: /\b(porte des reserves?|reserves?|sol(?: de la)? boulangerie|fours?|fournee|plans de travail)\b/ },
+  { roomId: '9', pattern: /\b(appartement(?: de grammy)?|grammy|chef grukk|grukk)\b/ },
+  { roomId: '7', pattern: /\b(quai de chargement|quai|chargement|porte laterale)\b/ },
+  { roomId: '5', pattern: /\b(bureau|paperasse|registres?|classeurs?)\b/ },
+  { roomId: '3', pattern: /\b(tas de dechets?|dechets?|champignons? violets?)\b/ },
+  { roomId: '2', pattern: /\b(verger|pommiers?|pommier)\b/ },
+]
+
+export const DOOR_TRANSITIONS: AdventureTransition[] = [
+  { fromRoomId: '1', toRoomId: '4' },
+  { fromRoomId: '7', toRoomId: '8' },
+  { fromRoomId: '4', toRoomId: '9', pattern: /\b(appartement|grammy|gauche|etage|haut|escalier)\b/ },
+  { fromRoomId: '4', toRoomId: '1', pattern: /\b(dehors|exterieur|sortie|arriere|retour)\b/ },
+  { fromRoomId: '4', toRoomId: '8' },
+  { fromRoomId: '8', toRoomId: '9', pattern: /\b(appartement|grammy|etage|haut|escalier)\b/ },
+  { fromRoomId: '8', toRoomId: '5', pattern: /\b(bureau|paperasse|registres?)\b/ },
+  { fromRoomId: '8', toRoomId: '7', pattern: /\b(quai|chargement|laterale|dock)\b/ },
+]
+
+export const FORWARD_TRANSITIONS: AdventureTransition[] = [
+  { fromRoomId: '1', toRoomId: '4' },
+  { fromRoomId: '4', toRoomId: '8' },
+  { fromRoomId: '7', toRoomId: '8' },
+  { fromRoomId: '8', toRoomId: '9' },
+]
+
 export function inferAdventureRoomId(cell: GridCell): string | null {
   return ADVENTURE_ROOMS.find(room =>
     cell.x >= room.zone.minX &&
@@ -100,4 +148,58 @@ export function getAdventureRoom(roomId: string | null | undefined): AdventureRo
 
 export function getEncounter(encounterId: string): EncounterDefinition | null {
   return ENCOUNTERS[encounterId] ?? null
+}
+
+export function centerCellForAdventureRoom(roomId: string): GridCell | null {
+  const room = getAdventureRoom(roomId)
+  if (!room) return null
+
+  return {
+    x: Math.round((room.zone.minX + room.zone.maxX) / 2),
+    y: Math.round((room.zone.minY + room.zone.maxY) / 2),
+  }
+}
+
+export function encounterIdForAdventureRoom(roomId: string | null | undefined): string | null {
+  if (!roomId) return null
+  return Object.values(ENCOUNTERS).find(encounter => encounter.roomId === roomId)?.id ?? null
+}
+
+export function findNamedAdventureLocationCell(text: string): GridCell | null {
+  return NAMED_LOCATION_CELLS.find(location => location.pattern.test(text))?.cell ?? null
+}
+
+export function findAdventureRoomIdByAlias(text: string): string | null {
+  return ROOM_NAVIGATION_ALIASES.find(alias => alias.pattern.test(text))?.roomId ?? null
+}
+
+export function findAdventureRoomIdByContextAlias(text: string, currentRoomId: string | null | undefined): string | null {
+  const matchedRoomIds = ROOM_CONTEXT_ALIASES
+    .filter(alias => alias.roomId !== currentRoomId && alias.pattern.test(text))
+    .map(alias => alias.roomId)
+
+  return matchedRoomIds.length === 1 ? matchedRoomIds[0] : null
+}
+
+export function relativeAdventureRoomIdForText(
+  text: string,
+  currentRoomId: string | null | undefined,
+  options: { doorAction: boolean; forwardAction: boolean }
+): string | null {
+  if (!currentRoomId) return null
+
+  if (options.doorAction) {
+    const transitions = DOOR_TRANSITIONS.filter(transition => transition.fromRoomId === currentRoomId)
+    const specific = transitions.find(transition => transition.pattern?.test(text))
+    if (specific) return specific.toRoomId
+
+    const fallback = transitions.find(transition => !transition.pattern)
+    if (fallback) return fallback.toRoomId
+  }
+
+  if (options.forwardAction) {
+    return FORWARD_TRANSITIONS.find(transition => transition.fromRoomId === currentRoomId)?.toRoomId ?? null
+  }
+
+  return null
 }

@@ -1,4 +1,5 @@
 import { logEvent } from './server-logger'
+import type { DMLlmUsageSummary } from './types'
 
 interface CacheCreationUsage {
   ephemeral_5m_input_tokens?: number | null
@@ -170,4 +171,32 @@ export function logAnthropicUsageSummary(
     estimatedCostUsd: roundUsd(summary.estimatedCostUsd),
     metadata,
   })
+}
+
+export function summarizeAnthropicUsage(entries: AnthropicUsageLogEntry[]): DMLlmUsageSummary {
+  const summary = entries.reduce(
+    (acc, entry) => ({
+      calls: acc.calls + 1,
+      inputTokens: acc.inputTokens + entry.inputTokens,
+      outputTokens: acc.outputTokens + entry.outputTokens,
+      cacheCreationInputTokens: acc.cacheCreationInputTokens + entry.cacheCreationInputTokens,
+      cacheReadInputTokens: acc.cacheReadInputTokens + entry.cacheReadInputTokens,
+      totalInputTokens: acc.totalInputTokens + entry.totalInputTokens,
+      estimatedCostUsd: acc.estimatedCostUsd + entry.estimatedCostUsd,
+    }),
+    {
+      calls: 0,
+      inputTokens: 0,
+      outputTokens: 0,
+      cacheCreationInputTokens: 0,
+      cacheReadInputTokens: 0,
+      totalInputTokens: 0,
+      estimatedCostUsd: 0,
+    }
+  )
+
+  return {
+    ...summary,
+    estimatedCostUsd: roundUsd(summary.estimatedCostUsd),
+  }
 }

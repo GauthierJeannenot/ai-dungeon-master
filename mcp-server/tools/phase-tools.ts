@@ -340,45 +340,6 @@ export function registerPhaseTools(server: McpServer): void {
       } catch (err) {
         return rules.ruleErrorResult(err)
       }
-
-      gs.setPhase('combat')
-
-      // Roll initiative for each combatant
-      const initiatives: Array<{ id: string; initiative: number; roll: string }> = []
-
-      for (const id of combatants) {
-        const entity = gs.getEntity(id)!
-        if (!entity) continue
-        const dexMod = getAbilityModifier(entity.stats.dex)
-        const roll = rollDice(d20WithModifier(dexMod))
-        entity.initiative = roll.total
-        initiatives.push({ id, initiative: roll.total, roll: roll.detail })
-      }
-
-      // Sort descending by initiative
-      initiatives.sort((a, b) => b.initiative - a.initiative)
-      const order = initiatives.map(i => i.id)
-      gs.setInitiativeOrder(order)
-
-      gs.addLogEntry({
-        round: 1,
-        turn: 'system',
-        action: 'COMBAT ENGAGÉ',
-        mechanicalDetail: initiatives.map(i => `${i.id}: ${i.roll}`).join(' | '),
-      })
-
-      return {
-        content: [{
-          type: 'text',
-          text: JSON.stringify({
-            phase: 'combat',
-            initiativeOrder: order,
-            initiatives,
-            currentTurn: gs.getState().currentTurn,
-            round: 1,
-          }),
-        }],
-      }
     }
   )
 

@@ -133,6 +133,13 @@ test('game action language routes local objects to interact instead of move', ()
   assert.deepEqual(intent.suggestedTools, ['trigger_room_event', 'roll_ability_check', 'start_encounter'])
 })
 
+test('game action language routes coordinate phrases with vais as movement', () => {
+  const intent = actions.classifyPlayerAction('je vais en (11,13)', baseGameState())
+  assert.equal(intent.kind, 'move')
+  assert.equal(intent.primitive, 'move')
+  assert.equal(intent.requiresEngine, true)
+})
+
 test('game action language routes dying player acceptance to death save', () => {
   const intent = actions.classifyPlayerAction('ok je tente', baseGameState({
     phase: 'combat',

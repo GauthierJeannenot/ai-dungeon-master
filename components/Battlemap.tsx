@@ -29,6 +29,10 @@ function getHPDescription(current: number, max: number): string {
   return 'À l\'agonie'
 }
 
+function hpPercent(current: number, max: number): number {
+  if (max <= 0) return 0
+  return Math.min(100, Math.max(0, (current / max) * 100))
+}
 
 export default function Battlemap({ gameState, cellSize = 48 }: BattlemapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -78,7 +82,7 @@ export default function Battlemap({ gameState, cellSize = 48 }: BattlemapProps) 
 
   const aliveMonsters = Object.values(gameState.monsters).filter(m => m.isAlive)
 
-  // Taille fixe de la carte : 17 cols × 15 rows (calée sur battlemap.jpeg ~880×800px)
+  // Taille fixe de la carte : 17 cols × 15 rows (calée sur battlemap.png ~880×800px)
   const MAP_COLS = 17
   const MAP_ROWS = 15
   const gridCols = Math.max(MAP_COLS, ...aliveMonsters.map(m => m.position.x + 2), gameState.player.position.x + 2)
@@ -205,7 +209,7 @@ function TokenPlayer({
         <div
           className="h-full rounded-full transition-all duration-300"
           style={{
-            width: `${(player.hp.current / player.hp.max) * 100}%`,
+            width: `${hpPercent(player.hp.current, player.hp.max)}%`,
             backgroundColor: getHPColor(player.hp.current, player.hp.max),
           }}
         />
@@ -256,7 +260,7 @@ function TokenMonster({
         <div
           className="h-full rounded-full transition-all duration-300"
           style={{
-            width: `${(monster.hp.current / monster.hp.max) * 100}%`,
+            width: `${hpPercent(monster.hp.current, monster.hp.max)}%`,
             backgroundColor: getHPColor(monster.hp.current, monster.hp.max),
           }}
         />

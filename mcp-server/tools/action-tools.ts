@@ -213,7 +213,11 @@ function resolveAbilityCheck({
 }): ToolResponse {
   const resolvedEntityId = entityId ?? 'player'
   const entity = gs.getEntity(resolvedEntityId)
-  if (!entity) return jsonResponse({ error: `Entity not found: ${resolvedEntityId}` })
+  if (!entity) {
+    return rules.ruleErrorResult(new rules.RuleViolation('ENTITY_NOT_FOUND', `Entity not found: ${resolvedEntityId}`, {
+      entityId: resolvedEntityId,
+    }))
+  }
 
   try {
     rules.validateAbilityCheck(resolvedEntityId)

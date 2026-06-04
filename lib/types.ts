@@ -79,6 +79,20 @@ export interface CombatLogEntry {
 
 export type GamePhase = 'exploration' | 'combat' | 'dialogue'
 
+export interface SceneMemory {
+  madeNoise?: boolean
+  insultedMac?: boolean
+  foundRecipeHalfCount?: number
+  sparedGoblin?: boolean
+  tension?: number
+  alertLevel?: number
+  macDisposition?: 'neutral' | 'helpful' | 'offended'
+  goblinMorale?: 'steady' | 'shaken' | 'broken'
+  lastDirectorBeats?: string[]
+  lastWorldSignals?: string[]
+  updatedAt?: string
+}
+
 export interface GameState {
   phase: GamePhase
   player: PlayerState
@@ -92,6 +106,7 @@ export interface GameState {
   roomsVisited: string[]
   currentRoomId: string | null
   encountersTriggered?: string[]
+  sceneMemory?: SceneMemory
 }
 
 export interface DiceRollResult {
@@ -159,6 +174,22 @@ export interface DMClientMeta {
   }
 }
 
+export interface DMLlmUsageSummary {
+  calls: number
+  inputTokens: number
+  outputTokens: number
+  cacheCreationInputTokens: number
+  cacheReadInputTokens: number
+  totalInputTokens: number
+  estimatedCostUsd: number
+}
+
+export interface DMTurnUsage {
+  llm: DMLlmUsageSummary
+  operations: string[]
+  narrator: 'director' | 'local' | 'llm' | 'fallback' | 'rule'
+}
+
 // API request/response types
 export interface DMRequest {
   message: string
@@ -179,6 +210,7 @@ export interface DMResponse {
   narrative: string
   newGameState: GameState
   toolsUsed: string[]
+  usage?: DMTurnUsage
   // Nouveau résumé retourné si une compression a eu lieu pendant cette requête
   summaryContext?: string
   error?: string

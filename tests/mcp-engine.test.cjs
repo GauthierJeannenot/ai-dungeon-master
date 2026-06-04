@@ -137,6 +137,21 @@ test('replaceState infers current room from player position', () => {
   assert.deepEqual(state.roomsVisited, ['4'])
 })
 
+test('replaceState preserves scene memory', () => {
+  const source = JSON.parse(JSON.stringify(gameState.getState()))
+  source.sceneMemory = {
+    madeNoise: true,
+    tension: 2,
+    lastDirectorBeats: ['noise-made'],
+    updatedAt: '2026-06-04T00:00:00.000Z',
+  }
+
+  gameState.replaceState(source)
+  const state = gameState.getState()
+
+  assert.deepEqual(state.sceneMemory, source.sceneMemory)
+})
+
 test('advanceTurn removes dead monsters from initiative', () => {
   gameState.spawnMonster(makeMonster('goblin_a'))
   gameState.spawnMonster(makeMonster('goblin_b'))
@@ -199,10 +214,17 @@ test('MCP server accepts replace_game_state and move_token toCell contracts', as
   await withMcpClient(async client => {
     const state = await callTool(client, 'get_game_state')
     state.player.position = { x: 4, y: 13 }
+    state.sceneMemory = {
+      madeNoise: true,
+      tension: 2,
+      lastDirectorBeats: ['noise-made'],
+      updatedAt: '2026-06-04T00:00:00.000Z',
+    }
 
     await callTool(client, 'replace_game_state', { gameState: state })
     const afterReplace = await callTool(client, 'get_game_state')
     assert.deepEqual(afterReplace.player.position, { x: 4, y: 13 })
+    assert.deepEqual(afterReplace.sceneMemory, state.sceneMemory)
 
     await callTool(client, 'move_token', {
       tokenId: 'player',
@@ -598,6 +620,21 @@ test('MCP resolve_player_action resolves canonical attack, move, and item action
   })
 })
 
+test('MCP resolve_player_action propagates canonical action errors', async () => {
+  await withMcpClient(async client => {
+    const result = await callTool(client, 'resolve_player_action', {
+      action: {
+        kind: 'ability_check',
+        entityId: 'missing_entity',
+        ability: 'wis',
+      },
+    })
+
+    assert.equal(result.code, 'ENTITY_NOT_FOUND')
+    assert.equal(result.success, undefined)
+  })
+})
+
 test('MCP rules reject overlong combat movement and occupied cells', async () => {
   await withMcpClient(async client => {
     const baseState = await callTool(client, 'get_game_state')
@@ -751,6 +788,40 @@ test('MCP roll_ability_check is limited to the actor turn in combat', async () =
     })
 
     assert.equal(wrongTurn.code, 'NOT_CURRENT_TURN')
+  })
+})
+
+test('MCP entity tools return canonical not-found rule errors', async () => {
+  await withMcpClient(async client => {
+    const attack = await callTool(client, 'resolve_attack', {
+      attackerId: 'missing_actor',
+      targetId: 'player',
+      weaponOrSpell: 'longsword',
+    })
+    assert.equal(attack.code, 'ENTITY_NOT_FOUND')
+    assert.equal(attack.detail.entityId, 'missing_actor')
+
+    const check = await callTool(client, 'roll_ability_check', {
+      entityId: 'missing_actor',
+      ability: 'cha',
+      dc: 14,
+    })
+    assert.equal(check.code, 'ENTITY_NOT_FOUND')
+    assert.equal(check.detail.entityId, 'missing_actor')
+
+    const save = await callTool(client, 'resolve_saving_throw', {
+      entityId: 'missing_actor',
+      ability: 'dex',
+      dc: 10,
+    })
+    assert.equal(save.code, 'ENTITY_NOT_FOUND')
+    assert.equal(save.detail.entityId, 'missing_actor')
+
+    const stats = await callTool(client, 'get_entity_stats', {
+      entityId: 'missing_actor',
+    })
+    assert.equal(stats.code, 'ENTITY_NOT_FOUND')
+    assert.equal(stats.detail.entityId, 'missing_actor')
   })
 })
 

@@ -4,8 +4,13 @@
   "private": true,
   "scripts": {
     "dev": "npm run build:mcp && concurrently \"next dev\" \"node mcp-server/dist/mcp-server/index.js\"",
+    "dev:mock": "node scripts/dev-mock.cjs",
     "build:mcp": "tsc -p mcp-server/tsconfig.json",
     "build": "npm run build:mcp && next build",
+    "typecheck": "npm run typecheck:mcp && npm run typecheck:next",
+    "typecheck:mcp": "tsc -p mcp-server/tsconfig.json --noEmit",
+    "typecheck:next": "tsc --noEmit",
+    "lint": "npm run typecheck",
     "test": "npm run build:mcp && node --test tests/*.test.cjs",
     "start": "next start"
   },

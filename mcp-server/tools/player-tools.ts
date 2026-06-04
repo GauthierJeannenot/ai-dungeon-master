@@ -90,6 +90,16 @@ const CombatLogEntrySchema = z.object({
   timestamp: z.number(),
 })
 
+const SceneMemorySchema = z.object({
+  madeNoise: z.boolean().optional(),
+  insultedMac: z.boolean().optional(),
+  foundRecipeHalfCount: z.number().int().min(0).max(2).optional(),
+  sparedGoblin: z.boolean().optional(),
+  tension: z.number().int().min(0).max(6).optional(),
+  lastDirectorBeats: z.array(z.string()).optional(),
+  updatedAt: z.string().optional(),
+})
+
 const GameStateSchema = z.object({
   phase: z.enum(['exploration', 'combat', 'dialogue']),
   player: PlayerStateSchema,
@@ -103,6 +113,7 @@ const GameStateSchema = z.object({
   roomsVisited: z.array(z.string()),
   currentRoomId: z.string().nullable(),
   encountersTriggered: z.array(z.string()).optional().default([]),
+  sceneMemory: SceneMemorySchema.optional(),
 }).superRefine((state, ctx) => {
   if (state.player.hp.current > state.player.hp.max) {
     ctx.addIssue({
@@ -394,10 +405,9 @@ export function registerPlayerTools(server: McpServer): void {
     async ({ entityId }) => {
       const entity = gs.getEntity(entityId)
       if (!entity) {
-        return {
-          content: [{ type: 'text', text: JSON.stringify({ error: `Entity not found: ${entityId}` }) }],
-          isError: true,
-        }
+        return rules.ruleErrorResult(new rules.RuleViolation('ENTITY_NOT_FOUND', `Entity not found: ${entityId}`, {
+          entityId,
+        }))
       }
       return {
         content: [{ type: 'text', text: JSON.stringify(entity, null, 2) }],

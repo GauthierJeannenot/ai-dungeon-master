@@ -25,6 +25,10 @@ function sessionPath(sessionId: string): string {
   return path.join(getSessionDir(), `${safeSessionId(sessionId)}.json`)
 }
 
+function tempSessionPath(sessionId: string): string {
+  return `${sessionPath(sessionId)}.${process.pid}.${Date.now()}.tmp`
+}
+
 export async function loadSession(sessionId: string | undefined): Promise<StoredGameSession | null> {
   if (!sessionId?.trim()) {
     logEvent('debug', 'session.load.skipped', { reason: 'missing-session-id' })
@@ -64,15 +68,25 @@ export async function saveSession(
   const dir = getSessionDir()
   await fs.mkdir(dir, { recursive: true })
 
+  const safeId = safeSessionId(sessionId)
   const payload: StoredGameSession = {
     ...data,
-    sessionId,
+    sessionId: safeId,
     updatedAt: new Date().toISOString(),
   }
 
-  await fs.writeFile(sessionPath(sessionId), JSON.stringify(payload, null, 2), 'utf-8')
+  const targetPath = sessionPath(sessionId)
+  const tmpPath = tempSessionPath(sessionId)
+  try {
+    await fs.writeFile(tmpPath, JSON.stringify(payload, null, 2), 'utf-8')
+    await fs.rename(tmpPath, targetPath)
+  } catch (err) {
+    await fs.unlink(tmpPath).catch(() => undefined)
+    throw err
+  }
+
   logEvent('debug', 'session.save.ok', {
-    sessionId: safeSessionId(sessionId),
+    sessionId: safeId,
     dir,
     historyLength: payload.history.length,
     hasSummary: Boolean(payload.summaryContext),

@@ -7,8 +7,18 @@ import { loadContextFiles } from '@/lib/context-loader'
 import { callMCPTool, listMCPTools } from '@/lib/mcp-client'
 import { loadSession, saveSession } from '@/lib/session-store'
 import { acquireSessionLock } from '@/lib/session-lock'
-import { ADVENTURE_ROOMS, ENCOUNTERS, inferAdventureRoomId as inferMappedAdventureRoomId } from '@/lib/adventure-map'
-import { DMRequest, DMResponse, GameState, ConversationTurn, CombatLogEntry, MonsterState } from '@/lib/types'
+import {
+  ADVENTURE_ROOMS,
+  centerCellForAdventureRoom,
+  ENCOUNTERS,
+  encounterIdForAdventureRoom,
+  findAdventureRoomIdByAlias,
+  findAdventureRoomIdByContextAlias,
+  findNamedAdventureLocationCell,
+  inferAdventureRoomId as inferMappedAdventureRoomId,
+  relativeAdventureRoomIdForText,
+} from '@/lib/adventure-map'
+import { DMRequest, DMResponse, GameState, ConversationTurn, CombatLogEntry, MonsterState, type DMTurnUsage } from '@/lib/types'
 import {
   isDoorTraversalIntent,
   normalizeFrenchText,
@@ -23,10 +33,12 @@ import {
   type GameActionKind,
   type GameActionPrimitive,
 } from '@/lib/game-actions'
+import { buildDirectorDecision } from '@/lib/dm-director'
 import { sanitizeAdventureModuleToolContracts } from '@/lib/dm-module-sanitizer'
 import {
   logAnthropicUsage,
   logAnthropicUsageSummary,
+  summarizeAnthropicUsage,
   type AnthropicUsageLogEntry,
 } from '@/lib/anthropic-usage'
 import { logEvent, summarizeGameState } from '@/lib/server-logger'
@@ -59,12 +71,27 @@ const PRIMARY_ACTION_TOOLS = new Set([
   'trigger_room_event',
   'end_combat',
 ])
+const DIRECTOR_LOCAL_FINAL_TOOLS = new Set([
+  'move_token',
+  'resolve_player_attack',
+  'resolve_player_action',
+  'use_healing_potion',
+  'roll_ability_check',
+  'roll_death_save',
+  'pass_turn',
+  'start_encounter',
+  'next_turn',
+  'resolve_attack',
+  'end_combat',
+])
 const LLM_MODE = parseLlmMode(process.env.LLM_MODE)
 const ALLOW_PAID_LLM = process.env.ALLOW_PAID_LLM !== 'false'
 const LLM_REPLAY_FALLBACK_TO_MOCK = process.env.LLM_REPLAY_FALLBACK_TO_MOCK === 'true'
 const LLM_CASSETTE_DIR = process.env.LLM_CASSETTE_DIR || path.join(process.cwd(), '.data', 'llm-cassettes')
 const LLM_MAX_CALLS_PER_REQUEST = parsePositiveInt(process.env.LLM_MAX_CALLS_PER_REQUEST, 10)
 const LLM_MAX_CALLS_PER_SESSION = parsePositiveInt(process.env.LLM_MAX_CALLS_PER_SESSION, 0)
+const LLM_PROMPT_CACHE_ENABLED = process.env.LLM_PROMPT_CACHE_ENABLED !== 'false'
+const LLM_PROMPT_CACHE_TTL = parsePromptCacheTtl(process.env.LLM_PROMPT_CACHE_TTL)
 
 // Nombre de messages récents conservés verbatim avant compression.
 // Au-delà, les plus anciens sont résumés en un paragraphe.
@@ -110,6 +137,35 @@ function parsePositiveInt(value: string | undefined, fallback: number): number {
   if (!value) return fallback
   const parsed = Number.parseInt(value, 10)
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback
+}
+
+function parsePromptCacheTtl(value: string | undefined): '5m' | '1h' {
+  if (!value) return '5m'
+  if (value === '5m' || value === '1h') return value
+  throw new Error(`LLM_PROMPT_CACHE_TTL invalide: ${value}. Valeurs attendues: 5m, 1h.`)
+}
+
+function promptCacheControl(): Anthropic.CacheControlEphemeral | undefined {
+  if (!LLM_PROMPT_CACHE_ENABLED) return undefined
+  return { type: 'ephemeral', ttl: LLM_PROMPT_CACHE_TTL }
+}
+
+function textBlockWithPromptCache(text: string): Anthropic.TextBlockParam {
+  const cacheControl = promptCacheControl()
+  return {
+    type: 'text',
+    text,
+    ...(cacheControl ? { cache_control: cacheControl } : {}),
+  }
+}
+
+function withToolPromptCache(tools: Anthropic.Tool[]): Anthropic.Tool[] {
+  const cacheControl = promptCacheControl()
+  if (!cacheControl || tools.length === 0) return tools
+  return tools.map((tool, index) => index === tools.length - 1
+    ? { ...tool, cache_control: cacheControl }
+    : tool
+  )
 }
 
 function normalizeBudgetSessionId(sessionId: string | undefined): string {
@@ -270,6 +326,8 @@ async function createLlmMessage(params: MessageCreateParams, context: LlmCallCon
     mode: LLM_MODE,
     requestCallCount: context.requestCallCount,
     sessionCallCount: nextSessionCalls,
+    promptCacheEnabled: LLM_PROMPT_CACHE_ENABLED,
+    promptCacheTtl: LLM_PROMPT_CACHE_ENABLED ? LLM_PROMPT_CACHE_TTL : null,
   })
 
   if (LLM_MODE === 'mock') {
@@ -747,11 +805,7 @@ function buildSystemBlocks(
   summaryContext: string | undefined
 ): Anthropic.TextBlockParam[] {
   return [
-    {
-      type: 'text',
-      text: buildStaticPrompt(),
-      cache_control: { type: 'ephemeral' },
-    },
+    textBlockWithPromptCache(buildStaticPrompt()),
     {
       type: 'text',
       text: buildDynamicPrompt(gameState, summaryContext),
@@ -785,11 +839,7 @@ function buildNarrationSystemBlocks(
   summaryContext: string | undefined
 ): Anthropic.TextBlockParam[] {
   return [
-    {
-      type: 'text',
-      text: buildNarrationStaticPrompt(),
-      cache_control: { type: 'ephemeral' },
-    },
+    textBlockWithPromptCache(buildNarrationStaticPrompt()),
     {
       type: 'text',
       text: buildDynamicPrompt(gameState, summaryContext),
@@ -1640,18 +1690,11 @@ function parseCoordinateMove(message: string, gameState: GameState): { x: number
 }
 
 function centerCellForRoom(roomId: string): { x: number; y: number } | null {
-  const room = ADVENTURE_ROOMS.find(candidate => candidate.id === roomId)
-  if (!room) return null
-
-  return {
-    x: Math.round((room.zone.minX + room.zone.maxX) / 2),
-    y: Math.round((room.zone.minY + room.zone.maxY) / 2),
-  }
+  return centerCellForAdventureRoom(roomId)
 }
 
 function encounterIdForRoom(roomId: string | null | undefined): string | null {
-  if (!roomId) return null
-  return Object.values(ENCOUNTERS).find(encounter => encounter.roomId === roomId)?.id ?? null
+  return encounterIdForAdventureRoom(roomId)
 }
 
 function roomEncounterTriggerReason(
@@ -1699,33 +1742,12 @@ function roomEncounterTriggerReason(
 
 function relativeRoomIdForExplorationMove(text: string, gameState: GameState): string | null {
   const doorAction = isDoorTraversalIntent(text)
-
-  if (doorAction) {
-    if (gameState.currentRoomId === '1') return '4'
-    if (gameState.currentRoomId === '7') return '8'
-    if (gameState.currentRoomId === '4') {
-      if (/\b(appartement|grammy|gauche|etage|haut|escalier)\b/.test(text)) return '9'
-      if (/\b(dehors|exterieur|sortie|arriere|retour)\b/.test(text)) return '1'
-      return '8'
-    }
-    if (gameState.currentRoomId === '8') {
-      if (/\b(appartement|grammy|etage|haut|escalier)\b/.test(text)) return '9'
-      if (/\b(bureau|paperasse|registres?)\b/.test(text)) return '5'
-      if (/\b(quai|chargement|laterale|dock)\b/.test(text)) return '7'
-    }
-  }
-
   const exploresForward = /\b(plus loin|continue|continuer|aventure|aventurer|avance|avancer|explore|explorer|nourriture|manger|reserve|reserves)\b/.test(text)
   const huntsEnemies = /\b(cherches?|chercher|trouves?|trouver|deniches?|denicher|traques?|traquer|pistes?|pister)\b(?=.{0,80}\b(gobelins?|ennemis?|mechants?|monstres?|creatures?|silhouettes?)\b)/.test(text)
-  if (!exploresForward && !huntsEnemies) {
-    return null
-  }
-
-  if (gameState.currentRoomId === '1') return '4'
-  if (gameState.currentRoomId === '4') return '8'
-  if (gameState.currentRoomId === '7') return '8'
-  if (gameState.currentRoomId === '8') return '9'
-  return null
+  return relativeAdventureRoomIdForText(text, gameState.currentRoomId, {
+    doorAction,
+    forwardAction: exploresForward || huntsEnemies,
+  })
 }
 
 function contextualRoomIdFromRecentDm(
@@ -1743,20 +1765,8 @@ function contextualRoomIdFromRecentDm(
   if (!lastDmTurn) return null
 
   const context = normalizeFrenchText(lastDmTurn.content)
-  const candidates: Array<[string, RegExp]> = [
-    ['8', /\b(porte des reserves?|reserves?|sol(?: de la)? boulangerie|fours?|fournee|plans de travail)\b/],
-    ['9', /\b(appartement(?: de grammy)?|grammy|chef grukk|grukk)\b/],
-    ['7', /\b(quai de chargement|quai|chargement|porte laterale)\b/],
-    ['5', /\b(bureau|paperasse|registres?|classeurs?)\b/],
-    ['3', /\b(tas de dechets?|dechets?|champignons? violets?)\b/],
-    ['2', /\b(verger|pommiers?|pommier)\b/],
-  ]
-
-  const matchedRoomIds = candidates
-    .filter(([roomId, pattern]) => roomId !== gameState.currentRoomId && pattern.test(context))
-    .map(([roomId]) => roomId)
-
-  if (matchedRoomIds.length === 1) return matchedRoomIds[0]
+  const contextRoomId = findAdventureRoomIdByContextAlias(context, gameState.currentRoomId)
+  if (contextRoomId) return contextRoomId
 
   if (gameState.currentRoomId === '4' && /\b(porte des reserves?|reserves?|fours?)\b/.test(context)) {
     return '8'
@@ -1777,28 +1787,14 @@ function parseNamedRoomMove(message: string, gameState: GameState): { x: number;
     return null
   }
 
-  const namedLocations: Array<{ pattern: RegExp; cell: { x: number; y: number } }> = [
-    { pattern: /\b(mac|treant|grand pommier|pommier anime|pommier eveille)\b/, cell: { x: 7, y: 13 } },
-  ]
-  const namedLocation = namedLocations.find(location => location.pattern.test(text))
-  if (namedLocation) {
-    const { cell } = namedLocation
+  const namedLocationCell = findNamedAdventureLocationCell(text)
+  if (namedLocationCell) {
+    const cell = namedLocationCell
     if (cell.x === gameState.player.position.x && cell.y === gameState.player.position.y) return null
     return cell
   }
 
-  const roomAliases: Array<[string, RegExp]> = [
-    ['5', /\b(bureau|bureau de grammy)\b/],
-    ['9', /\b(appartement|appartement de grammy|etage|a l etage|en haut|escalier)\b/],
-    ['8', /\b(sol de la boulangerie|boulangerie|four|cuisine)\b/],
-    ['7', /\b(quai|chargement|dock)\b/],
-    ['2', /\b(verger|pommiers?|pommier|arbres?)\b/],
-    ['3', /\b(dechets?|tas|champignons?|fungus)\b/],
-    ['4', /\b(entree|hall)\b/],
-    ['1', /\b(exterieur|dehors|sortie)\b/],
-  ]
-
-  const targetRoomId = relativeRoomId ?? roomAliases.find(([, pattern]) => pattern.test(text))?.[0]
+  const targetRoomId = relativeRoomId ?? findAdventureRoomIdByAlias(text)
   if (!targetRoomId || targetRoomId === gameState.currentRoomId) return null
 
   return centerCellForRoom(targetRoomId)
@@ -3272,6 +3268,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     let narrative = ''
+    let narratorSource: DMTurnUsage['narrator'] = 'fallback'
     let iterations = 0
     let turnBoundaryReached = false
     let primaryActionToolUsed: string | null = null
@@ -3291,13 +3288,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       logRoomStateAnomaly(currentGameState, requestId, sessionId, 'after-engine-first')
     }
 
-    const simpleEngineNarrationCandidate =
+    const engineFirstLocalNarrationCandidate =
       engineFirst.handled &&
       !sawMcpToolError &&
-      toolsUsed.length === 1 &&
-      ['move_token', 'use_healing_potion', 'roll_death_save', 'pass_turn'].includes(toolsUsed[0])
+      toolsUsed.length > 0 &&
+      toolsUsed.every(toolName => DIRECTOR_LOCAL_FINAL_TOOLS.has(toolName)) &&
+      actionIntent.kind !== 'social' &&
+      actionIntent.kind !== 'interact'
     const needsLlmIteration = !engineFirst.handled
-    const needsFinalNarrationHistory = engineFirst.handled && toolsUsed.length > 0 && !sawMcpToolError && !simpleEngineNarrationCandidate
+    const needsFinalNarrationHistory = engineFirst.handled && toolsUsed.length > 0 && !sawMcpToolError && !engineFirstLocalNarrationCandidate
     if (needsLlmIteration || needsFinalNarrationHistory) {
       await ensureHistoryReady(needsLlmIteration ? 'dm-iteration' : 'final-narration')
     } else {
@@ -3315,7 +3314,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     // ── Construction des messages pour l'appel LLM ──────────────────────────
     const systemBlocks = buildSystemBlocks(currentGameState, activeSummary)
-    const llmTools = selectToolsForLlm(mcpTools, currentGameState, actionIntent)
+    const llmTools = withToolPromptCache(selectToolsForLlm(mcpTools, currentGameState, actionIntent))
     const messages: Anthropic.MessageParam[] = [
       ...historyMessages,
       { role: 'user', content: message },
@@ -3395,6 +3394,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       const narrativeBeforeResponse = narrative
       if (responseText && response.stop_reason !== 'tool_use') {
         narrative += (narrative ? '\n\n' : '') + responseText
+        narratorSource = 'llm'
       } else if (responseText) {
         logEvent('debug', 'dm.narrative.discarded_pre_tool_text', {
           requestId,
@@ -3726,6 +3726,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       for (const block of finalResponse.content) {
         if (block.type === 'text') narrative += block.text
       }
+      if (narrative) narratorSource = 'llm'
       logEvent('warn', 'dm.final_fallback.narrative_ready', {
         requestId,
         sessionId,
@@ -3844,6 +3845,32 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         gameState: summarizeGameState(currentGameState),
       })
       narrative = ruleNarrative
+      narratorSource = 'rule'
+    }
+
+    const directorDecision = !sawMcpToolError
+      ? buildDirectorDecision({
+        playerMessage: message,
+        actionIntent,
+        gameState: currentGameState,
+        toolsUsed,
+        newCombatLogEntries,
+      })
+      : null
+    if (directorDecision) {
+      currentGameState = {
+        ...currentGameState,
+        sceneMemory: directorDecision.sceneMemory,
+      }
+      logEvent('info', 'dm.director.decision', {
+        requestId,
+        sessionId,
+        reason: directorDecision.reason,
+        shouldUseLlmNarrator: directorDecision.shouldUseLlmNarrator,
+        hasLocalNarrative: Boolean(directorDecision.narrative),
+        beats: directorDecision.beats,
+        sceneMemory: directorDecision.sceneMemory,
+      })
     }
 
     const engineTruthPacket = buildEngineTruthPacket(actionIntent, toolsUsed, currentGameState, newCombatLogEntries)
@@ -3858,9 +3885,23 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const localEngineNarrative = !sawMcpToolError
       ? buildLocalEngineNarrative(currentGameState, toolsUsed, newCombatLogEntries)
       : null
+    const directorNarrative = directorDecision?.narrative ?? null
 
-    if (localEngineNarrative) {
+    if (directorNarrative) {
+      narrative = directorNarrative
+      narratorSource = 'director'
+      logEvent('info', 'dm.final_narration.director_local', {
+        requestId,
+        sessionId,
+        reason: directorDecision?.reason,
+        beats: directorDecision?.beats ?? [],
+        toolsUsed: [...new Set(toolsUsed)],
+        newCombatLogCount: newCombatLogEntries.length,
+        narrativeLength: narrative.length,
+      })
+    } else if (localEngineNarrative) {
       narrative = localEngineNarrative
+      narratorSource = 'local'
       logEvent('info', 'dm.final_narration.local_engine', {
         requestId,
         sessionId,
@@ -3868,7 +3909,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         newCombatLogCount: newCombatLogEntries.length,
         narrativeLength: narrative.length,
       })
-    } else if (toolsUsed.length > 0 && !sawMcpToolError) {
+    } else if (toolsUsed.length > 0 && !sawMcpToolError && directorDecision?.shouldUseLlmNarrator !== false) {
       const finalNarrative = await generateFinalNarration({
         requestId,
         sessionId,
@@ -3884,6 +3925,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       })
       if (finalNarrative) {
         narrative = finalNarrative
+        narratorSource = 'llm'
       } else {
         const fallbackNarrative = buildOralFallbackNarrative(currentGameState, toolsUsed)
         logEvent('warn', 'dm.final_narration.fallback_after_tool_mutation', {
@@ -3894,7 +3936,20 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           fallbackNarrative,
         })
         narrative = fallbackNarrative
+        narratorSource = 'fallback'
       }
+    } else if (toolsUsed.length > 0 && !sawMcpToolError) {
+      const fallbackNarrative = buildOralFallbackNarrative(currentGameState, toolsUsed)
+      logEvent('warn', 'dm.final_narration.director_fallback_without_llm', {
+        requestId,
+        sessionId,
+        reason: directorDecision?.reason,
+        toolsUsed: [...new Set(toolsUsed)],
+        discardedDraftNarrative: narrative,
+        fallbackNarrative,
+      })
+      narrative = fallbackNarrative
+      narratorSource = 'fallback'
     }
 
     const oralNarrative = normalizeNarrativeForOralPlayback(narrative, currentGameState, toolsUsed)
@@ -3952,10 +4007,17 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       })
     }
 
+    const turnUsage: DMTurnUsage = {
+      llm: summarizeAnthropicUsage(usageLog),
+      operations: usageLog.map(entry => entry.operation),
+      narrator: narratorSource,
+    }
+
     const dmResponse: DMResponse = {
       narrative: narrative || 'Le Dungeon Master réfléchit...',
       newGameState: currentGameState,
       toolsUsed: [...new Set(toolsUsed)],
+      usage: turnUsage,
       // Renvoie le nouveau résumé au client seulement si une compression a eu lieu
       summaryContext: newSummary,
     }
@@ -3992,6 +4054,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       iterations,
       llmCalls: usageLog.length,
       estimatedCostUsd,
+      narrator: turnUsage.narrator,
+      cacheCreationInputTokens: turnUsage.llm.cacheCreationInputTokens,
+      cacheReadInputTokens: turnUsage.llm.cacheReadInputTokens,
       toolsUsed: [...new Set(toolsUsed)],
       compressedHistory: Boolean(newSummary),
       historyProcessed,

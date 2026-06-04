@@ -36,8 +36,9 @@ const INITIAL_GAME_STATE: GameState = {
   movementUsed: {},
   actionUsed: {},
   combatLog: [],
-  roomsVisited: [],
-  currentRoomId: null,
+  roomsVisited: ['1'],
+  currentRoomId: '1',
+  encountersTriggered: [],
 }
 
 function generateId(): string {

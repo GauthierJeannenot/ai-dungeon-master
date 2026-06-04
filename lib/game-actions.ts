@@ -175,9 +175,12 @@ export function classifyPlayerAction(message: string, gameState: GameState): Gam
   const directMovementIntent = /\b(deplaces?|deplacer|avances?|avancer|bouges?|bouger|aller|vers|entres?|entrer|rentres?|retournes?|retourner|rejoins?|rejoindre|retrouves?|retrouver|rends|traverses?|approches?|explores?|explorer|aventures?|aventurer|continues?|continuer|plus loin|montes?|monter|grimpes?|grimpe|empruntes?|prends|fuis|fuite|recules?|glisses?|glisser)\b/.test(text)
   const doorMovementIntent = isDoorTraversalIntent(text)
   const goToMovementIntent = /\b(vais|va)\b(?=.{0,80}\b(vers|au|aux|a la|a l|dans|voir|parler|rejoindre|retrouver|retourner|salle|piece|bureau|appartement|boulangerie|quai|verger|pommier)\b)/.test(text)
+  const coordinateMovementIntent =
+    /\(?\s*\d{1,2}\s*[,;]\s*\d{1,2}\s*\)?/.test(text) &&
+    /\b(va|vais|aller|deplaces?|deplacer|avances?|avancer|bouges?|bouger|marche|case|coordonnees?)\b/.test(text)
   const followIntent = /\b(suis|suivre|poursuis|poursuivre)\b/.test(text) && /\b(gobelins?|ennemis?|monstres?|creatures?|silhouettes?|eux|traces?)\b/.test(text)
   const searchEnemyIntent = /\b(cherches?|chercher|trouves?|trouver|deniches?|denicher|traques?|traquer|pistes?|pister)\b(?=.{0,80}\b(gobelins?|ennemis?|mechants?|monstres?|creatures?|silhouettes?)\b)/.test(text)
-  const movementIntent = directMovementIntent || doorMovementIntent || goToMovementIntent || followIntent || searchEnemyIntent
+  const movementIntent = directMovementIntent || doorMovementIntent || goToMovementIntent || coordinateMovementIntent || followIntent || searchEnemyIntent
   const mentionsCreature = /\b(ennemis?|gobelins?|monstres?|creatures?|silhouettes?|eclaireurs?)\b/.test(text)
   const explicitEncounterIntent = /\b(combat|initiative|debarques?|perissez|fuyez)\b/.test(text)
   const hostileCreatureIntent = mentionsCreature && /\b(attaquent?|attaquer|hostiles?|menacent?|chargent?|surgissent?|arrivent?|debarquent?|foncent?|encerclent?)\b/.test(text)

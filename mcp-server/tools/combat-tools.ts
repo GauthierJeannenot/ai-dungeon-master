@@ -132,8 +132,17 @@ export function resolveAttack(
   const attacker = gs.getEntity(attackerId)
   const target = gs.getEntity(targetId)
 
-  if (!attacker) return { content: [{ type: 'text' as const, text: JSON.stringify({ error: `Attacker not found: ${attackerId}` }) }], isError: true }
-  if (!target) return { content: [{ type: 'text' as const, text: JSON.stringify({ error: `Target not found: ${targetId}` }) }], isError: true }
+  if (!attacker) {
+    return rules.ruleErrorResult(new rules.RuleViolation('ENTITY_NOT_FOUND', `Entity not found: ${attackerId}`, {
+      entityId: attackerId,
+    }))
+  }
+  if (!target) {
+    return rules.ruleErrorResult(new rules.RuleViolation('ENTITY_NOT_FOUND', `Entity not found: ${targetId}`, {
+      entityId: targetId,
+    }))
+  }
+
   try {
     rules.validateAttack(attackerId, targetId, weaponOrSpell, rangeCells)
   } catch (err) {
@@ -292,97 +301,6 @@ export function registerCombatTools(server: McpServer): void {
     },
     async ({ attackerId, targetId, weaponOrSpell, advantage, disadvantage, customDamageDice, rangeCells }) => {
       return resolveAttack(attackerId, targetId, weaponOrSpell, advantage, disadvantage, customDamageDice, rangeCells)
-
-      const attacker = gs.getEntity(attackerId)!
-      const target = gs.getEntity(targetId)!
-
-      if (!attacker) return { content: [{ type: 'text', text: JSON.stringify({ error: `Attacker not found: ${attackerId}` }) }], isError: true }
-      if (!target) return { content: [{ type: 'text', text: JSON.stringify({ error: `Target not found: ${targetId}` }) }], isError: true }
-      try {
-        rules.validateAttack(attackerId, targetId, weaponOrSpell, rangeCells)
-      } catch (err) {
-        return rules.ruleErrorResult(err)
-      }
-
-      // Determine attack bonus
-      const strMod = getAbilityModifier(attacker.stats.str)
-      const profBonus = 'proficiencyBonus' in attacker ? Number((attacker as { proficiencyBonus: number }).proficiencyBonus) : 2
-      const attackBonus = 'attackBonus' in attacker ? Number((attacker as { attackBonus: number }).attackBonus) : (strMod + profBonus)
-
-      // Roll to-hit (with advantage/disadvantage)
-      const roll1 = rollDice(d20WithModifier(attackBonus))
-      let attackRoll = roll1
-
-      if (advantage && !disadvantage) {
-        const roll2 = rollDice(d20WithModifier(attackBonus))
-        attackRoll = roll1.total >= roll2.total ? roll1 : roll2
-        attackRoll = { ...attackRoll, detail: `ADV: ${roll1.detail} / ${roll2.detail} → kept ${attackRoll.total}` }
-      } else if (disadvantage && !advantage) {
-        const roll2 = rollDice(d20WithModifier(attackBonus))
-        attackRoll = roll1.total <= roll2.total ? roll1 : roll2
-        attackRoll = { ...attackRoll, detail: `DIS: ${roll1.detail} / ${roll2.detail} → kept ${attackRoll.total}` }
-      }
-
-      const targetAC = target.ac
-      const naturalRoll = attackRoll.rolls[0]
-      const criticalMiss = naturalRoll === 1
-      const criticalHit = naturalRoll === 20
-      const hit = criticalHit || (!criticalMiss && attackRoll.total >= targetAC)
-
-      let damageRoll = undefined
-      let damageDealt = undefined
-      let targetHpAfter = undefined
-      let targetDied = false
-
-      if (hit) {
-        // Determine damage dice
-        const strModDamage = getAbilityModifier(attacker.stats.str)
-        const baseDamage = customDamageDice ?? ('damageDice' in attacker ? (attacker as { damageDice: string }).damageDice : `${getWeaponDamage(weaponOrSpell)}+${strModDamage}`)
-        damageRoll = rollDice(criticalHit ? doubleDiceNotation(baseDamage) : baseDamage)
-        damageDealt = Math.max(1, damageRoll.total)
-
-        // Apply damage
-        if (targetId === 'player') {
-          const updated = gs.updatePlayerHP(-damageDealt)
-          targetHpAfter = updated.hp.current
-          targetDied = updated.hp.current === 0
-        } else {
-          const updated = gs.updateMonsterHP(targetId, -damageDealt)
-          targetHpAfter = updated.hp.current
-          targetDied = !updated.isAlive
-        }
-      }
-
-      const mechanicalSummary = hit
-        ? `Attaque: ${attackRoll.detail} vs CA ${targetAC} -> ${criticalHit ? 'CRITIQUE' : 'TOUCHE'} | Degats: ${damageRoll!.detail}${targetDied ? ' | MORT' : ''}`
-        : `Attaque: ${attackRoll.detail} vs CA ${targetAC} -> ${criticalMiss ? 'ECHEC CRITIQUE' : 'RATE'}`
-
-      const result: AttackResult = {
-        attackerId,
-        targetId,
-        weaponOrSpell,
-        attackRoll,
-        naturalRoll,
-        criticalHit,
-        criticalMiss,
-        targetAC,
-        hit,
-        damageRoll,
-        damageDealt,
-        targetHpAfter,
-        targetDied,
-        mechanicalSummary,
-      }
-
-      gs.addLogEntry({
-        round: gs.getState().round,
-        turn: attackerId,
-        action: `${attacker.name} attaque ${target.name} avec ${weaponOrSpell}`,
-        mechanicalDetail: mechanicalSummary,
-      })
-      rules.recordAction(attackerId)
-
-      return { content: [{ type: 'text', text: JSON.stringify(result) }] }
     }
   )
 
@@ -419,7 +337,11 @@ export function registerCombatTools(server: McpServer): void {
     async ({ entityId, ability, dc, proficient, expertise, label }) => {
       const resolvedEntityId = entityId ?? 'player'
       const entity = gs.getEntity(resolvedEntityId)
-      if (!entity) return { content: [{ type: 'text', text: JSON.stringify({ error: `Entity not found: ${resolvedEntityId}` }) }], isError: true }
+      if (!entity) {
+        return rules.ruleErrorResult(new rules.RuleViolation('ENTITY_NOT_FOUND', `Entity not found: ${resolvedEntityId}`, {
+          entityId: resolvedEntityId,
+        }))
+      }
       try {
         rules.validateAbilityCheck(resolvedEntityId)
       } catch (err) {
@@ -472,7 +394,11 @@ export function registerCombatTools(server: McpServer): void {
     },
     async ({ entityId, ability, dc, onFailure }) => {
       const entity = gs.getEntity(entityId)
-      if (!entity) return { content: [{ type: 'text', text: JSON.stringify({ error: `Entity not found: ${entityId}` }) }], isError: true }
+      if (!entity) {
+        return rules.ruleErrorResult(new rules.RuleViolation('ENTITY_NOT_FOUND', `Entity not found: ${entityId}`, {
+          entityId,
+        }))
+      }
       try {
         rules.validateSavingThrow(entityId)
       } catch (err) {

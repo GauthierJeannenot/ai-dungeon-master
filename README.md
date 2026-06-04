@@ -31,7 +31,7 @@ ANTHROPIC_API_KEY=sk-ant-...
 
 ### 2. Battlemap (optionnel)
 
-Placez votre image dans `/public/battlemap.jpg`. En l'absence du fichier, un fond sombre est affiché.
+Placez votre image dans `/public/battlemap.png`. En l'absence du fichier, un fond sombre est affiché.
 
 ### 3. Cout LLM et tests sans appels payants
 
@@ -60,6 +60,8 @@ En mode live, la route DM reduit aussi le cout sans passer en mock :
 
 - actions evidentes de combat/deplacement par coordonnees/passage de tour resolues cote moteur avant Anthropic
 - tools MCP filtres selon la phase et l'intention au lieu d'envoyer tous les schemas a chaque appel
+- director local pour narrer les mutations mecaniques simples sans appel final a Claude
+- memoire de scene compacte dans `gameState.sceneMemory` pour porter les consequences sans repayer tout l'historique
 - narration finale avec prompt court specialise et reponses visees a 1-2 phrases
 - correction serveur directe des narrations qui contredisent l'etat moteur, sans retry LLM supplementaire
 
