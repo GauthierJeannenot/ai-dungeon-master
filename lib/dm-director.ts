@@ -322,7 +322,12 @@ function buildLocalNarrative(input: DirectorInput): string | null {
   if (tools.includes('resolve_player_attack') || tools.includes('resolve_player_action') || tools.includes('resolve_attack')) {
     return buildAttackNarrative(gameState, newCombatLogEntries)
   }
-  if (tools.includes('move_token')) return buildMoveNarrative(gameState)
+  // Un déplacement « pour aller parler/interagir » (move + social/interact) doit
+  // être narré richement par le LLM (arrivée + amorce de scène), pas réduit à un
+  // simple récit de déplacement local.
+  if (tools.includes('move_token') && actionIntent.kind !== 'social' && actionIntent.kind !== 'interact') {
+    return buildMoveNarrative(gameState)
+  }
   if (tools.includes('use_healing_potion')) {
     return `La potion rallume tes forces: tu remontes a ${gameState.player.hp.current}/${gameState.player.hp.max} PV. Ce n'est pas du confort, mais c'est assez pour agir.`
   }

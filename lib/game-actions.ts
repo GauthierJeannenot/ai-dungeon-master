@@ -211,7 +211,7 @@ export function classifyPlayerAction(message: string, gameState: GameState): Gam
     (referencesLocalObjectInsteadOfRoom(text) || /\b(four|fours|rouleaux?|couteaux?|objets? magiques?|potions?)\b/.test(text))
   const asksOnlyForDescription = /\b(observe|regarde|inspecte|ecoute|vois|voir|decris|decrit|quoi|qu'est-ce|est-ce tout)\b/.test(text)
 
-  if (asksOnlyForDescription && !localObjectIntent && !/\b(deplace|attaque|frappe|combat|ouvres?|ouvrir|enfonces?|enfoncer|portes?|gobelins?|ennemis?|monstres?)\b/.test(text)) {
+  if (asksOnlyForDescription && !movementIntent && !localObjectIntent && !/\b(deplace|attaque|frappe|combat|ouvres?|ouvrir|enfonces?|enfoncer|portes?|gobelins?|ennemis?|monstres?)\b/.test(text)) {
     return intent(text, {
       kind: 'observe',
       primitive: 'narrate',

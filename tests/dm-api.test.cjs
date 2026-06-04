@@ -219,6 +219,27 @@ test('DM API handles a multi-intent action (move then social) with rich narratio
   assert.ok(data.narrative.length > 0)
 })
 
+test('DM API resolves a move+observe action ("je vais voir les dryades") through the engine', async t => {
+  const sessionId = `api-dryades-${process.pid}-${Date.now()}`
+  t.after(() => cleanupSession(sessionId))
+
+  const { response, data } = await postDm({
+    message: 'je vais voir les dryades',
+    clientRequestId: `client-${sessionId}`,
+    sessionId,
+    gameState: baseGameState(),
+    history: [],
+  })
+
+  assert.equal(response.status, 200)
+  // Le déplacement primaire doit être joué par le moteur, pas seulement narré:
+  // l'observe secondaire ne doit pas écraser l'intention move (cible: verger).
+  assert.ok(data.toolsUsed.includes('move_token'))
+  assert.ok(data.newGameState.player.position.y <= 2)
+  assert.equal(typeof data.narrative, 'string')
+  assert.ok(data.narrative.length > 0)
+})
+
 test('DM API routes open social scenes through rich mock LLM narration', async t => {
   const sessionId = `api-social-${process.pid}-${Date.now()}`
   t.after(() => cleanupSession(sessionId))

@@ -99,7 +99,7 @@ export const ROOM_NAVIGATION_ALIASES: Array<{ roomId: string; pattern: RegExp }>
   { roomId: '9', pattern: /\b(appartement|appartement de grammy|etage|a l etage|en haut|escalier)\b/ },
   { roomId: '8', pattern: /\b(sol de la boulangerie|boulangerie|four|cuisine)\b/ },
   { roomId: '7', pattern: /\b(quai|chargement|dock)\b/ },
-  { roomId: '2', pattern: /\b(verger|pommiers?|pommier|arbres?)\b/ },
+  { roomId: '2', pattern: /\b(verger|pommiers?|pommier|arbres?|dryades?)\b/ },
   { roomId: '3', pattern: /\b(dechets?|tas|champignons?|fungus)\b/ },
   { roomId: '4', pattern: /\b(entree|hall)\b/ },
   { roomId: '1', pattern: /\b(exterieur|dehors|sortie)\b/ },
@@ -111,7 +111,7 @@ export const ROOM_CONTEXT_ALIASES: Array<{ roomId: string; pattern: RegExp }> = 
   { roomId: '7', pattern: /\b(quai de chargement|quai|chargement|porte laterale)\b/ },
   { roomId: '5', pattern: /\b(bureau|paperasse|registres?|classeurs?)\b/ },
   { roomId: '3', pattern: /\b(tas de dechets?|dechets?|champignons? violets?)\b/ },
-  { roomId: '2', pattern: /\b(verger|pommiers?|pommier)\b/ },
+  { roomId: '2', pattern: /\b(verger|pommiers?|pommier|dryades?)\b/ },
 ]
 
 export const DOOR_TRANSITIONS: AdventureTransition[] = [

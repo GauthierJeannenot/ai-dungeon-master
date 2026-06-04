@@ -126,8 +126,11 @@ export function mockReportedIntents(message: string, gameState: GameState): Pars
 
   const movementVerb = /\b(vais|va|aller|vers|rejoindre|rejoins|approche|approcher|avance|avancer)\b/.test(text)
   const socialVerb = /\b(parler|parle|discuter|discute|demander|demande|negoci|negocier|convaincre|convaincs|saluer|salue|adresser)\b/.test(text)
+  const observeVerb = /\b(voir|regarder?|regarde|observer?|observe|examiner?|examine|inspecter?|inspecte|decouvrir)\b/.test(text)
   if (primary.kind === 'move' && movementVerb && socialVerb) {
     specs.push({ kind: 'social' })
+  } else if (primary.kind === 'move' && observeVerb) {
+    specs.push({ kind: 'observe' })
   }
 
   return specs

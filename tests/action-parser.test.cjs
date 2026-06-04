@@ -86,6 +86,11 @@ test('mock classifier splits "je vais parler aux dryades" into move then social'
   assert.deepEqual(specs.map(spec => spec.kind), ['move', 'social'])
 })
 
+test('mock classifier splits "je vais voir les dryades" into move then observe', () => {
+  const specs = parser.mockReportedIntents('je vais voir les dryades', baseGameState())
+  assert.deepEqual(specs.map(spec => spec.kind), ['move', 'observe'])
+})
+
 test('mock classifier keeps a single intent for a plain movement', () => {
   const specs = parser.mockReportedIntents('je vais en (11,13)', baseGameState())
   assert.deepEqual(specs.map(spec => spec.kind), ['move'])

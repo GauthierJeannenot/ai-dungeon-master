@@ -224,8 +224,10 @@ function selectFinalNarrationLlmRoute(
   sessionId: string | undefined
 ): LlmRoute {
   if (nextLlmCallWouldExceedBudget(requestCallCount, sessionId)) return 'blocked'
-  if (toolsUsed.length > 0) return 'short'
+  // Une scène sociale/d'interaction reste riche même après une action moteur
+  // (ex: « je vais parler aux dryades » = déplacement puis discussion).
   if (actionIntent.kind === 'social' || actionIntent.kind === 'interact') return 'rich'
+  if (toolsUsed.length > 0) return 'short'
   return 'short'
 }
 
@@ -1633,15 +1635,31 @@ function detectRequiredMechanicalAction(message: string, gameState: GameState): 
   return requiredMechanicalActionFromIntent(classifyPlayerAction(message, gameState))
 }
 
-const NARRATIVE_RICH_KINDS = new Set<GameActionKind>(['social', 'interact', 'guidance', 'observe'])
+// Suites « actives » qui justifient d'escalader la narration vers une scène
+// riche quand elles apparaissent en intention secondaire (ex: discuter après
+// s'être déplacé). À l'inverse, une suite « passive » (observe/guidance) ne
+// doit jamais écraser une intention primaire qui exige le moteur (move,
+// attack…), sinon le modèle narre l'action au lieu de la jouer.
+const ACTIVE_FOLLOWUP_KINDS = new Set<GameActionKind>(['social', 'interact'])
 
 /**
- * Choisit l'intention qui doit piloter le ton de la narration finale quand une
- * action contient plusieurs intentions. Un déplacement suivi d'une discussion
- * (« je vais parler aux dryades ») doit produire une narration sociale riche.
+ * Choisit l'intention qui pilote le ton de la narration finale quand une action
+ * contient plusieurs intentions.
+ *
+ * - Si la primaire n'exige pas le moteur, elle pilote la narration telle quelle
+ *   (ex: une simple observation reste une scène riche).
+ * - Si la primaire exige le moteur (move, attack…), on la conserve comme pilote
+ *   SAUF s'il existe une suite active (social/interact). Dans ce cas la suite
+ *   prend le relais APRÈS la résolution moteur (« je vais parler aux dryades »
+ *   = déplacement puis discussion). Une suite passive (observe/guidance) est
+ *   ignorée: la narration post-action décrit déjà le lieu atteint.
  */
 function pickNarrativeIntent(intents: GameActionIntent[]): GameActionIntent {
-  return intents.find(intent => NARRATIVE_RICH_KINDS.has(intent.kind)) ?? intents[0]
+  const [primary, ...rest] = intents
+  if (!primary.requiresEngine) return primary
+
+  const activeFollowUp = rest.find(intent => ACTIVE_FOLLOWUP_KINDS.has(intent.kind))
+  return activeFollowUp ?? primary
 }
 
 interface ParsedPlayerAction {
@@ -1933,7 +1951,7 @@ function parseNamedRoomMove(message: string, gameState: GameState): { x: number;
   if (!hasMovementVerb) return null
 
   const relativeRoomId = relativeRoomIdForExplorationMove(text, gameState)
-  if (!relativeRoomId && !/\b(salle|piece|bureau|appartement|boulangerie|quai|verger|mac|treant|pommier|etage|haut|escalier|four|cuisine|reserve|reserves|portes?|entree|seuil|battants?)\b/.test(text)) {
+  if (!relativeRoomId && !/\b(salle|piece|bureau|appartement|boulangerie|quai|verger|dryades?|mac|treant|pommier|etage|haut|escalier|four|cuisine|reserve|reserves|portes?|entree|seuil|battants?)\b/.test(text)) {
     return null
   }
 
@@ -4087,6 +4105,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       ? buildLocalEngineNarrative(currentGameState, toolsUsed, newCombatLogEntries)
       : null
     const directorNarrative = directorDecision?.narrative ?? null
+    // Quand le directeur réclame explicitement le narrateur LLM (scène sociale
+    // après déplacement, etc.), on ne court-circuite pas avec une narration
+    // moteur locale.
+    const directorWantsLlm = directorDecision?.shouldUseLlmNarrator === true
 
     if (directorNarrative) {
       narrative = directorNarrative
@@ -4100,7 +4122,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         newCombatLogCount: newCombatLogEntries.length,
         narrativeLength: narrative.length,
       })
-    } else if (localEngineNarrative) {
+    } else if (localEngineNarrative && !directorWantsLlm) {
       narrative = localEngineNarrative
       narratorSource = 'local'
       logEvent('info', 'dm.final_narration.local_engine', {
