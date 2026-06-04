@@ -400,11 +400,18 @@ test('DM API resolves the narrated initial front door through scene surface affo
     assert.equal(response.status, 200, message)
     assert.ok(data.toolsUsed.includes('resolve_player_action'), message)
     assert.notEqual(data.debug?.refusalCode, 'WORLD_OBJECT_NOT_AFFORDED', message)
+    assert.ok(data.debug?.actionPlan, message)
     assert.ok(data.debug?.sceneSurface?.objects?.some?.(object => object.id === 'front_double_door'), message)
     assert.ok(data.engine?.events?.some(event => event.type === 'door.opened' && event.targetId === 'front_double_door'), message)
+    if (/casse|detruis/i.test(message)) assert.ok(data.toolsUsed.includes('world.force'), message)
+    if (!/casse|detruis/i.test(message) && /pousse|rentre|interieur/i.test(message)) assert.ok(data.toolsUsed.includes('world.open'), message)
     if (/rentre|interieur|pousse|detruis/i.test(message)) {
+      assert.ok(data.debug.actionPlan.steps.length >= 2, message)
+      assert.ok(data.toolsUsed.includes('move_token'), message)
       assert.ok(data.engine?.events?.some(event => event.type === 'entity.moved'), message)
       assert.equal(data.newGameState.currentRoomId, '4', message)
+    } else {
+      assert.equal(data.debug.actionPlan.steps.length, 1, message)
     }
   }
 })
@@ -424,6 +431,7 @@ test('DM API returns a useful ambiguity instead of moving through an unspecified
   assert.equal(response.status, 200)
   assert.ok(data.toolsUsed.includes('resolve_player_action'))
   assert.equal(data.debug?.refusalCode, 'WORLD_OBJECT_AMBIGUOUS')
+  assert.equal(data.debug?.actionPlan?.blocked?.code, 'ACTION_PLAN_TARGET_AMBIGUOUS')
   assert.ok(data.engine?.events?.some(event => event.type === 'action.blocked'))
   assert.equal(data.newGameState.currentRoomId, '4')
   assert.match(data.narrative, /plusieurs|cibles|laquelle|porte/i)

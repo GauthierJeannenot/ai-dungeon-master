@@ -924,6 +924,7 @@ async function run() {
               actionKind: data.debug.actionIntent?.kind,
               parsedKind: data.debug.parsedAction?.kind,
               targetResolution: data.debug.targetResolution,
+              actionPlan: data.debug.actionPlan,
               sceneSurfaceObjectIds: data.debug.sceneSurface?.objects?.map?.(object => object.id) ?? [],
               sceneSurfaceExits: data.debug.sceneSurface?.exits?.map?.(exit => exit.roomId) ?? [],
               refusalCode: data.debug.refusalCode,

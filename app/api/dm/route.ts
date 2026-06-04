@@ -43,8 +43,9 @@ import {
 } from '@/lib/anthropic-usage'
 import { logEvent, summarizeGameState } from '@/lib/server-logger'
 import { buildEngineResolutionView, derivePlayerAffordances } from '@/lib/world-engine'
-import { buildPortalTraversalActionInput, buildWorldActionInput, resolveWorldActionTargets } from '@/lib/world-target-resolver'
+import { buildWorldActionInput, resolveWorldActionTargets } from '@/lib/world-target-resolver'
 import { buildSceneSurface, summarizeSceneSurfaceForDebug } from '@/lib/scene-surface'
+import { buildActionPlan, summarizeActionPlanForDebug, type ActionPlan } from '@/lib/action-plan'
 import {
   detectUnsupportedNarratedWorldFacts,
   type NarratedWorldFact,
@@ -94,6 +95,7 @@ const DIRECTOR_LOCAL_FINAL_TOOLS = new Set([
   'next_turn',
   'resolve_attack',
   'end_combat',
+  'world.help',
 ])
 const LLM_MODE = parseLlmMode(process.env.LLM_MODE)
 const NARRATION_MODE = parseNarrationMode(process.env.NARRATION_MODE)
@@ -2867,9 +2869,8 @@ function buildDmTurnDebug(
   actionIntent: GameActionIntent
 ): DMDebugTurnView {
   const isWorldAction = isCanonicalWorldActionKind(actionIntent.kind)
-  const portalTraversalInput = actionIntent.kind === 'move'
-    ? buildPortalTraversalActionInput(message, gameState)
-    : null
+  const actionPlan = buildActionPlan(message, gameState, actionIntent.kind)
+  const plannedAction = actionPlan?.steps.find(step => step.action)?.action ?? null
   const sceneSurface = buildSceneSurface(gameState)
   return {
     actionIntent: {
@@ -2880,13 +2881,14 @@ function buildDmTurnDebug(
       requiresEngine: actionIntent.requiresEngine,
     },
     parsedAction: isWorldAction
-      ? buildWorldActionInput(message, gameState, actionIntent.kind)
-      : portalTraversalInput,
-    targetResolution: isWorldAction
-      ? resolveWorldActionTargets(message, gameState, actionIntent.kind) as unknown as Record<string, unknown>
-      : portalTraversalInput
-        ? resolveWorldActionTargets(message, gameState, 'open') as unknown as Record<string, unknown>
-      : null,
+      ? plannedAction ?? buildWorldActionInput(message, gameState, actionIntent.kind)
+      : plannedAction,
+    targetResolution: actionPlan?.targetResolution
+      ? actionPlan.targetResolution as unknown as Record<string, unknown>
+      : isWorldAction
+        ? resolveWorldActionTargets(message, gameState, actionIntent.kind) as unknown as Record<string, unknown>
+        : null,
+    actionPlan: actionPlan ? summarizeActionPlanForDebug(actionPlan) : null,
     sceneSurface: summarizeSceneSurfaceForDebug(sceneSurface),
   }
 }
@@ -2987,6 +2989,143 @@ function toolsUsedForResolvedTool(toolName: string, result: unknown): string[] {
     : [toolName]
 }
 
+type EngineFirstResolution = {
+  handled: boolean
+  gameState: GameState
+  toolsUsed: string[]
+  draftNarrative: string
+  sawMcpToolError: boolean
+  mcpErrorResult?: unknown
+}
+
+function actionPlanStepSucceeded(result: unknown): boolean {
+  if (isMcpErrorResult(result)) return false
+  if (!isObjectRecord(result)) return false
+  if (result.success === false) return false
+  if (result.success === true) {
+    if (isObjectRecord(result.result) && result.result.success === false) return false
+    return true
+  }
+  if (isObjectRecord(result.result) && result.result.success === false) return false
+  if (isObjectRecord(result.result) && result.result.success === true) return true
+  return typeof result.mechanicalSummary === 'string'
+}
+
+async function executeActionPlan(
+  plan: ActionPlan,
+  gameState: GameState,
+  sessionId: string | undefined,
+  requestId: string,
+  startedAt: number,
+  actionIntent: GameActionIntent
+): Promise<EngineFirstResolution> {
+  let nextGameState = gameState
+  let previousStepSucceeded = true
+  let sawMcpToolError = false
+  let mcpErrorResult: unknown
+  const toolsUsed: string[] = []
+  const draftNarratives: string[] = []
+  const stepSummaries: Array<Record<string, unknown>> = []
+
+  logEvent('info', 'dm.cost.engine_first.plan.start', {
+    requestId,
+    sessionId,
+    actionIntent,
+    actionPlan: summarizeActionPlanForDebug(plan),
+    gameState: summarizeGameState(gameState),
+  })
+
+  for (const step of plan.steps) {
+    if (step.dependsOnPreviousSuccess && !previousStepSucceeded) {
+      stepSummaries.push({
+        id: step.id,
+        skipped: true,
+        reason: 'previous_step_failed',
+      })
+      logEvent('info', 'dm.cost.engine_first.plan.step.skipped', {
+        requestId,
+        sessionId,
+        step: {
+          id: step.id,
+          toolName: step.toolName,
+          reason: step.reason,
+        },
+        reason: 'previous_step_failed',
+      })
+      break
+    }
+
+    logEvent('info', 'dm.cost.engine_first.plan.step.start', {
+      requestId,
+      sessionId,
+      step: {
+        id: step.id,
+        toolName: step.toolName,
+        input: step.input,
+        reason: step.reason,
+      },
+    })
+
+    const result = await callMCPTool(step.toolName, step.input, sessionId)
+    const stepError = isMcpErrorResult(result)
+    const stepSucceeded = actionPlanStepSucceeded(result)
+    previousStepSucceeded = stepSucceeded
+    sawMcpToolError = sawMcpToolError || stepError
+    if (stepError) mcpErrorResult = result
+    toolsUsed.push(...toolsUsedForResolvedTool(step.toolName, result))
+
+    const stepNarrative = summarizeMcpResultForNarration(step.toolName, result)
+    if (stepNarrative.trim()) draftNarratives.push(stepNarrative)
+    nextGameState = await callMCPTool('get_game_state', {}, sessionId) as GameState
+
+    const stepSummary = {
+      id: step.id,
+      toolName: step.toolName,
+      succeeded: stepSucceeded,
+      errored: stepError,
+      result,
+    }
+    stepSummaries.push(stepSummary)
+
+    logEvent(stepError ? 'warn' : 'info', 'dm.cost.engine_first.plan.step.complete', {
+      requestId,
+      sessionId,
+      step: {
+        id: step.id,
+        toolName: step.toolName,
+      },
+      result,
+      stepSucceeded,
+      gameState: summarizeGameState(nextGameState),
+    })
+
+    if (stepError) break
+  }
+
+  const draftNarrative = draftNarratives.join('\n')
+
+  logEvent(sawMcpToolError ? 'warn' : 'info', 'dm.cost.engine_first.plan.complete', {
+    requestId,
+    sessionId,
+    durationMs: Date.now() - startedAt,
+    actionIntent,
+    actionPlan: summarizeActionPlanForDebug(plan),
+    stepSummaries,
+    draftNarrative,
+    toolsUsed,
+    gameState: summarizeGameState(nextGameState),
+  })
+
+  return {
+    handled: true,
+    gameState: nextGameState,
+    toolsUsed,
+    draftNarrative,
+    sawMcpToolError,
+    mcpErrorResult,
+  }
+}
+
 async function resolveServerFirstAction(
   message: string,
   gameState: GameState,
@@ -2994,14 +3133,7 @@ async function resolveServerFirstAction(
   requestId: string,
   recentHistory: ConversationTurn[],
   actionIntent: GameActionIntent
-): Promise<{
-  handled: boolean
-  gameState: GameState
-  toolsUsed: string[]
-  draftNarrative: string
-  sawMcpToolError: boolean
-  mcpErrorResult?: unknown
-}> {
+): Promise<EngineFirstResolution> {
   const startedAt = Date.now()
   let toolName: string | null = null
   let input: Record<string, unknown> | null = null
@@ -3186,25 +3318,23 @@ async function resolveServerFirstAction(
   }
 
   if (!toolName) {
-    const worldActionInput = parseWorldActionInput(message, gameState, actionIntent.kind)
+    const actionPlan = (isCanonicalWorldActionKind(actionIntent.kind) || actionIntent.kind === 'move')
+      ? buildActionPlan(message, gameState, actionIntent.kind)
+      : null
     const attackInput = parsePlayerAttackInput(message, gameState)
     const encounterRepairInput = parseEncounterRepairInput(message, gameState)
-    if (worldActionInput) {
-      const targetResolution = isCanonicalWorldActionKind(actionIntent.kind)
-        ? resolveWorldActionTargets(message, gameState, actionIntent.kind)
-        : null
+    if (actionPlan) {
       logEvent('debug', 'dm.world_action.target_resolved', {
         requestId,
         sessionId,
         actionKind: actionIntent.kind,
-        targetResolution,
-        worldActionInput,
+        targetResolution: actionPlan.targetResolution,
+        actionPlan: summarizeActionPlanForDebug(actionPlan),
         enabledAffordances: derivePlayerAffordances(gameState)
           .filter(affordance => affordance.enabled)
           .map(affordance => ({ id: affordance.id, kind: affordance.kind, label: affordance.label })),
       })
-      toolName = 'resolve_player_action'
-      input = canonicalPlayerActionInput(worldActionInput)
+      return executeActionPlan(actionPlan, gameState, sessionId, requestId, startedAt, actionIntent)
     } else if (attackInput) {
       toolName = 'resolve_player_action'
       input = canonicalPlayerActionInput({
@@ -3221,65 +3351,59 @@ async function resolveServerFirstAction(
         reason: 'Le joueur attend et passe son tour.',
       })
     } else if (actionIntent.kind === 'move') {
-      const portalTraversalInput = buildPortalTraversalActionInput(message, gameState)
-      if (portalTraversalInput) {
-        toolName = 'resolve_player_action'
-        input = canonicalPlayerActionInput(portalTraversalInput)
-      } else {
-        if (isAmbiguousExplorationMove(message, gameState)) {
-          const draftNarrative = buildAmbiguousExplorationMoveNarrative(gameState)
-          logEvent('info', 'dm.cost.engine_first.ambiguous_move', {
-            requestId,
-            sessionId,
-            actionIntent,
-            exits: currentRoomExitIds(gameState),
-            durationMs: Date.now() - startedAt,
-            draftNarrative,
-            gameState: summarizeGameState(gameState),
-          })
-          return {
-            handled: true,
-            gameState,
-            toolsUsed: [],
-            draftNarrative,
-            sawMcpToolError: false,
-          }
+      if (isAmbiguousExplorationMove(message, gameState)) {
+        const draftNarrative = buildAmbiguousExplorationMoveNarrative(gameState)
+        logEvent('info', 'dm.cost.engine_first.ambiguous_move', {
+          requestId,
+          sessionId,
+          actionIntent,
+          exits: currentRoomExitIds(gameState),
+          durationMs: Date.now() - startedAt,
+          draftNarrative,
+          gameState: summarizeGameState(gameState),
+        })
+        return {
+          handled: true,
+          gameState,
+          toolsUsed: [],
+          draftNarrative,
+          sawMcpToolError: false,
         }
+      }
 
-        const toCell =
-          parseCoordinateMove(message, gameState) ??
-          parseNamedRoomMove(message, gameState) ??
-          parseContextualRoomMove(message, gameState, recentHistory)
-        if (toCell) {
-          const targetRoomId = inferMappedAdventureRoomId(toCell)
-          const encounterId = encounterIdForRoom(targetRoomId)
-          const encounterTriggerReason = roomEncounterTriggerReason(message, gameState, targetRoomId, encounterId)
-          const shouldStartEncounter =
-            gameState.phase === 'exploration' &&
-            countAliveMonsters(gameState) === 0 &&
-            targetRoomId !== null &&
-            encounterId &&
-            encounterTriggerReason &&
-            (
-              targetRoomId !== gameState.currentRoomId ||
-              !gameState.roomsVisited.includes(targetRoomId)
-            )
+      const toCell =
+        parseCoordinateMove(message, gameState) ??
+        parseNamedRoomMove(message, gameState) ??
+        parseContextualRoomMove(message, gameState, recentHistory)
+      if (toCell) {
+        const targetRoomId = inferMappedAdventureRoomId(toCell)
+        const encounterId = encounterIdForRoom(targetRoomId)
+        const encounterTriggerReason = roomEncounterTriggerReason(message, gameState, targetRoomId, encounterId)
+        const shouldStartEncounter =
+          gameState.phase === 'exploration' &&
+          countAliveMonsters(gameState) === 0 &&
+          targetRoomId !== null &&
+          encounterId &&
+          encounterTriggerReason &&
+          (
+            targetRoomId !== gameState.currentRoomId ||
+            !gameState.roomsVisited.includes(targetRoomId)
+          )
 
-          if (shouldStartEncounter) {
-            toolName = 'start_encounter'
-            input = {
-              encounterId,
-              playerCell: toCell,
-              reason: encounterTriggerReason ?? 'Le joueur declenche une rencontre de salle.',
-            }
-          } else {
-            toolName = 'resolve_player_action'
-            input = canonicalPlayerActionInput({
-              kind: 'move',
-              tokenId: 'player',
-              toCell,
-            })
+        if (shouldStartEncounter) {
+          toolName = 'start_encounter'
+          input = {
+            encounterId,
+            playerCell: toCell,
+            reason: encounterTriggerReason ?? 'Le joueur declenche une rencontre de salle.',
           }
+        } else {
+          toolName = 'resolve_player_action'
+          input = canonicalPlayerActionInput({
+            kind: 'move',
+            tokenId: 'player',
+            toCell,
+          })
         }
       }
     }

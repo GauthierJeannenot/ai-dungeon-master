@@ -29,6 +29,7 @@ const LOCAL_NARRATION_TOOLS = new Set([
   'next_turn',
   'resolve_attack',
   'end_combat',
+  'world.help',
 ])
 
 function unique(values: string[]): string[] {
@@ -351,6 +352,16 @@ function buildAbilityNarrative(entries: CombatLogEntry[]): string | null {
   return `Le jet fixe l'incertitude: ${detail}.`
 }
 
+function buildHelpNarrative(gameState: GameState): string | null {
+  const helpedNpc = Object.values(gameState.world?.npcs ?? {}).find(npc =>
+    npc.roomId === gameState.currentRoomId &&
+    npc.memory?.helpedByPlayer === true
+  )
+  if (!helpedNpc) return null
+
+  return `Tu te places en appui de ${helpedNpc.name}. Ce n'est pas une promesse vague: le monde garde maintenant cette aide en memoire.${worldPressureTail(gameState)}`
+}
+
 function buildLocalNarrative(input: DirectorInput): string | null {
   const tools = unique(input.toolsUsed)
   const { actionIntent, gameState, newCombatLogEntries } = input
@@ -374,6 +385,7 @@ function buildLocalNarrative(input: DirectorInput): string | null {
         ? "Tu gardes ton souffle et laisses filer ton ouverture. La melee se deplace d'un cran."
         : `Tu prends une seconde dans ${roomName(gameState)}. Rien ne t'arrete, mais rien ne t'attend longtemps.`
     }
+    if (actionIntent.kind === 'help') return buildHelpNarrative(gameState)
     if (actionIntent.kind === 'ability_check') return buildAbilityNarrative(newCombatLogEntries)
     if (actionIntent.kind !== 'social') return buildAttackNarrative(gameState, newCombatLogEntries)
   }

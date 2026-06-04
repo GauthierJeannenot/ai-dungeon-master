@@ -344,6 +344,7 @@ export interface DMDebugTurnView {
   }
   parsedAction?: Record<string, unknown> | null
   targetResolution?: Record<string, unknown> | null
+  actionPlan?: Record<string, unknown> | null
   sceneSurface?: Record<string, unknown> | null
   refusalCode?: string | null
   worldDiff?: {

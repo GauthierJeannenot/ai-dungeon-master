@@ -38,6 +38,16 @@ function summarizeMcpPayload(value: unknown): unknown {
 
   const maybeArgs = value as { gameState?: GameState }
   if (maybeArgs.gameState) {
+    const nestedState = maybeArgs.gameState as Partial<GameState>
+    if (
+      !nestedState.player ||
+      !nestedState.monsters ||
+      !nestedState.phase ||
+      !Array.isArray(nestedState.combatLog)
+    ) {
+      return value
+    }
+
     return {
       ...maybeArgs,
       gameState: summarizeGameState(maybeArgs.gameState),
@@ -45,6 +55,19 @@ function summarizeMcpPayload(value: unknown): unknown {
   }
 
   return value
+}
+
+function parseMcpTextPayload(text: string): unknown {
+  let parsed: unknown = text
+  for (let depth = 0; depth < 4 && typeof parsed === 'string'; depth++) {
+    const trimmed = parsed.trim()
+    try {
+      parsed = JSON.parse(trimmed)
+    } catch {
+      return parsed
+    }
+  }
+  return parsed
 }
 
 function cleanupIdleClients(now = Date.now()): void {
@@ -236,7 +259,7 @@ export async function callMCPTool(
       const textContent = result.content.find((c: { type: string }) => c.type === 'text')
       if (textContent && 'text' in textContent) {
         try {
-          const parsed = JSON.parse(textContent.text as string)
+          const parsed = parseMcpTextPayload(textContent.text as string)
           logEvent(result.isError ? 'warn' : 'debug', 'mcp.tool.result', {
             sessionId: normalizedSessionId,
             toolName,
