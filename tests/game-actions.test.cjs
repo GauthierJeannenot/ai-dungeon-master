@@ -147,6 +147,33 @@ test('game action language routes coordinate phrases with vais as movement', () 
   assert.equal(intent.requiresEngine, true)
 })
 
+test('game action language treats "aller voir X" as movement, not observation', () => {
+  // Bug de prod: "je vais au verger voir les dryades" etait classe 'observe' a cause
+  // du mot "voir", donc aucun move_token n'etait emis et le pion ne bougeait jamais.
+  // Une vraie intention de deplacement vers une destination doit primer sur l'observation.
+  for (const message of [
+    'je vais au verger voir les dryades',
+    'je vais aller voir les dryades',
+  ]) {
+    const intent = actions.classifyPlayerAction(message, baseGameState())
+    assert.equal(intent.kind, 'move', `expected move for ${message}, got ${intent.kind}`)
+    assert.equal(intent.primitive, 'move')
+    assert.equal(intent.requiresEngine, true)
+  }
+})
+
+test('game action language still treats pure observation asks as observe', () => {
+  for (const message of [
+    'je regarde autour de moi',
+    'je vois quoi ici',
+    'decris la salle',
+  ]) {
+    const intent = actions.classifyPlayerAction(message, baseGameState())
+    assert.equal(intent.kind, 'observe', `expected observe for ${message}, got ${intent.kind}`)
+    assert.equal(intent.requiresEngine, false)
+  }
+})
+
 test('game action language routes dying player acceptance to death save', () => {
   const intent = actions.classifyPlayerAction('ok je tente', baseGameState({
     phase: 'combat',
