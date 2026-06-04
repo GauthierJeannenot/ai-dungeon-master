@@ -115,3 +115,57 @@ test('world validation catches malformed npc goals and alarm clocks', () => {
   assert.ok(codes.includes('ALARM_CLOCK_BELOW_LEVEL'))
   assert.ok(codes.includes('ALARM_CLOCK_THRESHOLD_INVALID'))
 })
+
+test('world validation accepts and validates fiction facts', () => {
+  const world = createInitialWorldState()
+  world.fictionFacts['fact-r4-water-under-door'] = {
+    id: 'fact-r4-water-under-door',
+    text: "De l'eau magique s'etale sous la porte.",
+    roomId: '4',
+    status: 'active',
+    source: "sort creation d'eau",
+    tags: ['water', 'wet_surface'],
+  }
+  world.eventLog.push({
+    id: 'fiction-created',
+    type: 'fiction.fact_created',
+    summary: "De l'eau magique s'etale sous la porte.",
+    targetId: 'fact-r4-water-under-door',
+    visibleToPlayer: true,
+  })
+
+  const result = validateWorldState(world)
+
+  assert.equal(result.ok, true)
+  assert.deepEqual(result.issues, [])
+})
+
+test('world validation catches malformed fiction facts and event targets', () => {
+  const world = createInitialWorldState()
+  world.fictionFacts['bad-fact'] = {
+    id: 'bad-fact',
+    text: '',
+    roomId: 'missing-room',
+    status: 'floating',
+    tags: [''],
+    metadata: { nested: { no: true } },
+  }
+  world.eventLog.push({
+    id: 'missing-fact-event',
+    type: 'fiction.fact_used',
+    summary: 'Missing fact used.',
+    targetId: 'missing-fact',
+    visibleToPlayer: true,
+  })
+
+  const result = validateWorldState(world)
+  const codes = result.issues.map(issue => issue.code)
+
+  assert.equal(result.ok, false)
+  assert.ok(codes.includes('FICTION_FACT_TEXT_MISSING'))
+  assert.ok(codes.includes('FICTION_FACT_STATUS_INVALID'))
+  assert.ok(codes.includes('FICTION_FACT_ROOM_UNKNOWN'))
+  assert.ok(codes.includes('FICTION_FACT_TAG_EMPTY'))
+  assert.ok(codes.includes('FICTION_FACT_METADATA_INVALID'))
+  assert.ok(codes.includes('EVENT_TARGET_FICTION_FACT_UNKNOWN'))
+})

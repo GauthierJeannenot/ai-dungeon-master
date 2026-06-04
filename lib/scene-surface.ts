@@ -1,5 +1,6 @@
 import type {
   CanonicalPlayerActionKind,
+  FictionFactState,
   GameState,
   Item,
   PlayerAffordance,
@@ -76,6 +77,15 @@ export interface SceneSurfaceInventoryItem {
   relevant: boolean
 }
 
+export interface SceneSurfaceFictionFact {
+  id: string
+  text: string
+  roomId?: string
+  status: FictionFactState['status']
+  source?: string
+  tags: string[]
+}
+
 export interface SceneSurfaceTarget {
   id: string
   type: 'object' | 'npc' | 'inventory' | 'room'
@@ -93,6 +103,7 @@ export interface SceneSurface {
   npcs: SceneSurfaceNpc[]
   hazards: SceneSurfaceObject[]
   inventory: SceneSurfaceInventoryItem[]
+  facts: SceneSurfaceFictionFact[]
   targets: SceneSurfaceTarget[]
   affordances: PlayerAffordance[]
   narratableFacts: string[]
@@ -532,6 +543,7 @@ function narratableFactsForSurface(surfaceBase: Omit<SceneSurface, 'affordances'
     ),
     ...surfaceBase.npcs.map(npc => `npc=${npc.id}:${npc.name}:known=${npc.known}:disposition=${npc.disposition}`),
     ...surfaceBase.hazards.map(hazard => `hazard=${hazard.id}:${hazard.name}:disarmed=${Boolean(hazard.disarmed)}`),
+    ...surfaceBase.facts.map(fact => `fictionFact=${fact.id}:status=${fact.status}:room=${fact.roomId ?? 'global'}:${fact.text}`),
   ]
 }
 
@@ -590,6 +602,18 @@ export function buildSceneSurface(gameState: GameState): SceneSurface {
   }))
   const destinations = buildLocationIndex(gameState)
     .filter(destination => destination.current || destination.adjacent || destination.known || destination.visited || destination.viaObjectId)
+  const facts = Object.values(world?.fictionFacts ?? {})
+    .filter(fact => fact.status !== 'expired')
+    .filter(fact => !fact.roomId || fact.roomId === currentRoomId)
+    .map(fact => ({
+      id: fact.id,
+      text: fact.text,
+      roomId: fact.roomId,
+      status: fact.status,
+      source: fact.source,
+      tags: fact.tags ?? [],
+    }))
+    .sort((a, b) => a.id.localeCompare(b.id, 'fr'))
   const surfaceBase = {
     currentRoomId,
     currentRoom,
@@ -599,6 +623,7 @@ export function buildSceneSurface(gameState: GameState): SceneSurface {
     npcs,
     hazards,
     inventory,
+    facts,
   }
   const affordances = deriveSceneSurfaceAffordances(surfaceBase, gameState)
   const targets = buildTargets(objects, npcs, inventory, destinations)
@@ -702,6 +727,14 @@ export function summarizeSceneSurfaceForDebug(surface: SceneSurface): Record<str
       name: npc.name,
       disposition: npc.disposition,
       known: npc.known,
+    })),
+    facts: surface.facts.map(fact => ({
+      id: fact.id,
+      text: fact.text,
+      roomId: fact.roomId,
+      status: fact.status,
+      source: fact.source,
+      tags: fact.tags,
     })),
     enabledAffordances: surface.affordances
       .filter(affordance => affordance.enabled)

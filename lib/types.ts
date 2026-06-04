@@ -169,6 +169,21 @@ export interface WorldAlarmState {
   }
 }
 
+export type FictionFactStatus = 'active' | 'used' | 'expired'
+
+export interface FictionFactState {
+  id: string
+  text: string
+  roomId?: string
+  status: FictionFactStatus
+  source?: string
+  tags?: string[]
+  createdAt?: string
+  updatedAt?: string
+  expires?: 'turn' | 'scene' | 'location' | 'never' | string | null
+  metadata?: Record<string, string | number | boolean>
+}
+
 export interface WorldState {
   schemaVersion?: number
   rooms: Record<string, WorldRoomState>
@@ -176,6 +191,7 @@ export interface WorldState {
   npcs: Record<string, WorldNpcState>
   quests: Record<string, WorldQuestState>
   alarms: Record<string, WorldAlarmState>
+  fictionFacts: Record<string, FictionFactState>
   flags?: Record<string, boolean>
   eventLog: EngineEvent[]
 }
@@ -273,6 +289,7 @@ export type CanonicalPlayerActionKind =
   | 'wait'
   | 'death_save'
   | 'observe'
+  | 'improvise'
 
 export type EngineEventType =
   | 'combat.attack'
@@ -305,6 +322,10 @@ export type EngineEventType =
   | 'character.hidden'
   | 'escape.attempted'
   | 'character.stabilized'
+  | 'fiction.fact_created'
+  | 'fiction.fact_used'
+  | 'fiction.fact_expired'
+  | 'improvisation.resolved'
   | 'action.blocked'
   | 'state.changed'
 
@@ -364,6 +385,7 @@ export interface DMDebugTurnView {
     npcs?: Record<string, { before: Record<string, unknown>; after: Record<string, unknown> }>
     quests?: Record<string, { before: Record<string, unknown>; after: Record<string, unknown> }>
     alarms?: Record<string, { before: Record<string, unknown>; after: Record<string, unknown> }>
+    fictionFacts?: Record<string, { before: Record<string, unknown>; after: Record<string, unknown> }>
     flags?: { before: Record<string, boolean>; after: Record<string, boolean> }
   }
 }

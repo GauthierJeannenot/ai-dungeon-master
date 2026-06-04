@@ -209,6 +209,30 @@ test('game action language treats aller voir a distant landmark as movement', ()
   }
 })
 
+test('game action language routes creative unmodeled actions to improvise', () => {
+  const cases = [
+    "je lance creation d'eau sous la porte",
+    "j'arrache une jambe de table pour m'en faire une arme",
+    "je bloque la porte avec une chaise",
+    "je renverse de la farine au sol pour faire glisser les gobelins",
+  ]
+
+  for (const message of cases) {
+    const intent = actions.classifyPlayerAction(message, baseGameState())
+    assert.equal(intent.kind, 'improvise', message)
+    assert.equal(intent.primitive, 'world_action', message)
+    assert.equal(intent.requiresEngine, true, message)
+    assert.deepEqual(intent.suggestedTools, ['resolve_player_action'], message)
+  }
+})
+
+test('game action language keeps simple door pushing as movement or canonical portal intent', () => {
+  const intent = actions.classifyPlayerAction('je pousse la porte et je rentre', baseGameState())
+
+  assert.notEqual(intent.kind, 'improvise')
+  assert.equal(intent.requiresEngine, true)
+})
+
 test('game action language routes dying player acceptance to death save', () => {
   const state = baseGameState({
     phase: 'combat',

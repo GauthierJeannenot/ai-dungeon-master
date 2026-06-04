@@ -1,6 +1,7 @@
 import type {
   EngineEvent,
   EngineEventType,
+  FictionFactState,
   WorldAlarmState,
   WorldNpcState,
   WorldObjectState,
@@ -39,6 +40,11 @@ const NPC_TARGET_EVENTS = new Set<EngineEventType>([
 
 const QUEST_TARGET_EVENTS = new Set<EngineEventType>(['quest.completed'])
 const ALARM_TARGET_EVENTS = new Set<EngineEventType>(['alarm.raised'])
+const FICTION_FACT_TARGET_EVENTS = new Set<EngineEventType>([
+  'fiction.fact_created',
+  'fiction.fact_used',
+  'fiction.fact_expired',
+])
 
 function issue(code: string, path: string, message: string): WorldValidationIssue {
   return { code, path, message }
@@ -81,6 +87,7 @@ function validateUniqueIds(world: WorldState, issues: WorldValidationIssue[]): v
   for (const [id] of Object.entries(world.npcs ?? {})) visit(id, `npcs.${id}`)
   for (const [id] of Object.entries(world.quests ?? {})) visit(id, `quests.${id}`)
   for (const [id] of Object.entries(world.alarms ?? {})) visit(id, `alarms.${id}`)
+  for (const [id] of Object.entries(world.fictionFacts ?? {})) visit(id, `fictionFacts.${id}`)
 }
 
 function validateRoom(roomId: string, room: WorldRoomState, world: WorldState, issues: WorldValidationIssue[]): void {
@@ -239,6 +246,29 @@ function validateAlarm(alarmId: string, alarm: WorldAlarmState, issues: WorldVal
   }
 }
 
+function validateFictionFact(factId: string, fact: FictionFactState, world: WorldState, issues: WorldValidationIssue[]): void {
+  const path = `fictionFacts.${factId}`
+  if (!fact.text?.trim()) {
+    issues.push(issue('FICTION_FACT_TEXT_MISSING', `${path}.text`, 'Fiction fact text is required.'))
+  }
+  if (!['active', 'used', 'expired'].includes(fact.status)) {
+    issues.push(issue('FICTION_FACT_STATUS_INVALID', `${path}.status`, 'Fiction fact status must be active, used, or expired.'))
+  }
+  if (fact.roomId && !world.rooms[fact.roomId]) {
+    issues.push(issue('FICTION_FACT_ROOM_UNKNOWN', `${path}.roomId`, `Room "${fact.roomId}" does not exist.`))
+  }
+  for (const [index, tag] of (fact.tags ?? []).entries()) {
+    if (!tag.trim()) {
+      issues.push(issue('FICTION_FACT_TAG_EMPTY', `${path}.tags.${index}`, 'Fiction fact tags cannot be empty.'))
+    }
+  }
+  for (const [key, value] of Object.entries(fact.metadata ?? {})) {
+    if (value === null || !['string', 'number', 'boolean'].includes(typeof value)) {
+      issues.push(issue('FICTION_FACT_METADATA_INVALID', `${path}.metadata.${key}`, 'Fiction fact metadata values must be scalar.'))
+    }
+  }
+}
+
 function validateEventTarget(event: EngineEvent, index: number, world: WorldState, issues: WorldValidationIssue[]): void {
   const path = `eventLog.${index}`
   if (!event.id?.trim()) {
@@ -260,6 +290,9 @@ function validateEventTarget(event: EngineEvent, index: number, world: WorldStat
   if (ALARM_TARGET_EVENTS.has(event.type) && !world.alarms[event.targetId]) {
     issues.push(issue('EVENT_TARGET_ALARM_UNKNOWN', `${path}.targetId`, `Alarm target "${event.targetId}" does not exist.`))
   }
+  if (FICTION_FACT_TARGET_EVENTS.has(event.type) && !world.fictionFacts?.[event.targetId]) {
+    issues.push(issue('EVENT_TARGET_FICTION_FACT_UNKNOWN', `${path}.targetId`, `Fiction fact target "${event.targetId}" does not exist.`))
+  }
 }
 
 export function validateWorldState(world: WorldState): WorldValidationResult {
@@ -273,6 +306,7 @@ export function validateWorldState(world: WorldState): WorldValidationResult {
   validateKeyedEntity(issues, 'objects', world.objects)
   validateKeyedEntity(issues, 'npcs', world.npcs)
   validateKeyedEntity(issues, 'quests', world.quests)
+  validateKeyedEntity(issues, 'fictionFacts', world.fictionFacts)
   validateUniqueIds(world, issues)
 
   for (const [roomId, room] of Object.entries(world.rooms ?? {})) validateRoom(roomId, room, world, issues)
@@ -280,6 +314,7 @@ export function validateWorldState(world: WorldState): WorldValidationResult {
   for (const [npcId, npc] of Object.entries(world.npcs ?? {})) validateNpc(npcId, npc, world, issues)
   for (const [questId, quest] of Object.entries(world.quests ?? {})) validateQuest(questId, quest, world, issues)
   for (const [alarmId, alarm] of Object.entries(world.alarms ?? {})) validateAlarm(alarmId, alarm, issues)
+  for (const [factId, fact] of Object.entries(world.fictionFacts ?? {})) validateFictionFact(factId, fact, world, issues)
   for (const [flagId, value] of Object.entries(world.flags ?? {})) {
     if (typeof value !== 'boolean') {
       issues.push(issue('WORLD_FLAG_INVALID', `flags.${flagId}`, 'World flags must be booleans.'))

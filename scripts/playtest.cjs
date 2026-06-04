@@ -499,6 +499,20 @@ const builtInScenarios = [
     ],
   },
   {
+    name: 'creative-fiction-ledger',
+    initialGameState: bakeryEntranceGameState(),
+    turns: [
+      {
+        message: "je lance creation d'eau sous la porte pour mouiller le sol",
+        expectNoLlm: narrationMode === 'budget',
+        category: 'world',
+        expectTools: ['resolve_player_action', 'world.improvise'],
+        expectEvents: ['fiction.fact_created', 'improvisation.resolved'],
+        expectAffordances: ['improvise'],
+      },
+    ],
+  },
+  {
     name: 'apartment-recipe',
     initialGameState: apartmentRecipeGameState(),
     turns: [

@@ -124,3 +124,62 @@ test('world event replay detects duplicate take and impossible trap trigger', ()
   assert.ok(codes.includes('REPLAY_DUPLICATE_TAKE'))
   assert.ok(codes.includes('REPLAY_TRIGGERED_DISARMED_TRAP'))
 })
+
+test('world event replay applies fiction fact creation and usage', () => {
+  const events = [
+    {
+      id: 'create-water',
+      type: 'fiction.fact_created',
+      summary: "De l'eau magique s'etale sous la porte.",
+      targetId: 'fact-r4-water-under-door',
+      metadata: {
+        fact: {
+          id: 'fact-r4-water-under-door',
+          text: "De l'eau magique s'etale sous la porte.",
+          roomId: '4',
+          tags: ['water', 'wet_surface'],
+          source: "sort creation d'eau",
+        },
+      },
+      visibleToPlayer: true,
+    },
+    {
+      id: 'use-water',
+      type: 'fiction.fact_used',
+      summary: 'Le sol mouille est exploite.',
+      targetId: 'fact-r4-water-under-door',
+      visibleToPlayer: true,
+    },
+  ]
+
+  const result = replayWorldEvents(createInitialWorldState(), events)
+
+  assert.deepEqual(result.issues, [])
+  assert.equal(result.world.fictionFacts['fact-r4-water-under-door'].text, "De l'eau magique s'etale sous la porte.")
+  assert.equal(result.world.fictionFacts['fact-r4-water-under-door'].status, 'used')
+  assert.deepEqual(result.world.fictionFacts['fact-r4-water-under-door'].tags, ['water', 'wet_surface'])
+})
+
+test('world event replay detects duplicate active fiction fact creation', () => {
+  const events = [
+    {
+      id: 'create-water-once',
+      type: 'fiction.fact_created',
+      summary: "De l'eau magique s'etale sous la porte.",
+      targetId: 'fact-r4-water-under-door',
+      visibleToPlayer: true,
+    },
+    {
+      id: 'create-water-twice',
+      type: 'fiction.fact_created',
+      summary: "De l'eau magique s'etale encore sous la porte.",
+      targetId: 'fact-r4-water-under-door',
+      visibleToPlayer: true,
+    },
+  ]
+
+  const result = replayWorldEvents(createInitialWorldState(), events)
+  const codes = result.issues.map(issue => issue.code)
+
+  assert.ok(codes.includes('REPLAY_DUPLICATE_FICTION_FACT'))
+})

@@ -167,6 +167,7 @@ function canonicalKind(kind: GameActionKind): CanonicalPlayerActionKind | undefi
     'use_object',
     'combine_recipe',
     'use_item',
+    'improvise',
   ].includes(kind) ? kind as CanonicalPlayerActionKind : undefined
 }
 
@@ -396,6 +397,14 @@ export function buildWorldActionInput(
       return { kind: 'use_object', ...(targetName ? { targetName } : {}) }
     case 'combine_recipe':
       return { kind: 'combine_recipe' }
+    case 'improvise':
+      return {
+        kind: 'improvise',
+        intent: message,
+        ...(targetName ?? npcTargetName ? { targetName: targetName ?? npcTargetName } : {}),
+        ...(itemName ? { targetName: itemName } : {}),
+        desiredEffect: message,
+      }
     default:
       return null
   }

@@ -406,6 +406,7 @@ export function createInitialWorldState(): WorldState {
         },
       },
     },
+    fictionFacts: {},
     flags: {},
     eventLog: [],
   }

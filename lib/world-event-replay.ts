@@ -1,4 +1,4 @@
-import type { EngineEvent, WorldNpcDisposition, WorldState } from './types'
+import type { EngineEvent, FictionFactState, WorldNpcDisposition, WorldState } from './types'
 import { validateWorldState, type WorldValidationIssue } from './world-validation'
 
 export interface WorldEventReplayIssue {
@@ -65,6 +65,21 @@ function targetAlarm(world: WorldState, event: EngineEvent, issues: WorldEventRe
     return undefined
   }
   return world.alarms[event.targetId]
+}
+
+function targetFictionFact(world: WorldState, event: EngineEvent, issues: WorldEventReplayIssue[]) {
+  if (!event.targetId || !world.fictionFacts?.[event.targetId]) {
+    issues.push(replayIssue('REPLAY_FICTION_FACT_TARGET_MISSING', event, `Fiction fact target "${event.targetId ?? 'none'}" does not exist.`))
+    return undefined
+  }
+  return world.fictionFacts[event.targetId]
+}
+
+function metadataFact(event: EngineEvent): Partial<FictionFactState> {
+  const raw = event.metadata?.fact
+  return raw && typeof raw === 'object' && !Array.isArray(raw)
+    ? raw as Partial<FictionFactState>
+    : {}
 }
 
 function applyEvent(world: WorldState, event: EngineEvent, issues: WorldEventReplayIssue[]): void {
@@ -191,6 +206,52 @@ function applyEvent(world: WorldState, event: EngineEvent, issues: WorldEventRep
       }
       return
 
+    case 'fiction.fact_created':
+      {
+        if (!event.targetId) {
+          issues.push(replayIssue('REPLAY_FICTION_FACT_ID_MISSING', event, 'Fiction fact creation lacks a target id.'))
+          return
+        }
+        const factPatch = metadataFact(event)
+        const existing = world.fictionFacts[event.targetId]
+        if (existing && existing.status === 'active') {
+          issues.push(replayIssue('REPLAY_DUPLICATE_FICTION_FACT', event, `${existing.text} was created more than once.`))
+        }
+        world.fictionFacts[event.targetId] = {
+          id: event.targetId,
+          text: typeof factPatch.text === 'string' && factPatch.text.trim() ? factPatch.text : event.summary,
+          status: 'active',
+          roomId: typeof factPatch.roomId === 'string' ? factPatch.roomId : undefined,
+          source: typeof factPatch.source === 'string' ? factPatch.source : undefined,
+          tags: Array.isArray(factPatch.tags) ? factPatch.tags.filter((tag): tag is string => typeof tag === 'string') : [],
+          createdAt: typeof factPatch.createdAt === 'string' ? factPatch.createdAt : undefined,
+          updatedAt: typeof factPatch.updatedAt === 'string' ? factPatch.updatedAt : undefined,
+          expires: typeof factPatch.expires === 'string' || factPatch.expires === null ? factPatch.expires : undefined,
+          metadata: factPatch.metadata,
+        }
+      }
+      return
+
+    case 'fiction.fact_used':
+      {
+        const fact = targetFictionFact(world, event, issues)
+        if (fact) {
+          fact.status = 'used'
+          fact.updatedAt = typeof event.metadata?.updatedAt === 'string' ? event.metadata.updatedAt : fact.updatedAt
+        }
+      }
+      return
+
+    case 'fiction.fact_expired':
+      {
+        const fact = targetFictionFact(world, event, issues)
+        if (fact) {
+          fact.status = 'expired'
+          fact.updatedAt = typeof event.metadata?.updatedAt === 'string' ? event.metadata.updatedAt : fact.updatedAt
+        }
+      }
+      return
+
     default:
       return
   }
@@ -198,6 +259,7 @@ function applyEvent(world: WorldState, event: EngineEvent, issues: WorldEventRep
 
 export function replayWorldEvents(initialWorld: WorldState, events: EngineEvent[]): WorldEventReplayResult {
   const world = structuredClone(initialWorld)
+  world.fictionFacts ??= {}
   const issues: WorldEventReplayIssue[] = []
 
   for (const event of events) applyEvent(world, event, issues)

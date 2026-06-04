@@ -192,6 +192,7 @@ function isCanonicalWorldActionKind(kind: GameActionKind): boolean {
     'stabilize',
     'use_object',
     'combine_recipe',
+    'improvise',
   ].includes(kind)
 }
 
@@ -1633,7 +1634,8 @@ function selectToolsForLlm(
     if (isCanonicalWorldActionKind(actionIntent.kind)) return pickTools(allTools, ['resolve_player_action', 'get_entity_stats'])
     if (actionIntent.kind === 'social') return pickTools(allTools, ['resolve_player_action', 'get_entity_stats'])
     if (actionIntent.kind === 'ability_check') return pickTools(allTools, ['resolve_player_action'])
-    if (actionIntent.kind === 'observe' || actionIntent.kind === 'guidance' || actionIntent.kind === 'query_state' || actionIntent.kind === 'unknown') {
+    if (actionIntent.kind === 'unknown') return pickTools(allTools, ['resolve_player_action', 'get_entity_stats'])
+    if (actionIntent.kind === 'observe' || actionIntent.kind === 'guidance' || actionIntent.kind === 'query_state') {
       return pickTools(allTools, ['get_entity_stats'])
     }
 
@@ -1672,7 +1674,9 @@ function selectToolsForLlm(
     return pickTools(allTools, ['resolve_player_action', 'get_entity_stats'])
   }
 
-  if (actionIntent.kind === 'observe' || actionIntent.kind === 'guidance' || actionIntent.kind === 'query_state' || actionIntent.kind === 'unknown') {
+  if (actionIntent.kind === 'unknown') return pickTools(allTools, ['resolve_player_action', 'get_entity_stats'])
+
+  if (actionIntent.kind === 'observe' || actionIntent.kind === 'guidance' || actionIntent.kind === 'query_state') {
     return pickTools(allTools, ['get_entity_stats'])
   }
 
@@ -2588,6 +2592,7 @@ const PLAYER_ACTION_KINDS = new Set<CanonicalPlayerActionKind>([
   'stabilize',
   'use_object',
   'combine_recipe',
+  'improvise',
   'ability_check',
   'social',
   'use_item',
@@ -3125,6 +3130,17 @@ function alarmWorldDebug(alarm: WorldState['alarms'][string]): Record<string, un
   }
 }
 
+function fictionFactWorldDebug(fact: WorldState['fictionFacts'][string]): Record<string, unknown> {
+  return {
+    text: fact.text,
+    roomId: fact.roomId,
+    status: fact.status,
+    source: fact.source,
+    tags: fact.tags ?? [],
+    expires: fact.expires,
+  }
+}
+
 function debugRecordsChanged(before: Record<string, unknown>, after: Record<string, unknown>): boolean {
   return JSON.stringify(before) !== JSON.stringify(after)
 }
@@ -3158,6 +3174,7 @@ function buildWorldDebugDiff(
     npcs: diffWorldRecords(beforeWorld?.npcs, afterWorld?.npcs, npcWorldDebug),
     quests: diffWorldRecords(beforeWorld?.quests, afterWorld?.quests, questWorldDebug),
     alarms: diffWorldRecords(beforeWorld?.alarms, afterWorld?.alarms, alarmWorldDebug),
+    fictionFacts: diffWorldRecords(beforeWorld?.fictionFacts, afterWorld?.fictionFacts, fictionFactWorldDebug),
     ...(flagsChanged ? { flags: { before: beforeFlags, after: afterFlags } } : {}),
   }
 }
@@ -4525,6 +4542,7 @@ function buildLocalEngineNarrative(
     const engineView = buildEngineResolutionView(gameState, newCombatLogEntries, newWorldEvents)
     const eventTypes = engineView.events.map(event => event.type)
     const latestWorldEvent = newWorldEvents.at(-1)
+    const latestEventOfType = (type: EngineEvent['type']) => [...newWorldEvents].reverse().find(event => event.type === type)
     if (eventTypes.includes('room.examined') || eventTypes.includes('object.examined')) return latestWorldEvent?.summary ?? 'Tu examines sans ajouter de fait cache au monde.'
     if (eventTypes.includes('clue.read')) return latestWorldEvent?.summary ?? 'Le texte lu devient un fait moteur clair.'
     if (eventTypes.includes('room.object_discovered')) return latestWorldEvent?.summary ?? 'Ta fouille revele un element concret.'
@@ -4542,6 +4560,13 @@ function buildLocalEngineNarrative(
     if (eventTypes.includes('alarm.raised')) return latestWorldEvent?.summary ?? 'L alerte monte dans le monde.'
     if (eventTypes.includes('trap.disarmed')) return latestWorldEvent?.summary ?? 'Le piege est desamorce.'
     if (eventTypes.includes('trap.triggered')) return latestWorldEvent?.summary ?? 'Le piege se declenche.'
+    if (eventTypes.includes('fiction.fact_created')) return latestEventOfType('fiction.fact_created')?.summary
+      ? `${latestEventOfType('fiction.fact_created')?.summary}. Ce detail devient vrai dans la scene.`
+      : 'Ton improvisation ajoute un fait concret et persistant a la scene.'
+    if (eventTypes.includes('fiction.fact_used')) return latestEventOfType('fiction.fact_used')?.summary
+      ? `${latestEventOfType('fiction.fact_used')?.summary}. Tu peux t appuyer dessus tant qu il reste coherent.`
+      : 'Tu exploites un fait fictionnel deja etabli.'
+    if (eventTypes.includes('improvisation.resolved')) return latestWorldEvent?.summary ?? 'Ton improvisation est acceptee comme fait moteur.'
     if (eventTypes.includes('action.blocked')) return latestWorldEvent?.summary ?? "Ton geste n'est pas possible dans l'etat actuel."
     if (eventTypes.includes('entity.moved')) return buildOralFallbackNarrative(gameState, ['move_token'])
     if (eventTypes.includes('item.used')) {

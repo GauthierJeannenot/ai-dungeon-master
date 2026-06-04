@@ -178,14 +178,24 @@ export function derivePlayerAffordances(gameState: GameState): PlayerAffordance[
       }))
     }
 
-    affordances.push(affordance({
-      id: 'combat-check',
-      kind: 'ability_check',
-      label: 'Tenter une manoeuvre risquee',
-      enabled: true,
-      reason: 'Une action creative doit passer par un test ou une action sociale.',
-      toolName: 'resolve_player_action',
-    }))
+    affordances.push(
+      affordance({
+        id: 'combat-check',
+        kind: 'ability_check',
+        label: 'Tenter une manoeuvre risquee',
+        enabled: true,
+        reason: 'Une action creative doit passer par un test ou une action sociale.',
+        toolName: 'resolve_player_action',
+      }),
+      affordance({
+        id: 'combat-improvise',
+        kind: 'improvise',
+        label: 'Improviser avec la fiction',
+        enabled: true,
+        reason: 'Une action creative hors objets modelises peut creer ou utiliser un fait fictionnel persistant.',
+        toolName: 'resolve_player_action',
+      })
+    )
 
     return affordances
   }
@@ -228,6 +238,14 @@ export function derivePlayerAffordances(gameState: GameState): PlayerAffordance[
       label: 'Parler ou negocier',
       enabled: true,
       reason: 'Une interaction sociale peut etre resolue si un interlocuteur est present en fiction.',
+      toolName: 'resolve_player_action',
+    }),
+    affordance({
+      id: 'exploration-improvise',
+      kind: 'improvise',
+      label: 'Improviser avec la fiction',
+      enabled: true,
+      reason: 'Une action creative hors objets modelises peut creer ou utiliser un fait fictionnel persistant.',
       toolName: 'resolve_player_action',
     })
   )

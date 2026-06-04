@@ -5,6 +5,7 @@ import {
   PlayerState,
   Item,
   EngineEvent,
+  FictionFactState,
   WorldAlarmState,
   WorldNpcDisposition,
   WorldNpcState,
@@ -91,6 +92,15 @@ function mergeAlarmState(defaultAlarm: WorldAlarmState | undefined, incomingAlar
   }
 }
 
+function mergeFictionFactState(defaultFact: FictionFactState | undefined, incomingFact: FictionFactState): FictionFactState {
+  return {
+    ...defaultFact,
+    ...incomingFact,
+    tags: incomingFact.tags ?? defaultFact?.tags,
+    metadata: { ...(defaultFact?.metadata ?? {}), ...(incomingFact.metadata ?? {}) },
+  }
+}
+
 function ensureWorldState(): WorldState {
   const defaults = createInitialWorldState()
   const incoming = state.world
@@ -120,12 +130,18 @@ function ensureWorldState(): WorldState {
     alarms[id] = mergeAlarmState(defaults.alarms[id], structuredClone(alarm))
   }
 
+  const fictionFacts: Record<string, FictionFactState> = structuredClone(defaults.fictionFacts ?? {})
+  for (const [id, fact] of Object.entries(incoming?.fictionFacts ?? {})) {
+    fictionFacts[id] = mergeFictionFactState(defaults.fictionFacts?.[id], structuredClone(fact))
+  }
+
   state.world = {
     rooms,
     objects,
     npcs,
     quests,
     alarms,
+    fictionFacts,
     flags: { ...defaults.flags, ...(incoming?.flags ?? {}) },
     eventLog: structuredClone(incoming?.eventLog ?? []).slice(-WORLD_EVENT_LOG_LIMIT),
   }
@@ -387,6 +403,38 @@ export function raiseWorldAlarm(alarmId: string, reason: string, amount = 1): Wo
     updatedAt: new Date().toISOString(),
   }
   return alarm
+}
+
+export function upsertFictionFact(fact: FictionFactState): FictionFactState {
+  const world = ensureWorldState()
+  const previous = world.fictionFacts[fact.id]
+  const now = new Date().toISOString()
+  const next: FictionFactState = {
+    ...previous,
+    ...fact,
+    status: fact.status ?? previous?.status ?? 'active',
+    createdAt: fact.createdAt ?? previous?.createdAt ?? now,
+    updatedAt: fact.updatedAt ?? now,
+    tags: fact.tags ?? previous?.tags ?? [],
+    metadata: { ...(previous?.metadata ?? {}), ...(fact.metadata ?? {}) },
+  }
+  world.fictionFacts[fact.id] = next
+  return next
+}
+
+export function updateFictionFact(factId: string, patch: Partial<FictionFactState>): FictionFactState {
+  const world = ensureWorldState()
+  const fact = world.fictionFacts[factId]
+  if (!fact) throw new Error(`Fiction fact not found: ${factId}`)
+  const updated: FictionFactState = {
+    ...fact,
+    ...patch,
+    tags: patch.tags ?? fact.tags,
+    metadata: { ...(fact.metadata ?? {}), ...(patch.metadata ?? {}) },
+    updatedAt: patch.updatedAt ?? new Date().toISOString(),
+  }
+  world.fictionFacts[factId] = updated
+  return updated
 }
 
 export function setWorldFlag(flagId: string, value: boolean): void {

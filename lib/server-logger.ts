@@ -403,6 +403,8 @@ export function summarizeGameState(gameState: GameState | undefined | null): Rec
   const monsters = Object.values(gameState.monsters)
   const aliveMonsters = monsters.filter(monster => monster.isAlive)
   const deadMonsters = monsters.filter(monster => !monster.isAlive)
+  const fictionFacts = Object.values(gameState.world?.fictionFacts ?? {})
+  const activeFictionFacts = fictionFacts.filter(fact => fact.status !== 'expired')
 
   return {
     phase: gameState.phase,
@@ -427,6 +429,11 @@ export function summarizeGameState(gameState: GameState | undefined | null): Rec
     combatLogCount: gameState.combatLog.length,
     roomsVisitedCount: gameState.roomsVisited.length,
     currentRoomId: gameState.currentRoomId,
+    fictionFacts: {
+      total: fictionFacts.length,
+      active: activeFictionFacts.length,
+      activeIds: activeFictionFacts.map(fact => fact.id).slice(-8),
+    },
   }
 }
 

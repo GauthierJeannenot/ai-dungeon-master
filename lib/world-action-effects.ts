@@ -65,6 +65,13 @@ export const WORLD_ACTION_EFFECTS: Record<string, WorldActionEffectDefinition> =
     consumesCombatAction: true,
     canonicalEvents: ['quest.completed'],
   },
+  improvise: {
+    kind: 'improvise',
+    target: 'room',
+    mutatesWorld: true,
+    consumesCombatAction: true,
+    canonicalEvents: ['fiction.fact_created', 'fiction.fact_used', 'improvisation.resolved'],
+  },
 }
 
 export function worldActionEffectForKind(kind: CanonicalPlayerActionKind): WorldActionEffectDefinition | undefined {

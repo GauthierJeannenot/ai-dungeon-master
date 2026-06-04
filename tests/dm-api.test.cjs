@@ -300,6 +300,34 @@ test('DM API resolves a combat attack through MCP in mock mode', async t => {
   assert.equal(data.usage?.llmRoute, 'short')
 })
 
+test('DM API resolves creative improvisation as persistent fiction instead of default fallback', async t => {
+  const sessionId = `api-improvise-${process.pid}-${Date.now()}`
+  t.after(() => cleanupSession(sessionId))
+
+  const { response, data } = await postDm({
+    message: "je lance creation d'eau sous la porte pour mouiller le sol",
+    clientRequestId: `client-${sessionId}`,
+    sessionId,
+    gameState: bakeryEntranceGameState(),
+    history: [],
+  })
+
+  assert.equal(response.status, 200)
+  assert.ok(data.toolsUsed.includes('resolve_player_action'))
+  assert.equal(data.turnTrace?.intent.kind, 'improvise')
+  assert.ok(data.turnTrace?.actions.some(action => action.toolName === 'resolve_player_action' && action.executed))
+  assert.ok(data.engine?.events?.some(event => event.type === 'fiction.fact_created'))
+  assert.ok(data.engine?.events?.some(event => event.type === 'improvisation.resolved'))
+  assert.ok(Object.values(data.newGameState.world.fictionFacts).some(fact =>
+    fact.text.includes("eau") &&
+    fact.roomId === '4' &&
+    fact.status === 'active'
+  ))
+  assert.ok(data.turnTrace?.worldDiff?.fictionFacts)
+  assert.doesNotMatch(data.narrative, DEFAULT_SCENE_NARRATIVE_PATTERN)
+  assert.doesNotMatch(data.narrative, /situation ne le permet pas|intention cherche une prise|geste se bloque/i)
+})
+
 test('DM API routes open social scenes through rich mock LLM narration', async t => {
   const sessionId = `api-social-${process.pid}-${Date.now()}`
   t.after(() => cleanupSession(sessionId))

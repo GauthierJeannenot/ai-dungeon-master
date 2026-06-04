@@ -7,6 +7,7 @@ import {
   AbilityCheckResult,
   EngineEvent,
   EntityStats,
+  FictionFactState,
   Item,
   WorldNpcDisposition,
   WorldNpcState,
@@ -59,10 +60,21 @@ type PlayerActionKind =
   | 'use_item'
   | 'wait'
   | 'death_save'
+  | 'improvise'
 
 const TargetHintSchema = z.enum(['nearest', 'right', 'left', 'front', 'back', 'wounded'])
 const AbilitySchema = z.enum(['str', 'dex', 'con', 'int', 'wis', 'cha'])
 const CellSchema = z.object({ x: z.number().int().min(0), y: z.number().int().min(0) })
+const FictionFactPatchSchema = z.object({
+  id: z.string().min(1).max(80).optional(),
+  text: z.string().min(1).max(320),
+  roomId: z.string().min(1).max(40).optional(),
+  tags: z.array(z.string().min(1).max(40)).max(12).optional(),
+  source: z.string().min(1).max(120).optional(),
+  expires: z.string().max(40).nullable().optional(),
+  metadata: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
+})
+type FictionFactPatch = z.infer<typeof FictionFactPatchSchema>
 
 const PlayerActionSchema = z.discriminatedUnion('kind', [
   z.object({
@@ -232,6 +244,16 @@ const PlayerActionSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('death_save'),
   }),
+  z.object({
+    kind: z.literal('improvise'),
+    intent: z.string().min(1).max(500),
+    targetName: z.string().max(120).optional(),
+    method: z.string().max(240).optional(),
+    desiredEffect: z.string().max(320).optional(),
+    createsFacts: z.array(FictionFactPatchSchema).max(5).optional(),
+    usesFactIds: z.array(z.string().min(1).max(80)).max(5).optional(),
+    tags: z.array(z.string().min(1).max(40)).max(12).optional(),
+  }),
 ])
 
 function jsonResponse(value: unknown): ToolResponse {
@@ -276,6 +298,16 @@ function summarizeState() {
       disposition: npc.disposition,
       known: npc.known,
     }))
+  const activeFictionFacts = Object.values(world.fictionFacts ?? {})
+    .filter(fact => fact.status !== 'expired')
+    .filter(fact => !roomId || !fact.roomId || fact.roomId === roomId)
+    .map(fact => ({
+      id: fact.id,
+      text: fact.text,
+      roomId: fact.roomId,
+      tags: fact.tags ?? [],
+      source: fact.source,
+    }))
   return {
     phase: state.phase,
     round: state.round,
@@ -296,6 +328,7 @@ function summarizeState() {
     world: {
       roomObjects,
       roomNpcs,
+      activeFictionFacts,
       quests: world.quests,
       alarms: world.alarms,
       lastEventTypes: world.eventLog.slice(-5).map(event => event.type),
@@ -2325,6 +2358,211 @@ function resolveUseObjectAction({
   })
 }
 
+function sanitizeFactTags(values: string[] | undefined, text: string): string[] {
+  const normalized = new Set<string>()
+  for (const value of values ?? []) {
+    const tag = normalizeFrenchText(value).replace(/[^a-z0-9_-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40)
+    if (tag) normalized.add(tag)
+  }
+
+  const haystack = normalizeFrenchText(text)
+  const inferred: Array<[string, RegExp]> = [
+    ['water', /\b(eau|flotte|pluie|mouille|mouiller|creation d eau|create water)\b/],
+    ['wet_surface', /\b(sol mouille|flaque|glisser|mouille|eau au sol)\b/],
+    ['fire', /\b(feu|flamme|brule|incendie|enflamme)\b/],
+    ['smoke', /\b(fumee|brouillard|vapeur)\b/],
+    ['barrier', /\b(bloque|barricade|coince|obstacle|barriere)\b/],
+    ['improvised_tool', /\b(fabrique|bricole|arme|outil|jambe de table|planche)\b/],
+    ['magic', /\b(sort|magie|enchante|creation|invoque|conjure)\b/],
+    ['noise', /\b(bruit|vacarme|fracas|crie|hurle)\b/],
+  ]
+  for (const [tag, pattern] of inferred) {
+    if (pattern.test(haystack)) normalized.add(tag)
+  }
+  normalized.add('improvised')
+  return [...normalized].slice(0, 12)
+}
+
+function baseFactSlug(text: string): string {
+  const normalized = normalizeFrenchText(text)
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48)
+  return normalized || 'fait'
+}
+
+function nextFictionFactId(text: string, roomId: string | undefined): string {
+  const world = gs.getWorldState()
+  const roomPrefix = roomId ? `r${roomId}` : 'global'
+  const base = `fact-${roomPrefix}-${baseFactSlug(text)}`
+  if (!world.fictionFacts[base]) return base
+  for (let index = 2; index < 100; index++) {
+    const candidate = `${base}-${index}`
+    if (!world.fictionFacts[candidate]) return candidate
+  }
+  return `fact-${roomPrefix}-${Date.now()}`
+}
+
+function buildDefaultFictionFact({
+  intent,
+  targetName,
+  method,
+  desiredEffect,
+  tags,
+}: {
+  intent: string
+  targetName?: string
+  method?: string
+  desiredEffect?: string
+  tags?: string[]
+}): FictionFactPatch {
+  const text = (desiredEffect ?? intent).trim()
+  const targetText = targetName?.trim()
+  return {
+    text: targetText ? `${text} (cible: ${targetText})` : text,
+    tags: sanitizeFactTags(tags, `${intent} ${desiredEffect ?? ''} ${method ?? ''} ${targetName ?? ''}`),
+    source: method?.trim() || 'player_improvisation',
+    roomId: gs.getState().currentRoomId ?? undefined,
+    expires: 'scene',
+  }
+}
+
+function normalizeFictionFactPatch(patch: FictionFactPatch, fallbackRoomId: string | null): FictionFactState {
+  const text = patch.text.trim()
+  const roomId = patch.roomId ?? fallbackRoomId ?? undefined
+  if (roomId && !gs.getWorldState().rooms[roomId]) {
+    throw new rules.RuleViolation('FICTION_FACT_ROOM_UNKNOWN', 'The improvised fact targets an unknown room.', {
+      roomId,
+      text,
+    })
+  }
+  return {
+    id: patch.id?.trim() || nextFictionFactId(text, roomId),
+    text,
+    roomId,
+    status: 'active',
+    source: patch.source?.trim() || 'player_improvisation',
+    tags: sanitizeFactTags(patch.tags, text),
+    expires: patch.expires ?? 'scene',
+    metadata: patch.metadata,
+  }
+}
+
+function resolveImproviseAction({
+  intent,
+  targetName,
+  method,
+  desiredEffect,
+  createsFacts,
+  usesFactIds,
+  tags,
+}: {
+  intent: string
+  targetName?: string
+  method?: string
+  desiredEffect?: string
+  createsFacts?: FictionFactPatch[]
+  usesFactIds?: string[]
+  tags?: string[]
+}): ToolResponse {
+  const availabilityError = assertWorldActionAvailable()
+  if (availabilityError) return availabilityError
+
+  const world = gs.getWorldState()
+  const missingFactIds = (usesFactIds ?? []).filter(factId => !world.fictionFacts[factId] || world.fictionFacts[factId].status === 'expired')
+  if (missingFactIds.length > 0) {
+    return blockedAction('FICTION_FACT_NOT_FOUND', 'The improvisation refers to a fiction fact that is not active in the world state.', {
+      missingFactIds,
+      activeFactIds: Object.values(world.fictionFacts).filter(fact => fact.status !== 'expired').map(fact => fact.id),
+    })
+  }
+
+  const factPatches = createsFacts?.length
+    ? createsFacts
+    : [buildDefaultFictionFact({ intent, targetName, method, desiredEffect, tags })]
+
+  const createdFacts: FictionFactState[] = []
+  const usedFacts: FictionFactState[] = []
+  const now = new Date().toISOString()
+
+  try {
+    for (const factId of usesFactIds ?? []) {
+      const updated = gs.updateFictionFact(factId, {
+        status: 'used',
+        updatedAt: now,
+        metadata: { lastUsedBy: 'player' },
+      })
+      usedFacts.push(updated)
+      gs.recordWorldEvent({
+        type: 'fiction.fact_used',
+        summary: `Fait fictionnel utilise: ${updated.text}`,
+        actorId: 'player',
+        targetId: updated.id,
+        outcome: 'success',
+        metadata: {
+          factId: updated.id,
+          updatedAt: now,
+        },
+      })
+    }
+
+    for (const patch of factPatches) {
+      const fact = gs.upsertFictionFact(normalizeFictionFactPatch(patch, gs.getState().currentRoomId))
+      createdFacts.push(fact)
+      gs.recordWorldEvent({
+        type: 'fiction.fact_created',
+        summary: fact.text,
+        actorId: 'player',
+        targetId: fact.id,
+        outcome: 'success',
+        metadata: {
+          fact,
+          intent,
+          targetName,
+          method,
+          desiredEffect,
+        },
+      })
+    }
+  } catch (err) {
+    return rules.ruleErrorResult(err)
+  }
+
+  gs.recordWorldEvent({
+    type: 'improvisation.resolved',
+    summary: createdFacts.length > 0
+      ? `Improvisation acceptee: ${createdFacts.map(fact => fact.text).join(' ; ')}`
+      : `Improvisation resolue avec ${usedFacts.length} fait(s) fictionnel(s).`,
+    actorId: 'player',
+    outcome: 'success',
+    metadata: {
+      intent,
+      targetName,
+      method,
+      desiredEffect,
+      createdFactIds: createdFacts.map(fact => fact.id),
+      usedFactIds: usedFacts.map(fact => fact.id),
+    },
+  })
+
+  gs.addLogEntry({
+    round: gs.getState().round,
+    turn: gs.getState().currentTurn ?? 'player',
+    action: `${gs.getPlayer().name} improvise`,
+    mechanicalDetail: `Faits crees: ${createdFacts.map(fact => fact.id).join(', ') || 'aucun'} | faits utilises: ${usedFacts.map(fact => fact.id).join(', ') || 'aucun'}`,
+  })
+  recordActionIfCombat()
+
+  return jsonResponse({
+    success: true,
+    createdFacts,
+    usedFacts,
+    mechanicalSummary: createdFacts.length > 0
+      ? `Fiction persistante: ${createdFacts.map(fact => fact.text).join(' ; ')}`
+      : `Fiction persistante utilisee: ${usedFacts.map(fact => fact.text).join(' ; ')}`,
+  })
+}
+
 function resolveCombineRecipeAction(): ToolResponse {
   const availabilityError = assertWorldActionAvailable()
   if (availabilityError) return availabilityError
@@ -2382,7 +2620,7 @@ function resolveCombineRecipeAction(): ToolResponse {
 export function registerActionTools(server: McpServer): void {
   server.tool(
     'resolve_player_action',
-    'Canonical player action facade. Use one compact action: attack, move, examine, read, search, open, take, unlock, force, disarm, talk, ask, persuade, threaten, show_item, give_item, hide, help, flee, stabilize, use_object, combine_recipe, ability_check, social, use_item, wait, or death_save. The engine validates legality, mutates state, records canonical events, and returns the authoritative result.',
+    'Canonical player action facade. Use one compact action: attack, move, examine, read, search, open, take, unlock, force, disarm, talk, ask, persuade, threaten, show_item, give_item, hide, help, flee, stabilize, use_object, combine_recipe, improvise, ability_check, social, use_item, wait, or death_save. Use improvise for creative facts outside modeled objects; the engine persists those facts. The engine validates legality, mutates state, records canonical events, and returns the authoritative result.',
     {
       action: PlayerActionSchema.describe('Compact player action to resolve through the rules engine.'),
     },
@@ -2534,6 +2772,17 @@ export function registerActionTools(server: McpServer): void {
 
         case 'combine_recipe':
           return wrapActionResult('combine_recipe', 'world.combine_recipe', resolveCombineRecipeAction())
+
+        case 'improvise':
+          return wrapActionResult('improvise', 'world.improvise', resolveImproviseAction({
+            intent: action.intent,
+            targetName: action.targetName,
+            method: action.method,
+            desiredEffect: action.desiredEffect,
+            createsFacts: action.createsFacts,
+            usesFactIds: action.usesFactIds,
+            tags: action.tags,
+          }))
 
         case 'ability_check':
           return wrapActionResult('ability_check', 'roll_ability_check', resolveAbilityCheck({

@@ -1406,6 +1406,58 @@ test('MCP initial world definition is data-driven across the full module', async
   })
 })
 
+test('MCP resolve_player_action persists creative improvisation as fiction facts', async () => {
+  await withMcpClient(async client => {
+    const baseState = await callTool(client, 'get_game_state')
+    baseState.player.position = { x: 10, y: 10 }
+    baseState.roomsVisited = ['4']
+    baseState.currentRoomId = '4'
+    await callTool(client, 'replace_game_state', { gameState: baseState })
+
+    const improvised = await callTool(client, 'resolve_player_action', {
+      action: {
+        kind: 'improvise',
+        intent: "je lance creation d'eau sous la porte pour mouiller le sol",
+        method: "sort creation d'eau",
+        desiredEffect: "de l'eau magique s'etale sous la porte et mouille le sol",
+      },
+    })
+
+    assert.equal(improvised.success, true)
+    assert.equal(improvised.kind, 'improvise')
+    assert.equal(improvised.toolEquivalent, 'world.improvise')
+    assert.equal(improvised.result.createdFacts.length, 1)
+    const fact = improvised.result.createdFacts[0]
+    assert.equal(fact.roomId, '4')
+    assert.equal(fact.status, 'active')
+    assert.ok(fact.tags.includes('water'))
+    assert.ok(fact.tags.includes('wet_surface'))
+
+    let stateAfter = await callTool(client, 'get_game_state')
+    assert.equal(stateAfter.world.fictionFacts[fact.id].text, fact.text)
+    assert.ok(stateAfter.world.eventLog.some(event => event.type === 'fiction.fact_created' && event.targetId === fact.id))
+    assert.ok(stateAfter.world.eventLog.some(event => event.type === 'improvisation.resolved'))
+
+    const reused = await callTool(client, 'resolve_player_action', {
+      action: {
+        kind: 'improvise',
+        intent: "j'utilise l'eau au sol pour faire glisser le gobelin",
+        usesFactIds: [fact.id],
+        createsFacts: [{
+          text: "Le sol mouille devient une zone glissante exploitable.",
+          tags: ['wet_surface', 'slippery'],
+        }],
+      },
+    })
+    assert.equal(reused.success, true)
+
+    stateAfter = await callTool(client, 'get_game_state')
+    assert.equal(stateAfter.world.fictionFacts[fact.id].status, 'used')
+    assert.ok(stateAfter.world.eventLog.some(event => event.type === 'fiction.fact_used' && event.targetId === fact.id))
+    assert.ok(Object.values(stateAfter.world.fictionFacts).some(existing => existing.tags.includes('slippery')))
+  })
+})
+
 test('MCP resolve_player_action handles apartment recipe half and canonical recipe completion', async () => {
   await withMcpClient(async client => {
     const baseState = await callTool(client, 'get_game_state')
