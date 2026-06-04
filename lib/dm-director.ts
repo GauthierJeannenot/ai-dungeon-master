@@ -145,7 +145,10 @@ function updateSceneMemory(input: DirectorInput): SceneMemory {
     signals.push('Un gobelin epargne peut changer le ton des prochains echanges.')
   }
 
-  const combatEscalated = tools.includes('resolve_player_attack') || tools.includes('resolve_attack')
+  const combatEscalated =
+    tools.includes('resolve_player_attack') ||
+    tools.includes('resolve_attack') ||
+    (tools.includes('resolve_player_action') && input.actionIntent.kind === 'attack')
   if (combatEscalated) tension += 1
   if (noisyThisTurn) alertLevel += 1
   if (combatEscalated) alertLevel += 1
@@ -319,7 +322,24 @@ function buildLocalNarrative(input: DirectorInput): string | null {
 
   if (tools.includes('start_encounter')) return buildEncounterNarrative(gameState)
   if (tools.includes('end_combat') && gameState.phase !== 'combat') return buildEndCombatNarrative(gameState)
-  if (tools.includes('resolve_player_attack') || tools.includes('resolve_player_action') || tools.includes('resolve_attack')) {
+  if (tools.includes('resolve_player_action')) {
+    if (actionIntent.kind === 'move') return buildMoveNarrative(gameState)
+    if (actionIntent.kind === 'use_item') {
+      return `La potion rallume tes forces: tu remontes a ${gameState.player.hp.current}/${gameState.player.hp.max} PV. Ce n'est pas du confort, mais c'est assez pour agir.`
+    }
+    if (actionIntent.kind === 'death_save') {
+      const detail = [...newCombatLogEntries].reverse().find(entry => entry.mechanicalDetail)?.mechanicalDetail
+      return detail ? `Au bord du noir, le destin repond: ${detail}.` : null
+    }
+    if (actionIntent.kind === 'wait') {
+      return gameState.phase === 'combat'
+        ? "Tu gardes ton souffle et laisses filer ton ouverture. La melee se deplace d'un cran."
+        : `Tu prends une seconde dans ${roomName(gameState)}. Rien ne t'arrete, mais rien ne t'attend longtemps.`
+    }
+    if (actionIntent.kind === 'ability_check') return buildAbilityNarrative(newCombatLogEntries)
+    if (actionIntent.kind !== 'social') return buildAttackNarrative(gameState, newCombatLogEntries)
+  }
+  if (tools.includes('resolve_player_attack') || tools.includes('resolve_attack')) {
     return buildAttackNarrative(gameState, newCombatLogEntries)
   }
   if (tools.includes('move_token')) return buildMoveNarrative(gameState)

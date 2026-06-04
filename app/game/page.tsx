@@ -432,6 +432,14 @@ export default function GamePage() {
         inputMode: clientMeta.inputMode ?? 'text',
         narrative: truncateClientText(data.narrative ?? ''),
         toolsUsed: data.toolsUsed,
+        engine: data.engine ? {
+          eventTypes: data.engine.events.map(event => event.type),
+          affordances: data.engine.affordances.map(action => ({
+            kind: action.kind,
+            enabled: action.enabled,
+            toolName: action.toolName,
+          })),
+        } : undefined,
         usage: data.usage,
         summaryContextLength: data.summaryContext?.length ?? 0,
         gameState: data.newGameState ? summarizeClientGameState(data.newGameState) : null,

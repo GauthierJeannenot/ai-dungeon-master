@@ -121,11 +121,20 @@ function summarizeState() {
 function wrapActionResult(kind: PlayerActionKind, toolEquivalent: string, result: ToolResponse): ToolResponse {
   if (result.isError) return result
 
+  const parsedResult = parseToolPayload(result)
+  const mechanicalSummary = typeof parsedResult === 'object' &&
+    parsedResult !== null &&
+    'mechanicalSummary' in parsedResult &&
+    typeof parsedResult.mechanicalSummary === 'string'
+    ? parsedResult.mechanicalSummary
+    : undefined
+
   return jsonResponse({
     success: true,
     kind,
     toolEquivalent,
-    result: parseToolPayload(result),
+    mechanicalSummary,
+    result: parsedResult,
     gameState: summarizeState(),
   })
 }

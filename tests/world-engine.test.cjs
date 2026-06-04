@@ -117,6 +117,7 @@ test('world engine exposes canonical combat actions for conscious player turns',
   const affordances = worldEngine.derivePlayerAffordances(state)
 
   assert.equal(affordances.find(action => action.kind === 'attack')?.toolName, 'resolve_player_action')
+  assert.equal(affordances.find(action => action.kind === 'social')?.toolName, 'resolve_player_action')
   assert.equal(affordances.find(action => action.kind === 'move')?.enabled, true)
   assert.equal(affordances.find(action => action.kind === 'wait')?.toolName, 'resolve_player_action')
   assert.equal(affordances.find(action => action.kind === 'use_item')?.enabled, true)

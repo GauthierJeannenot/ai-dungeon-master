@@ -18,7 +18,7 @@ import {
   inferAdventureRoomId as inferMappedAdventureRoomId,
   relativeAdventureRoomIdForText,
 } from '@/lib/adventure-map'
-import { DMRequest, DMResponse, GameState, ConversationTurn, CombatLogEntry, MonsterState, type DMTurnUsage, type EngineEvent, type PlayerAffordance } from '@/lib/types'
+import { DMRequest, DMResponse, GameState, ConversationTurn, CombatLogEntry, MonsterState, type CanonicalPlayerActionKind, type DMTurnUsage, type EngineEvent, type PlayerAffordance } from '@/lib/types'
 import {
   isDoorTraversalIntent,
   normalizeFrenchText,
@@ -42,7 +42,7 @@ import {
   type AnthropicUsageLogEntry,
 } from '@/lib/anthropic-usage'
 import { logEvent, summarizeGameState } from '@/lib/server-logger'
-import { buildEngineResolutionView } from '@/lib/world-engine'
+import { buildEngineResolutionView, derivePlayerAffordances } from '@/lib/world-engine'
 
 export const maxDuration = 60
 
@@ -340,6 +340,12 @@ function createMockLlmMessage(params: MessageCreateParams, context: LlmCallConte
     return mockTextMessage("Les adversaires agissent avant que tu puisses reprendre l'initiative.")
   }
 
+  if (gameState.phase === 'combat' && /passe|attend|attends|patient|ne fais rien/.test(text) && toolAvailable('resolve_player_action', context.tools)) {
+    return mockToolMessage('resolve_player_action', {
+      action: { kind: 'wait', reason: 'Le joueur attend.' },
+    })
+  }
+
   if (gameState.phase === 'combat' && /passe|attend|attends|patient|ne fais rien/.test(text) && toolAvailable('pass_turn', context.tools)) {
     return mockToolMessage('pass_turn', { reason: 'Le joueur attend.' })
   }
@@ -352,10 +358,30 @@ function createMockLlmMessage(params: MessageCreateParams, context: LlmCallConte
   }
 
   const coordinateMatch = text.match(/\(?\s*(\d{1,2})\s*[,;]\s*(\d{1,2})\s*\)?/)
+  if (coordinateMatch && /va|vais|avance|bouge|déplace|deplace|marche|case/.test(text) && toolAvailable('resolve_player_action', context.tools)) {
+    return mockToolMessage('resolve_player_action', {
+      action: {
+        kind: 'move',
+        tokenId: 'player',
+        toCell: { x: Number(coordinateMatch[1]), y: Number(coordinateMatch[2]) },
+      },
+    })
+  }
+
   if (coordinateMatch && /va|vais|avance|bouge|déplace|deplace|marche|case/.test(text) && toolAvailable('move_token', context.tools)) {
     return mockToolMessage('move_token', {
       tokenId: 'player',
       toCell: { x: Number(coordinateMatch[1]), y: Number(coordinateMatch[2]) },
+    })
+  }
+
+  if (gameState.phase === 'combat' && gameState.currentTurn === 'player' && /attaque|frappe|tape|coup|charge/.test(text) && toolAvailable('resolve_player_action', context.tools)) {
+    return mockToolMessage('resolve_player_action', {
+      action: {
+        kind: 'attack',
+        targetHint: 'nearest',
+        weaponOrSpell: 'longsword',
+      },
     })
   }
 
@@ -1006,6 +1032,13 @@ function buildMcpRuleErrorNarrative(errorResult: unknown, gameState: GameState, 
     return "Pas encore: il te reste une vraie action a poser avant de laisser filer ton tour."
   }
 
+  if (code === 'ACTION_NOT_AFFORDED') {
+    if (gameState.player.hp.current <= 0 || gameState.player.conditions.includes('unconscious')) {
+      return buildPlayerDownNarrative(gameState)
+    }
+    return "Ton intention cherche une prise, mais la scene ne l'offre pas encore: il faut un geste plus direct ou un angle plus clair."
+  }
+
   if (code === 'NOT_CURRENT_TURN' || code === 'PLAYER_TURN_REQUIRED') {
     return "Pas maintenant: le rythme du combat ne te laisse pas cette ouverture."
   }
@@ -1358,12 +1391,12 @@ const TOOL_INTENT_SATISFIERS: Record<string, string[]> = {
 
 const LLM_TOOL_SETS = {
   explorationAmbient: ['roll_ability_check', 'trigger_room_event', 'get_entity_stats'],
-  explorationDefault: ['use_healing_potion', 'roll_ability_check', 'roll_dice', 'trigger_room_event', 'get_entity_stats'],
-  explorationMovement: ['move_token', 'trigger_room_event', 'start_encounter', 'use_healing_potion', 'roll_ability_check', 'roll_dice', 'get_entity_stats'],
-  explorationEncounter: ['start_encounter', 'move_token', 'trigger_room_event', 'use_healing_potion', 'roll_ability_check', 'roll_dice', 'get_entity_stats'],
-  combatPlayer: ['resolve_player_action', 'resolve_player_attack', 'move_token', 'pass_turn', 'end_combat', 'roll_death_save', 'use_healing_potion', 'roll_ability_check', 'roll_dice', 'get_entity_stats', 'resolve_saving_throw'],
+  explorationDefault: ['resolve_player_action', 'get_entity_stats'],
+  explorationMovement: ['resolve_player_action', 'start_encounter', 'get_entity_stats'],
+  explorationEncounter: ['resolve_player_action', 'start_encounter', 'get_entity_stats'],
+  combatPlayer: ['resolve_player_action', 'end_combat', 'get_entity_stats'],
   combatNonPlayer: ['roll_ability_check', 'roll_dice', 'get_entity_stats'],
-  dialogue: ['use_healing_potion', 'roll_ability_check', 'roll_dice', 'get_entity_stats', 'apply_condition'],
+  dialogue: ['resolve_player_action', 'get_entity_stats', 'apply_condition'],
 } as const
 
 type PlayerAttackTargetHint = 'nearest' | 'right' | 'left' | 'front' | 'back' | 'wounded'
@@ -1402,13 +1435,13 @@ function selectToolsForLlm(
   if (gameState.phase === 'combat') {
     if (gameState.currentTurn !== 'player') return pickTools(allTools, LLM_TOOL_SETS.combatNonPlayer)
 
-    if (actionIntent.kind === 'attack') return pickTools(allTools, ['resolve_player_action', 'resolve_player_attack', 'move_token'])
-    if (actionIntent.kind === 'move') return pickTools(allTools, ['resolve_player_action', 'move_token'])
-    if (actionIntent.kind === 'wait') return pickTools(allTools, ['resolve_player_action', 'pass_turn'])
-    if (actionIntent.kind === 'death_save') return pickTools(allTools, ['resolve_player_action', 'roll_death_save'])
-    if (actionIntent.kind === 'use_item') return pickTools(allTools, ['resolve_player_action', 'use_healing_potion'])
-    if (actionIntent.kind === 'social') return pickTools(allTools, ['resolve_player_action', 'roll_ability_check', 'end_combat'])
-    if (actionIntent.kind === 'ability_check') return pickTools(allTools, ['resolve_player_action', 'roll_ability_check'])
+    if (actionIntent.kind === 'attack') return pickTools(allTools, ['resolve_player_action'])
+    if (actionIntent.kind === 'move') return pickTools(allTools, ['resolve_player_action'])
+    if (actionIntent.kind === 'wait') return pickTools(allTools, ['resolve_player_action'])
+    if (actionIntent.kind === 'death_save') return pickTools(allTools, ['resolve_player_action'])
+    if (actionIntent.kind === 'use_item') return pickTools(allTools, ['resolve_player_action'])
+    if (actionIntent.kind === 'social') return pickTools(allTools, ['resolve_player_action', 'get_entity_stats'])
+    if (actionIntent.kind === 'ability_check') return pickTools(allTools, ['resolve_player_action'])
     if (actionIntent.kind === 'observe' || actionIntent.kind === 'guidance' || actionIntent.kind === 'query_state' || actionIntent.kind === 'unknown') {
       return pickTools(allTools, ['get_entity_stats'])
     }
@@ -1421,23 +1454,23 @@ function selectToolsForLlm(
   }
 
   if (actionIntent.kind === 'move') {
-    return pickTools(allTools, ['resolve_player_action', 'move_token', 'start_encounter', 'get_entity_stats'])
+    return pickTools(allTools, LLM_TOOL_SETS.explorationMovement)
   }
 
   if (actionIntent.kind === 'attack' || actionIntent.kind === 'encounter') {
-    return pickTools(allTools, ['resolve_player_action', 'start_encounter', 'resolve_player_attack', 'get_entity_stats'])
+    return pickTools(allTools, LLM_TOOL_SETS.explorationEncounter)
   }
 
   if (actionIntent.kind === 'interact') {
-    return pickTools(allTools, ['resolve_player_action', 'trigger_room_event', 'roll_ability_check', 'start_encounter', 'use_healing_potion', 'get_entity_stats'])
+    return pickTools(allTools, ['resolve_player_action', 'start_encounter', 'get_entity_stats'])
   }
 
   if (actionIntent.kind === 'use_item') {
-    return pickTools(allTools, ['resolve_player_action', 'use_healing_potion'])
+    return pickTools(allTools, ['resolve_player_action'])
   }
 
   if (actionIntent.kind === 'social' || actionIntent.kind === 'ability_check') {
-    return pickTools(allTools, ['resolve_player_action', 'roll_ability_check', 'get_entity_stats'])
+    return pickTools(allTools, ['resolve_player_action', 'get_entity_stats'])
   }
 
   if (actionIntent.kind === 'observe' || actionIntent.kind === 'guidance' || actionIntent.kind === 'query_state' || actionIntent.kind === 'unknown') {
@@ -2000,6 +2033,76 @@ function lastMonsterThatAttackedPlayer(gameState: GameState): string | null {
   return null
 }
 
+const PLAYER_ACTION_KINDS = new Set<CanonicalPlayerActionKind>([
+  'attack',
+  'move',
+  'interact',
+  'ability_check',
+  'social',
+  'use_item',
+  'wait',
+  'death_save',
+  'observe',
+])
+
+function playerActionKindFromToolUse(toolName: string, input: unknown): CanonicalPlayerActionKind | null {
+  if (toolName === 'resolve_player_action') {
+    if (!isObjectRecord(input) || !isObjectRecord(input.action)) return null
+    const kind = input.action.kind
+    return typeof kind === 'string' && PLAYER_ACTION_KINDS.has(kind as CanonicalPlayerActionKind)
+      ? kind as CanonicalPlayerActionKind
+      : null
+  }
+
+  if (toolName === 'resolve_player_attack') return 'attack'
+  if (toolName === 'use_healing_potion') return 'use_item'
+  if (toolName === 'roll_death_save') return 'death_save'
+  if (toolName === 'pass_turn') return 'wait'
+  if (toolName === 'roll_ability_check') return 'ability_check'
+  if (toolName === 'trigger_room_event') return 'interact'
+  if (toolName === 'move_token') {
+    if (!isObjectRecord(input)) return 'move'
+    const tokenId = typeof input.tokenId === 'string' ? input.tokenId : 'player'
+    return tokenId === 'player' ? 'move' : null
+  }
+
+  return null
+}
+
+function validateToolUseAgainstAffordances(
+  toolName: string,
+  input: unknown,
+  gameState: GameState
+): Record<string, unknown> | null {
+  const actionKind = playerActionKindFromToolUse(toolName, input)
+  if (!actionKind) return null
+
+  const affordances = derivePlayerAffordances(gameState)
+  if (affordances.some(action => action.kind === actionKind && action.enabled)) return null
+
+  return {
+    error: `Player action '${actionKind}' is not currently afforded by the world state.`,
+    code: 'ACTION_NOT_AFFORDED',
+    detail: {
+      actionKind,
+      toolName,
+      player: {
+        hp: gameState.player.hp,
+        conditions: gameState.player.conditions,
+        deathSaves: gameState.player.deathSaves,
+      },
+      phase: gameState.phase,
+      currentTurn: gameState.currentTurn,
+      affordances: affordances.map(action => ({
+        kind: action.kind,
+        enabled: action.enabled,
+        reason: action.reason,
+        toolName: action.toolName,
+      })),
+    },
+  }
+}
+
 function lastPlayerAttackTarget(gameState: GameState): string | null {
   const alive = aliveMonsters(gameState)
 
@@ -2168,12 +2271,34 @@ function parseEncounterRepairInput(
 function summarizeMcpResultForNarration(toolName: string, result: unknown): string {
   if (isObjectRecord(result)) {
     if (typeof result.mechanicalSummary === 'string') return result.mechanicalSummary
+    if (isObjectRecord(result.result) && typeof result.result.mechanicalSummary === 'string') return result.result.mechanicalSummary
     if (typeof result.error === 'string') return "Ton geste se bloque: ce n'est pas possible dans la situation actuelle."
     if (typeof result.reason === 'string') return result.reason
   }
 
   if (toolName === 'move_token') return "Tu avances, et la scene change autour de toi."
   return "L'action se resout dans la scene."
+}
+
+function canonicalPlayerActionInput(action: Record<string, unknown>): Record<string, unknown> {
+  return { action }
+}
+
+function canonicalResultToolEquivalent(result: unknown): string | null {
+  return isObjectRecord(result) && typeof result.toolEquivalent === 'string'
+    ? result.toolEquivalent
+    : null
+}
+
+function canonicalResultSucceeded(result: unknown): boolean {
+  return isObjectRecord(result) && result.success === true
+}
+
+function toolsUsedForResolvedTool(toolName: string, result: unknown): string[] {
+  const toolEquivalent = canonicalResultToolEquivalent(result)
+  return toolEquivalent && toolEquivalent !== toolName
+    ? [toolName, toolEquivalent]
+    : [toolName]
 }
 
 async function resolveServerFirstAction(
@@ -2221,8 +2346,8 @@ async function resolveServerFirstAction(
       actionIntent.kind === 'death_save' &&
       !detectPlayerDownStatusQuestion(message)
     ) {
-      toolName = 'roll_death_save'
-      input = {}
+      toolName = 'resolve_player_action'
+      input = canonicalPlayerActionInput({ kind: 'death_save' })
     } else {
       const draftNarrative = buildPlayerDownNarrative(gameState)
       logEvent('info', 'dm.cost.engine_first.player_down_guidance', {
@@ -2299,8 +2424,8 @@ async function resolveServerFirstAction(
   }
 
   if (!toolName && actionIntent.kind === 'use_item' && actionIntent.reason === 'healing-potion-intent') {
-    toolName = 'use_healing_potion'
-    input = {}
+    toolName = 'resolve_player_action'
+    input = canonicalPlayerActionInput({ kind: 'use_item', itemType: 'healing_potion' })
   }
 
   const directAbilityCheck = directSocialAbilityCheckFromMessage(message, gameState)
@@ -2309,12 +2434,14 @@ async function resolveServerFirstAction(
     pendingAbilityCheck && detectAbilityCheckAcceptance(message) ? pendingAbilityCheck : null
   )
   if (!toolName && abilityCheckToResolve) {
-    const abilityInput: Record<string, unknown> = {
+    const abilityAction: Record<string, unknown> = {
+      kind: abilityCheckToResolve.social ? 'social' : 'ability_check',
       ability: abilityCheckToResolve.ability,
       label: abilityCheckToResolve.label,
       proficient: abilityCheckToResolve.proficient ?? false,
     }
-    if (typeof abilityCheckToResolve.dc === 'number') abilityInput.dc = abilityCheckToResolve.dc
+    if (typeof abilityCheckToResolve.dc === 'number') abilityAction.dc = abilityCheckToResolve.dc
+    const abilityInput = canonicalPlayerActionInput(abilityAction)
 
     logEvent('info', 'dm.cost.engine_first.ability_check.start', {
       requestId,
@@ -2324,17 +2451,19 @@ async function resolveServerFirstAction(
       gameState: summarizeGameState(gameState),
     })
 
-    const abilityResult = await callMCPTool('roll_ability_check', abilityInput, sessionId)
+    const abilityResult = await callMCPTool('resolve_player_action', abilityInput, sessionId)
     let sawMcpToolError = isMcpErrorResult(abilityResult)
     let nextGameState = await callMCPTool('get_game_state', {}, sessionId) as GameState
-    const toolsUsed = ['roll_ability_check']
-    let draftNarrative = summarizeMcpResultForNarration('roll_ability_check', abilityResult)
+    const toolsUsed = toolsUsedForResolvedTool('resolve_player_action', abilityResult)
+    let draftNarrative = summarizeMcpResultForNarration('resolve_player_action', abilityResult)
 
     if (
       !sawMcpToolError &&
       abilityCheckToResolve.social &&
+      canonicalResultSucceeded(abilityResult) &&
       isObjectRecord(abilityResult) &&
-      abilityResult.success === true &&
+      isObjectRecord(abilityResult.result) &&
+      abilityResult.result.success === true &&
       nextGameState.phase === 'combat'
     ) {
       const endCombatResult = await callMCPTool('end_combat', {
@@ -2375,14 +2504,20 @@ async function resolveServerFirstAction(
     const attackInput = parsePlayerAttackInput(message, gameState)
     const encounterRepairInput = parseEncounterRepairInput(message, gameState)
     if (attackInput) {
-      toolName = 'resolve_player_attack'
-      input = attackInput
+      toolName = 'resolve_player_action'
+      input = canonicalPlayerActionInput({
+        kind: 'attack',
+        ...attackInput,
+      })
     } else if (encounterRepairInput) {
       toolName = 'start_encounter'
       input = encounterRepairInput
     } else if (actionIntent.kind === 'wait') {
-      toolName = 'pass_turn'
-      input = { reason: 'Le joueur attend et passe son tour.' }
+      toolName = 'resolve_player_action'
+      input = canonicalPlayerActionInput({
+        kind: 'wait',
+        reason: 'Le joueur attend et passe son tour.',
+      })
     } else if (actionIntent.kind === 'move') {
       const toCell =
         parseCoordinateMove(message, gameState) ??
@@ -2411,8 +2546,12 @@ async function resolveServerFirstAction(
             reason: encounterTriggerReason ?? 'Le joueur declenche une rencontre de salle.',
           }
         } else {
-          toolName = 'move_token'
-          input = { tokenId: 'player', toCell }
+          toolName = 'resolve_player_action'
+          input = canonicalPlayerActionInput({
+            kind: 'move',
+            tokenId: 'player',
+            toCell,
+          })
         }
       }
     }
@@ -2435,6 +2574,7 @@ async function resolveServerFirstAction(
   const sawMcpToolError = isMcpErrorResult(result)
   const nextGameState = await callMCPTool('get_game_state', {}, sessionId) as GameState
   const draftNarrative = summarizeMcpResultForNarration(toolName, result)
+  const resolvedToolsUsed = toolsUsedForResolvedTool(toolName, result)
 
   logEvent(sawMcpToolError ? 'warn' : 'info', 'dm.cost.engine_first.complete', {
     requestId,
@@ -2451,7 +2591,7 @@ async function resolveServerFirstAction(
   return {
     handled: true,
     gameState: nextGameState,
-    toolsUsed: [toolName],
+    toolsUsed: resolvedToolsUsed,
     draftNarrative,
     sawMcpToolError,
     mcpErrorResult: sawMcpToolError ? result : undefined,
@@ -3056,6 +3196,23 @@ function buildLocalEngineNarrative(
   if (uniqueTools.length !== 1 || newCombatLogEntries.length > 1) return null
 
   const [toolName] = uniqueTools
+  if (toolName === 'resolve_player_action') {
+    const eventTypes = buildEngineResolutionView(gameState, newCombatLogEntries).events.map(event => event.type)
+    if (eventTypes.includes('entity.moved')) return buildOralFallbackNarrative(gameState, ['move_token'])
+    if (eventTypes.includes('item.used')) {
+      const player = gameState.player
+      return `La potion te remet du feu dans les veines: tu remontes a ${player.hp.current} PV sur ${player.hp.max}. Le danger n'a pas disparu, mais tu peux de nouveau peser sur la scene.`
+    }
+    if (eventTypes.includes('combat.death_save')) return buildPlayerDownNarrative(gameState)
+    if (eventTypes.includes('combat.turn_passed')) {
+      return gameState.phase === 'combat'
+        ? "Tu gardes ton souffle et tu laisses passer l'ouverture. Le combat bouge autour de toi, assez pres pour que le prochain geste compte."
+        : buildDirectiveSceneNarrative(gameState)
+    }
+    if (eventTypes.includes('check.rolled')) return newCombatLogEntries.at(-1)?.mechanicalDetail ?? null
+    return null
+  }
+
   if (toolName === 'move_token') {
     return buildOralFallbackNarrative(gameState, toolsUsed)
   }
@@ -3705,6 +3862,29 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             continue
           }
 
+          const affordanceValidationError = validateToolUseAgainstAffordances(toolUse.name, toolUse.input, currentGameState)
+          if (affordanceValidationError) {
+            sawMcpToolError = true
+            latestMcpErrorResult = affordanceValidationError
+            logEvent('warn', 'dm.tool_use.blocked_by_affordance', {
+              requestId,
+              sessionId,
+              iteration: iterations,
+              toolUseId: toolUse.id,
+              toolName: toolUse.name,
+              input: toolUse.input,
+              result: affordanceValidationError,
+              gameState: summarizeGameState(currentGameState),
+            })
+            toolResults.push({
+              type: 'tool_result',
+              tool_use_id: toolUse.id,
+              content: JSON.stringify(affordanceValidationError),
+              is_error: true,
+            })
+            continue
+          }
+
           if (toolUse.name === 'start_encounter') {
             const validationError = validateStartEncounterToolInput(toolUse.input, currentGameState, message)
             if (validationError) {
@@ -3760,6 +3940,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
                 toolName: toolUse.name,
                 result,
               })
+            }
+            if (!mcpResultIsError) {
+              for (const resolvedToolName of toolsUsedForResolvedTool(toolUse.name, result)) {
+                if (!toolsUsed.includes(resolvedToolName)) toolsUsed.push(resolvedToolName)
+              }
             }
             if (toolUse.name === 'next_turn' && !mcpResultIsError) {
               turnBoundaryReached = true

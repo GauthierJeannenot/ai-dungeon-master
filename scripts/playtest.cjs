@@ -347,6 +347,10 @@ async function run() {
             status,
             durationMs,
             toolsUsed: data.toolsUsed ?? [],
+            engineEventTypes: data.engine?.events?.map(event => event.type) ?? [],
+            enabledAffordances: data.engine?.affordances
+              ?.filter(action => action.enabled)
+              .map(action => action.kind) ?? [],
             narrator: usage?.narrator ?? 'unknown',
             llmRoute: usage?.llmRoute ?? 'unknown',
             llmCalls: usage?.llm?.calls ?? 0,

@@ -184,7 +184,7 @@ test('DM API resolves an exploration move through MCP in mock mode', async t => 
   })
 
   assert.equal(response.status, 200)
-  assert.ok(data.toolsUsed.includes('move_token'))
+  assert.ok(data.toolsUsed.includes('resolve_player_action'))
   assert.deepEqual(data.newGameState.player.position, { x: 11, y: 13 })
   assert.equal(typeof data.narrative, 'string')
   assert.ok(data.narrative.length > 0)
@@ -217,7 +217,7 @@ test('DM API resolves a combat attack through MCP in mock mode', async t => {
   })
 
   assert.equal(response.status, 200)
-  assert.ok(data.toolsUsed.includes('resolve_player_attack'))
+  assert.ok(data.toolsUsed.includes('resolve_player_action'))
   assert.equal(data.newGameState.monsters.goblin_a.isAlive, false)
   assert.ok(data.newGameState.combatLog.some(entry => /attaque/i.test(entry.action)))
   assert.doesNotMatch(data.narrative, /\[Mock\]/)

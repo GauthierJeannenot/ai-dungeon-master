@@ -103,14 +103,24 @@ export function derivePlayerAffordances(gameState: GameState): PlayerAffordance[
     }
 
     if (monstersAlive > 0) {
-      affordances.push(affordance({
-        id: 'attack-active-enemy',
-        kind: 'attack',
-        label: 'Attaquer une cible vivante',
-        enabled: true,
-        reason: `${monstersAlive} adversaire(s) vivant(s) sont engages.`,
-        toolName: 'resolve_player_action',
-      }))
+      affordances.push(
+        affordance({
+          id: 'attack-active-enemy',
+          kind: 'attack',
+          label: 'Attaquer une cible vivante',
+          enabled: true,
+          reason: `${monstersAlive} adversaire(s) vivant(s) sont engages.`,
+          toolName: 'resolve_player_action',
+        }),
+        affordance({
+          id: 'combat-social-pressure',
+          kind: 'social',
+          label: 'Parlementer ou intimider',
+          enabled: true,
+          reason: 'Un adversaire conscient peut reagir a une pression sociale credible.',
+          toolName: 'resolve_player_action',
+        })
+      )
     }
 
     affordances.push(
@@ -185,6 +195,14 @@ export function derivePlayerAffordances(gameState: GameState): PlayerAffordance[
       label: 'Tenter un test',
       enabled: true,
       reason: 'Les actions incertaines passent par un test moteur.',
+      toolName: 'resolve_player_action',
+    }),
+    affordance({
+      id: 'exploration-social',
+      kind: 'social',
+      label: 'Parler ou negocier',
+      enabled: true,
+      reason: 'Une interaction sociale peut etre resolue si un interlocuteur est present en fiction.',
       toolName: 'resolve_player_action',
     })
   )
