@@ -324,7 +324,7 @@ function appendClientDebugLog(
 async function syncClientDebugLog(sessionId: string): Promise<void> {
   const entries = readClientDebugLog()
   if (entries.length === 0) return
-  const batch = entries.slice(0, CLIENT_DEBUG_SYNC_BATCH_SIZE)
+  const batch = entries.slice(-CLIENT_DEBUG_SYNC_BATCH_SIZE)
 
   const res = await fetch('/api/debug/client-logs', {
     method: 'POST',
@@ -337,8 +337,11 @@ async function syncClientDebugLog(sessionId: string): Promise<void> {
   })
   if (!res.ok) return
 
-  const sentIds = new Set(batch.map(entry => entry.id))
-  writeClientDebugLog(readClientDebugLog().filter(entry => !sentIds.has(entry.id)))
+  // Keep the local ring buffer after a successful sync. On multi-machine or
+  // ephemeral deployments, the server-side log that accepted the batch can
+  // disappear before we inspect it; keeping recent entries lets refreshes
+  // republish the same blackbox data to the currently visible instance.
+  writeClientDebugLog(readClientDebugLog())
 }
 
 function phaseLabel(phase: GameState['phase']): { label: string; color: string } {

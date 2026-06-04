@@ -261,9 +261,9 @@ GAME_SESSION_STORE_DIR=/chemin/vers/sessions
 
 Cette persistance fichier permet de reprendre une partie apres redemarrage du processus Node tant que le stockage local est conserve. Sur un deploiement multi-instance ou avec disque ephemere, migrez cette interface vers Redis, Postgres ou un stockage equivalent.
 
-### Logs de production Railway
+### Logs de production
 
-L'application emet des logs structures JSON sur stdout/stderr avec le prefixe `[ai-dm:<event>]`. Railway les capture automatiquement dans les logs runtime du service.
+L'application emet des logs structures JSON sur stdout/stderr avec le prefixe `[ai-dm:<event>]`. L'hebergeur les capture normalement dans les logs runtime du service.
 
 Variables utiles :
 
@@ -284,36 +284,43 @@ En debug live, les textes narratifs/messages joueur sont inclus par defaut pour 
 
 Les logs sont conserves a trois niveaux :
 
-- stdout/stderr Railway, avec le prefixe `[ai-dm:<event>]`
+- stdout/stderr hebergeur, avec le prefixe `[ai-dm:<event>]`
 - buffer memoire rapide, utile pendant que le process tourne
-- fichier JSONL local (`.data/logs/server.jsonl` en local, `/data/ai-dungeon-master/logs/server.jsonl` si un volume Railway est deja monte sur `/data`)
+- fichier JSONL local (`.data/logs/server.jsonl` en local, ou le chemin `APP_LOG_PERSIST_DIR` si un volume persistant est monte)
 
-Sans aucune configuration Railway/GitHub supplementaire, le navigateur garde aussi une boite noire de playtest dans `localStorage` et la republie au serveur via `/api/debug/client-logs`. Apres un redeploiement, il suffit de rafraichir ou de rejouer depuis le meme navigateur pour revoir les dernieres actions sous l'evenement `client.blackbox.entry` dans `/api/debug/logs`.
+Sans aucune configuration hebergeur/GitHub supplementaire, le navigateur garde aussi une boite noire de playtest dans `localStorage` et la republie au serveur via `/api/debug/client-logs`. Les entrees recentes restent dans le navigateur meme apres une sync reussie, afin qu'un simple refresh puisse les republier si Fly/une autre plateforme a servi les logs depuis une machine differente ou a perdu le buffer serveur. Apres un redeploiement, il suffit de rafraichir ou de rejouer depuis le meme navigateur pour revoir les dernieres actions sous l'evenement `client.blackbox.entry` dans `/api/debug/logs`.
 
-Si vous avez deja un volume Railway monte ailleurs que `/data`, `APP_LOG_PERSIST_DIR=/chemin/du/volume` permet de forcer le repertoire. Ce n'est pas requis pour la boite noire navigateur.
+Si vous avez deja un volume monte, `APP_LOG_PERSIST_DIR=/chemin/du/volume` permet de forcer le repertoire. Ce n'est pas requis pour la boite noire navigateur.
 
-Lecture via Railway CLI :
+Lecture via CLI hebergeur :
 
 ```bash
+# Railway
 railway logs
 railway logs | grep 'ai-dm:dm.request'
 railway logs | grep 'dm-'
 railway logs | grep 'mcp.tool'
+
+# Fly.io
+fly logs -a ai-dungeon-master
+fly logs -a ai-dungeon-master | grep 'ai-dm:dm.request'
+fly logs -a ai-dungeon-master | grep 'dm-'
+fly logs -a ai-dungeon-master | grep 'mcp.tool'
 ```
 
 Lecture via endpoint HTTP protege :
 
 ```bash
-railway variables set APP_DEBUG_LOG_TOKEN=un-token-long-aleatoire
+# Exemple: configurez APP_DEBUG_LOG_TOKEN dans l'hebergeur.
 
 curl -H "Authorization: Bearer un-token-long-aleatoire" \
-  "https://votre-app.railway.app/api/debug/logs?limit=100"
+  "https://votre-app.example.com/api/debug/logs?limit=100"
 
 curl -H "Authorization: Bearer un-token-long-aleatoire" \
-  "https://votre-app.railway.app/api/debug/logs?event=dm.request"
+  "https://votre-app.example.com/api/debug/logs?event=dm.request"
 
 curl -X DELETE -H "Authorization: Bearer un-token-long-aleatoire" \
-  "https://votre-app.railway.app/api/debug/logs"
+  "https://votre-app.example.com/api/debug/logs"
 ```
 
 L'endpoint `GET /api/debug/logs` retourne les logs persistants si le fichier JSONL existe, sinon les logs recents gardes en memoire par le process Node. Pendant le debug live, la lecture est publique par defaut pour permettre une surveillance externe sans acces Railway; remettez `APP_DEBUG_LOG_PUBLIC_READ=false` ou retirez ce mode apres la session. `DELETE /api/debug/logs` reste protege par `APP_DEBUG_LOG_TOKEN` et efface a la fois le buffer memoire et le fichier JSONL local. Utilisez de preference le header `Authorization: Bearer ...`. Le parametre `?token=` est desactive par defaut; activez-le seulement pour depannage manuel avec `APP_DEBUG_LOG_TOKEN_QUERY_ENABLED=true`, car il peut fuiter dans des historiques navigateur/proxy.
