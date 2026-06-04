@@ -55,6 +55,8 @@ Modes disponibles :
 | `LLM_MAX_CALLS_PER_SESSION=0` | Budget live par session (`0` = illimite) |
 | `LLM_PROMPT_CACHE_ENABLED=true` | Active les breakpoints de prompt caching Anthropic |
 | `LLM_PROMPT_CACHE_TTL=5m` | TTL du cache prompt (`5m` par defaut, `1h` possible pour longs playtests) |
+| `LLM_SHORT_NARRATION_MAX_TOKENS=220` | Sortie courte pour les narrations mecaniques ou contraintes |
+| `LLM_RICH_NARRATION_MAX_TOKENS=420` | Sortie plus large pour scenes sociales/ouvertes |
 | `LLM_MODULE_CONTEXT_MAX_CHARS=6500` | Limite le contexte du module envoye au LLM |
 | `LLM_FINAL_NARRATION_MAX_TOKENS=180` | Plafond de sortie pour les narrations finales breves |
 
@@ -65,9 +67,19 @@ En mode live, la route DM reduit aussi le cout sans passer en mock :
 - director local pour narrer les mutations mecaniques simples sans appel final a Claude
 - memoire de scene compacte dans `gameState.sceneMemory` pour porter les consequences sans repayer tout l'historique
 - prompt caching sur les blocs systeme statiques et les schemas tools selectionnes
-- mini budget visible en jeu: cout partie/tour, appels LLM, cache lu/ecrit et source narrative
+- mini budget visible en jeu: cout partie/tour, appels LLM, cache lu/ecrit, source narrative et route LLM
 - narration finale avec prompt court specialise et reponses visees a 1-2 phrases
 - correction serveur directe des narrations qui contredisent l'etat moteur, sans retry LLM supplementaire
+
+Playtest cout/qualite :
+
+```bash
+npm run playtest:mock
+node scripts/playtest.cjs --mode replay --report .data/playtest-reports/replay.json
+node scripts/playtest.cjs --mode live --allow-paid --report .data/playtest-reports/live.json
+```
+
+Le playtest agrège appels LLM, cout estime, routes `none/short/rich/blocked`, source narrative, tools, violations de seuils et tours simples qui ont appele le LLM. Les seuils sont configurables via `PLAYTEST_MAX_COST_USD`, `PLAYTEST_MIN_DIRECTOR_LOCAL_RATIO`, `PLAYTEST_MAX_AVERAGE_LLM_CALLS` et `PLAYTEST_MAX_SIMPLE_TURN_LLM_CALLS`.
 
 ### 4. Fichiers de contexte (optionnel)
 

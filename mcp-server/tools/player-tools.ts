@@ -99,6 +99,7 @@ const SceneMemorySchema = z.object({
   alertLevel: z.number().int().min(0).max(5).optional(),
   macDisposition: z.enum(['neutral', 'helpful', 'offended']).optional(),
   goblinMorale: z.enum(['steady', 'shaken', 'broken']).optional(),
+  patrolPressure: z.enum(['quiet', 'stirring', 'hunting']).optional(),
   lastDirectorBeats: z.array(z.string()).optional(),
   lastWorldSignals: z.array(z.string()).optional(),
   updatedAt: z.string().optional(),

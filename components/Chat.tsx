@@ -283,11 +283,11 @@ function describePlayerTurn(gameState: GameState): string {
 function MessageBubble({ msg }: { msg: ChatMessage }) {
   if (msg.role === 'dm') {
     return (
-      <div className="flex flex-col gap-0.5">
+      <div className="flex min-w-0 flex-col gap-0.5">
         <span className="text-[10px] text-amber-700 uppercase tracking-widest font-semibold pl-1">
           Dungeon Master
         </span>
-        <div className="bg-stone-800/60 border-l-2 border-amber-700/60 rounded-r-lg px-3 py-2 text-stone-200 italic leading-relaxed text-sm font-serif">
+        <div className="min-w-0 break-words bg-stone-800/60 border-l-2 border-amber-700/60 rounded-r-lg px-3 py-2 text-stone-200 italic leading-relaxed text-sm font-serif">
           {msg.content}
         </div>
       </div>
@@ -296,11 +296,11 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
 
   if (msg.role === 'player') {
     return (
-      <div className="flex flex-col items-end gap-0.5">
+      <div className="flex min-w-0 flex-col items-end gap-0.5">
         <span className="text-[10px] text-blue-600 uppercase tracking-widest font-semibold pr-1">
           Vous
         </span>
-        <div className="bg-blue-900/30 border border-blue-800/40 rounded-lg px-3 py-2 text-blue-100 text-sm max-w-[85%]">
+        <div className="min-w-0 max-w-[85%] break-words bg-blue-900/30 border border-blue-800/40 rounded-lg px-3 py-2 text-blue-100 text-sm">
           {msg.content}
         </div>
       </div>
@@ -308,7 +308,7 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
   }
 
   return (
-    <div className="bg-stone-950 border border-stone-700/50 rounded px-3 py-2 font-mono text-xs text-emerald-400 leading-relaxed">
+    <div className="min-w-0 break-words bg-stone-950 border border-stone-700/50 rounded px-3 py-2 font-mono text-xs text-emerald-400 leading-relaxed">
       <span className="text-stone-500 mr-1">d20</span>
       {msg.content}
     </div>
@@ -857,7 +857,7 @@ export default function Chat({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3 scrollbar-thin scrollbar-thumb-stone-700">
+      <div className="min-w-0 flex-1 overflow-y-auto px-3 py-3 space-y-3 scrollbar-thin scrollbar-thumb-stone-700">
         {messages.length === 0 && (
           <div className="text-center text-stone-600 text-sm italic mt-8 px-4">
             La table est prete. Tentez quelque chose de brillant, douteux, ou les deux.

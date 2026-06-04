@@ -69,6 +69,14 @@ function worldPressureTail(gameState: GameState): string {
     return " Plus loin, la boulangerie n'a plus l'air endormie."
   }
 
+  if (memory.patrolPressure === 'hunting') {
+    return ' Des pas cherchent maintenant une origine au bruit.'
+  }
+
+  if (memory.patrolPressure === 'stirring') {
+    return ' Quelque chose remue dans les salles voisines.'
+  }
+
   if ((memory.alertLevel ?? 0) >= 2) {
     return ' Un craquement repond quelque part dans le batiment.'
   }
@@ -142,6 +150,16 @@ function updateSceneMemory(input: DirectorInput): SceneMemory {
   if (noisyThisTurn) alertLevel += 1
   if (combatEscalated) alertLevel += 1
   if (tools.includes('end_combat')) tension = Math.max(0, tension - 2)
+  let patrolPressure = previous.patrolPressure ?? 'quiet'
+  if (alertLevel >= 5 && patrolPressure !== 'hunting') {
+    patrolPressure = 'hunting'
+    beats.push('patrol-hunting')
+    signals.push('La boulangerie se met franchement a chercher la source du desordre.')
+  } else if (alertLevel >= 3 && patrolPressure === 'quiet') {
+    patrolPressure = 'stirring'
+    beats.push('patrol-stirring')
+    signals.push('Des pas etouffes commencent a repondre dans le batiment.')
+  }
 
   const goblinCasualties = input.newCombatLogEntries.filter(entry =>
     /\bgobel/i.test(entry.action) && /\|\s*MORT/i.test(entry.mechanicalDetail ?? '')
@@ -169,6 +187,7 @@ function updateSceneMemory(input: DirectorInput): SceneMemory {
     alertLevel: clamp(alertLevel, 0, 5),
     macDisposition,
     goblinMorale,
+    patrolPressure,
     lastDirectorBeats: beats,
     lastWorldSignals: signals,
     updatedAt: new Date().toISOString(),

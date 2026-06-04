@@ -167,6 +167,7 @@ test('DM API resolves an exploration move through MCP in mock mode', async t => 
   assert.equal(typeof data.newGameState.sceneMemory?.updatedAt, 'string')
   assert.equal(data.usage?.llm.calls, 0)
   assert.equal(data.usage?.narrator, 'director')
+  assert.equal(data.usage?.llmRoute, 'none')
 })
 
 test('DM API resolves a combat attack through MCP in mock mode', async t => {
@@ -196,4 +197,24 @@ test('DM API resolves a combat attack through MCP in mock mode', async t => {
   assert.equal(data.newGameState.sceneMemory?.goblinMorale, 'shaken')
   assert.equal(data.usage?.llm.calls, 0)
   assert.equal(data.usage?.narrator, 'director')
+  assert.equal(data.usage?.llmRoute, 'none')
+})
+
+test('DM API routes open social scenes through rich mock LLM narration', async t => {
+  const sessionId = `api-social-${process.pid}-${Date.now()}`
+  t.after(() => cleanupSession(sessionId))
+
+  const { response, data } = await postDm({
+    message: 'je negocie avec Mac pour le convaincre de nous aider',
+    clientRequestId: `client-${sessionId}`,
+    sessionId,
+    gameState: baseGameState(),
+    history: [],
+  })
+
+  assert.equal(response.status, 200)
+  assert.ok((data.usage?.llm.calls ?? 0) >= 1)
+  assert.ok((data.usage?.llm.calls ?? 0) <= 2)
+  assert.equal(data.usage?.llmRoute, 'rich')
+  assert.equal(data.usage?.narrator, 'llm')
 })

@@ -75,6 +75,7 @@ interface ClientBudgetSummary {
   estimatedCostUsd: number
   lastTurnCostUsd: number
   lastNarrator: DMTurnUsage['narrator'] | null
+  lastLlmRoute: DMTurnUsage['llmRoute']
 }
 
 const WELCOME_MESSAGE =
@@ -100,6 +101,7 @@ function emptyBudgetSummary(): ClientBudgetSummary {
     estimatedCostUsd: 0,
     lastTurnCostUsd: 0,
     lastNarrator: null,
+    lastLlmRoute: 'none',
   }
 }
 
@@ -116,6 +118,7 @@ function addTurnUsage(summary: ClientBudgetSummary, usage: DMTurnUsage | undefin
     estimatedCostUsd: Number((summary.estimatedCostUsd + usage.llm.estimatedCostUsd).toFixed(8)),
     lastTurnCostUsd: usage.llm.estimatedCostUsd,
     lastNarrator: usage.narrator,
+    lastLlmRoute: usage.llmRoute,
   }
 }
 
@@ -223,6 +226,7 @@ function summarizeClientGameState(state: GameState): Record<string, unknown> {
       alertLevel: state.sceneMemory.alertLevel,
       macDisposition: state.sceneMemory.macDisposition,
       goblinMorale: state.sceneMemory.goblinMorale,
+      patrolPressure: state.sceneMemory.patrolPressure,
       lastDirectorBeats: state.sceneMemory.lastDirectorBeats,
     } : null,
   }
@@ -610,9 +614,10 @@ export default function GamePage() {
                 <div className={`font-mono ${alertColor}`}>{alertLevel}/5</div>
               </div>
             </div>
-            <div className="mt-1 flex items-center justify-between gap-2 font-mono text-[10px] text-stone-500">
-              <span>cache {budgetSummary.cacheReadInputTokens}/{budgetSummary.cacheCreationInputTokens}</span>
-              <span>narrateur {narratorLabel(budgetSummary.lastNarrator)}</span>
+            <div className="mt-1 grid grid-cols-2 gap-x-2 gap-y-0.5 font-mono text-[10px] text-stone-500 sm:grid-cols-[auto_1fr_auto]">
+              <span className="min-w-0">cache {budgetSummary.cacheReadInputTokens}/{budgetSummary.cacheCreationInputTokens}</span>
+              <span className="min-w-0 text-right sm:text-center">narrateur {narratorLabel(budgetSummary.lastNarrator)}</span>
+              <span className="min-w-0 text-right sm:col-auto">route {budgetSummary.lastLlmRoute}</span>
             </div>
           </div>
           {gameState.phase === 'combat' && (

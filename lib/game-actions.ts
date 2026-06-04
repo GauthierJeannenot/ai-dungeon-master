@@ -185,7 +185,11 @@ export function classifyPlayerAction(message: string, gameState: GameState): Gam
   const explicitEncounterIntent = /\b(combat|initiative|debarques?|perissez|fuyez)\b/.test(text)
   const hostileCreatureIntent = mentionsCreature && /\b(attaquent?|attaquer|hostiles?|menacent?|chargent?|surgissent?|arrivent?|debarquent?|foncent?|encerclent?)\b/.test(text)
   const encounterIntent = explicitEncounterIntent || hostileCreatureIntent
-  const socialIntent = /\b(persuasion|intimidation|convain|convaincre|negoci|negocier|mentir|mensonge|baratin|intimider|soumet|soumission|reddition|rends toi|rendez vous|rejoignez|rejoins moi|parlemente|capitule)\b/.test(text)
+  const explicitSocialIntent = /\b(persuasion|intimidation|convain|convaincre|negoci|negocier|mentir|mensonge|baratin|intimider|soumet|soumission|reddition|rends toi|rendez vous|rejoignez|rejoins moi|parlemente|capitule)\b/.test(text)
+  const conversationalSocialIntent =
+    /\b(parles?|parler|discutes?|discuter|demandes?|demander|questionnes?|questionner|adresses?|adresser)\b/.test(text) &&
+    /\b(mac|pommier|treant|arbre|gobelins?|grukk|grammy|pnj|personne|lui|elle|eux)\b/.test(text)
+  const socialIntent = explicitSocialIntent || conversationalSocialIntent
   const abilityCheckIntent = socialIntent || /\b(test|jet|athletisme|athletics|perception|discretion|stealth|crocheter|fouiller|chercher|forcer|soulever|pousser)\b/.test(text)
   const localObjectIntent = /\b(ouvres?|ouvrir|fouilles?|fouiller|inspectes?|inspecter|examines?|examiner|tiroirs?|coffres?|armoires?|livres?|four|fours|rouleaux?|couteaux?|objets?|potions?)\b/.test(text) &&
     (referencesLocalObjectInsteadOfRoom(text) || /\b(four|fours|rouleaux?|couteaux?|objets? magiques?|potions?)\b/.test(text))

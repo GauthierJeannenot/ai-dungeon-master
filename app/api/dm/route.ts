@@ -53,6 +53,8 @@ const MODEL = 'claude-haiku-4-5'
 const MAX_TOOL_ITERATIONS = 3
 const MAX_TOKENS = 400
 const FINAL_NARRATION_MAX_TOKENS = parsePositiveInt(process.env.LLM_FINAL_NARRATION_MAX_TOKENS, 260)
+const LLM_SHORT_NARRATION_MAX_TOKENS = parsePositiveInt(process.env.LLM_SHORT_NARRATION_MAX_TOKENS, FINAL_NARRATION_MAX_TOKENS)
+const LLM_RICH_NARRATION_MAX_TOKENS = parsePositiveInt(process.env.LLM_RICH_NARRATION_MAX_TOKENS, 420)
 const ORAL_NARRATION_MAX_SENTENCES = parsePositiveInt(process.env.ORAL_NARRATION_MAX_SENTENCES, 8)
 const ORAL_NARRATION_MAX_CHARS = parsePositiveInt(process.env.ORAL_NARRATION_MAX_CHARS, 900)
 const COMBAT_LOG_TAIL = 6
@@ -112,12 +114,14 @@ type LlmOperation =
   | 'dm.final_narration_fallback'
 
 type MessageCreateParams = Anthropic.MessageCreateParamsNonStreaming
+type LlmRoute = DMTurnUsage['llmRoute']
 
 interface LlmCallContext {
   requestId: string
   sessionId?: string
   operation: LlmOperation
   requestCallCount: number
+  llmRoute?: LlmRoute
   gameState?: GameState
   playerMessage?: string
   newCombatLogEntries?: CombatLogEntry[]
@@ -166,6 +170,52 @@ function withToolPromptCache(tools: Anthropic.Tool[]): Anthropic.Tool[] {
     ? { ...tool, cache_control: cacheControl }
     : tool
   )
+}
+
+function nextLlmCallWouldExceedBudget(requestCallCount: number, sessionId: string | undefined): boolean {
+  if (requestCallCount > LLM_MAX_CALLS_PER_REQUEST) return true
+
+  const budgetSessionId = normalizeBudgetSessionId(sessionId)
+  const nextSessionCalls = (sessionLlmCalls.get(budgetSessionId) ?? 0) + 1
+  return LLM_MAX_CALLS_PER_SESSION > 0 && nextSessionCalls > LLM_MAX_CALLS_PER_SESSION
+}
+
+function mergeLlmRoute(current: LlmRoute, next: LlmRoute): LlmRoute {
+  if (next === 'blocked') return 'blocked'
+  if (current === 'blocked') return 'blocked'
+  if (current === 'rich' || next === 'rich') return 'rich'
+  if (current === 'short' || next === 'short') return 'short'
+  return 'none'
+}
+
+function maxTokensForLlmRoute(route: LlmRoute): number {
+  return route === 'rich' ? LLM_RICH_NARRATION_MAX_TOKENS : LLM_SHORT_NARRATION_MAX_TOKENS
+}
+
+function selectIterationLlmRoute(actionIntent: GameActionIntent, requestCallCount: number, sessionId: string | undefined): LlmRoute {
+  if (nextLlmCallWouldExceedBudget(requestCallCount, sessionId)) return 'blocked'
+  if (
+    actionIntent.kind === 'social' ||
+    actionIntent.kind === 'interact' ||
+    actionIntent.kind === 'guidance' ||
+    actionIntent.kind === 'observe'
+  ) {
+    return 'rich'
+  }
+
+  return 'short'
+}
+
+function selectFinalNarrationLlmRoute(
+  actionIntent: GameActionIntent,
+  toolsUsed: string[],
+  requestCallCount: number,
+  sessionId: string | undefined
+): LlmRoute {
+  if (nextLlmCallWouldExceedBudget(requestCallCount, sessionId)) return 'blocked'
+  if (toolsUsed.length > 0) return 'short'
+  if (actionIntent.kind === 'social' || actionIntent.kind === 'interact') return 'rich'
+  return 'short'
 }
 
 function normalizeBudgetSessionId(sessionId: string | undefined): string {
@@ -324,6 +374,7 @@ async function createLlmMessage(params: MessageCreateParams, context: LlmCallCon
     sessionId: context.sessionId,
     operation: context.operation,
     mode: LLM_MODE,
+    llmRoute: context.llmRoute ?? 'none',
     requestCallCount: context.requestCallCount,
     sessionCallCount: nextSessionCalls,
     promptCacheEnabled: LLM_PROMPT_CACHE_ENABLED,
@@ -2957,6 +3008,7 @@ async function generateFinalNarration(
     engineTruthPacket: EngineTruthPacket
     summaryContext: string | undefined
     usageLog: AnthropicUsageLogEntry[]
+    llmRoute: LlmRoute
   }
 ): Promise<string | null> {
   const startedAt = Date.now()
@@ -2972,6 +3024,7 @@ async function generateFinalNarration(
     engineTruthPacket,
     summaryContext,
     usageLog,
+    llmRoute,
   } = params
 
   logEvent('info', 'dm.final_narration.start', {
@@ -2995,7 +3048,7 @@ async function generateFinalNarration(
   try {
     const response = await createLlmMessage({
       model: MODEL,
-      max_tokens: FINAL_NARRATION_MAX_TOKENS,
+      max_tokens: maxTokensForLlmRoute(llmRoute),
       system: buildNarrationSystemBlocks(gameState, summaryContext),
       messages: [{ role: 'user', content: finalPrompt }],
     }, {
@@ -3003,6 +3056,7 @@ async function generateFinalNarration(
       sessionId,
       operation: 'dm.final_narration',
       requestCallCount: usageLog.length + 1,
+      llmRoute,
       gameState,
       playerMessage,
       newCombatLogEntries,
@@ -3029,6 +3083,7 @@ async function generateFinalNarration(
       metadata: {
         newCombatLogCount: newCombatLogEntries.length,
         draftNarrativeLength: draftNarrative.length,
+        llmRoute,
       },
     }))
 
@@ -3269,6 +3324,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     let narrative = ''
     let narratorSource: DMTurnUsage['narrator'] = 'fallback'
+    let llmRoute: LlmRoute = 'none'
     let iterations = 0
     let turnBoundaryReached = false
     let primaryActionToolUsed: string | null = null
@@ -3297,7 +3353,23 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       actionIntent.kind !== 'interact'
     const needsLlmIteration = !engineFirst.handled
     const needsFinalNarrationHistory = engineFirst.handled && toolsUsed.length > 0 && !sawMcpToolError && !engineFirstLocalNarrationCandidate
-    if (needsLlmIteration || needsFinalNarrationHistory) {
+    const iterationLlmRoute = needsLlmIteration
+      ? selectIterationLlmRoute(actionIntent, usageLog.length + 1, sessionId)
+      : 'none'
+    if (iterationLlmRoute === 'blocked') {
+      llmRoute = mergeLlmRoute(llmRoute, 'blocked')
+      narrative = buildDirectiveSceneNarrative(currentGameState)
+      narratorSource = 'fallback'
+      logEvent('warn', 'dm.llm_router.blocked_before_iteration', {
+        requestId,
+        sessionId,
+        actionIntent,
+        requestCallCount: usageLog.length + 1,
+      })
+    } else {
+      llmRoute = mergeLlmRoute(llmRoute, iterationLlmRoute)
+    }
+    if ((needsLlmIteration && iterationLlmRoute !== 'blocked') || needsFinalNarrationHistory) {
       await ensureHistoryReady(needsLlmIteration ? 'dm-iteration' : 'final-narration')
     } else {
       logEvent('debug', 'dm.history.skipped_before_llm', {
@@ -3334,7 +3406,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       requiredMechanicalAction,
     })
 
-    while (!engineFirst.handled && iterations < MAX_TOOL_ITERATIONS) {
+    while (!engineFirst.handled && iterationLlmRoute !== 'blocked' && iterations < MAX_TOOL_ITERATIONS) {
       iterations++
       const iterationStartedAt = Date.now()
       logEvent('info', 'dm.anthropic.iteration.start', {
@@ -3350,7 +3422,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
       const response = await createLlmMessage({
         model: MODEL,
-        max_tokens: MAX_TOKENS,
+        max_tokens: iterationLlmRoute === 'rich' ? LLM_RICH_NARRATION_MAX_TOKENS : MAX_TOKENS,
         system: systemBlocks,
         tools: llmTools.length > 0 ? llmTools : undefined,
         messages,
@@ -3359,6 +3431,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         sessionId,
         operation: 'dm.iteration',
         requestCallCount: usageLog.length + 1,
+        llmRoute: iterationLlmRoute,
         gameState: currentGameState,
         playerMessage: message,
         tools: llmTools,
@@ -3384,6 +3457,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           iteration: iterations,
           toolsAvailable: llmTools.length,
           rawToolsAvailable: mcpTools.length,
+          llmRoute: iterationLlmRoute,
         },
       }))
 
@@ -3682,57 +3756,74 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         toolsUsed: [...new Set(toolsUsed)],
       })
     } else if (!narrative && iterations >= MAX_TOOL_ITERATIONS) {
-      const fallbackStartedAt = Date.now()
-      logEvent('warn', 'dm.final_fallback.start', {
-        requestId,
-        sessionId,
-        iterations,
-      })
-      const finalResponse = await createLlmMessage({
-        model: MODEL,
-        max_tokens: FINAL_NARRATION_MAX_TOKENS,
-        system: buildNarrationSystemBlocks(currentGameState!, activeSummary),
-        messages: [{ role: 'user', content: message }],
-      }, {
-        requestId,
-        sessionId,
-        operation: 'dm.final_narration_fallback',
-        requestCallCount: usageLog.length + 1,
-        gameState: currentGameState!,
-        playerMessage: message,
-      })
-      logEvent('warn', 'dm.final_fallback.response', {
-        requestId,
-        sessionId,
-        durationMs: Date.now() - fallbackStartedAt,
-        stopReason: finalResponse.stop_reason,
-        content: summarizeContentBlocks(finalResponse.content),
-      })
-
-      usageLog.push(logAnthropicUsage({
-        requestId,
-        sessionId,
-        inputMode,
-        clientRequestId,
-        operation: 'dm.final_narration_fallback',
-        model: MODEL,
-        usage: finalResponse.usage,
-        stopReason: finalResponse.stop_reason,
-        metadata: {
+      const fallbackLlmRoute = selectFinalNarrationLlmRoute(actionIntent, toolsUsed, usageLog.length + 1, sessionId)
+      if (fallbackLlmRoute === 'blocked') {
+        llmRoute = mergeLlmRoute(llmRoute, 'blocked')
+        narrative = buildDirectiveSceneNarrative(currentGameState)
+        narratorSource = 'fallback'
+        logEvent('warn', 'dm.final_fallback.blocked_by_budget', {
+          requestId,
+          sessionId,
           iterations,
-        },
-      }))
+          requestCallCount: usageLog.length + 1,
+        })
+      } else {
+        llmRoute = mergeLlmRoute(llmRoute, fallbackLlmRoute)
+        const fallbackStartedAt = Date.now()
+        logEvent('warn', 'dm.final_fallback.start', {
+          requestId,
+          sessionId,
+          iterations,
+          llmRoute: fallbackLlmRoute,
+        })
+        const finalResponse = await createLlmMessage({
+          model: MODEL,
+          max_tokens: maxTokensForLlmRoute(fallbackLlmRoute),
+          system: buildNarrationSystemBlocks(currentGameState!, activeSummary),
+          messages: [{ role: 'user', content: message }],
+        }, {
+          requestId,
+          sessionId,
+          operation: 'dm.final_narration_fallback',
+          requestCallCount: usageLog.length + 1,
+          llmRoute: fallbackLlmRoute,
+          gameState: currentGameState!,
+          playerMessage: message,
+        })
+        logEvent('warn', 'dm.final_fallback.response', {
+          requestId,
+          sessionId,
+          durationMs: Date.now() - fallbackStartedAt,
+          stopReason: finalResponse.stop_reason,
+          content: summarizeContentBlocks(finalResponse.content),
+        })
 
-      for (const block of finalResponse.content) {
-        if (block.type === 'text') narrative += block.text
+        usageLog.push(logAnthropicUsage({
+          requestId,
+          sessionId,
+          inputMode,
+          clientRequestId,
+          operation: 'dm.final_narration_fallback',
+          model: MODEL,
+          usage: finalResponse.usage,
+          stopReason: finalResponse.stop_reason,
+          metadata: {
+            iterations,
+            llmRoute: fallbackLlmRoute,
+          },
+        }))
+
+        for (const block of finalResponse.content) {
+          if (block.type === 'text') narrative += block.text
+        }
+        if (narrative) narratorSource = 'llm'
+        logEvent('warn', 'dm.final_fallback.narrative_ready', {
+          requestId,
+          sessionId,
+          narrativeLength: narrative.length,
+          narrative,
+        })
       }
-      if (narrative) narratorSource = 'llm'
-      logEvent('warn', 'dm.final_fallback.narrative_ready', {
-        requestId,
-        sessionId,
-        narrativeLength: narrative.length,
-        narrative,
-      })
     }
 
     try {
@@ -3910,25 +4001,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         narrativeLength: narrative.length,
       })
     } else if (toolsUsed.length > 0 && !sawMcpToolError && directorDecision?.shouldUseLlmNarrator !== false) {
-      const finalNarrative = await generateFinalNarration({
-        requestId,
-        sessionId,
-        inputMode,
-        clientRequestId,
-        playerMessage: message,
-        draftNarrative: narrative,
-        gameState: currentGameState,
-        newCombatLogEntries,
-        engineTruthPacket,
-        summaryContext: activeSummary,
-        usageLog,
-      })
-      if (finalNarrative) {
-        narrative = finalNarrative
-        narratorSource = 'llm'
-      } else {
+      const finalLlmRoute = selectFinalNarrationLlmRoute(actionIntent, toolsUsed, usageLog.length + 1, sessionId)
+      if (finalLlmRoute === 'blocked') {
+        llmRoute = mergeLlmRoute(llmRoute, 'blocked')
         const fallbackNarrative = buildOralFallbackNarrative(currentGameState, toolsUsed)
-        logEvent('warn', 'dm.final_narration.fallback_after_tool_mutation', {
+        logEvent('warn', 'dm.final_narration.blocked_by_budget', {
           requestId,
           sessionId,
           toolsUsed: [...new Set(toolsUsed)],
@@ -3937,6 +4014,37 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         })
         narrative = fallbackNarrative
         narratorSource = 'fallback'
+      } else {
+        llmRoute = mergeLlmRoute(llmRoute, finalLlmRoute)
+        const finalNarrative = await generateFinalNarration({
+          requestId,
+          sessionId,
+          inputMode,
+          clientRequestId,
+          playerMessage: message,
+          draftNarrative: narrative,
+          gameState: currentGameState,
+          newCombatLogEntries,
+          engineTruthPacket,
+          summaryContext: activeSummary,
+          usageLog,
+          llmRoute: finalLlmRoute,
+        })
+        if (finalNarrative) {
+          narrative = finalNarrative
+          narratorSource = 'llm'
+        } else {
+          const fallbackNarrative = buildOralFallbackNarrative(currentGameState, toolsUsed)
+          logEvent('warn', 'dm.final_narration.fallback_after_tool_mutation', {
+            requestId,
+            sessionId,
+            toolsUsed: [...new Set(toolsUsed)],
+            discardedDraftNarrative: narrative,
+            fallbackNarrative,
+          })
+          narrative = fallbackNarrative
+          narratorSource = 'fallback'
+        }
       }
     } else if (toolsUsed.length > 0 && !sawMcpToolError) {
       const fallbackNarrative = buildOralFallbackNarrative(currentGameState, toolsUsed)
@@ -4011,6 +4119,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       llm: summarizeAnthropicUsage(usageLog),
       operations: usageLog.map(entry => entry.operation),
       narrator: narratorSource,
+      llmRoute,
     }
 
     const dmResponse: DMResponse = {
@@ -4055,6 +4164,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       llmCalls: usageLog.length,
       estimatedCostUsd,
       narrator: turnUsage.narrator,
+      llmRoute: turnUsage.llmRoute,
       cacheCreationInputTokens: turnUsage.llm.cacheCreationInputTokens,
       cacheReadInputTokens: turnUsage.llm.cacheReadInputTokens,
       toolsUsed: [...new Set(toolsUsed)],

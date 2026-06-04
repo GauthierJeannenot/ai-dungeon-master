@@ -133,6 +133,13 @@ test('game action language routes local objects to interact instead of move', ()
   assert.deepEqual(intent.suggestedTools, ['trigger_room_event', 'roll_ability_check', 'start_encounter'])
 })
 
+test('game action language routes conversational NPC asks to social checks', () => {
+  const intent = actions.classifyPlayerAction('je parle gentiment a Mac pour lui demander ce qu il sait', baseGameState())
+  assert.equal(intent.kind, 'social')
+  assert.equal(intent.primitive, 'check')
+  assert.deepEqual(intent.suggestedTools, ['roll_ability_check'])
+})
+
 test('game action language routes coordinate phrases with vais as movement', () => {
   const intent = actions.classifyPlayerAction('je vais en (11,13)', baseGameState())
   assert.equal(intent.kind, 'move')

@@ -216,3 +216,43 @@ test('director does not increase alert every turn after old noise', () => {
   assert.equal(decision.sceneMemory.madeNoise, true)
   assert.equal(decision.sceneMemory.alertLevel, 1)
 })
+
+test('director escalates patrol pressure when alert crosses thresholds', () => {
+  const decision = buildDirectorDecision({
+    playerMessage: 'je hurle et je frappe la porte pour les provoquer',
+    actionIntent: baseIntent({ kind: 'interact', primitive: 'interact', requiresEngine: true }),
+    gameState: baseGameState({
+      sceneMemory: {
+        madeNoise: true,
+        alertLevel: 2,
+        tension: 2,
+        patrolPressure: 'quiet',
+      },
+    }),
+    toolsUsed: ['start_encounter'],
+    newCombatLogEntries: [],
+  })
+
+  assert.equal(decision.sceneMemory.alertLevel, 3)
+  assert.equal(decision.sceneMemory.patrolPressure, 'stirring')
+  assert.ok(decision.beats.includes('patrol-stirring'))
+
+  const hunting = buildDirectorDecision({
+    playerMessage: "j'attaque encore",
+    actionIntent: baseIntent({ kind: 'attack', primitive: 'resolve_attack' }),
+    gameState: baseGameState({
+      sceneMemory: {
+        madeNoise: true,
+        alertLevel: 4,
+        tension: 3,
+        patrolPressure: 'stirring',
+      },
+    }),
+    toolsUsed: ['resolve_player_attack'],
+    newCombatLogEntries: [],
+  })
+
+  assert.equal(hunting.sceneMemory.alertLevel, 5)
+  assert.equal(hunting.sceneMemory.patrolPressure, 'hunting')
+  assert.ok(hunting.beats.includes('patrol-hunting'))
+})
