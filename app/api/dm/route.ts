@@ -2114,6 +2114,7 @@ function buildIntentInterpreterPrompt(summary: IntentInterpreterInputSummary): s
     'Schema attendu: intentKind, confidence, requiresClarification, clarificationQuestion, canonicalAction, improvisation, targetHints, reasoningSummary.',
     'targetHints est un OBJET (jamais un tableau) avec des champs optionnels: targetName, targetId, targetType, targetHint, candidates (candidates est un tableau de chaines). S il y a plusieurs cibles possibles, mets-les dans targetHints.candidates.',
     'reasoningSummary est une seule phrase de 240 caracteres maximum.',
+    'Si tu remplis improvisation, improvisation.type DOIT etre exactement l une de ces valeurs: create_fiction_fact, use_fiction_fact, social_transgression, environmental_change, improvised_tool_object, distraction_noise, non_mechanical_flavor. N invente aucune autre valeur. Dans le doute, utilise create_fiction_fact.',
     `Resume moteur:\n${JSON.stringify(summary, null, 2)}`,
   ].join('\n\n')
 }

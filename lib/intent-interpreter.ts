@@ -40,25 +40,76 @@ function coerceTargetHints(value: unknown): unknown {
 // reasoningSummary is meant to be a short, non-technical note. The LLM
 // occasionally overruns the 240-char cap; truncate instead of failing.
 function coerceReasoningSummary(value: unknown): unknown {
-  if (typeof value !== 'string') return value
+  if (typeof value !== 'string') return `${value ?? ''}`.slice(0, REASONING_SUMMARY_MAX)
   const trimmed = value.trim()
   return trimmed.length > REASONING_SUMMARY_MAX ? `${trimmed.slice(0, REASONING_SUMMARY_MAX - 1)}…` : trimmed
+}
+
+const IMPROVISATION_TYPE_VALUES = [
+  'create_fiction_fact',
+  'use_fiction_fact',
+  'social_transgression',
+  'environmental_change',
+  'improvised_tool_object',
+  'distraction_noise',
+  'non_mechanical_flavor',
+] as const
+
+// The LLM frequently invents improvisation type labels outside the enum
+// (e.g. "creative_improvisation", "song", "performance"). Map the obvious
+// synonyms and otherwise default to create_fiction_fact so a creative action is
+// still accepted as an improvisation instead of collapsing the turn to a mock.
+function coerceImprovisationType(value: unknown): unknown {
+  if (typeof value !== 'string') return 'create_fiction_fact'
+  const normalized = value.trim().toLowerCase()
+  if ((IMPROVISATION_TYPE_VALUES as readonly string[]).includes(normalized)) return normalized
+  if (/social|persuad|seduc|intimid|transgress|bluff|deceiv|ment|mensong/.test(normalized)) return 'social_transgression'
+  if (/tool|object|objet|outil|weapon|arme|craft|fabriqu|improvis.*item/.test(normalized)) return 'improvised_tool_object'
+  if (/noise|distract|diversion|bruit|attir/.test(normalized)) return 'distraction_noise'
+  if (/environ|terrain|nature|weather|meteo|fire|feu|water|eau|element/.test(normalized)) return 'environmental_change'
+  if (/flavor|flavour|flair|cosmetic|decor|ambian|roleplay|rp\b|mood/.test(normalized)) return 'non_mechanical_flavor'
+  if (/use|reuse|utilise|reutilise|existing|exploit/.test(normalized)) return 'use_fiction_fact'
+  return 'create_fiction_fact'
+}
+
+// Coerce the whole improvisation object so a junk `type` or `persistence` never
+// throws. Null/undefined stays as-is (improvisation is optional).
+function coerceImprovisation(value: unknown): unknown {
+  if (value === null || value === undefined) return value
+  if (typeof value !== 'object' || Array.isArray(value)) return { type: coerceImprovisationType(value) }
+  const obj = value as Record<string, unknown>
+  const persistence = typeof obj.persistence === 'string' ? obj.persistence.trim().toLowerCase() : undefined
+  return {
+    ...obj,
+    type: coerceImprovisationType(obj.type),
+    persistence: persistence && ['none', 'scene', 'session'].includes(persistence) ? persistence : undefined,
+  }
+}
+
+// Clamp confidence into [0,1]; default to a neutral 0.5 when missing/non-numeric.
+function coerceConfidence(value: unknown): unknown {
+  const num = typeof value === 'number' ? value : Number(value)
+  if (!Number.isFinite(num)) return 0.5
+  return Math.min(1, Math.max(0, num))
 }
 
 export const IntentInterpreterOutputSchema = z.object({
   schemaVersion: z.literal(INTENT_INTERPRETER_SCHEMA_VERSION).default(INTENT_INTERPRETER_SCHEMA_VERSION),
   intentKind: z.string().min(1),
-  confidence: z.number().min(0).max(1),
+  confidence: z.preprocess(coerceConfidence, z.number().min(0).max(1)),
   requiresClarification: z.boolean(),
   clarificationQuestion: z.string().trim().min(1).nullable().optional(),
   canonicalAction: z.record(z.string(), z.unknown()).nullable().optional(),
-  improvisation: z.object({
-    type: IntentImprovisationTypeSchema,
-    persistence: z.enum(['none', 'scene', 'session']).optional(),
-    createsFacts: z.array(z.record(z.string(), z.unknown())).optional(),
-    usesFactIds: z.array(z.string()).optional(),
-    tags: z.array(z.string()).optional(),
-  }).nullable().optional(),
+  improvisation: z.preprocess(
+    coerceImprovisation,
+    z.object({
+      type: IntentImprovisationTypeSchema,
+      persistence: z.enum(['none', 'scene', 'session']).optional(),
+      createsFacts: z.array(z.record(z.string(), z.unknown())).optional(),
+      usesFactIds: z.array(z.string()).optional(),
+      tags: z.array(z.string()).optional(),
+    }).nullable().optional(),
+  ),
   targetHints: z.preprocess(
     coerceTargetHints,
     z.object({
@@ -71,7 +122,9 @@ export const IntentInterpreterOutputSchema = z.object({
   ).default({}),
   reasoningSummary: z.preprocess(coerceReasoningSummary, z.string().max(240)),
   source: z.enum(['mock', 'llm', 'fallback']).default('mock'),
-}).strict()
+  // Intentionally NOT strict: unknown keys invented by the LLM are stripped
+  // rather than throwing, so format drift never collapses the turn to a mock.
+})
 
 export type IntentImprovisationType = z.infer<typeof IntentImprovisationTypeSchema>
 export type IntentInterpreterOutput = z.infer<typeof IntentInterpreterOutputSchema>

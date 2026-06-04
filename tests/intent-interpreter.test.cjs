@@ -132,6 +132,42 @@ test('intent interpreter coerces array targetHints and overlong reasoningSummary
   assert.equal(output.source, 'llm')
 })
 
+test('intent interpreter coerces an out-of-enum improvisation type instead of failing', () => {
+  const output = validateIntentInterpreterOutput({
+    schemaVersion: 1,
+    intentKind: 'improvise',
+    confidence: 0.78,
+    requiresClarification: false,
+    canonicalAction: { kind: 'improvise', intent: 'je chante pour flatter les pommes' },
+    improvisation: { type: 'creative_improvisation', persistence: 'scene' },
+    targetHints: { targetName: 'druidesse du verger' },
+    reasoningSummary: 'Action creative chantee.',
+  }, 'llm')
+
+  assert.equal(output.source, 'llm')
+  assert.equal(output.improvisation.type, 'create_fiction_fact')
+  assert.equal(output.improvisation.persistence, 'scene')
+})
+
+test('intent interpreter maps improvisation synonyms and clamps confidence and drops unknown keys', () => {
+  const output = validateIntentInterpreterOutput({
+    schemaVersion: 1,
+    intentKind: 'improvise',
+    confidence: 4.2,
+    requiresClarification: false,
+    canonicalAction: { kind: 'improvise' },
+    improvisation: { type: 'persuade the guard', persistence: 'forever' },
+    targetHints: {},
+    reasoningSummary: 'ok',
+    surpriseField: 'the llm invented this',
+  }, 'llm')
+
+  assert.equal(output.improvisation.type, 'social_transgression')
+  assert.equal(output.improvisation.persistence, undefined)
+  assert.equal(output.confidence, 1)
+  assert.equal('surpriseField' in output, false)
+})
+
 test('intent interpreter coerces a bare string targetHints into a targetHint field', () => {
   const output = validateIntentInterpreterOutput({
     schemaVersion: 1,
