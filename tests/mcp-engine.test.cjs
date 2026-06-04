@@ -1458,6 +1458,43 @@ test('MCP resolve_player_action persists creative improvisation as fiction facts
   })
 })
 
+test('MCP resolve_player_action turns transgressive NPC improvise into relation state', async () => {
+  await withMcpClient(async client => {
+    const baseState = await callTool(client, 'get_game_state')
+    baseState.player.position = { x: 4, y: 13 }
+    baseState.roomsVisited = ['1']
+    baseState.currentRoomId = '1'
+    await callTool(client, 'replace_game_state', { gameState: baseState })
+
+    const transgression = await callTool(client, 'resolve_player_action', {
+      action: {
+        kind: 'improvise',
+        intent: 'je fais pipi sur mac',
+      },
+    })
+
+    assert.equal(transgression.success, true)
+    assert.equal(transgression.kind, 'improvise')
+    assert.equal(transgression.result.createdFacts.length, 1)
+    assert.equal(transgression.result.npcReaction.npc.id, 'mac')
+    assert.equal(transgression.result.npcReaction.from, 'neutral')
+    assert.equal(transgression.result.npcReaction.to, 'offended')
+    const fact = transgression.result.createdFacts[0]
+    assert.equal(fact.roomId, '1')
+    assert.ok(fact.text.includes('Mac'))
+    assert.ok(fact.tags.includes('bodily_transgression'))
+    assert.ok(fact.tags.includes('humiliation') || fact.tags.includes('improvised'))
+
+    const stateAfter = await callTool(client, 'get_game_state')
+    assert.equal(stateAfter.world.npcs.mac.disposition, 'offended')
+    assert.equal(stateAfter.world.npcs.mac.memory.offendedByPlayer, true)
+    assert.equal(stateAfter.world.flags.npc_mac_offended_by_player, true)
+    assert.ok(stateAfter.world.eventLog.some(event => event.type === 'fiction.fact_created' && event.targetId === fact.id))
+    assert.ok(stateAfter.world.eventLog.some(event => event.type === 'npc.disposition_changed' && event.targetId === 'mac'))
+    assert.ok(stateAfter.world.eventLog.some(event => event.type === 'state.changed' && event.metadata?.reason === 'transgressive_improvisation_memory'))
+  })
+})
+
 test('MCP resolve_player_action handles apartment recipe half and canonical recipe completion', async () => {
   await withMcpClient(async client => {
     const baseState = await callTool(client, 'get_game_state')

@@ -65,6 +65,7 @@ function baseGameState(overrides = {}) {
 }
 
 const actions = loadTsModule('lib/game-actions.ts')
+const { createInitialWorldState } = loadTsModule('lib/adventure-world.ts')
 
 test('game action language classifies compact combat continuations as attacks', () => {
   const gameState = baseGameState({
@@ -90,11 +91,17 @@ test('game action language classifies compact combat continuations as attacks', 
     initiativeOrder: ['player', 'goblin_1'],
   })
 
-  const intent = actions.classifyPlayerAction('vas-y encore', gameState)
-  assert.equal(intent.kind, 'attack')
-  assert.equal(intent.primitive, 'resolve_attack')
-  assert.equal(intent.reason, 'player-combat-attack-intent')
-  assert.deepEqual(intent.suggestedTools, ['resolve_player_attack', 'move_token'])
+  for (const message of [
+    'vas-y encore',
+    "j'attque le gobelin 1",
+    'celui directement devant moi',
+  ]) {
+    const intent = actions.classifyPlayerAction(message, gameState)
+    assert.equal(intent.kind, 'attack', message)
+    assert.equal(intent.primitive, 'resolve_attack', message)
+    assert.equal(intent.reason, 'player-combat-attack-intent', message)
+    assert.deepEqual(intent.suggestedTools, ['resolve_player_attack', 'move_token'], message)
+  }
 })
 
 test('game action language does not turn status questions into attacks', () => {
@@ -124,6 +131,37 @@ test('game action language does not turn status questions into attacks', () => {
   const intent = actions.classifyPlayerAction('je suis mort ou je continue?', gameState)
   assert.notEqual(intent.kind, 'attack')
   assert.equal(intent.requiresEngine, false)
+})
+
+test('game action language lets combat de-escalation override attack words', () => {
+  const gameState = baseGameState({
+    phase: 'combat',
+    currentTurn: 'player',
+    monsters: {
+      goblin_1: {
+        id: 'goblin_1',
+        name: 'Gobelin patrouille',
+        type: 'goblin',
+        hp: { current: 7, max: 7 },
+        ac: 13,
+        stats: { str: 8, dex: 14, con: 10, int: 10, wis: 8, cha: 8 },
+        position: { x: 5, y: 13 },
+        conditions: [],
+        xpValue: 50,
+        attackBonus: 4,
+        damageDice: '1d6+2',
+        speed: 30,
+        isAlive: true,
+      },
+    },
+    initiativeOrder: ['player', 'goblin_1'],
+  })
+
+  const intent = actions.classifyPlayerAction("ok ok, arretez de m'attaquer on fait la paix", gameState)
+  assert.equal(intent.kind, 'social')
+  assert.equal(intent.primitive, 'check')
+  assert.equal(intent.reason, 'combat-deescalation-intent')
+  assert.deepEqual(intent.suggestedTools, ['roll_ability_check'])
 })
 
 test('game action language does not treat casual va as movement', () => {
@@ -163,6 +201,34 @@ test('game action language routes conversational NPC asks to canonical ask', () 
   assert.deepEqual(intent.suggestedTools, ['resolve_player_action'])
 })
 
+test('game action language routes implicit speech to present NPCs through canonical social actions', () => {
+  const state = baseGameState({
+    currentRoomId: '2',
+    roomsVisited: ['2'],
+    world: createInitialWorldState(),
+  })
+
+  for (const message of [
+    'salut, je suis la pour recuperer la recette de grammy',
+    'ou sont les gobelins',
+  ]) {
+    const intent = actions.classifyPlayerAction(message, state)
+    assert.equal(intent.kind, 'ask', message)
+    assert.equal(intent.primitive, 'world_action', message)
+    assert.equal(intent.requiresEngine, true, message)
+    assert.deepEqual(intent.suggestedTools, ['resolve_player_action'], message)
+  }
+})
+
+test('game action language treats enemy location questions as non-encounter state queries', () => {
+  const intent = actions.classifyPlayerAction('ou sont les gobelins', baseGameState({ currentRoomId: '7' }))
+  assert.equal(intent.kind, 'query_state')
+  assert.equal(intent.primitive, 'query_state')
+  assert.equal(intent.reason, 'enemy-location-question')
+  assert.equal(intent.requiresEngine, false)
+  assert.deepEqual(intent.suggestedTools, ['get_entity_stats'])
+})
+
 test('game action language routes natural world verbs and anaphora to canonical actions', () => {
   const state = baseGameState({ currentRoomId: '5' })
   const cases = [
@@ -178,6 +244,7 @@ test('game action language routes natural world verbs and anaphora to canonical 
     ['je donne la note a Grukk', 'give_item'],
     ['je persuade la dryade de nous aider', 'persuade'],
     ['je lui demande ou est la recette', 'ask'],
+    ['j aide Mac a surveiller le seuil', 'help'],
     ['j assemble les deux fragments de recette', 'combine_recipe'],
   ]
 
@@ -215,6 +282,9 @@ test('game action language routes creative unmodeled actions to improvise', () =
     "j'arrache une jambe de table pour m'en faire une arme",
     "je bloque la porte avec une chaise",
     "je renverse de la farine au sol pour faire glisser les gobelins",
+    'je fais pipi sur mac',
+    "je pisse sur l'arbre",
+    'je crache sur la dryade',
   ]
 
   for (const message of cases) {
@@ -223,6 +293,10 @@ test('game action language routes creative unmodeled actions to improvise', () =
     assert.equal(intent.primitive, 'world_action', message)
     assert.equal(intent.requiresEngine, true, message)
     assert.deepEqual(intent.suggestedTools, ['resolve_player_action'], message)
+    if (/pipi|pisse|crache/.test(message)) {
+      assert.equal(intent.reason, 'transgressive-improvisation-intent', message)
+      assert.equal(intent.confidence, 'high', message)
+    }
   }
 })
 

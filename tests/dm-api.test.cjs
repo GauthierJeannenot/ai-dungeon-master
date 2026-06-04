@@ -200,6 +200,17 @@ function loadingDockGameState() {
   })
 }
 
+function orchardGameState() {
+  return baseGameState({
+    player: {
+      ...baseGameState().player,
+      position: { x: 9, y: 2 },
+    },
+    roomsVisited: ['1', '2'],
+    currentRoomId: '2',
+  })
+}
+
 function lowHpPotionCombatGameState() {
   const state = combatGameState()
   return {
@@ -300,6 +311,59 @@ test('DM API resolves a combat attack through MCP in mock mode', async t => {
   assert.equal(data.usage?.llmRoute, 'short')
 })
 
+test('DM API resolves typoed combat attacks through the canonical action facade', async t => {
+  const sessionId = `api-typo-attack-${process.pid}-${Date.now()}`
+  const previousDice = process.env.AI_DM_TEST_DICE_SEQUENCE
+  process.env.AI_DM_TEST_DICE_SEQUENCE = '20,8,8'
+  t.after(async () => {
+    if (previousDice === undefined) delete process.env.AI_DM_TEST_DICE_SEQUENCE
+    else process.env.AI_DM_TEST_DICE_SEQUENCE = previousDice
+    await cleanupSession(sessionId)
+  })
+
+  const { response, data } = await postDm({
+    message: "j'attque le gobelin 1",
+    clientRequestId: `client-${sessionId}`,
+    sessionId,
+    gameState: combatGameState(),
+    history: [],
+  })
+
+  assert.equal(response.status, 200)
+  assert.equal(data.turnTrace?.intent.kind, 'attack')
+  assert.ok(data.toolsUsed.includes('resolve_player_action'))
+  assert.ok(data.engine?.events?.some(event => event.type === 'combat.attack'))
+  assert.ok(data.newGameState.combatLog.some(entry => /attaque/i.test(entry.action)))
+  assert.doesNotMatch(data.narrative, /celui a|celui à|lequel cibles-tu/i)
+})
+
+test('DM API routes combat peace pleas as social checks instead of attacks', async t => {
+  const sessionId = `api-combat-peace-${process.pid}-${Date.now()}`
+  const previousDice = process.env.AI_DM_TEST_DICE_SEQUENCE
+  process.env.AI_DM_TEST_DICE_SEQUENCE = '20,20,20'
+  t.after(async () => {
+    if (previousDice === undefined) delete process.env.AI_DM_TEST_DICE_SEQUENCE
+    else process.env.AI_DM_TEST_DICE_SEQUENCE = previousDice
+    await cleanupSession(sessionId)
+  })
+
+  const { response, data } = await postDm({
+    message: "ok ok, arretez de m'attaquer on fait la paix",
+    clientRequestId: `client-${sessionId}`,
+    sessionId,
+    gameState: combatGameState(),
+    history: [],
+  })
+
+  assert.equal(response.status, 200)
+  assert.equal(data.turnTrace?.intent.kind, 'social')
+  assert.equal(data.turnTrace?.intent.reason, 'combat-deescalation-intent')
+  assert.ok(data.toolsUsed.includes('resolve_player_action'))
+  assert.ok(data.toolsUsed.includes('roll_ability_check'))
+  assert.equal(data.engine?.events?.some(event => event.type === 'combat.attack'), false)
+  assert.ok(data.newGameState.combatLog.some(entry => /Persuasion|Intimidation/i.test(entry.action)))
+})
+
 test('DM API resolves creative improvisation as persistent fiction instead of default fallback', async t => {
   const sessionId = `api-improvise-${process.pid}-${Date.now()}`
   t.after(() => cleanupSession(sessionId))
@@ -324,6 +388,33 @@ test('DM API resolves creative improvisation as persistent fiction instead of de
     fact.status === 'active'
   ))
   assert.ok(data.turnTrace?.worldDiff?.fictionFacts)
+  assert.doesNotMatch(data.narrative, DEFAULT_SCENE_NARRATIVE_PATTERN)
+  assert.doesNotMatch(data.narrative, /situation ne le permet pas|intention cherche une prise|geste se bloque/i)
+})
+
+test('DM API resolves prod transgression against Mac through engine state', async t => {
+  const sessionId = `api-transgressive-mac-${process.pid}-${Date.now()}`
+  t.after(() => cleanupSession(sessionId))
+
+  const { response, data } = await postDm({
+    message: 'je fais pipi sur mac',
+    clientRequestId: `client-${sessionId}`,
+    sessionId,
+    gameState: baseGameState(),
+    history: [],
+  })
+
+  assert.equal(response.status, 200)
+  assert.ok(data.toolsUsed.includes('resolve_player_action'))
+  assert.equal(data.turnTrace?.intent.kind, 'improvise')
+  assert.equal(data.turnTrace?.intent.reason, 'transgressive-improvisation-intent')
+  assert.ok(data.engine?.events?.some(event => event.type === 'fiction.fact_created'))
+  assert.ok(data.engine?.events?.some(event => event.type === 'npc.disposition_changed' && event.targetId === 'mac'))
+  assert.equal(data.newGameState.world.npcs.mac.disposition, 'offended')
+  assert.equal(data.newGameState.world.npcs.mac.memory.offendedByPlayer, true)
+  assert.equal(data.newGameState.world.flags.npc_mac_offended_by_player, true)
+  assert.ok(data.turnTrace?.worldDiff?.fictionFacts)
+  assert.ok(data.turnTrace?.worldDiff?.npcs?.mac)
   assert.doesNotMatch(data.narrative, DEFAULT_SCENE_NARRATIVE_PATTERN)
   assert.doesNotMatch(data.narrative, /situation ne le permet pas|intention cherche une prise|geste se bloque/i)
 })
@@ -774,4 +865,58 @@ test('DM API canonical ask reveals information without forcing disposition chang
   assert.ok(data.engine?.events?.some(event => event.type === 'npc.information_revealed' && event.targetId === 'mac'))
   assert.notEqual(data.usage?.narrator, 'fallback')
   assert.doesNotMatch(data.narrative, DEFAULT_SCENE_NARRATIVE_PATTERN)
+})
+
+test('DM API routes implicit dryad questions to canonical ask events', async t => {
+  const sessionId = `api-implicit-dryad-ask-${process.pid}-${Date.now()}`
+  t.after(() => cleanupSession(sessionId))
+
+  const first = await postDm({
+    message: 'salut, je suis la pour recuperer la recette de grammy',
+    clientRequestId: `client-recipe-${sessionId}`,
+    sessionId,
+    gameState: orchardGameState(),
+    history: [],
+  })
+
+  assert.equal(first.response.status, 200)
+  assert.ok(first.data.toolsUsed.includes('resolve_player_action'))
+  assert.equal(first.data.turnTrace?.intent.kind, 'ask')
+  assert.equal(first.data.turnTrace?.intent.reason, 'implicit-present-npc-ask')
+  assert.ok(first.data.engine?.events?.some(event => event.type === 'npc.information_revealed' && event.targetId === 'dryad_orchard'))
+  assert.notEqual(first.data.usage?.narrator, 'fallback')
+
+  const second = await postDm({
+    message: 'ou sont les gobelins',
+    clientRequestId: `client-goblins-${sessionId}`,
+    sessionId,
+    gameState: first.data.newGameState,
+    history: [],
+  })
+
+  assert.equal(second.response.status, 200)
+  assert.ok(second.data.toolsUsed.includes('resolve_player_action'))
+  assert.equal(second.data.turnTrace?.intent.kind, 'ask')
+  assert.ok(second.data.engine?.events?.some(event => event.type === 'npc.information_revealed' && event.targetId === 'dryad_orchard'))
+  assert.equal(second.data.engine?.events?.some(event => event.type === 'combat.started'), false)
+})
+
+test('DM API does not start an encounter for a bare goblin location question', async t => {
+  const sessionId = `api-goblin-location-question-${process.pid}-${Date.now()}`
+  t.after(() => cleanupSession(sessionId))
+
+  const { response, data } = await postDm({
+    message: 'ou sont les gobelins',
+    clientRequestId: `client-${sessionId}`,
+    sessionId,
+    gameState: loadingDockGameState(),
+    history: [],
+  })
+
+  assert.equal(response.status, 200)
+  assert.equal(data.turnTrace?.intent.kind, 'query_state')
+  assert.equal(data.turnTrace?.intent.reason, 'enemy-location-question')
+  assert.equal(data.toolsUsed.includes('start_encounter'), false)
+  assert.equal(data.engine?.events?.some(event => event.type === 'combat.started'), false)
+  assert.equal(data.newGameState.phase, 'exploration')
 })

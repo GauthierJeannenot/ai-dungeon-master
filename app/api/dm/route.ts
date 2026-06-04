@@ -401,7 +401,7 @@ function createMockLlmMessage(params: MessageCreateParams, context: LlmCallConte
     return mockToolMessage('resolve_player_action', canonicalPlayerActionInput(mockWorldAction))
   }
 
-  if (gameState.phase === 'exploration' && /gobelin|combat|debarque|perisse|fuyez|attaque/.test(text) && toolAvailable('start_encounter', context.tools)) {
+  if (gameState.phase === 'exploration' && /gobelin|combat|debarque|perisse|fuyez|attaque|attque/.test(text) && toolAvailable('start_encounter', context.tools)) {
     return mockToolMessage('start_encounter', {
       encounterId: 'bakery_floor_goblins',
       reason: 'Le joueur provoque bruyamment les gobelins du sol de la boulangerie.',
@@ -426,7 +426,7 @@ function createMockLlmMessage(params: MessageCreateParams, context: LlmCallConte
     })
   }
 
-  if (gameState.phase === 'combat' && gameState.currentTurn === 'player' && /attaque|frappe|tape|coup|charge/.test(text) && toolAvailable('resolve_player_action', context.tools)) {
+  if (gameState.phase === 'combat' && gameState.currentTurn === 'player' && /attaque|attque|frappe|tape|coup|charge/.test(text) && toolAvailable('resolve_player_action', context.tools)) {
     return mockToolMessage('resolve_player_action', {
       action: {
         kind: 'attack',
@@ -436,7 +436,7 @@ function createMockLlmMessage(params: MessageCreateParams, context: LlmCallConte
     })
   }
 
-  if (gameState.phase === 'combat' && gameState.currentTurn === 'player' && /attaque|frappe|tape|coup|charge/.test(text) && toolAvailable('resolve_player_attack', context.tools)) {
+  if (gameState.phase === 'combat' && gameState.currentTurn === 'player' && /attaque|attque|frappe|tape|coup|charge/.test(text) && toolAvailable('resolve_player_attack', context.tools)) {
     return mockToolMessage('resolve_player_attack', {
       targetHint: 'nearest',
       weaponOrSpell: 'longsword',
@@ -2788,7 +2788,7 @@ function directSocialAbilityCheckFromMessage(message: string, gameState: GameSta
   if (gameState.phase !== 'combat' || gameState.currentTurn !== 'player' || countAliveMonsters(gameState) === 0) return null
 
   const text = normalizeFrenchText(message)
-  const socialCombatIntent = /\b(soumet|soumission|rends toi|rendez vous|rendez-vous|reddition|je suis ton chef|votre chef|baissez les armes|baisse ton arme|rejoignez|rejoins moi|rejoins-moi|rallie|ralliez|parlemente|parlementer|negocie|negocier|convain|convaincre|intimide|intimider|menace|menacer|capitule|capitulez)\b/.test(text)
+  const socialCombatIntent = /\b(soumet|soumission|rends toi|rendez vous|rendez-vous|reddition|je suis ton chef|votre chef|baissez les armes|baisse ton arme|rejoignez|rejoins moi|rejoins-moi|rallie|ralliez|parlemente|parlementer|negocie|negocier|convain|convaincre|intimide|intimider|menace|menacer|capitule|capitulez|arretez?|arrete|stop|paix|treve|cessez?|cesse|calmez|calme|on fait la paix|faire la paix|je me rends|me rends|pitie)\b/.test(text)
   if (!socialCombatIntent) return null
 
   const intimidation = /\b(soumet|rends toi|rendez vous|rendez-vous|je suis ton chef|votre chef|baissez les armes|baisse ton arme|intimide|intimider|menace|menacer|capitule|capitulez|mort|tuer|tue)\b/.test(text)
@@ -3573,26 +3573,16 @@ async function resolveServerFirstAction(
     }
   }
 
-  if (detectDryadInformationRequest(message, gameState)) {
-    const draftNarrative = buildDryadInformationNarrative()
-    logEvent('info', 'dm.cost.engine_first.dryad_information', {
-      requestId,
-      sessionId,
-      durationMs: Date.now() - startedAt,
-      draftNarrative,
-      gameState: summarizeGameState(gameState),
+  if (!toolName && detectDryadInformationRequest(message, gameState)) {
+    toolName = 'resolve_player_action'
+    input = canonicalPlayerActionInput({
+      kind: 'ask',
+      targetName: 'druidesse du verger',
+      topic: message,
     })
-    return {
-      handled: true,
-      gameState,
-      toolsUsed: [],
-      draftNarrative,
-      sawMcpToolError: false,
-      actionExecutions: [],
-    }
   }
 
-  if (actionIntent.kind === 'guidance') {
+  if (!toolName && actionIntent.kind === 'guidance') {
     const draftNarrative = buildQuestGuidanceNarrative(gameState)
     logEvent('info', 'dm.cost.engine_first.quest_guidance', {
       requestId,

@@ -99,6 +99,29 @@ test('target resolver maps the initial narrated door through the scene surface',
   assert.equal(resolution.targetSource, 'explicit')
 })
 
+test('target resolver maps transgressive tree wording to Mac for improvise', () => {
+  const state = baseGameState({
+    currentRoomId: '1',
+    roomsVisited: ['1'],
+    player: {
+      ...baseGameState().player,
+      position: { x: 4, y: 13 },
+    },
+  })
+
+  const input = targetResolver.buildWorldActionInput("je pisse sur l'arbre", state, 'improvise')
+  const resolution = targetResolver.resolveWorldActionTargets('je fais pipi sur mac', state, 'improvise')
+
+  assert.deepEqual(input, {
+    kind: 'improvise',
+    intent: "je pisse sur l'arbre",
+    targetName: 'Mac',
+    desiredEffect: "je pisse sur l'arbre",
+  })
+  assert.equal(resolution.npcTargetName, 'Mac')
+  assert.equal(resolution.npcTargetSource, 'explicit')
+})
+
 test('target resolver refuses to invent a door side when several scene portals match', () => {
   const state = baseGameState({
     currentRoomId: '4',

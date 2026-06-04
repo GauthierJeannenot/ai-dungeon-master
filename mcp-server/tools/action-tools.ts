@@ -15,8 +15,10 @@ import {
   WorldQuestState,
 } from '../../lib/types'
 import { normalizeFrenchText } from '../../lib/dm-intent'
+import { analyzeFictionImprovisation } from '../../lib/fiction-intent'
 import { centerCellForAdventureRoom } from '../../lib/adventure-map'
 import { buildSceneSurface, objectIsOnSceneSurface } from '../../lib/scene-surface'
+import { resolveWorldActionTargets } from '../../lib/world-target-resolver'
 import {
   isWorldObjectOpenable,
   isWorldObjectReadable,
@@ -2379,8 +2381,28 @@ function sanitizeFactTags(values: string[] | undefined, text: string): string[] 
   for (const [tag, pattern] of inferred) {
     if (pattern.test(haystack)) normalized.add(tag)
   }
+  for (const tag of analyzeFictionImprovisation(text).tags) normalized.add(tag)
   normalized.add('improvised')
   return [...normalized].slice(0, 12)
+}
+
+function transgressiveFactText(intent: string, targetName?: string): string | null {
+  const analysis = analyzeFictionImprovisation(intent)
+  if (!analysis.transgressive) return null
+  const target = targetName?.trim()
+  if (analysis.categories.includes('bodily_transgression')) {
+    return target
+      ? `${target} est souille par un geste volontairement humiliant du joueur.`
+      : 'Le joueur commet un geste corporel volontairement humiliant dans la scene.'
+  }
+  if (analysis.categories.includes('defacement')) {
+    return target
+      ? `${target} est degrade par un geste volontairement provocateur du joueur.`
+      : 'Le joueur degrade volontairement un element de la scene.'
+  }
+  return target
+    ? `${target} subit une provocation humiliante du joueur.`
+    : 'Le joueur commet une provocation humiliante dans la scene.'
 }
 
 function baseFactSlug(text: string): string {
@@ -2416,10 +2438,10 @@ function buildDefaultFictionFact({
   desiredEffect?: string
   tags?: string[]
 }): FictionFactPatch {
-  const text = (desiredEffect ?? intent).trim()
   const targetText = targetName?.trim()
+  const text = transgressiveFactText(intent, targetText) ?? (desiredEffect ?? intent).trim()
   return {
-    text: targetText ? `${text} (cible: ${targetText})` : text,
+    text: targetText && !text.includes(targetText) ? `${text} (cible: ${targetText})` : text,
     tags: sanitizeFactTags(tags, `${intent} ${desiredEffect ?? ''} ${method ?? ''} ${targetName ?? ''}`),
     source: method?.trim() || 'player_improvisation',
     roomId: gs.getState().currentRoomId ?? undefined,
@@ -2448,6 +2470,77 @@ function normalizeFictionFactPatch(patch: FictionFactPatch, fallbackRoomId: stri
   }
 }
 
+function inferredImproviseTargetName(intent: string, explicitTargetName?: string): string | undefined {
+  if (explicitTargetName?.trim()) return explicitTargetName.trim()
+  const resolution = resolveWorldActionTargets(intent, gs.getState(), 'improvise')
+  return resolution.npcTargetName ?? resolution.targetName
+}
+
+function optionalNpcTargetForImprovise(targetName: string | undefined, intent: string): WorldNpcState | undefined {
+  const roomId = gs.getState().currentRoomId
+  if (!roomId) return undefined
+  const world = gs.getWorldState()
+  const text = normalizeFrenchText(intent)
+  const referencesPronounTarget = /\b(lui|elle|eux|dessus|sur lui|sur elle)\b/.test(text)
+  const candidates = Object.values(world.npcs).filter(npc => {
+    if (npc.roomId !== roomId) return false
+    if (targetName) return npcMatchesTarget(npc, targetName)
+    return referencesPronounTarget
+  })
+  return candidates.length === 1 ? candidates[0] : undefined
+}
+
+function dispositionAfterTransgression(npc: WorldNpcState): WorldNpcDisposition {
+  if (npc.disposition === 'helpful') return 'neutral'
+  if (npc.disposition === 'neutral' || npc.disposition === 'wary') return 'offended'
+  if (npc.disposition === 'offended') return 'hostile'
+  return npc.disposition
+}
+
+function recordTransgressiveNpcReaction(
+  npcBefore: WorldNpcState,
+  npcAfter: WorldNpcState,
+  fact: FictionFactState | undefined,
+  intent: string
+): void {
+  if (npcBefore.disposition !== npcAfter.disposition || npcBefore.known !== npcAfter.known) {
+    gs.recordWorldEvent({
+      type: 'npc.disposition_changed',
+      summary: `${npcAfter.name} se braque: ${npcBefore.disposition} -> ${npcAfter.disposition}.`,
+      actorId: 'player',
+      targetId: npcAfter.id,
+      outcome: 'failure',
+      metadata: {
+        roomId: npcAfter.roomId,
+        from: npcBefore.disposition,
+        to: npcAfter.disposition,
+        reason: 'transgressive_improvisation',
+        factId: fact?.id,
+      },
+    })
+    syncLegacyNpcMemory(npcAfter)
+  }
+
+  gs.updateNpcMemory(npcAfter.id, {
+    offendedByPlayer: true,
+    lastTransgression: intent.slice(0, 180),
+    ...(fact ? { lastTransgressionFactId: fact.id } : {}),
+  })
+  gs.setWorldFlag(`npc_${npcAfter.id}_offended_by_player`, true)
+  gs.recordWorldEvent({
+    type: 'state.changed',
+    summary: `${npcAfter.name} garde en memoire la provocation du joueur.`,
+    actorId: 'player',
+    targetId: npcAfter.id,
+    outcome: 'failure',
+    metadata: {
+      npcId: npcAfter.id,
+      factId: fact?.id,
+      reason: 'transgressive_improvisation_memory',
+    },
+  })
+}
+
 function resolveImproviseAction({
   intent,
   targetName,
@@ -2468,6 +2561,11 @@ function resolveImproviseAction({
   const availabilityError = assertWorldActionAvailable()
   if (availabilityError) return availabilityError
 
+  const analysis = analyzeFictionImprovisation(intent)
+  const resolvedTargetName = inferredImproviseTargetName(intent, targetName)
+  const npcTarget = analysis.socialViolation
+    ? optionalNpcTargetForImprovise(resolvedTargetName, intent)
+    : undefined
   const world = gs.getWorldState()
   const missingFactIds = (usesFactIds ?? []).filter(factId => !world.fictionFacts[factId] || world.fictionFacts[factId].status === 'expired')
   if (missingFactIds.length > 0) {
@@ -2479,10 +2577,12 @@ function resolveImproviseAction({
 
   const factPatches = createsFacts?.length
     ? createsFacts
-    : [buildDefaultFictionFact({ intent, targetName, method, desiredEffect, tags })]
+    : [buildDefaultFictionFact({ intent, targetName: resolvedTargetName, method, desiredEffect, tags: [...(tags ?? []), ...analysis.tags] })]
 
   const createdFacts: FictionFactState[] = []
   const usedFacts: FictionFactState[] = []
+  let reactedNpc: WorldNpcState | undefined
+  let npcBeforeReaction: WorldNpcState | undefined
   const now = new Date().toISOString()
 
   try {
@@ -2524,6 +2624,13 @@ function resolveImproviseAction({
         },
       })
     }
+
+    if (npcTarget && analysis.socialViolation) {
+      npcBeforeReaction = structuredClone(npcTarget)
+      const nextDisposition = dispositionAfterTransgression(npcTarget)
+      reactedNpc = gs.updateNpcDisposition(npcTarget.id, nextDisposition)
+      recordTransgressiveNpcReaction(npcBeforeReaction, reactedNpc, createdFacts[0], intent)
+    }
   } catch (err) {
     return rules.ruleErrorResult(err)
   }
@@ -2538,10 +2645,18 @@ function resolveImproviseAction({
     metadata: {
       intent,
       targetName,
+      resolvedTargetName,
       method,
       desiredEffect,
+      analysis: {
+        categories: analysis.categories,
+        severity: analysis.severity,
+        transgressive: analysis.transgressive,
+        socialViolation: analysis.socialViolation,
+      },
       createdFactIds: createdFacts.map(fact => fact.id),
       usedFactIds: usedFacts.map(fact => fact.id),
+      reactedNpcId: reactedNpc?.id,
     },
   })
 
@@ -2557,6 +2672,13 @@ function resolveImproviseAction({
     success: true,
     createdFacts,
     usedFacts,
+    npcReaction: reactedNpc && npcBeforeReaction
+      ? {
+          npc: reactedNpc,
+          from: npcBeforeReaction.disposition,
+          to: reactedNpc.disposition,
+        }
+      : undefined,
     mechanicalSummary: createdFacts.length > 0
       ? `Fiction persistante: ${createdFacts.map(fact => fact.text).join(' ; ')}`
       : `Fiction persistante utilisee: ${usedFacts.map(fact => fact.text).join(' ; ')}`,

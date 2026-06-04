@@ -7,6 +7,10 @@ import {
   referencesLocalObjectInsteadOfRoom,
 } from './dm-intent'
 import { hasGoToMovementIntent, hasMovementVerb } from './natural-language'
+import {
+  analyzeFictionImprovisation,
+  detectFictionImprovisationIntent,
+} from './fiction-intent'
 
 export type GameActionKind =
   | 'attack'
@@ -69,6 +73,7 @@ export interface GameActionIntent {
 }
 
 const NO_TOOLS: string[] = []
+const ATTACK_VERB_PATTERN = /\b(attaques?|attaquer|attques?|attquer|ataques?|ataquer|frappes?|frapper|tapes?|taper|coup|assene|charges?|charger|tires?|tirer|lances?|lancer)\b/
 
 function intent(
   normalizedText: string,
@@ -84,6 +89,10 @@ function aliveMonsterCount(gameState: GameState): number {
   return Object.values(gameState.monsters).filter(monster => monster.isAlive).length
 }
 
+function hasAttackVerb(text: string): boolean {
+  return ATTACK_VERB_PATTERN.test(text)
+}
+
 function isPlayerAtZeroHp(gameState: GameState): boolean {
   return gameState.player.hp.current <= 0
 }
@@ -92,11 +101,44 @@ function isPlayerDeathResolved(gameState: GameState): boolean {
   return Boolean(gameState.player.deathSaves?.stable || gameState.player.deathSaves?.dead)
 }
 
+function hasPresentNpc(gameState: GameState): boolean {
+  if (!gameState.currentRoomId || !gameState.world?.npcs) return false
+  return Object.values(gameState.world.npcs).some(npc => npc.roomId === gameState.currentRoomId)
+}
+
+function isImplicitPresentNpcSpeech(text: string, gameState: GameState): boolean {
+  if (!hasPresentNpc(gameState)) return false
+  if (
+    /\b(va|vais|aller|deplaces?|deplacer|diriges?|diriger|avances?|avancer|bouges?|bouger|sors|sortir|entre|entrer|ouvre|ouvrir|fouille|fouiller|aides?|aider|assistes?|assister)\b/.test(text) ||
+    hasAttackVerb(text)
+  ) {
+    return false
+  }
+  return /\b(salut|bonjour|bonsoir|hello|je suis|je viens|je cherche|je veux|j'aimerais|j aimerais|recuperer|recupere|trouver|trouve|recette|grammy|gobelins?|ou sont|ou est|où sont|où est|qui|quoi|comment|pourquoi|aide|besoin|information|infos?)\b/.test(text)
+}
+
+function implicitPresentNpcSpeechKind(text: string): 'ask' | 'talk' {
+  return /\b(recette|gobelins?|grammy|ou sont|ou est|où sont|où est|qui|quoi|comment|pourquoi|trouver|trouve|chercher|cherche|information|infos?)\b/.test(text)
+    ? 'ask'
+    : 'talk'
+}
+
+function isEnemyLocationQuestion(text: string): boolean {
+  const asksWhere = /\b(ou sont|ou est|ils sont ou|elles sont ou|sont ou|position|localisation|emplacement)\b/.test(text)
+  const mentionsEnemies = /\b(gobelins?|ennemis?|monstres?|creatures?|adversaires?|patrouille|grukk|chef)\b/.test(text)
+  return asksWhere && mentionsEnemies && !hasAttackVerb(text)
+}
+
 export function isAnaphoricCombatAttackText(normalizedText: string): boolean {
   const attackContinuation = /\b(encore|continues?|continuer|vas[- ]y|go|allez|pareil|meme chose|recommence|retape|acheves?|achever|finis[- ]le|fini[- ]le|termine[- ]le|remets[- ]lui|refais[- ]ca)\b/.test(normalizedText)
   if (!attackContinuation) return false
 
   return !/\b(attends?|attendre|passe|passer|mort|pv|points? de vie|hp|etat|ou suis|regardes?|observer|observe|decris|quoi|pourquoi|comment)\b/.test(normalizedText)
+}
+
+function isSpatialCombatTargetSelection(normalizedText: string): boolean {
+  return /\b(celui|celle|gobelin|ennemi|monstre|adversaire)\b/.test(normalizedText) &&
+    /\b(devant|face|en face|directement|droite|gauche|derriere|arriere|proche|plus proche|au contact)\b/.test(normalizedText)
 }
 
 export function detectDeathSaveIntent(message: string): boolean {
@@ -116,11 +158,7 @@ export function detectDirectiveGuidanceRequest(message: string): boolean {
 }
 
 export function detectCreativeImproviseIntent(message: string): boolean {
-  const text = normalizeFrenchText(message)
-  const creativeVerb = /\b(crees?|creer|creation|invoques?|invoquer|conjures?|conjurer|fabriques?|fabriquer|bricoles?|bricoler|improvises?|improviser|inventes?|inventer|transformes?|transformer|arrache|arraches?|arracher|casses?|casser|detruis|detruire|renverses?|renverser|verses?|verser|repands?|repandre|mouilles?|mouiller|seches?|secher|enflammes?|enflammer|eteins?|eteindre|bloques?|bloquer|coinces?|coincer|barricades?|barricader|pieges?|pieger|attaches?|attacher|ligotes?|ligoter|creuses?|creuser)\b/.test(text)
-  const worldMaterial = /\b(eau|flotte|pluie|feu|fumee|huile|farine|corde|chaise|table|planche|jambe|sol|porte|mur|trou|tunnel|boue|verre|pierre|meuble|outil|arme|abri|barricade|piege|lumiere|ombre|odeur|bruit|sort|magie|illusion|creation d eau|create water)\b/.test(text)
-  const purpose = /\b(pour|afin de|histoire de|comme ca|de facon a|de maniere a|servir de|en faire|faire glisser|ralentir|bloquer|distraire|couvrir|eteindre|mouiller|ouvrir|passer|franchir)\b/.test(text)
-  return creativeVerb && (worldMaterial || purpose)
+  return detectFictionImprovisationIntent(message)
 }
 
 export function detectLocationReconcileIntent(message: string): boolean {
@@ -196,8 +234,10 @@ export function classifyPlayerAction(message: string, gameState: GameState): Gam
     })
   }
 
-  const obviousAttackIntent = /\b(attaque|attaquer|frappe|frapper|tape|coup|assene|charge|tire|lance)\b/.test(text)
+  const obviousAttackIntent = hasAttackVerb(text)
+  const earlyImplicitNpcSpeechIntent = isImplicitPresentNpcSpeech(text, gameState)
   const personalStatusQuestion =
+    !earlyImplicitNpcSpeechIntent &&
     !obviousAttackIntent &&
     /\b(mort|pv|points? de vie|hp|etat|inconscient|je peux|peux[- ]?je|est[- ]ce que je|je suis|suis[- ]je)\b/.test(text) &&
     /\b(je|me|moi|mon|ma|mes|suis|peux|continue|continuer)\b/.test(text)
@@ -250,7 +290,7 @@ export function classifyPlayerAction(message: string, gameState: GameState): Gam
     /\b(porte|tiroir|coffre|armoire|four|couvercle|placard|sacs?|farine)\b/.test(text)
   ) || anaphoricOpenIntent
   const anaphoricTakeIntent = /\b(?:le prends|la prends|l[' ]?attrapes?|l[' ]?empoches?|prends ca|ramasse ca|recupere ca|reprends ca)\b/.test(text)
-  const takeWorldObjectIntent = (
+  const takeWorldObjectIntent = !earlyImplicitNpcSpeechIntent && (
     /\b(prends?|prendre|reprends?|reprendre|ramasses?|ramasser|recuperes?|recuperer|empoches?|empocher|saisis|attrapes?|attraper)\b/.test(text) &&
     /\b(recette|fragment|moitie|indice|objet|papier|parchemin|cle|clef|potion|lettre)\b/.test(text)
   ) || anaphoricTakeIntent
@@ -277,7 +317,9 @@ export function classifyPlayerAction(message: string, gameState: GameState): Gam
     /\b(moi|joueur|heros|allie|blesse|inconscient|agonisant)\b/.test(text)
   const useWorldObjectIntent = /\b(utilises?|utiliser|actives?|activer|touches?|toucher|manipules?|manipuler|declenches?|declencher)\b/.test(text) &&
     /\b(four|levier|piege|champignons?|objet|runes?|mecanisme|ratelier|couteaux?)\b/.test(text)
-  const creativeImproviseIntent = detectCreativeImproviseIntent(message)
+  const improvisationAnalysis = analyzeFictionImprovisation(message)
+  const creativeImproviseIntent = improvisationAnalysis.improvisable
+  const implicitNpcSpeechIntent = earlyImplicitNpcSpeechIntent
 
   if (readIntent) {
     return intent(text, {
@@ -433,6 +475,29 @@ export function classifyPlayerAction(message: string, gameState: GameState): Gam
     })
   }
 
+  if (implicitNpcSpeechIntent) {
+    const kind = implicitPresentNpcSpeechKind(text)
+    return intent(text, {
+      kind,
+      primitive: 'world_action',
+      reason: kind === 'ask' ? 'implicit-present-npc-ask' : 'implicit-present-npc-talk',
+      requiresEngine: true,
+      suggestedTools: ['resolve_player_action'],
+      confidence: 'medium',
+    })
+  }
+
+  if (isEnemyLocationQuestion(text)) {
+    return intent(text, {
+      kind: 'query_state',
+      primitive: 'query_state',
+      reason: 'enemy-location-question',
+      requiresEngine: false,
+      suggestedTools: ['get_entity_stats'],
+      confidence: 'high',
+    })
+  }
+
   if (examineIntent) {
     return intent(text, {
       kind: 'examine',
@@ -503,10 +568,12 @@ export function classifyPlayerAction(message: string, gameState: GameState): Gam
     return intent(text, {
       kind: 'improvise',
       primitive: 'world_action',
-      reason: 'creative-improvisation-intent',
+      reason: improvisationAnalysis.transgressive
+        ? 'transgressive-improvisation-intent'
+        : 'creative-improvisation-intent',
       requiresEngine: true,
       suggestedTools: ['resolve_player_action'],
-      confidence: 'medium',
+      confidence: improvisationAnalysis.transgressive ? 'high' : 'medium',
     })
   }
 
@@ -522,19 +589,22 @@ export function classifyPlayerAction(message: string, gameState: GameState): Gam
   const movementIntent = directMovementIntent || doorMovementIntent || goToMovementIntent || coordinateMovementIntent || followIntent || searchEnemyIntent
   const mentionsCreature = /\b(ennemis?|gobelins?|monstres?|creatures?|silhouettes?|eclaireurs?)\b/.test(text)
   const explicitEncounterIntent = /\b(combat|initiative|debarques?|perissez|fuyez)\b/.test(text)
-  const hostileCreatureIntent = mentionsCreature && /\b(attaquent?|attaquer|hostiles?|menacent?|chargent?|surgissent?|arrivent?|debarquent?|foncent?|encerclent?)\b/.test(text)
+  const hostileCreatureIntent = mentionsCreature && (hasAttackVerb(text) || /\b(hostiles?|menacent?|chargent?|surgissent?|arrivent?|debarquent?|foncent?|encerclent?)\b/.test(text))
   const encounterIntent = explicitEncounterIntent || hostileCreatureIntent
   const explicitSocialIntent = /\b(persuasion|intimidation|convain|convaincre|negoci|negocier|mentir|mensonge|baratin|intimider|soumet|soumission|reddition|rends toi|rendez vous|rejoignez|rejoins moi|parlemente|capitule)\b/.test(text)
+  const combatDeescalationIntent =
+    gameState.phase === 'combat' &&
+    /\b(arretez?|arrete|stop|paix|treve|cessez?|cesse|calmez|calme|on fait la paix|faire la paix|je me rends|me rends|pitie|parlemente|parlementer|negocie|negocier)\b/.test(text)
   const conversationalSocialIntent =
     /\b(parles?|parler|discutes?|discuter|demandes?|demander|questionnes?|questionner|adresses?|adresser)\b/.test(text) &&
     /\b(mac|pommier|treant|arbre|gobelins?|grukk|grammy|pnj|personne|lui|elle|eux)\b/.test(text)
-  const socialIntent = explicitSocialIntent || conversationalSocialIntent
+  const socialIntent = explicitSocialIntent || conversationalSocialIntent || combatDeescalationIntent
   const abilityCheckIntent = socialIntent || /\b(test|jet|athletisme|athletics|perception|discretion|stealth|crochettes?|crochetes?|crocheter|crochetage|fouiller|chercher|forcer|soulever|pousser)\b/.test(text)
   const localObjectIntent = /\b(ouvres?|ouvrir|fouilles?|fouiller|inspectes?|inspecter|examines?|examiner|crochettes?|crochetes?|crocheter|tiroirs?|coffres?|armoires?|livres?|four|fours|rouleaux?|couteaux?|objets?|potions?)\b/.test(text) &&
     (referencesLocalObjectInsteadOfRoom(text) || /\b(four|fours|rouleaux?|couteaux?|objets? magiques?|potions?)\b/.test(text))
   const asksOnlyForDescription = /\b(observe|regarde|inspecte|ecoute|vois|voir|decris|decrit|quoi|qu'est-ce|est-ce tout)\b/.test(text)
 
-  if (asksOnlyForDescription && !movementIntent && !localObjectIntent && !/\b(deplace|attaque|frappe|combat|ouvres?|ouvrir|enfonces?|enfoncer|portes?|gobelins?|ennemis?|monstres?)\b/.test(text)) {
+  if (asksOnlyForDescription && !movementIntent && !localObjectIntent && !hasAttackVerb(text) && !/\b(deplace|combat|ouvres?|ouvrir|enfonces?|enfoncer|portes?|gobelins?|ennemis?|monstres?)\b/.test(text)) {
     return intent(text, {
       kind: 'observe',
       primitive: 'narrate',
@@ -550,15 +620,31 @@ export function classifyPlayerAction(message: string, gameState: GameState): Gam
     gameState.currentTurn === 'player' &&
     aliveMonsterCount(gameState) > 0 &&
     isAnaphoricCombatAttackText(text)
+  const spatialCombatTargetSelection =
+    gameState.phase === 'combat' &&
+    gameState.currentTurn === 'player' &&
+    aliveMonsterCount(gameState) > 0 &&
+    isSpatialCombatTargetSelection(text)
 
-  if (gameState.phase === 'combat' && gameState.currentTurn === 'player' && (attackIntent || anaphoricCombatAttackIntent)) {
+  if (gameState.phase === 'combat' && gameState.currentTurn === 'player' && combatDeescalationIntent) {
+    return intent(text, {
+      kind: 'social',
+      primitive: 'check',
+      reason: 'combat-deescalation-intent',
+      requiresEngine: true,
+      suggestedTools: ['roll_ability_check'],
+      confidence: 'high',
+    })
+  }
+
+  if (gameState.phase === 'combat' && gameState.currentTurn === 'player' && (attackIntent || anaphoricCombatAttackIntent || spatialCombatTargetSelection)) {
     return intent(text, {
       kind: 'attack',
       primitive: 'resolve_attack',
       reason: 'player-combat-attack-intent',
       requiresEngine: true,
       suggestedTools: ['resolve_player_attack', 'move_token'],
-      confidence: anaphoricCombatAttackIntent && !attackIntent ? 'medium' : 'high',
+      confidence: !attackIntent && (anaphoricCombatAttackIntent || spatialCombatTargetSelection) ? 'medium' : 'high',
     })
   }
 

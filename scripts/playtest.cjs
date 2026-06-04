@@ -271,6 +271,17 @@ function bakeryEntranceGameState() {
   })
 }
 
+function orchardGameState() {
+  return baseGameState({
+    player: {
+      ...baseGameState().player,
+      position: { x: 9, y: 2 },
+    },
+    roomsVisited: ['1', '2'],
+    currentRoomId: '2',
+  })
+}
+
 function bakeryFloorGameState() {
   return baseGameState({
     player: {
@@ -365,6 +376,8 @@ function fixtureGameState(name) {
       return bakeryHazardGameState()
     case 'bakery-entrance':
       return bakeryEntranceGameState()
+    case 'orchard':
+      return orchardGameState()
     case 'bakery-floor':
       return bakeryFloorGameState()
     case 'grukk-combat':
@@ -513,6 +526,44 @@ const builtInScenarios = [
     ],
   },
   {
+    name: 'transgressive-npc-improvise',
+    initialGameState: baseGameState(),
+    turns: [
+      {
+        message: 'je fais pipi sur mac',
+        expectNoLlm: narrationMode === 'budget',
+        category: 'world',
+        expectTools: ['resolve_player_action', 'world.improvise'],
+        expectEvents: ['fiction.fact_created', 'npc.disposition_changed', 'state.changed', 'improvisation.resolved'],
+        expectAffordances: ['improvise'],
+      },
+    ],
+  },
+  {
+    name: 'implicit-npc-speech',
+    initialGameState: orchardGameState(),
+    turns: [
+      {
+        message: 'salut, je suis la pour recuperer la recette de grammy',
+        expectNoLlm: narrationMode === 'budget',
+        category: 'social',
+        expectTools: ['resolve_player_action'],
+        expectEvents: ['npc.information_revealed'],
+        expectAffordances: ['ask'],
+        forbidEvents: ['combat.started'],
+      },
+      {
+        message: 'ou sont les gobelins',
+        expectNoLlm: narrationMode === 'budget',
+        category: 'social',
+        expectTools: ['resolve_player_action'],
+        expectEvents: ['npc.information_revealed'],
+        expectAffordances: ['ask'],
+        forbidEvents: ['combat.started'],
+      },
+    ],
+  },
+  {
     name: 'apartment-recipe',
     initialGameState: apartmentRecipeGameState(),
     turns: [
@@ -612,6 +663,32 @@ const builtInScenarios = [
       "je l'attaque encore",
       'vas-y encore',
     ].map(message => ({ message, expectNoLlm: narrationMode === 'budget', category: 'simple' })),
+  },
+  {
+    name: 'combat-language-regressions',
+    initialGameState: combatGameState(),
+    turns: [
+      {
+        message: "j'attque le gobelin 1",
+        expectNoLlm: narrationMode === 'budget',
+        category: 'combat',
+        expectTools: ['resolve_player_action'],
+        expectEvents: ['combat.attack'],
+      },
+    ],
+  },
+  {
+    name: 'combat-deescalation',
+    initialGameState: combatGameState(),
+    turns: [
+      {
+        message: "ok ok, arretez de m'attaquer on fait la paix",
+        expectNoLlm: narrationMode === 'budget',
+        category: 'combat',
+        expectTools: ['resolve_player_action', 'roll_ability_check'],
+        forbidEvents: ['combat.attack'],
+      },
+    ],
   },
   {
     name: 'open-scenes',
