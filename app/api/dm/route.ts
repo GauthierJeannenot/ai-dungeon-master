@@ -60,6 +60,7 @@ const ORAL_NARRATION_MAX_CHARS = parsePositiveInt(process.env.ORAL_NARRATION_MAX
 const COMBAT_LOG_TAIL = 6
 const MAX_AUTO_NPC_TURNS = 8
 type LlmMode = 'live' | 'mock' | 'record' | 'replay'
+type NarrationMode = 'quality' | 'budget'
 const INTERNAL_MCP_TOOLS = new Set(['replace_game_state', 'get_game_state', 'next_turn', 'update_hp', 'add_to_log', 'enter_combat', 'resolve_attack'])
 const PRIMARY_ACTION_TOOLS = new Set([
   'resolve_player_action',
@@ -87,6 +88,7 @@ const DIRECTOR_LOCAL_FINAL_TOOLS = new Set([
   'end_combat',
 ])
 const LLM_MODE = parseLlmMode(process.env.LLM_MODE)
+const NARRATION_MODE = parseNarrationMode(process.env.NARRATION_MODE)
 const ALLOW_PAID_LLM = process.env.ALLOW_PAID_LLM !== 'false'
 const LLM_REPLAY_FALLBACK_TO_MOCK = process.env.LLM_REPLAY_FALLBACK_TO_MOCK === 'true'
 const LLM_CASSETTE_DIR = process.env.LLM_CASSETTE_DIR || path.join(process.cwd(), '.data', 'llm-cassettes')
@@ -135,6 +137,12 @@ function parseLlmMode(value: string | undefined): LlmMode {
     return mode
   }
   throw new Error(`LLM_MODE invalide: ${value}. Valeurs attendues: live, mock, record, replay.`)
+}
+
+function parseNarrationMode(value: string | undefined): NarrationMode {
+  const mode = (value ?? 'quality').toLowerCase()
+  if (mode === 'quality' || mode === 'budget') return mode
+  throw new Error(`NARRATION_MODE invalide: ${value}. Valeurs attendues: quality, budget.`)
 }
 
 function parsePositiveInt(value: string | undefined, fallback: number): number {
@@ -213,8 +221,15 @@ function selectFinalNarrationLlmRoute(
   sessionId: string | undefined
 ): LlmRoute {
   if (nextLlmCallWouldExceedBudget(requestCallCount, sessionId)) return 'blocked'
+  if (
+    actionIntent.kind === 'social' ||
+    actionIntent.kind === 'interact' ||
+    actionIntent.kind === 'guidance' ||
+    actionIntent.kind === 'observe'
+  ) {
+    return 'rich'
+  }
   if (toolsUsed.length > 0) return 'short'
-  if (actionIntent.kind === 'social' || actionIntent.kind === 'interact') return 'rich'
   return 'short'
 }
 
@@ -300,19 +315,28 @@ function createMockLlmMessage(params: MessageCreateParams, context: LlmCallConte
   }
 
   if (context.operation === 'dm.final_narration' || context.operation === 'dm.final_narration_fallback') {
+    const prompt = lastUserText(params.messages)
+    const draftMatch = prompt.match(/Brouillon non autoritaire[\s\S]*?:\n([\s\S]*?)\n\nPaquet moteur/)
+    const draft = draftMatch?.[1]?.trim()
+    if (draft && !/\[Mock\]/.test(draft)) {
+      return mockTextMessage(draft)
+    }
+
     const latestMechanical = context.newCombatLogEntries?.at(-1)?.mechanicalDetail
-    return mockTextMessage(latestMechanical
-      ? `[Mock] Action résolue. ${latestMechanical}`
-      : '[Mock] Action prise en compte. Que faites-vous ?')
+    if (latestMechanical) {
+      return mockTextMessage(`L'action se résout: ${latestMechanical}. La scène reste ouverte.`)
+    }
+
+    return mockTextMessage('La scène avance; un détail concret te donne une prise pour continuer.')
   }
 
   const text = (context.playerMessage || lastUserText(params.messages)).toLowerCase()
   const gameState = context.gameState
 
-  if (!gameState) return mockTextMessage('[Mock] Le Dungeon Master observe la situation.')
+  if (!gameState) return mockTextMessage('Le Dungeon Master observe la situation.')
 
   if (gameState.phase === 'combat' && gameState.currentTurn && gameState.currentTurn !== 'player') {
-    return mockTextMessage('[Mock] Les adversaires agissent avant que vous puissiez reprendre l’initiative.')
+    return mockTextMessage("Les adversaires agissent avant que tu puisses reprendre l'initiative.")
   }
 
   if (gameState.phase === 'combat' && /passe|attend|attends|patient|ne fais rien/.test(text) && toolAvailable('pass_turn', context.tools)) {
@@ -341,7 +365,7 @@ function createMockLlmMessage(params: MessageCreateParams, context: LlmCallConte
     })
   }
 
-  return mockTextMessage('[Mock] La scène progresse sans appel payant au LLM.')
+  return mockTextMessage('La scène progresse; quelque chose dans le décor répond à ton geste.')
 }
 
 async function readCassette(key: string): Promise<Anthropic.Message | null> {
@@ -3352,7 +3376,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       actionIntent.kind !== 'social' &&
       actionIntent.kind !== 'interact'
     const needsLlmIteration = !engineFirst.handled
-    const needsFinalNarrationHistory = engineFirst.handled && toolsUsed.length > 0 && !sawMcpToolError && !engineFirstLocalNarrationCandidate
+    const needsFinalNarrationHistory = engineFirst.handled &&
+      toolsUsed.length > 0 &&
+      !sawMcpToolError &&
+      (NARRATION_MODE === 'quality' || !engineFirstLocalNarrationCandidate)
     const iterationLlmRoute = needsLlmIteration
       ? selectIterationLlmRoute(actionIntent, usageLog.length + 1, sessionId)
       : 'none'
@@ -3977,37 +4004,21 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       ? buildLocalEngineNarrative(currentGameState, toolsUsed, newCombatLogEntries)
       : null
     const directorNarrative = directorDecision?.narrative ?? null
+    const draftNarrative = narrative || directorNarrative || localEngineNarrative || ''
+    const shouldTryFinalLlmNarration = toolsUsed.length > 0 && !sawMcpToolError && (
+      NARRATION_MODE === 'quality' ||
+      (!directorNarrative && !localEngineNarrative && directorDecision?.shouldUseLlmNarrator !== false)
+    )
 
-    if (directorNarrative) {
-      narrative = directorNarrative
-      narratorSource = 'director'
-      logEvent('info', 'dm.final_narration.director_local', {
-        requestId,
-        sessionId,
-        reason: directorDecision?.reason,
-        beats: directorDecision?.beats ?? [],
-        toolsUsed: [...new Set(toolsUsed)],
-        newCombatLogCount: newCombatLogEntries.length,
-        narrativeLength: narrative.length,
-      })
-    } else if (localEngineNarrative) {
-      narrative = localEngineNarrative
-      narratorSource = 'local'
-      logEvent('info', 'dm.final_narration.local_engine', {
-        requestId,
-        sessionId,
-        toolsUsed: [...new Set(toolsUsed)],
-        newCombatLogCount: newCombatLogEntries.length,
-        narrativeLength: narrative.length,
-      })
-    } else if (toolsUsed.length > 0 && !sawMcpToolError && directorDecision?.shouldUseLlmNarrator !== false) {
+    if (shouldTryFinalLlmNarration) {
       const finalLlmRoute = selectFinalNarrationLlmRoute(actionIntent, toolsUsed, usageLog.length + 1, sessionId)
       if (finalLlmRoute === 'blocked') {
         llmRoute = mergeLlmRoute(llmRoute, 'blocked')
-        const fallbackNarrative = buildOralFallbackNarrative(currentGameState, toolsUsed)
+        const fallbackNarrative = draftNarrative || buildOralFallbackNarrative(currentGameState, toolsUsed)
         logEvent('warn', 'dm.final_narration.blocked_by_budget', {
           requestId,
           sessionId,
+          narrationMode: NARRATION_MODE,
           toolsUsed: [...new Set(toolsUsed)],
           discardedDraftNarrative: narrative,
           fallbackNarrative,
@@ -4022,7 +4033,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           inputMode,
           clientRequestId,
           playerMessage: message,
-          draftNarrative: narrative,
+          draftNarrative,
           gameState: currentGameState,
           newCombatLogEntries,
           engineTruthPacket,
@@ -4034,10 +4045,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           narrative = finalNarrative
           narratorSource = 'llm'
         } else {
-          const fallbackNarrative = buildOralFallbackNarrative(currentGameState, toolsUsed)
+          const fallbackNarrative = draftNarrative || buildOralFallbackNarrative(currentGameState, toolsUsed)
           logEvent('warn', 'dm.final_narration.fallback_after_tool_mutation', {
             requestId,
             sessionId,
+            narrationMode: NARRATION_MODE,
             toolsUsed: [...new Set(toolsUsed)],
             discardedDraftNarrative: narrative,
             fallbackNarrative,
@@ -4046,11 +4058,36 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           narratorSource = 'fallback'
         }
       }
+    } else if (directorNarrative) {
+      narrative = directorNarrative
+      narratorSource = 'director'
+      logEvent('info', 'dm.final_narration.director_local', {
+        requestId,
+        sessionId,
+        narrationMode: NARRATION_MODE,
+        reason: directorDecision?.reason,
+        beats: directorDecision?.beats ?? [],
+        toolsUsed: [...new Set(toolsUsed)],
+        newCombatLogCount: newCombatLogEntries.length,
+        narrativeLength: narrative.length,
+      })
+    } else if (localEngineNarrative) {
+      narrative = localEngineNarrative
+      narratorSource = 'local'
+      logEvent('info', 'dm.final_narration.local_engine', {
+        requestId,
+        sessionId,
+        narrationMode: NARRATION_MODE,
+        toolsUsed: [...new Set(toolsUsed)],
+        newCombatLogCount: newCombatLogEntries.length,
+        narrativeLength: narrative.length,
+      })
     } else if (toolsUsed.length > 0 && !sawMcpToolError) {
-      const fallbackNarrative = buildOralFallbackNarrative(currentGameState, toolsUsed)
+      const fallbackNarrative = draftNarrative || buildOralFallbackNarrative(currentGameState, toolsUsed)
       logEvent('warn', 'dm.final_narration.director_fallback_without_llm', {
         requestId,
         sessionId,
+        narrationMode: NARRATION_MODE,
         reason: directorDecision?.reason,
         toolsUsed: [...new Set(toolsUsed)],
         discardedDraftNarrative: narrative,
@@ -4152,6 +4189,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       sessionId,
       durationMs: Date.now() - requestStartedAt,
       inputMode,
+      narrationMode: NARRATION_MODE,
       actionIntent: {
         kind: actionIntent.kind,
         primitive: actionIntent.primitive,
@@ -4180,6 +4218,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       sessionId,
       durationMs: Date.now() - requestStartedAt,
       inputMode,
+      narrationMode: NARRATION_MODE,
       voice: clientMeta?.voice,
       iterations,
       toolsUsed: [...new Set(toolsUsed)],

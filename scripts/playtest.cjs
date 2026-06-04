@@ -31,6 +31,7 @@ function numberOption(name, fallback) {
 }
 
 const mode = option('--mode', process.env.LLM_MODE || 'mock')
+const narrationMode = option('--narration-mode', process.env.NARRATION_MODE || 'quality')
 const allowPaid = hasFlag('--allow-paid') || process.env.ALLOW_PAID_LLM === 'true'
 const jsonOutput = hasFlag('--json')
 const noFail = hasFlag('--no-fail')
@@ -50,6 +51,7 @@ process.env.APP_LOG_LEVEL = process.env.APP_LOG_LEVEL || 'error'
 process.env.APP_LOG_PERSIST_ENABLED = process.env.APP_LOG_PERSIST_ENABLED || 'false'
 process.env.GAME_SESSION_STORE_DIR = process.env.GAME_SESSION_STORE_DIR || sessionStoreDir
 process.env.LLM_MODE = mode
+process.env.NARRATION_MODE = narrationMode
 process.env.AI_DM_TEST_DICE_SEQUENCE = process.env.AI_DM_TEST_DICE_SEQUENCE ||
   Array.from({ length: 160 }, (_, index) => [17, 6, 14, 3, 12, 4, 18, 5][index % 8]).join(',')
 
@@ -175,7 +177,7 @@ const scenarios = [
       'je vais en (10,11)',
       'je vais en (9,11)',
       'je vais en (8,11)',
-    ].map(message => ({ message, expectNoLlm: true, category: 'simple' })),
+    ].map(message => ({ message, expectNoLlm: narrationMode === 'budget', category: 'simple' })),
   },
   {
     name: 'combat-local',
@@ -191,7 +193,7 @@ const scenarios = [
       "j'attaque le gobelin",
       "je l'attaque encore",
       'vas-y encore',
-    ].map(message => ({ message, expectNoLlm: true, category: 'simple' })),
+    ].map(message => ({ message, expectNoLlm: narrationMode === 'budget', category: 'simple' })),
   },
   {
     name: 'open-scenes',
@@ -241,6 +243,23 @@ function ratio(numerator, denominator) {
   return denominator > 0 ? Number((numerator / denominator).toFixed(4)) : 0
 }
 
+const roboticNarrativePatterns = [
+  /\[Mock\]/i,
+  /\bcase\s+\d/i,
+  /decor se replace/i,
+  /scene progresse/i,
+  /detail exploitable/i,
+  /prise claire/i,
+  /Que faites-vous/i,
+  /choisir ton prochain risque/i,
+]
+
+function findRoboticNarrativeReason(narrative) {
+  if (typeof narrative !== 'string') return null
+  const pattern = roboticNarrativePatterns.find(item => item.test(narrative))
+  return pattern ? String(pattern) : null
+}
+
 async function postDm(POST, body) {
   const response = await POST(new Request('http://localhost/api/dm', {
     method: 'POST',
@@ -261,13 +280,15 @@ async function run() {
 
   const report = {
     mode,
+    narrationMode,
     allowPaid,
     startedAt: new Date().toISOString(),
     targets: {
       maxEstimatedCostUsd: numberOption('--max-cost-usd', Number(process.env.PLAYTEST_MAX_COST_USD ?? 0.05)),
-      minDirectorLocalRatio: numberOption('--min-director-local-ratio', Number(process.env.PLAYTEST_MIN_DIRECTOR_LOCAL_RATIO ?? 0.65)),
-      maxAverageLlmCallsPerTurn: numberOption('--max-average-llm-calls', Number(process.env.PLAYTEST_MAX_AVERAGE_LLM_CALLS ?? 0.45)),
-      maxSimpleTurnLlmCalls: numberOption('--max-simple-turn-llm-calls', Number(process.env.PLAYTEST_MAX_SIMPLE_TURN_LLM_CALLS ?? 0)),
+      minDirectorLocalRatio: numberOption('--min-director-local-ratio', Number(process.env.PLAYTEST_MIN_DIRECTOR_LOCAL_RATIO ?? (narrationMode === 'budget' ? 0.65 : 0))),
+      minLlmNarratorRatio: numberOption('--min-llm-narrator-ratio', Number(process.env.PLAYTEST_MIN_LLM_NARRATOR_RATIO ?? (narrationMode === 'quality' ? 0.75 : 0))),
+      maxAverageLlmCallsPerTurn: numberOption('--max-average-llm-calls', Number(process.env.PLAYTEST_MAX_AVERAGE_LLM_CALLS ?? (narrationMode === 'quality' ? 1.2 : 0.45))),
+      maxSimpleTurnLlmCalls: numberOption('--max-simple-turn-llm-calls', Number(process.env.PLAYTEST_MAX_SIMPLE_TURN_LLM_CALLS ?? (narrationMode === 'quality' ? 2 : 0))),
     },
     summary: {
       turns: 0,
@@ -278,6 +299,7 @@ async function run() {
       operationCounts: {},
       toolCounts: {},
       directorLocalRatio: 0,
+      llmNarratorRatio: 0,
       averageLlmCallsPerTurn: 0,
     },
     turns: [],
@@ -286,6 +308,7 @@ async function run() {
       simpleTurnLlmViolations: [],
       emptyNarratives: [],
       mockLeaksOnSimpleTurns: [],
+      roboticNarratives: [],
     },
     targetViolations: [],
   }
@@ -330,6 +353,7 @@ async function run() {
             estimatedCostUsd: usage?.llm?.estimatedCostUsd ?? 0,
             operations: usage?.operations ?? [],
             narrativeLength: typeof data.narrative === 'string' ? data.narrative.length : 0,
+            narrativeSample: typeof data.narrative === 'string' ? data.narrative.slice(0, 240) : '',
             phase: data.newGameState?.phase,
             alertLevel: data.newGameState?.sceneMemory?.alertLevel ?? 0,
           }
@@ -352,6 +376,10 @@ async function run() {
           }
           if (turn.expectNoLlm && /\[Mock\]/.test(data.narrative ?? '')) {
             report.quality.mockLeaksOnSimpleTurns.push(turnReport)
+          }
+          const roboticReason = findRoboticNarrativeReason(data.narrative)
+          if (roboticReason) {
+            report.quality.roboticNarratives.push({ ...turnReport, reason: roboticReason })
           }
 
           if (status >= 400) break
@@ -376,14 +404,18 @@ async function run() {
   report.summary.durationMs = Date.now() - startedAt
   const directorLocalTurns = (report.summary.narratorCounts.director ?? 0) + (report.summary.narratorCounts.local ?? 0)
   report.summary.directorLocalRatio = ratio(directorLocalTurns, report.summary.turns)
+  report.summary.llmNarratorRatio = ratio(report.summary.narratorCounts.llm ?? 0, report.summary.turns)
   report.summary.averageLlmCallsPerTurn = ratio(report.summary.usage.calls, report.summary.turns)
   report.finishedAt = new Date().toISOString()
 
   if (report.summary.usage.estimatedCostUsd > report.targets.maxEstimatedCostUsd) {
     report.targetViolations.push(`estimatedCostUsd ${report.summary.usage.estimatedCostUsd} > ${report.targets.maxEstimatedCostUsd}`)
   }
-  if (report.summary.directorLocalRatio < report.targets.minDirectorLocalRatio) {
+  if (report.targets.minDirectorLocalRatio > 0 && report.summary.directorLocalRatio < report.targets.minDirectorLocalRatio) {
     report.targetViolations.push(`directorLocalRatio ${report.summary.directorLocalRatio} < ${report.targets.minDirectorLocalRatio}`)
+  }
+  if (report.targets.minLlmNarratorRatio > 0 && report.summary.llmNarratorRatio < report.targets.minLlmNarratorRatio) {
+    report.targetViolations.push(`llmNarratorRatio ${report.summary.llmNarratorRatio} < ${report.targets.minLlmNarratorRatio}`)
   }
   if (report.summary.averageLlmCallsPerTurn > report.targets.maxAverageLlmCallsPerTurn) {
     report.targetViolations.push(`averageLlmCallsPerTurn ${report.summary.averageLlmCallsPerTurn} > ${report.targets.maxAverageLlmCallsPerTurn}`)
@@ -397,6 +429,9 @@ async function run() {
   if (report.quality.emptyNarratives.length > 0) {
     report.targetViolations.push(`${report.quality.emptyNarratives.length} turns returned empty narratives`)
   }
+  if (report.quality.roboticNarratives.length > 0) {
+    report.targetViolations.push(`${report.quality.roboticNarratives.length} turns matched robotic narration patterns`)
+  }
 
   if (reportPath) {
     const absolutePath = path.resolve(reportPath)
@@ -407,9 +442,10 @@ async function run() {
   if (jsonOutput) {
     console.log(JSON.stringify(report, null, 2))
   } else {
-    console.log(`Playtest ${mode}: ${report.summary.turns} tours en ${report.summary.durationMs} ms`)
+    console.log(`Playtest ${mode}/${narrationMode}: ${report.summary.turns} tours en ${report.summary.durationMs} ms`)
     console.log(`LLM: ${report.summary.usage.calls} appels, cout estime $${report.summary.usage.estimatedCostUsd.toFixed(8)}, moyenne ${report.summary.averageLlmCallsPerTurn} appel/tour`)
     console.log(`Director/local: ${(report.summary.directorLocalRatio * 100).toFixed(1)}%`)
+    console.log(`Narrateur LLM: ${(report.summary.llmNarratorRatio * 100).toFixed(1)}%`)
     console.log(`Narrateurs: ${JSON.stringify(report.summary.narratorCounts)}`)
     console.log(`Routes LLM: ${JSON.stringify(report.summary.llmRouteCounts)}`)
     console.log(`Tools: ${JSON.stringify(report.summary.toolCounts)}`)

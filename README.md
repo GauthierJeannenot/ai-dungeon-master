@@ -50,6 +50,8 @@ Modes disponibles :
 | `LLM_MODE=mock` | Reponses deterministes locales, sans appel payant |
 | `LLM_MODE=record` | Appels live + sauvegarde des reponses dans `.data/llm-cassettes/` |
 | `LLM_MODE=replay` | Rejoue les cassettes, sans appel payant |
+| `NARRATION_MODE=quality` | Mode par defaut: le moteur resout les faits, puis le LLM ecrit la reponse visible |
+| `NARRATION_MODE=budget` | Mode economie: garde les narrations locales quand elles sont considerees sures |
 | `LLM_REPLAY_FALLBACK_TO_MOCK=true` | En replay, bascule sur le mock si une cassette manque |
 | `LLM_MAX_CALLS_PER_REQUEST=10` | Coupe une requete trop bavarde |
 | `LLM_MAX_CALLS_PER_SESSION=0` | Budget live par session (`0` = illimite) |
@@ -64,7 +66,7 @@ En mode live, la route DM reduit aussi le cout sans passer en mock :
 
 - actions evidentes de combat/deplacement par coordonnees/passage de tour resolues cote moteur avant Anthropic
 - tools MCP filtres selon la phase et l'intention au lieu d'envoyer tous les schemas a chaque appel
-- director local pour narrer les mutations mecaniques simples sans appel final a Claude
+- director local pour produire des beats/fallbacks; en `NARRATION_MODE=quality`, Claude reprend la voix finale visible apres les mutations moteur
 - memoire de scene compacte dans `gameState.sceneMemory` pour porter les consequences sans repayer tout l'historique
 - prompt caching sur les blocs systeme statiques et les schemas tools selectionnes
 - mini budget visible en jeu: cout partie/tour, appels LLM, cache lu/ecrit, source narrative et route LLM
@@ -75,11 +77,11 @@ Playtest cout/qualite :
 
 ```bash
 npm run playtest:mock
-node scripts/playtest.cjs --mode replay --report .data/playtest-reports/replay.json
-node scripts/playtest.cjs --mode live --allow-paid --report .data/playtest-reports/live.json
+node scripts/playtest.cjs --mode replay --narration-mode quality --report .data/playtest-reports/replay.json
+node scripts/playtest.cjs --mode live --narration-mode quality --allow-paid --report .data/playtest-reports/live.json
 ```
 
-Le playtest agrège appels LLM, cout estime, routes `none/short/rich/blocked`, source narrative, tools, violations de seuils et tours simples qui ont appele le LLM. Les seuils sont configurables via `PLAYTEST_MAX_COST_USD`, `PLAYTEST_MIN_DIRECTOR_LOCAL_RATIO`, `PLAYTEST_MAX_AVERAGE_LLM_CALLS` et `PLAYTEST_MAX_SIMPLE_TURN_LLM_CALLS`.
+Le playtest agrège appels LLM, cout estime, routes `none/short/rich/blocked`, source narrative, tools, violations de seuils, part de narrateur LLM et formulations robotiques interdites (`[Mock]`, coordonnees visibles, phrases generiques type "decor se replace"). Les seuils sont configurables via `PLAYTEST_MAX_COST_USD`, `PLAYTEST_MIN_LLM_NARRATOR_RATIO`, `PLAYTEST_MIN_DIRECTOR_LOCAL_RATIO`, `PLAYTEST_MAX_AVERAGE_LLM_CALLS` et `PLAYTEST_MAX_SIMPLE_TURN_LLM_CALLS`.
 
 ### 4. Fichiers de contexte (optionnel)
 

@@ -164,10 +164,11 @@ test('DM API resolves an exploration move through MCP in mock mode', async t => 
   assert.equal(typeof data.narrative, 'string')
   assert.ok(data.narrative.length > 0)
   assert.doesNotMatch(data.narrative, /\[Mock\]/)
+  assert.doesNotMatch(data.narrative, /case|decor se replace/i)
   assert.equal(typeof data.newGameState.sceneMemory?.updatedAt, 'string')
-  assert.equal(data.usage?.llm.calls, 0)
-  assert.equal(data.usage?.narrator, 'director')
-  assert.equal(data.usage?.llmRoute, 'none')
+  assert.equal(data.usage?.llm.calls, 1)
+  assert.equal(data.usage?.narrator, 'llm')
+  assert.equal(data.usage?.llmRoute, 'short')
 })
 
 test('DM API resolves a combat attack through MCP in mock mode', async t => {
@@ -195,9 +196,9 @@ test('DM API resolves a combat attack through MCP in mock mode', async t => {
   assert.doesNotMatch(data.narrative, /\[Mock\]/)
   assert.equal(data.newGameState.sceneMemory?.madeNoise, true)
   assert.equal(data.newGameState.sceneMemory?.goblinMorale, 'shaken')
-  assert.equal(data.usage?.llm.calls, 0)
-  assert.equal(data.usage?.narrator, 'director')
-  assert.equal(data.usage?.llmRoute, 'none')
+  assert.equal(data.usage?.llm.calls, 1)
+  assert.equal(data.usage?.narrator, 'llm')
+  assert.equal(data.usage?.llmRoute, 'short')
 })
 
 test('DM API routes open social scenes through rich mock LLM narration', async t => {
