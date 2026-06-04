@@ -7,6 +7,16 @@ import type {
   PlayerAffordance,
 } from './types'
 import { normalizeFrenchText } from './dm-intent'
+import {
+  canCombineRecipe,
+  isRecipeAlreadyCombined,
+  isWorldObjectDisarmable,
+  isWorldObjectOpenable,
+  isWorldObjectReadable,
+  isWorldObjectTakeable,
+  isWorldObjectUsable,
+  ownedRecipeHalfIds,
+} from './world-action-effects'
 
 function aliveMonsters(gameState: GameState) {
   return Object.values(gameState.monsters).filter(monster => monster.isAlive)
@@ -30,13 +40,6 @@ function currentRoomNpcs(gameState: GameState) {
 
 function affordance(fields: PlayerAffordance): PlayerAffordance {
   return fields
-}
-
-function isObjectOpenable(object: { kind: string; opened?: boolean; locked?: boolean }): boolean {
-  return object.kind === 'door' ||
-    object.kind === 'container' ||
-    object.opened !== undefined ||
-    object.locked !== undefined
 }
 
 export function derivePlayerAffordances(gameState: GameState): PlayerAffordance[] {
@@ -266,32 +269,31 @@ export function derivePlayerAffordances(gameState: GameState): PlayerAffordance[
   const hiddenObjects = objects.filter(object => !object.visible || !object.discovered)
   const visibleObjects = objects.filter(object => object.visible || object.discovered)
   const unopenedObjects = visibleObjects.filter(object =>
-    isObjectOpenable(object) &&
+    isWorldObjectOpenable(object) &&
     object.opened !== true
   )
   const takeableObjects = visibleObjects.filter(object =>
-    ['item', 'clue'].includes(object.kind) &&
-    object.taken !== true
+    isWorldObjectTakeable(object)
   )
   const usableObjects = visibleObjects.filter(object =>
-    ['fixture', 'trap'].includes(object.kind)
+    isWorldObjectUsable(object)
   )
   const inventoryIds = new Set(gameState.player.inventory.map(item => item.id))
   const readableObjects = visibleObjects.filter(object =>
-    Boolean(object.readableText || object.tags?.includes('readable'))
+    isWorldObjectReadable(object)
   )
   const readableInventoryObjects = Object.values(gameState.world?.objects ?? {}).filter(object =>
     inventoryIds.has(object.id) &&
-    Boolean(object.readableText || object.tags?.includes('readable')) &&
+    isWorldObjectReadable(object) &&
     !readableObjects.some(visibleObject => visibleObject.id === object.id)
   )
   const disarmableTraps = visibleObjects.filter(object =>
-    object.kind === 'trap' && object.disarmed !== true
+    isWorldObjectDisarmable(object)
   )
   const recipeQuest = gameState.world?.quests.grammy_recipe
-  const ownedRecipeHalves = Object.values(gameState.world?.objects ?? {})
-    .filter(object => object.tags?.includes('recipe_half') && (object.taken || inventoryIds.has(object.id)))
-  const recipeAlreadyCombined = Boolean(recipeQuest?.flags?.recipe_combined || gameState.world?.flags?.recipe_combined)
+  const recipeAlreadyCombined = isRecipeAlreadyCombined(gameState.world)
+  const hasRecipeHalves = canCombineRecipe(gameState.world, gameState.player) ||
+    ownedRecipeHalfIds(gameState.world, gameState.player).length >= (recipeQuest?.goal ?? 2)
 
   affordances.push(affordance({
     id: 'world-examine-current-room',
@@ -455,10 +457,10 @@ export function derivePlayerAffordances(gameState: GameState): PlayerAffordance[
     id: 'world-combine-recipe',
     kind: 'combine_recipe',
     label: 'Assembler la recette',
-    enabled: Boolean(recipeQuest && !recipeAlreadyCombined && (recipeQuest.progress >= 2 || ownedRecipeHalves.length >= 2)),
+    enabled: Boolean(recipeQuest && !recipeAlreadyCombined && hasRecipeHalves),
     reason: recipeAlreadyCombined
       ? 'La recette est deja assemblee.'
-      : (recipeQuest?.progress ?? 0) >= 2 || ownedRecipeHalves.length >= 2
+      : hasRecipeHalves
         ? 'Les deux fragments sont acquis par le moteur.'
         : 'Il manque encore un fragment de recette.',
     toolName: 'resolve_player_action',

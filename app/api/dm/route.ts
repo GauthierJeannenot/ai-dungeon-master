@@ -18,7 +18,7 @@ import {
   inferAdventureRoomId as inferMappedAdventureRoomId,
   relativeAdventureRoomIdForText,
 } from '@/lib/adventure-map'
-import { DMRequest, DMResponse, GameState, ConversationTurn, CombatLogEntry, MonsterState, type CanonicalPlayerActionKind, type DMTurnUsage, type EngineEvent, type PlayerAffordance } from '@/lib/types'
+import { DMRequest, DMResponse, GameState, ConversationTurn, CombatLogEntry, MonsterState, type CanonicalPlayerActionKind, type DMDebugTurnView, type DMTurnUsage, type EngineEvent, type PlayerAffordance, type WorldState } from '@/lib/types'
 import {
   isDoorTraversalIntent,
   normalizeFrenchText,
@@ -43,6 +43,11 @@ import {
 } from '@/lib/anthropic-usage'
 import { logEvent, summarizeGameState } from '@/lib/server-logger'
 import { buildEngineResolutionView, derivePlayerAffordances } from '@/lib/world-engine'
+import { buildWorldActionInput, resolveWorldActionTargets } from '@/lib/world-target-resolver'
+import {
+  detectUnsupportedNarratedWorldFacts,
+  type NarratedWorldFact,
+} from '@/lib/narrative-world-contract'
 
 export const maxDuration = 60
 
@@ -1678,6 +1683,15 @@ function detectNarrativeWorldContractIssue(
   const npcs = Object.values(world.npcs)
   const recentEvents = world.eventLog.slice(-8)
   const recentEventTypes = new Set(recentEvents.map(event => event.type))
+  const unsupportedFacts = detectUnsupportedNarratedWorldFacts(responseText, gameState, recentEvents, toolsUsed)
+  if (unsupportedFacts.length > 0) {
+    const first = unsupportedFacts[0]
+    return {
+      reason: first.reason,
+      matchedTriggers: unsupportedFacts.map(problem => `${problem.fact.kind}:${problem.fact.trigger}`),
+      suggestedTools: first.suggestedTools,
+    }
+  }
 
   const narratesRecipeAcquired =
     /\b(trouves?|trouve|decouvres?|decouvre|ramasses?|ramasse|prends?|prend|recuperes?|recupere|empoches?|empoche)\b.{0,80}\b(recette|fragment|moitie|parchemin|papier)\b/.test(text) ||
@@ -2676,101 +2690,102 @@ function parseWorldActionInput(
 ): Record<string, unknown> | null {
   const kind = actionKind ?? classifyPlayerAction(message, gameState).kind
   if (!isCanonicalWorldActionKind(kind)) return null
+  return buildWorldActionInput(message, gameState, kind)
+}
 
-  const explicitTargetName = extractExpandedWorldTargetName(message)
-  const targetName = explicitTargetName ?? inferAnaphoricWorldTargetName(message, gameState, kind)
-  const explicitNpcTargetName = extractWorldNpcTargetName(message)
-  const npcTargetName = explicitNpcTargetName ?? inferAnaphoricNpcTargetName(message, gameState, kind)
-  const itemName = extractWorldItemName(message)
-  switch (kind) {
-    case 'examine':
-      return targetName ? { kind: 'examine', targetName } : { kind: 'examine' }
+function buildDmTurnDebug(
+  message: string,
+  gameState: GameState,
+  actionIntent: GameActionIntent
+): DMDebugTurnView {
+  const isWorldAction = isCanonicalWorldActionKind(actionIntent.kind)
+  return {
+    actionIntent: {
+      kind: actionIntent.kind,
+      primitive: actionIntent.primitive,
+      reason: actionIntent.reason,
+      confidence: actionIntent.confidence,
+      requiresEngine: actionIntent.requiresEngine,
+    },
+    parsedAction: isWorldAction ? buildWorldActionInput(message, gameState, actionIntent.kind) : null,
+    targetResolution: isWorldAction
+      ? resolveWorldActionTargets(message, gameState, actionIntent.kind) as unknown as Record<string, unknown>
+      : null,
+  }
+}
 
-    case 'read':
-      return { kind: 'read', ...(targetName ? { targetName } : {}) }
+function objectWorldDebug(object: WorldState['objects'][string]): Record<string, unknown> {
+  return {
+    visible: object.visible,
+    discovered: object.discovered,
+    opened: object.opened,
+    locked: object.locked,
+    taken: object.taken,
+    used: object.used,
+    disarmed: object.disarmed,
+  }
+}
 
-    case 'search':
-      return targetName && /\b(tiroirs?|armoires?|coffres?|four|champignons?|caisses?|sacs?|bureau|appartement)\b/.test(normalizeFrenchText(message))
-        ? { kind: 'search', targetName }
-        : { kind: 'search' }
+function npcWorldDebug(npc: WorldState['npcs'][string]): Record<string, unknown> {
+  return {
+    roomId: npc.roomId,
+    disposition: npc.disposition,
+    known: npc.known,
+    memory: npc.memory ?? {},
+  }
+}
 
-    case 'open':
-      return { kind: 'open', ...(targetName ? { targetName } : {}) }
+function questWorldDebug(quest: WorldState['quests'][string]): Record<string, unknown> {
+  return {
+    progress: quest.progress,
+    goal: quest.goal,
+    completed: quest.completed,
+    flags: quest.flags ?? {},
+  }
+}
 
-    case 'take':
-      return { kind: 'take', ...(targetName ? { targetName } : {}) }
+function alarmWorldDebug(alarm: WorldState['alarms'][string]): Record<string, unknown> {
+  return {
+    level: alarm.level,
+    raised: alarm.raised,
+    reason: alarm.reason,
+  }
+}
 
-    case 'unlock':
-      return { kind: 'unlock', ...(targetName ? { targetName } : {}) }
+function debugRecordsChanged(before: Record<string, unknown>, after: Record<string, unknown>): boolean {
+  return JSON.stringify(before) !== JSON.stringify(after)
+}
 
-    case 'force':
-      return { kind: 'force', ...(targetName ? { targetName } : {}) }
+function diffWorldRecords<T>(
+  beforeRecords: Record<string, T> | undefined,
+  afterRecords: Record<string, T> | undefined,
+  summarize: (value: T) => Record<string, unknown>
+): Record<string, { before: Record<string, unknown>; after: Record<string, unknown> }> | undefined {
+  const diff: Record<string, { before: Record<string, unknown>; after: Record<string, unknown> }> = {}
+  for (const id of new Set([...Object.keys(beforeRecords ?? {}), ...Object.keys(afterRecords ?? {})])) {
+    const before = beforeRecords?.[id] ? summarize(beforeRecords[id]) : {}
+    const after = afterRecords?.[id] ? summarize(afterRecords[id]) : {}
+    if (debugRecordsChanged(before, after)) diff[id] = { before, after }
+  }
+  return Object.keys(diff).length > 0 ? diff : undefined
+}
 
-    case 'disarm':
-      return { kind: 'disarm', ...(targetName ? { targetName } : {}) }
-
-    case 'talk':
-      return {
-        kind: 'talk',
-        ...(npcTargetName ? { targetName: npcTargetName } : {}),
-        topic: message,
-      }
-
-    case 'ask':
-      return {
-        kind: 'ask',
-        ...(npcTargetName ? { targetName: npcTargetName } : {}),
-        topic: message,
-      }
-
-    case 'persuade':
-      return {
-        kind: 'persuade',
-        ...(npcTargetName ? { targetName: npcTargetName } : {}),
-        topic: message,
-      }
-
-    case 'threaten':
-      return {
-        kind: 'threaten',
-        ...(npcTargetName ? { targetName: npcTargetName } : {}),
-        demand: message,
-      }
-
-    case 'show_item':
-      return {
-        kind: 'show_item',
-        ...(npcTargetName ? { targetName: npcTargetName } : {}),
-        ...(itemName ? { itemName } : {}),
-      }
-
-    case 'give_item':
-      return {
-        kind: 'give_item',
-        ...(npcTargetName ? { targetName: npcTargetName } : {}),
-        ...(itemName ? { itemName } : {}),
-      }
-
-    case 'hide':
-      return { kind: 'hide' }
-
-    case 'help':
-      return { kind: 'help', ...(npcTargetName ? { targetName: npcTargetName } : {}) }
-
-    case 'flee':
-      return { kind: 'flee' }
-
-    case 'stabilize':
-      return { kind: 'stabilize', targetId: 'player' }
-
-    case 'use_object':
-      return { kind: 'use_object', ...(targetName ? { targetName } : {}) }
-
-    case 'combine_recipe':
-      return { kind: 'combine_recipe' }
-
-    default:
-      return null
+function buildWorldDebugDiff(
+  beforeWorld: WorldState | undefined,
+  afterWorld: WorldState | undefined,
+  events: EngineEvent[]
+): DMDebugTurnView['worldDiff'] {
+  if (!beforeWorld && !afterWorld) return { events }
+  const beforeFlags = beforeWorld?.flags ?? {}
+  const afterFlags = afterWorld?.flags ?? {}
+  const flagsChanged = debugRecordsChanged(beforeFlags, afterFlags)
+  return {
+    events,
+    objects: diffWorldRecords(beforeWorld?.objects, afterWorld?.objects, objectWorldDebug),
+    npcs: diffWorldRecords(beforeWorld?.npcs, afterWorld?.npcs, npcWorldDebug),
+    quests: diffWorldRecords(beforeWorld?.quests, afterWorld?.quests, questWorldDebug),
+    alarms: diffWorldRecords(beforeWorld?.alarms, afterWorld?.alarms, alarmWorldDebug),
+    ...(flagsChanged ? { flags: { before: beforeFlags, after: afterFlags } } : {}),
   }
 }
 
@@ -2999,6 +3014,19 @@ async function resolveServerFirstAction(
     const attackInput = parsePlayerAttackInput(message, gameState)
     const encounterRepairInput = parseEncounterRepairInput(message, gameState)
     if (worldActionInput) {
+      const targetResolution = isCanonicalWorldActionKind(actionIntent.kind)
+        ? resolveWorldActionTargets(message, gameState, actionIntent.kind)
+        : null
+      logEvent('debug', 'dm.world_action.target_resolved', {
+        requestId,
+        sessionId,
+        actionKind: actionIntent.kind,
+        targetResolution,
+        worldActionInput,
+        enabledAffordances: derivePlayerAffordances(gameState)
+          .filter(affordance => affordance.enabled)
+          .map(affordance => ({ id: affordance.id, kind: affordance.kind, label: affordance.label })),
+      })
       toolName = 'resolve_player_action'
       input = canonicalPlayerActionInput(worldActionInput)
     } else if (attackInput) {
@@ -3593,6 +3621,10 @@ interface EngineTruthPacket {
   affordances: PlayerAffordance[]
   combatLog: Array<Pick<CombatLogEntry, 'round' | 'turn' | 'action' | 'mechanicalDetail'>>
   allowedFacts: string[]
+  narrativeFactContract: {
+    supportedEventTypes: string[]
+    riskyFactKinds: Array<NarratedWorldFact['kind']>
+  }
 }
 
 function formatPosition(position: { x: number; y: number }): string {
@@ -3665,11 +3697,15 @@ function buildEngineTruthPacket(
       .map(object => `worldObject=${object.id} name=${object.name} kind=${object.kind} visible=${object.visible} discovered=${object.discovered} opened=${Boolean(object.opened)} locked=${Boolean(object.locked)} taken=${Boolean(object.taken)} used=${Boolean(object.used)} disarmed=${Boolean(object.disarmed)} readable=${Boolean(object.readableText || object.tags?.includes('readable'))}`),
     ...Object.values(gameState.world?.npcs ?? {})
       .filter(npc => npc.roomId === gameState.currentRoomId)
-      .map(npc => `worldNpc=${npc.id} name=${npc.name} disposition=${npc.disposition} known=${Boolean(npc.known)} memory=${JSON.stringify(npc.memory ?? {})}`),
+      .map(npc => `worldNpc=${npc.id} name=${npc.name} disposition=${npc.disposition} known=${Boolean(npc.known)} faction=${npc.faction ?? 'none'} goals=${JSON.stringify(npc.goals ?? [])} memory=${JSON.stringify(npc.memory ?? {})}`),
     ...Object.values(gameState.world?.quests ?? {})
       .map(quest => `quest=${quest.id} progress=${quest.progress}/${quest.goal} completed=${Boolean(quest.completed)} flags=${JSON.stringify(quest.flags ?? {})}`),
     ...Object.entries(gameState.world?.alarms ?? {})
-      .map(([alarmId, alarm]) => `alarm=${alarmId} raised=${alarm.raised} level=${alarm.level} reason=${alarm.reason ?? 'none'}`),
+      .map(([alarmId, alarm]) => `alarm=${alarmId} raised=${alarm.raised} level=${alarm.level} clock=${alarm.clock ? `${alarm.clock.value}:${JSON.stringify(alarm.clock.thresholds ?? {})}` : 'none'} reason=${alarm.reason ?? 'none'}`),
+    `narrativeFactContract=${JSON.stringify({
+      supportedEventTypes: [...new Set(engineResolution.events.map(event => event.type))],
+      riskyFactKinds: ['recipe_acquired', 'recipe_completed', 'object_discovered', 'object_opened', 'npc_convinced', 'trap_triggered', 'trap_disarmed', 'alarm_negated', 'player_dead', 'player_unconscious'],
+    })}`,
     ...engineResolution.events.map(event => `event=${event.type} outcome=${event.outcome ?? 'none'} summary=${event.summary}`),
     ...engineResolution.affordances.map(action => `affordance=${action.kind} enabled=${action.enabled} tool=${action.toolName ?? 'none'} reason=${action.reason}`),
     ...aliveMonsters.map(monster => `monster=${monster.name} id=${monster.id} hp=${monster.hp} position=${monster.position}`),
@@ -3697,6 +3733,10 @@ function buildEngineTruthPacket(
       mechanicalDetail: entry.mechanicalDetail,
     })),
     allowedFacts,
+    narrativeFactContract: {
+      supportedEventTypes: [...new Set(engineResolution.events.map(event => event.type))],
+      riskyFactKinds: ['recipe_acquired', 'recipe_completed', 'object_discovered', 'object_opened', 'npc_convinced', 'trap_triggered', 'trap_disarmed', 'alarm_negated', 'player_dead', 'player_unconscious'],
+    },
   }
 }
 
@@ -4024,6 +4064,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     logRoomStateAnomaly(currentGameState, requestId, sessionId, 'after-mcp-sync')
     const combatLogStartLength = currentGameState.combatLog.length
     const worldEventStartLength = currentGameState.world?.eventLog.length ?? 0
+    const worldDebugBeforeTurn = currentGameState.world ? structuredClone(currentGameState.world) : undefined
 
     if (currentGameState.phase === 'combat' && currentGameState.currentTurn && currentGameState.currentTurn !== 'player') {
       try {
@@ -4055,6 +4096,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     const actionIntent = classifyPlayerAction(message, currentGameState)
+    const turnDebug = buildDmTurnDebug(message, currentGameState, actionIntent)
     const requiredMechanicalAction = requiredMechanicalActionFromIntent(actionIntent)
     logEvent('info', 'dm.action.intent', {
       requestId,
@@ -4065,6 +4107,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       requiresEngine: actionIntent.requiresEngine,
       suggestedTools: actionIntent.suggestedTools,
       gameState: summarizeGameState(currentGameState),
+    })
+    logEvent('debug', 'dm.turn.debug_action', {
+      requestId,
+      clientRequestId,
+      sessionId,
+      debug: turnDebug,
     })
 
     let recentHistory = requestHistory.slice(-HISTORY_KEEP_RECENT)
@@ -4957,6 +5005,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       engine: {
         events: engineTruthPacket.events,
         affordances: engineTruthPacket.affordances,
+      },
+      debug: {
+        ...turnDebug,
+        refusalCode: mcpErrorCode(latestMcpErrorResult),
+        worldDiff: buildWorldDebugDiff(worldDebugBeforeTurn, currentGameState.world, newWorldEvents),
       },
       usage: turnUsage,
       // Renvoie le nouveau résumé au client seulement si une compression a eu lieu

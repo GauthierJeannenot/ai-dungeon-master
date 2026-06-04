@@ -207,7 +207,7 @@ export function classifyPlayerAction(message: string, gameState: GameState): Gam
       /\b(autour|alentours|ici|la piece|la salle|ce lieu|decor)\b/.test(text) ||
       /^(?:je |j[' ])?(?:regarde|observe|inspecte|ecoute)\.?$/.test(text)
     )
-  const unlockIntent = /\b(crochetes?|crocheter|deverrouilles?|deverrouiller|deverouille|serrure)\b/.test(text)
+  const unlockIntent = /\b(crochettes?|crochetes?|crocheter|crochetage|deverrouilles?|deverrouiller|deverouille|serrure)\b/.test(text)
   const forceObjectIntent = /\b(forces?|forcer|enfonces?|enfoncer|defonces?|defoncer|casses?|casser)\b/.test(text) &&
     /\b(porte|tiroir|coffre|armoire|serrure|verrou)\b/.test(text)
   const disarmIntent = /\b(desamorces?|desamorcer|desactives?|desactiver|neutralises?|neutraliser|securises?|securiser)\b/.test(text) &&
@@ -485,8 +485,8 @@ export function classifyPlayerAction(message: string, gameState: GameState): Gam
     /\b(parles?|parler|discutes?|discuter|demandes?|demander|questionnes?|questionner|adresses?|adresser)\b/.test(text) &&
     /\b(mac|pommier|treant|arbre|gobelins?|grukk|grammy|pnj|personne|lui|elle|eux)\b/.test(text)
   const socialIntent = explicitSocialIntent || conversationalSocialIntent
-  const abilityCheckIntent = socialIntent || /\b(test|jet|athletisme|athletics|perception|discretion|stealth|crocheter|fouiller|chercher|forcer|soulever|pousser)\b/.test(text)
-  const localObjectIntent = /\b(ouvres?|ouvrir|fouilles?|fouiller|inspectes?|inspecter|examines?|examiner|tiroirs?|coffres?|armoires?|livres?|four|fours|rouleaux?|couteaux?|objets?|potions?)\b/.test(text) &&
+  const abilityCheckIntent = socialIntent || /\b(test|jet|athletisme|athletics|perception|discretion|stealth|crochettes?|crochetes?|crocheter|crochetage|fouiller|chercher|forcer|soulever|pousser)\b/.test(text)
+  const localObjectIntent = /\b(ouvres?|ouvrir|fouilles?|fouiller|inspectes?|inspecter|examines?|examiner|crochettes?|crochetes?|crocheter|tiroirs?|coffres?|armoires?|livres?|four|fours|rouleaux?|couteaux?|objets?|potions?)\b/.test(text) &&
     (referencesLocalObjectInsteadOfRoom(text) || /\b(four|fours|rouleaux?|couteaux?|objets? magiques?|potions?)\b/.test(text))
   const asksOnlyForDescription = /\b(observe|regarde|inspecte|ecoute|vois|voir|decris|decrit|quoi|qu'est-ce|est-ce tout)\b/.test(text)
 

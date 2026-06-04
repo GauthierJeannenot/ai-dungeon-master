@@ -15,6 +15,7 @@ import {
 } from '../lib/types'
 import { inferAdventureRoomId } from '../lib/adventure-map'
 import { createInitialWorldState } from '../lib/adventure-world'
+import { assertWorldStateValid } from '../lib/world-validation'
 
 // Initial player template — overridable via context files
 const DEFAULT_PLAYER: PlayerState = {
@@ -67,6 +68,8 @@ function mergeNpcState(defaultNpc: WorldNpcState | undefined, incomingNpc: World
     ...incomingNpc,
     aliases: incomingNpc.aliases ?? defaultNpc?.aliases,
     tags: incomingNpc.tags ?? defaultNpc?.tags,
+    faction: incomingNpc.faction ?? defaultNpc?.faction,
+    goals: incomingNpc.goals ?? defaultNpc?.goals,
     memory: { ...(defaultNpc?.memory ?? {}), ...(incomingNpc.memory ?? {}) },
   }
 }
@@ -83,6 +86,7 @@ function mergeAlarmState(defaultAlarm: WorldAlarmState | undefined, incomingAlar
   return {
     ...defaultAlarm,
     ...incomingAlarm,
+    clock: incomingAlarm.clock ?? defaultAlarm?.clock,
   }
 }
 
@@ -124,6 +128,7 @@ function ensureWorldState(): WorldState {
     flags: { ...defaults.flags, ...(incoming?.flags ?? {}) },
     eventLog: structuredClone(incoming?.eventLog ?? []).slice(-WORLD_EVENT_LOG_LIMIT),
   }
+  assertWorldStateValid(state.world, 'Merged world state')
   return state.world
 }
 
@@ -142,7 +147,11 @@ function createInitialState(): GameState {
     roomsVisited: initialRoomId ? [initialRoomId] : [],
     currentRoomId: initialRoomId,
     encountersTriggered: [],
-    world: createInitialWorldState(),
+    world: (() => {
+      const world = createInitialWorldState()
+      assertWorldStateValid(world, 'Initial world state')
+      return world
+    })(),
   }
 }
 
@@ -367,6 +376,9 @@ export function raiseWorldAlarm(alarmId: string, reason: string, amount = 1): Wo
   alarm.level = Math.max(0, alarm.level + amount)
   alarm.raised = true
   alarm.reason = reason
+  if (alarm.clock) {
+    alarm.clock.value = Math.max(alarm.clock.value, alarm.level)
+  }
   world.alarms[alarmId] = alarm
   state.sceneMemory = {
     ...(state.sceneMemory ?? {}),

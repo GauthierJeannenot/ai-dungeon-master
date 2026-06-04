@@ -509,6 +509,7 @@ export default function GamePage() {
             .filter(action => !action.enabled)
             .map(action => ({ kind: action.kind, label: action.label, reason: action.reason })),
         } : undefined,
+        debug: data.debug,
         usage: data.usage,
         summaryContextLength: data.summaryContext?.length ?? 0,
         gameState: data.newGameState ? summarizeClientGameState(data.newGameState) : null,

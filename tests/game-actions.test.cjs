@@ -147,6 +147,8 @@ test('game action language routes natural world verbs and anaphora to canonical 
     ['je lis le papier', 'read'],
     ["je l'ouvre", 'open'],
     ['je le prends', 'take'],
+    ['je crochette', 'unlock'],
+    ['je crochette le tiroir', 'unlock'],
     ['je crochette la serrure', 'unlock'],
     ['je desamorce le piege', 'disarm'],
     ['je montre la recette a Mac', 'show_item'],

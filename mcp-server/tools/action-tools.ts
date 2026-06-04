@@ -14,6 +14,13 @@ import {
   WorldQuestState,
 } from '../../lib/types'
 import { normalizeFrenchText } from '../../lib/dm-intent'
+import {
+  isWorldObjectOpenable,
+  isWorldObjectReadable,
+  isWorldObjectTakeable,
+  isWorldObjectTrap,
+  recipeCombinationStatus,
+} from '../../lib/world-action-effects'
 import { resolvePlayerAttack, type TargetHint } from './combat-tools'
 
 type ToolResponse = {
@@ -396,13 +403,6 @@ function npcMatchesTarget(npc: WorldNpcState, targetName?: string): boolean {
   return parts.length > 0 && parts.some(part => haystacks.some(haystack => haystack.includes(part)))
 }
 
-function isObjectOpenable(object: WorldObjectState): boolean {
-  return object.kind === 'door' ||
-    object.kind === 'container' ||
-    object.opened !== undefined ||
-    object.locked !== undefined
-}
-
 function resolveWorldObjectTarget({
   targetId,
   targetName,
@@ -425,8 +425,8 @@ function resolveWorldObjectTarget({
     if (object.roomId !== roomId) return false
     if (object.taken) return false
     if (kinds && !kinds.includes(object.kind)) return false
-    if (onlyOpenable && !isObjectOpenable(object)) return false
-    if (onlyTakeable && !['item', 'clue'].includes(object.kind)) return false
+    if (onlyOpenable && !isWorldObjectOpenable(object)) return false
+    if (onlyTakeable && !isWorldObjectTakeable(object)) return false
     if (!includeHidden && !object.visible && !object.discovered) return false
     if (!objectMatchesTarget(object, targetName)) return false
     return true
@@ -546,7 +546,7 @@ function resolveReadableObjectTarget(targetId?: string, targetName?: string): Wo
     const inRoom = roomId && object.roomId === roomId && (object.visible || object.discovered)
     const inInventory = inventoryIds.has(object.id)
     if (!inRoom && !inInventory) return false
-    if (!object.readableText && !object.tags?.includes('readable')) return false
+    if (!isWorldObjectReadable(object)) return false
     if (!objectMatchesTarget(object, targetName)) return false
     return true
   })
@@ -1136,7 +1136,7 @@ function resolveSearchAction({
   const world = gs.getWorldState()
   const containedBehindClosedObjects = new Set(
     Object.values(world.objects)
-      .filter(object => object.contains?.length && isObjectOpenable(object) && object.opened !== true)
+      .filter(object => object.contains?.length && isWorldObjectOpenable(object) && object.opened !== true)
       .flatMap(object => object.contains ?? [])
   )
   const hiddenCandidates = Object.values(world.objects).filter(object => {
@@ -2126,7 +2126,7 @@ function resolveUseObjectAction({
   let hpDamage = 0
   let alarm = undefined
 
-  if ((updated.kind === 'trap' || updated.tags?.includes('trap')) && updated.disarmed) {
+  if (isWorldObjectTrap(updated) && updated.disarmed) {
     gs.recordWorldEvent({
       type: 'object.used',
       summary: `${updated.name} est manipule sans danger: le piege est desamorce.`,
@@ -2139,7 +2139,7 @@ function resolveUseObjectAction({
         useType,
       },
     })
-  } else if (updated.kind === 'trap' || updated.tags?.includes('trap')) {
+  } else if (isWorldObjectTrap(updated)) {
     const damageRoll = rollDice('1d6')
     hpDamage = damageRoll.total
     gs.updatePlayerHP(-hpDamage)
@@ -2208,25 +2208,18 @@ function resolveCombineRecipeAction(): ToolResponse {
   if (availabilityError) return availabilityError
 
   const world = gs.getWorldState()
-  const recipeQuest = world.quests.grammy_recipe
-  const recipeHalves = Object.values(world.objects).filter(object => object.tags?.includes('recipe_half'))
-  const takenHalfIds = recipeHalves.filter(object => object.taken).map(object => object.id)
-  const inventoryIds = new Set(gs.getPlayer().inventory.map(item => item.id))
-  const ownedHalfIds = recipeHalves
-    .filter(object => object.taken || inventoryIds.has(object.id))
-    .map(object => object.id)
-  const hasBothHalves = ownedHalfIds.length >= 2 || recipeQuest?.progress >= 2
+  const recipeStatus = recipeCombinationStatus(world, gs.getPlayer())
+  const recipeQuest = recipeStatus.quest
 
-  if (!hasBothHalves) {
+  if (!recipeStatus.canCombine && !recipeStatus.alreadyCombined) {
     return blockedAction('RECIPE_INCOMPLETE', 'The recipe cannot be combined before both halves are found by the engine.', {
-      ownedHalfIds,
-      takenHalfIds,
+      ownedHalfIds: recipeStatus.ownedHalfIds,
       questProgress: recipeQuest?.progress ?? 0,
       questGoal: recipeQuest?.goal ?? 2,
     })
   }
 
-  if (recipeQuest?.completed && recipeQuest.flags?.recipe_combined) {
+  if (recipeQuest && recipeStatus.alreadyCombined) {
     return jsonResponse({
       success: true,
       quest: recipeQuest,
@@ -2243,7 +2236,7 @@ function resolveCombineRecipeAction(): ToolResponse {
     outcome: 'success',
     metadata: {
       questId: quest.id,
-      ownedHalfIds,
+      ownedHalfIds: recipeStatus.ownedHalfIds,
       progress: quest.progress,
       goal: quest.goal,
       completed: quest.completed,
@@ -2259,7 +2252,7 @@ function resolveCombineRecipeAction(): ToolResponse {
   return jsonResponse({
     success: true,
     quest,
-    ownedHalfIds,
+    ownedHalfIds: recipeStatus.ownedHalfIds,
     mechanicalSummary: `Recette assemblee: ${quest.progress}/${quest.goal}.`,
   })
 }

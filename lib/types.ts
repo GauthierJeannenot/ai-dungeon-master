@@ -138,6 +138,8 @@ export interface WorldNpcState {
   aliases?: string[]
   disposition: WorldNpcDisposition
   known?: boolean
+  faction?: string
+  goals?: string[]
   tags?: string[]
   memory?: Record<string, string | number | boolean>
 }
@@ -155,6 +157,12 @@ export interface WorldAlarmState {
   level: number
   raised: boolean
   reason?: string
+  clock?: {
+    id: string
+    name: string
+    value: number
+    thresholds?: Record<string, number>
+  }
 }
 
 export interface WorldState {
@@ -323,6 +331,27 @@ export interface EngineResolutionView {
   affordances: PlayerAffordance[]
 }
 
+export interface DMDebugTurnView {
+  actionIntent?: {
+    kind: string
+    primitive: string
+    reason: string
+    confidence: string
+    requiresEngine: boolean
+  }
+  parsedAction?: Record<string, unknown> | null
+  targetResolution?: Record<string, unknown> | null
+  refusalCode?: string | null
+  worldDiff?: {
+    events: EngineEvent[]
+    objects?: Record<string, { before: Record<string, unknown>; after: Record<string, unknown> }>
+    npcs?: Record<string, { before: Record<string, unknown>; after: Record<string, unknown> }>
+    quests?: Record<string, { before: Record<string, unknown>; after: Record<string, unknown> }>
+    alarms?: Record<string, { before: Record<string, unknown>; after: Record<string, unknown> }>
+    flags?: { before: Record<string, boolean>; after: Record<string, boolean> }
+  }
+}
+
 // Un tour de conversation envoyé au LLM (player/dm uniquement — pas mechanical)
 export interface ConversationTurn {
   role: 'player' | 'dm'
@@ -380,6 +409,7 @@ export interface DMResponse {
   newGameState: GameState
   toolsUsed: string[]
   engine?: EngineResolutionView
+  debug?: DMDebugTurnView
   usage?: DMTurnUsage
   // Nouveau résumé retourné si une compression a eu lieu pendant cette requête
   summaryContext?: string

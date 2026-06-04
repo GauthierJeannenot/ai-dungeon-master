@@ -6,6 +6,7 @@
     "dev": "npm run build:mcp && concurrently \"next dev\" \"node mcp-server/dist/mcp-server/index.js\"",
     "dev:mock": "node scripts/dev-mock.cjs",
     "playtest": "node scripts/playtest.cjs",
+    "replay:session-log": "node scripts/replay-session-log.cjs",
     "playtest:mock": "npm run build:mcp && node scripts/playtest.cjs --mode mock --narration-mode quality",
     "playtest:budget": "npm run build:mcp && node scripts/playtest.cjs --mode mock --narration-mode budget",
     "build:mcp": "tsc -p mcp-server/tsconfig.json",

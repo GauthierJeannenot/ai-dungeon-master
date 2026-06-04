@@ -284,7 +284,58 @@ function fleeingCombatGameState() {
   }
 }
 
-const scenarios = [
+function fixtureGameState(name) {
+  switch (name) {
+    case 'base':
+    case 'entrance':
+      return baseGameState()
+    case 'office':
+      return officeGameState()
+    case 'apartment':
+      return apartmentRecipeGameState()
+    case 'bakery-hazard':
+      return bakeryHazardGameState()
+    case 'combat':
+      return combatGameState()
+    case 'downed-combat':
+      return downedCombatGameState()
+    case 'fleeing-combat':
+      return fleeingCombatGameState()
+    default:
+      throw new Error(`Fixture initialGameState inconnu: ${name}`)
+  }
+}
+
+function normalizeFixtureTurn(turn) {
+  const normalized = typeof turn === 'string' ? { message: turn } : { ...turn }
+  if (!normalized.message || typeof normalized.message !== 'string') {
+    throw new Error('Fixture turn invalide: chaque tour doit contenir message.')
+  }
+  return {
+    expectNoLlm: normalized.expectNoLlm ?? (normalized.category === 'regression' || normalized.category === 'world'
+      ? narrationMode === 'budget'
+      : false),
+    category: normalized.category ?? 'regression',
+    ...normalized,
+  }
+}
+
+function loadSessionRegressionScenarios() {
+  const fixturePath = option('--session-fixture', path.join(process.cwd(), 'tests', 'fixtures', 'real-session-regression.json'))
+  if (!fixturePath || !fs.existsSync(fixturePath)) return []
+
+  const fixture = JSON.parse(fs.readFileSync(fixturePath, 'utf8'))
+  const fixtures = Array.isArray(fixture) ? fixture : [fixture]
+  return fixtures.map((entry, index) => ({
+    name: entry.name ?? `session-regression-${index + 1}`,
+    initialGameState: typeof entry.initialGameState === 'string'
+      ? fixtureGameState(entry.initialGameState)
+      : entry.initialGameState ?? baseGameState(),
+    turns: (entry.turns ?? entry.messages ?? []).map(normalizeFixtureTurn),
+  }))
+}
+
+const builtInScenarios = [
   {
     name: 'exploration-local',
     initialGameState: baseGameState(),
@@ -541,6 +592,58 @@ const scenarios = [
       },
     ],
   },
+  {
+    name: 'natural-fuzz-world',
+    initialGameState: officeGameState(),
+    turns: [
+      {
+        message: 'je regarde',
+        expectNoLlm: false,
+        category: 'fuzz',
+      },
+      {
+        message: 'je fouille partout',
+        expectNoLlm: narrationMode === 'budget',
+        category: 'fuzz',
+        expectTools: ['resolve_player_action'],
+        expectEvents: ['room.object_discovered'],
+        expectAffordances: ['unlock', 'force'],
+      },
+      {
+        message: "je l'ouvre",
+        expectNoLlm: narrationMode === 'budget',
+        category: 'fuzz',
+        expectTools: ['resolve_player_action'],
+        expectEvents: ['action.blocked'],
+        expectAffordances: ['unlock', 'force'],
+      },
+      {
+        message: 'je crochette',
+        expectNoLlm: narrationMode === 'budget',
+        category: 'fuzz',
+        expectTools: ['resolve_player_action'],
+        expectEvents: ['object.opened', 'room.object_discovered'],
+        expectAffordances: ['take'],
+      },
+      {
+        message: 'je le prends',
+        expectNoLlm: narrationMode === 'budget',
+        category: 'fuzz',
+        expectTools: ['resolve_player_action'],
+        expectEvents: ['object.taken', 'quest.item_found'],
+      },
+      {
+        message: "j'essaie autre chose, attends quoi?",
+        expectNoLlm: false,
+        category: 'meta',
+      },
+    ],
+  },
+]
+
+const scenarios = [
+  ...builtInScenarios,
+  ...loadSessionRegressionScenarios(),
 ]
 
 function emptyUsage() {
@@ -645,6 +748,9 @@ async function run() {
       missingExpectedTools: [],
       missingExpectedEvents: [],
       missingExpectedAffordances: [],
+      missingDebugViews: [],
+      missingWorldDebugDiffs: [],
+      missingTargetResolutions: [],
     },
     targetViolations: [],
   }
@@ -696,6 +802,16 @@ async function run() {
             blockedAffordances: data.engine?.affordances
               ?.filter(action => !action.enabled)
               .map(action => ({ kind: action.kind, reason: action.reason })) ?? [],
+            debug: data.debug ? {
+              actionKind: data.debug.actionIntent?.kind,
+              parsedKind: data.debug.parsedAction?.kind,
+              targetResolution: data.debug.targetResolution,
+              refusalCode: data.debug.refusalCode,
+              changedObjects: Object.keys(data.debug.worldDiff?.objects ?? {}),
+              changedNpcs: Object.keys(data.debug.worldDiff?.npcs ?? {}),
+              changedQuests: Object.keys(data.debug.worldDiff?.quests ?? {}),
+              changedAlarms: Object.keys(data.debug.worldDiff?.alarms ?? {}),
+            } : undefined,
             narrator: usage?.narrator ?? 'unknown',
             llmRoute: usage?.llmRoute ?? 'unknown',
             llmCalls: usage?.llm?.calls ?? 0,
@@ -722,6 +838,20 @@ async function run() {
           }
           if (status < 400 && !data.engine) {
             report.quality.missingEngineViews.push(turnReport)
+          }
+          if (status < 400 && !data.debug) {
+            report.quality.missingDebugViews.push(turnReport)
+          }
+          if (status < 400 && (turn.category === 'world' || turn.category === 'regression' || turn.category === 'fuzz') && !data.debug?.worldDiff) {
+            report.quality.missingWorldDebugDiffs.push(turnReport)
+          }
+          if (
+            status < 400 &&
+            (turn.category === 'world' || turn.category === 'regression' || turn.category === 'fuzz' || turn.category === 'social') &&
+            (turn.expectTools ?? []).includes('resolve_player_action') &&
+            !data.debug?.targetResolution
+          ) {
+            report.quality.missingTargetResolutions.push(turnReport)
           }
           for (const expectedTool of turn.expectTools ?? []) {
             if (!turnReport.toolsUsed.includes(expectedTool)) {
@@ -801,6 +931,15 @@ async function run() {
   }
   if (report.quality.missingEngineViews.length > 0) {
     report.targetViolations.push(`${report.quality.missingEngineViews.length} turns missed engine debug views`)
+  }
+  if (report.quality.missingDebugViews.length > 0) {
+    report.targetViolations.push(`${report.quality.missingDebugViews.length} turns missed structured debug views`)
+  }
+  if (report.quality.missingWorldDebugDiffs.length > 0) {
+    report.targetViolations.push(`${report.quality.missingWorldDebugDiffs.length} world turns missed world debug diffs`)
+  }
+  if (report.quality.missingTargetResolutions.length > 0) {
+    report.targetViolations.push(`${report.quality.missingTargetResolutions.length} canonical actions missed target resolution debug`)
   }
   if (report.quality.missingExpectedTools.length > 0) {
     report.targetViolations.push(`${report.quality.missingExpectedTools.length} expected tools were not used`)
