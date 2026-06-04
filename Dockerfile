@@ -1,13 +1,13 @@
 # syntax=docker/dockerfile:1
 
 # ---------------------------------------------------------------------------
-# AI Dungeon Master — Fly.io image
+# AI Dungeon Master production image
 #
 # The app is a STATEFUL long-running Next.js server: each game session spawns
 # the MCP engine as a stdio subprocess (node mcp-server/dist/mcp-server/index.js)
 # and persists session JSON to disk. It therefore runs as a persistent
-# container (not serverless). Session state lives on a Fly volume mounted at
-# /data (see fly.toml + GAME_SESSION_STORE_DIR below).
+# container (not serverless). Session state lives on a persistent volume mounted
+# at /data (see fly.toml, docker-compose.oracle.yml + GAME_SESSION_STORE_DIR).
 # ---------------------------------------------------------------------------
 
 # ---- Stage 1: build (full deps + next build + tsc for the MCP engine) ----
@@ -47,7 +47,7 @@ COPY public        ./public
 COPY context       ./context
 COPY next.config.ts package.json package-lock.json ./
 
-# Persistent session store + ephemeral logs/cassettes dir. The Fly volume is
+# Persistent session store + ephemeral logs/cassettes dir. A deployment volume is
 # mounted over /data at runtime; this just guarantees the path exists.
 RUN mkdir -p /data/sessions .data \
     && chown -R node:node /app /data

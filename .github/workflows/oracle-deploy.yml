@@ -1,0 +1,133 @@
+name: Deploy to Oracle VPS
+
+on:
+  workflow_run:
+    workflows: [CI]
+    branches: [main, master]
+    types: [completed]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-oracle
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy to Oracle VPS
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    env:
+      ORACLE_HOST: ${{ secrets.ORACLE_HOST }}
+      ORACLE_USER: ${{ secrets.ORACLE_USER }}
+      ORACLE_SSH_KEY: ${{ secrets.ORACLE_SSH_KEY }}
+      ORACLE_DOMAIN: ${{ secrets.ORACLE_DOMAIN }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      APP_DEBUG_LOG_TOKEN: ${{ secrets.APP_DEBUG_LOG_TOKEN }}
+      APP_DEBUG_LOG_PUBLIC_READ: ${{ secrets.APP_DEBUG_LOG_PUBLIC_READ }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Check deploy secrets
+        id: preflight
+        shell: bash
+        run: |
+          missing=()
+          [ -n "$ORACLE_HOST" ] || missing+=("ORACLE_HOST")
+          [ -n "$ORACLE_SSH_KEY" ] || missing+=("ORACLE_SSH_KEY")
+          [ -n "$ANTHROPIC_API_KEY" ] || missing+=("ANTHROPIC_API_KEY")
+
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::notice::Oracle deploy skipped. Missing repository secrets: ${missing[*]}"
+            echo "deploy_enabled=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "deploy_enabled=true" >> "$GITHUB_OUTPUT"
+
+      - name: Configure SSH
+        id: ssh
+        if: steps.preflight.outputs.deploy_enabled == 'true'
+        shell: bash
+        run: |
+          user_name="${ORACLE_USER:-ubuntu}"
+          mkdir -p "$HOME/.ssh"
+          printf '%s\n' "$ORACLE_SSH_KEY" > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          ssh-keyscan -H "$ORACLE_HOST" >> "$HOME/.ssh/known_hosts"
+          echo "user=$user_name" >> "$GITHUB_OUTPUT"
+
+      - name: Bootstrap VM
+        if: steps.preflight.outputs.deploy_enabled == 'true'
+        shell: bash
+        run: |
+          remote="${{ steps.ssh.outputs.user }}@$ORACLE_HOST"
+          ssh "$remote" 'bash -s' < scripts/oracle/bootstrap-vm.sh
+
+      - name: Sync repository to VM
+        if: steps.preflight.outputs.deploy_enabled == 'true'
+        shell: bash
+        run: |
+          remote="${{ steps.ssh.outputs.user }}@$ORACLE_HOST"
+          rsync -az --delete \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='.next' \
+            --exclude='mcp-server/dist' \
+            --exclude='.data' \
+            --exclude='data' \
+            --exclude='caddy_data' \
+            --exclude='caddy_config' \
+            ./ "$remote:/opt/ai-dungeon-master/"
+
+      - name: Write production env
+        if: steps.preflight.outputs.deploy_enabled == 'true'
+        shell: bash
+        run: |
+          remote="${{ steps.ssh.outputs.user }}@$ORACLE_HOST"
+          domain_value="${ORACLE_DOMAIN:-$ORACLE_HOST.sslip.io}"
+          public_debug="${APP_DEBUG_LOG_PUBLIC_READ:-false}"
+
+          {
+            printf 'ANTHROPIC_API_KEY=%s\n' "$ANTHROPIC_API_KEY"
+            printf 'NODE_ENV=production\n'
+            printf 'PORT=8080\n'
+            printf 'HOSTNAME=0.0.0.0\n'
+            printf 'DOMAIN=%s\n' "$domain_value"
+            printf 'GAME_SESSION_STORE_DIR=/data/sessions\n'
+            printf 'APP_LOG_LEVEL=debug\n'
+            printf 'APP_LOG_INCLUDE_TEXT=true\n'
+            printf 'APP_LOG_BUFFER_ENABLED=true\n'
+            printf 'APP_LOG_PERSIST_ENABLED=true\n'
+            printf 'APP_LOG_PERSIST_DIR=/data/logs\n'
+            printf 'APP_LOG_PERSIST_MAX_BYTES=20000000\n'
+            printf 'APP_DEBUG_LOG_TOKEN=%s\n' "$APP_DEBUG_LOG_TOKEN"
+            printf 'APP_DEBUG_LOG_PUBLIC_READ=%s\n' "$public_debug"
+          } | ssh "$remote" "cat > /opt/ai-dungeon-master/.env.production"
+          echo "domain=$domain_value" >> "$GITHUB_ENV"
+
+      - name: Deploy containers
+        if: steps.preflight.outputs.deploy_enabled == 'true'
+        shell: bash
+        run: |
+          remote="${{ steps.ssh.outputs.user }}@$ORACLE_HOST"
+          ssh "$remote" 'cd /opt/ai-dungeon-master && sudo docker compose -f docker-compose.oracle.yml up -d --build --remove-orphans'
+
+      - name: Check deployment
+        if: steps.preflight.outputs.deploy_enabled == 'true'
+        shell: bash
+        run: |
+          url="https://$domain/api/health"
+          for attempt in $(seq 1 30); do
+            if curl -fsS "$url"; then
+              echo "Production URL: https://$domain/game" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            sleep 5
+          done
+
+          echo "::warning::Deploy finished, but health check did not answer yet: $url"
+          echo "Production URL candidate: https://$domain/game" >> "$GITHUB_STEP_SUMMARY"

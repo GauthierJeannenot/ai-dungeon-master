@@ -142,7 +142,7 @@ GitHub repo
     │       │
     │       ├── GitHub Actions CI → type-check + build
     │       │
-    │       └── Auto-deploy → Fly.io
+    │       └── Auto-deploy → Oracle VPS ou Fly.io
     │
     └── Serveur persistant Node.js
             ├── Next.js (app + API routes)
@@ -151,7 +151,31 @@ GitHub repo
 
 ---
 
-### Option A — Fly.io (production actuelle)
+### Option A — Oracle Always Free VPS (recommande)
+
+**Avantages** : VM gratuite durable, pas de mise en veille applicative, disque persistant, logs consultables, compatible avec le serveur MCP comme processus enfant.
+
+**Limite reelle** : un humain doit creer le compte Oracle, passer carte/MFA/CAPTCHA/CGU et creer la VM. Ensuite, le repo peut deployer automatiquement.
+
+Fichiers ajoutes :
+
+- `.github/workflows/oracle-deploy.yml` : CD GitHub Actions par SSH apres CI verte
+- `docker-compose.oracle.yml` : app Next.js + MCP + Caddy
+- `Caddyfile` : reverse proxy HTTPS
+- `scripts/oracle/bootstrap-vm.sh` : bootstrap Docker/Compose du VPS
+- `docs/oracle-deploy.md` : setup VM, secrets GitHub, debug logs, URL
+
+URL cible :
+
+```text
+https://<ORACLE_DOMAIN ou ORACLE_HOST.sslip.io>/game
+```
+
+Voir [docs/oracle-deploy.md](docs/oracle-deploy.md) pour la procedure complete.
+
+---
+
+### Option B — Fly.io
 
 **Avantages** : volume persistant, logs consultables, déploiement GitHub Actions déjà présent via `.github/workflows/fly-deploy.yml`.
 
@@ -183,7 +207,7 @@ fly deploy
 
 ---
 
-### Option B — Render (gratuit permanent)
+### Option C — Render (gratuit permanent)
 
 **Avantages** : free tier sans limite de temps (750h/mois)  
 **Inconvénient** : mise en veille après 15 min d'inactivité (cold start ~30 sec)
@@ -207,7 +231,7 @@ Activé par défaut (`autoDeploy: true` dans `render.yaml`). Chaque push sur la 
 
 ---
 
-### Option C — Koyeb (free tier permanent, sans mise en veille)
+### Option D — Koyeb (free tier permanent, sans mise en veille)
 
 **Avantages** : 2 instances gratuites permanentes, pas de mise en veille  
 **Coût** : gratuit

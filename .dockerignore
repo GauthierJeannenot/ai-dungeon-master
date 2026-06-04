@@ -5,8 +5,11 @@ node_modules
 .next
 mcp-server/dist
 
-# Local runtime state (sessions/logs live on the Fly volume, not the image)
+# Local runtime state (sessions/logs live on a mounted volume, not the image)
 .data
+data
+caddy_data
+caddy_config
 
 # VCS / tooling
 .git
@@ -14,9 +17,9 @@ mcp-server/dist
 .claude
 .vscode
 
-# Local env files — secrets are injected via `fly secrets set`
-.env
-.env*.local
+# Local env files. Secrets are injected by the deployment target.
+.env*
+!.env.example
 
 # Misc
 npm-debug.log*
