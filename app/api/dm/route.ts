@@ -895,6 +895,7 @@ Respecte strictement les résultats mécaniques fournis: jets, dégâts, morts, 
 Ne lance aucun dé, n'invente aucun nouvel ennemi, ne résous aucun tour futur.
 Salle 2: les dryades du verger ne sont pas une rencontre de combat prédéfinie. Si elles sont offensées, elles esquivent, lancent des pommes pourries et mettent la pression; ne déclenche pas de combat contre un autre monstre.
 Joueur à 0 PV: il est inconscient. Ne lui propose pas d'attaque ou de mouvement; un tour joueur inconscient sert à lancer roll_death_save.
+Si currentTurn=player et que le joueur est inconscient, la main visible correspond au jet de mort: ne dis pas que les ennemis vont agir maintenant ni que c'est à eux de frapper.
 Réponse brève: 2-5 phrases courtes, au présent, style vivant mais clair.
 Français naturel et correct: accents, accords simples, phrases propres. Pas de franglais gratuit.
 Format vocal: pas de Markdown, pas de liste, pas de titre, pas de parenthèse, pas d'excuse, pas de commentaire méta, pas de mention du système, des prompts, du moteur, des tools, de MCP ou de l'IA.
@@ -1507,6 +1508,25 @@ function detectNarrativeStateContractIssue(
 
   const text = normalizeFrenchText(responseText)
   const aliveCount = countAliveMonsters(gameState)
+
+  if (
+    gameState.phase === 'combat' &&
+    gameState.currentTurn === 'player' &&
+    gameState.player.hp.current <= 0 &&
+    !isPlayerDeathResolved(gameState)
+  ) {
+    const narratesEnemyActingNow =
+      /\b(?:c'est|c est|maintenant)\s+a\s+(?:eux|elles|lui)\s+de\s+(?:frapper|jouer|agir|attaquer)\b/.test(text) ||
+      /\ba\s+(?:eux|elles|lui)\s+de\s+(?:frapper|jouer|agir|attaquer)\b/.test(text) ||
+      /\b(?:ils|elles|les gobelins|les ennemis|les adversaires)\s+(?:vont|peuvent|s'appretent a|se preparent a)\s+(?:frapper|attaquer|agir)\b/.test(text)
+    if (narratesEnemyActingNow) {
+      return {
+        reason: 'enemy_turn_claim_while_player_death_save_open',
+        matchedTriggers: ['enemy_acts_now_but_current_turn_player'],
+        suggestedTools: ['roll_death_save'],
+      }
+    }
+  }
 
   if (gameState.phase === 'combat' && aliveCount > 0 && !toolsUsed.includes('end_combat')) {
     const mentionsEnemies = /\b(gobelins?|ennemis?|monstres?|creatures?|adversaires?|gardes?|hobgobelins?|grukk|chef grukk)\b/.test(text)
@@ -2938,6 +2958,31 @@ function formatPosition(position: { x: number; y: number }): string {
   return `(${position.x},${position.y})`
 }
 
+function formatDeathSavesForTruth(gameState: GameState): string {
+  const saves = gameState.player.deathSaves ?? { successes: 0, failures: 0 }
+  return `successes=${saves.successes}, failures=${saves.failures}, stable=${Boolean(saves.stable)}, dead=${Boolean(saves.dead)}`
+}
+
+function buildDownedPlayerFinalNarrationInstruction(gameState: GameState): string | undefined {
+  if (gameState.player.hp.current > 0) return undefined
+
+  const saves = gameState.player.deathSaves ?? { successes: 0, failures: 0 }
+  if (saves.dead) {
+    return 'CONTRAINTE KO: Le joueur est mort selon le paquet moteur. Narre la consequence immediate de la mort; ne propose ni attaque, ni mouvement, ni jet de mort.'
+  }
+  if (saves.stable) {
+    return 'CONTRAINTE KO: Le joueur est stable mais inconscient. Narre une consequence immediate de scene; ne propose ni attaque, ni mouvement, ni nouvelle action heroique.'
+  }
+  if (gameState.phase === 'combat' && gameState.currentTurn === 'player') {
+    return 'CONTRAINTE KO: currentTurn=player signifie que le prochain levier jouable est un jet de mort. Ne dis jamais que les ennemis vont agir maintenant, que c est a eux de frapper, ou que le joueur peut attaquer/se deplacer.'
+  }
+  if (gameState.phase === 'combat') {
+    return 'CONTRAINTE KO: Le joueur est inconscient pendant que l initiative tourne. Ne propose ni attaque, ni mouvement, ni defense active; rappelle seulement une consequence immediate soutenue par les logs.'
+  }
+
+  return 'CONTRAINTE KO: Le joueur est a 0 PV hors combat. Ne propose ni attaque, ni mouvement heroique; garde la suite sur les consequences immediates de la scene.'
+}
+
 function buildEngineTruthPacket(
   actionIntent: GameActionIntent,
   toolsUsed: string[],
@@ -2958,11 +3003,17 @@ function buildEngineTruthPacket(
     `currentTurn=${gameState.currentTurn ?? 'none'}`,
     `round=${gameState.round}`,
     `playerHp=${gameState.player.hp.current}/${gameState.player.hp.max}`,
+    `playerConditions=${gameState.player.conditions.join(',') || 'none'}`,
+    `playerDeathSaves=${formatDeathSavesForTruth(gameState)}`,
+    `playerCanAct=${gameState.player.hp.current > 0 && !gameState.player.conditions.includes('unconscious')}`,
     `playerPosition=${formatPosition(gameState.player.position)}`,
     `currentRoomId=${gameState.currentRoomId ?? 'unknown'}`,
     `aliveMonsters=${aliveMonsters.length}`,
     ...aliveMonsters.map(monster => `monster=${monster.name} id=${monster.id} hp=${monster.hp} position=${monster.position}`),
   ]
+
+  const downedInstruction = buildDownedPlayerFinalNarrationInstruction(gameState)
+  if (downedInstruction) allowedFacts.push(downedInstruction)
 
   return {
     actionIntent: {
@@ -3064,6 +3115,7 @@ async function generateFinalNarration(
     `Action du joueur:\n${playerMessage}`,
     draftNarrative ? `Brouillon non autoritaire, a utiliser seulement s'il ne contredit pas le paquet moteur:\n${draftNarrative}` : undefined,
     `Paquet moteur faisant autorité. Tu ne peux affirmer que ces faits, les logs mécaniques, ou une conséquence sensorielle directe:\n${formatEngineTruthPacket(engineTruthPacket)}`,
+    buildDownedPlayerFinalNarrationInstruction(gameState),
     `Logs mécaniques lisibles:\n${formatCombatLogEntries(newCombatLogEntries)}`,
     `Structure obligatoire: conséquence visible du résultat mécanique, puis réaction du décor ou d'un PNJ seulement si elle est soutenue par le paquet moteur, le module ou l'historique, puis piste, prise ou tension jouable en fiction. Tout fait absent du paquet moteur doit rester hors champ, hypothèse, piste ou ne pas être mentionné. Ne crée pas de nouvelle menace présente si le moteur n'a pas créé l'entité ou le danger.`,
     `Écris la réponse finale au joueur en français correct, au présent, en 2-4 phrases courtes, 120 mots maximum. Elle doit être naturelle à l'oral et donner de l'élan: mouvement, réplique, menace, opportunité ou information exploitable. Termine toujours par une ponctuation finale. Respecte strictement les résultats mécaniques. N'annonce aucune action future non résolue. Pas de Markdown, pas de liste, pas de parenthèse, pas d'excuse, pas de méta, pas de menu, pas de mention du système, du moteur, des tools, de MCP ou de l'IA. Pas de coordonnées ni d'ID technique sauf demande explicite du joueur. Ne déclare pas de fin de quête/campagne ni de conclusion alternative sauf demande explicite. Pas de time-skip: seulement la prochaine minute jouable. Si le joueur critique le style, la longueur, le système ou un bug, ne réponds pas à la critique: applique la correction silencieusement et reprends la scène en fiction.`,
@@ -3375,11 +3427,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       toolsUsed.every(toolName => DIRECTOR_LOCAL_FINAL_TOOLS.has(toolName)) &&
       actionIntent.kind !== 'social' &&
       actionIntent.kind !== 'interact'
+    const engineFirstVisibleDraft = engineFirst.handled && Boolean(engineFirst.draftNarrative.trim())
     const needsLlmIteration = !engineFirst.handled
     const needsFinalNarrationHistory = engineFirst.handled &&
-      toolsUsed.length > 0 &&
       !sawMcpToolError &&
-      (NARRATION_MODE === 'quality' || !engineFirstLocalNarrationCandidate)
+      (
+        NARRATION_MODE === 'quality'
+          ? (toolsUsed.length > 0 || engineFirstVisibleDraft)
+          : (toolsUsed.length > 0 && !engineFirstLocalNarrationCandidate)
+      )
     const iterationLlmRoute = needsLlmIteration
       ? selectIterationLlmRoute(actionIntent, usageLog.length + 1, sessionId)
       : 'none'
@@ -4005,9 +4061,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       : null
     const directorNarrative = directorDecision?.narrative ?? null
     const draftNarrative = narrative || directorNarrative || localEngineNarrative || ''
-    const shouldTryFinalLlmNarration = toolsUsed.length > 0 && !sawMcpToolError && (
-      NARRATION_MODE === 'quality' ||
-      (!directorNarrative && !localEngineNarrative && directorDecision?.shouldUseLlmNarrator !== false)
+    const hasPlayerVisibleDraft = Boolean(draftNarrative.trim())
+    const shouldPolishEngineFirstDraft = engineFirst.handled && hasPlayerVisibleDraft && narratorSource !== 'llm'
+    const shouldTryFinalLlmNarration = !sawMcpToolError && (
+      NARRATION_MODE === 'quality'
+        ? (toolsUsed.length > 0 || shouldPolishEngineFirstDraft)
+        : (toolsUsed.length > 0 && !directorNarrative && !localEngineNarrative && directorDecision?.shouldUseLlmNarrator !== false)
     )
 
     if (shouldTryFinalLlmNarration) {

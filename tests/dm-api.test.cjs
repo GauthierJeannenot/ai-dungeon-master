@@ -129,6 +129,31 @@ function combatGameState() {
   })
 }
 
+function downedCombatGameState() {
+  const state = combatGameState()
+  return {
+    ...state,
+    player: {
+      ...state.player,
+      hp: { current: 0, max: 20 },
+      conditions: ['unconscious'],
+      deathSaves: { successes: 0, failures: 2 },
+    },
+    actionUsed: {},
+    movementUsed: {},
+    combatLog: [
+      {
+        id: 'log-downed',
+        round: 2,
+        turn: 'goblin_a',
+        action: 'Gobelin test attaque Heros',
+        mechanicalDetail: 'Heros tombe a 0 PV | A TERRE (0 succes, 2 echecs mort)',
+        timestamp: Date.now(),
+      },
+    ],
+  }
+}
+
 async function postDm(body) {
   const response = await POST(new Request('http://localhost/api/dm', {
     method: 'POST',
@@ -216,6 +241,28 @@ test('DM API routes open social scenes through rich mock LLM narration', async t
   assert.equal(response.status, 200)
   assert.ok((data.usage?.llm.calls ?? 0) >= 1)
   assert.ok((data.usage?.llm.calls ?? 0) <= 2)
+  assert.equal(data.usage?.llmRoute, 'rich')
+  assert.equal(data.usage?.narrator, 'llm')
+})
+
+test('DM API routes downed player status guidance through final LLM narration', async t => {
+  const sessionId = `api-downed-status-${process.pid}-${Date.now()}`
+  t.after(() => cleanupSession(sessionId))
+
+  const { response, data } = await postDm({
+    message: 'donc je suis mort la?',
+    clientRequestId: `client-${sessionId}`,
+    sessionId,
+    gameState: downedCombatGameState(),
+    history: [],
+  })
+
+  assert.equal(response.status, 200)
+  assert.deepEqual(data.toolsUsed, [])
+  assert.equal(data.newGameState.player.hp.current, 0)
+  assert.equal(data.newGameState.currentTurn, 'player')
+  assert.equal(data.usage?.llm.calls, 1)
+  assert.deepEqual(data.usage?.operations, ['dm.final_narration'])
   assert.equal(data.usage?.llmRoute, 'rich')
   assert.equal(data.usage?.narrator, 'llm')
 })

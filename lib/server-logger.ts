@@ -406,6 +406,7 @@ export function summarizeGameState(gameState: GameState | undefined | null): Rec
     currentTurn: gameState.currentTurn,
     player: {
       hp: gameState.player.hp,
+      deathSaves: gameState.player.deathSaves,
       position: gameState.player.position,
       conditions: gameState.player.conditions,
     },
