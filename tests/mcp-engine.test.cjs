@@ -142,7 +142,11 @@ test('replaceState preserves scene memory', () => {
   source.sceneMemory = {
     madeNoise: true,
     tension: 2,
+    alertLevel: 3,
+    macDisposition: 'offended',
+    goblinMorale: 'shaken',
     lastDirectorBeats: ['noise-made'],
+    lastWorldSignals: ['Du bruit porte plus loin.'],
     updatedAt: '2026-06-04T00:00:00.000Z',
   }
 
@@ -217,7 +221,11 @@ test('MCP server accepts replace_game_state and move_token toCell contracts', as
     state.sceneMemory = {
       madeNoise: true,
       tension: 2,
+      alertLevel: 3,
+      macDisposition: 'offended',
+      goblinMorale: 'shaken',
       lastDirectorBeats: ['noise-made'],
+      lastWorldSignals: ['Du bruit porte plus loin.'],
       updatedAt: '2026-06-04T00:00:00.000Z',
     }
 

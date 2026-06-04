@@ -165,6 +165,8 @@ test('DM API resolves an exploration move through MCP in mock mode', async t => 
   assert.ok(data.narrative.length > 0)
   assert.doesNotMatch(data.narrative, /\[Mock\]/)
   assert.equal(typeof data.newGameState.sceneMemory?.updatedAt, 'string')
+  assert.equal(data.usage?.llm.calls, 0)
+  assert.equal(data.usage?.narrator, 'director')
 })
 
 test('DM API resolves a combat attack through MCP in mock mode', async t => {
@@ -191,4 +193,7 @@ test('DM API resolves a combat attack through MCP in mock mode', async t => {
   assert.ok(data.newGameState.combatLog.some(entry => /attaque/i.test(entry.action)))
   assert.doesNotMatch(data.narrative, /\[Mock\]/)
   assert.equal(data.newGameState.sceneMemory?.madeNoise, true)
+  assert.equal(data.newGameState.sceneMemory?.goblinMorale, 'shaken')
+  assert.equal(data.usage?.llm.calls, 0)
+  assert.equal(data.usage?.narrator, 'director')
 })

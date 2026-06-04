@@ -96,7 +96,11 @@ const SceneMemorySchema = z.object({
   foundRecipeHalfCount: z.number().int().min(0).max(2).optional(),
   sparedGoblin: z.boolean().optional(),
   tension: z.number().int().min(0).max(6).optional(),
+  alertLevel: z.number().int().min(0).max(5).optional(),
+  macDisposition: z.enum(['neutral', 'helpful', 'offended']).optional(),
+  goblinMorale: z.enum(['steady', 'shaken', 'broken']).optional(),
   lastDirectorBeats: z.array(z.string()).optional(),
+  lastWorldSignals: z.array(z.string()).optional(),
   updatedAt: z.string().optional(),
 })
 

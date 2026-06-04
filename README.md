@@ -53,6 +53,8 @@ Modes disponibles :
 | `LLM_REPLAY_FALLBACK_TO_MOCK=true` | En replay, bascule sur le mock si une cassette manque |
 | `LLM_MAX_CALLS_PER_REQUEST=10` | Coupe une requete trop bavarde |
 | `LLM_MAX_CALLS_PER_SESSION=0` | Budget live par session (`0` = illimite) |
+| `LLM_PROMPT_CACHE_ENABLED=true` | Active les breakpoints de prompt caching Anthropic |
+| `LLM_PROMPT_CACHE_TTL=5m` | TTL du cache prompt (`5m` par defaut, `1h` possible pour longs playtests) |
 | `LLM_MODULE_CONTEXT_MAX_CHARS=6500` | Limite le contexte du module envoye au LLM |
 | `LLM_FINAL_NARRATION_MAX_TOKENS=180` | Plafond de sortie pour les narrations finales breves |
 
@@ -62,6 +64,8 @@ En mode live, la route DM reduit aussi le cout sans passer en mock :
 - tools MCP filtres selon la phase et l'intention au lieu d'envoyer tous les schemas a chaque appel
 - director local pour narrer les mutations mecaniques simples sans appel final a Claude
 - memoire de scene compacte dans `gameState.sceneMemory` pour porter les consequences sans repayer tout l'historique
+- prompt caching sur les blocs systeme statiques et les schemas tools selectionnes
+- mini budget visible en jeu: cout partie/tour, appels LLM, cache lu/ecrit et source narrative
 - narration finale avec prompt court specialise et reponses visees a 1-2 phrases
 - correction serveur directe des narrations qui contredisent l'etat moteur, sans retry LLM supplementaire
 

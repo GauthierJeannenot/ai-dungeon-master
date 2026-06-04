@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import Chat from '@/components/Chat'
 import CombatTracker from '@/components/CombatTracker'
-import { GameState, ChatMessage, DMResponse, DMRequest, ConversationTurn, DMClientMeta } from '@/lib/types'
+import { GameState, ChatMessage, DMResponse, DMRequest, ConversationTurn, DMClientMeta, type DMTurnUsage } from '@/lib/types'
 
 // Battlemap uses browser APIs — load client-only
 const Battlemap = dynamic(() => import('@/components/Battlemap'), { ssr: false })
@@ -50,6 +50,7 @@ const SESSION_KEYS = {
   gameState: 'ai-dm-game-state',
   messages: 'ai-dm-messages',
   summaryContext: 'ai-dm-summary-context',
+  budget: 'ai-dm-budget-summary',
 }
 const CLIENT_DEBUG_LOG_KEY = 'ai-dm-client-debug-log-v1'
 const CLIENT_DEBUG_BROWSER_ID_KEY = 'ai-dm-client-debug-browser-id'
@@ -64,6 +65,18 @@ interface ClientDebugEntry {
   payload: Record<string, unknown>
 }
 
+interface ClientBudgetSummary {
+  turns: number
+  llmCalls: number
+  inputTokens: number
+  outputTokens: number
+  cacheCreationInputTokens: number
+  cacheReadInputTokens: number
+  estimatedCostUsd: number
+  lastTurnCostUsd: number
+  lastNarrator: DMTurnUsage['narrator'] | null
+}
+
 const WELCOME_MESSAGE =
   'Le vieux sorcier Tyndareus le Vert vous a confié une mission des plus… particulières. Sa carte en main, vous avez chevauché deux jours jusqu\'à cette bâtisse en pierre abandonnée au bout d\'un chemin de gravier envahi par les herbes folles. L\'odeur vous a frappé bien avant que le bâtiment n\'apparaisse : cannelle, muscade, pommes mûres — un parfum presque magique qui flotte dans l\'air chaud. Devant vous se dressent de grandes portes en bois doubles, à moitié vermoulues. Sur le chemin, un immense pommier aux branches noueuses vous observe… ou du moins, c\'est l\'impression que donne son écorce ridée. Bienvenue à la Boulangerie de Grammy. La porte attend, l\'arbre vous juge, et quelque chose sent beaucoup trop bon pour être honnête.'
 
@@ -73,6 +86,53 @@ function createWelcomeMessage(): ChatMessage {
     role: 'dm',
     content: WELCOME_MESSAGE,
     timestamp: Date.now(),
+  }
+}
+
+function emptyBudgetSummary(): ClientBudgetSummary {
+  return {
+    turns: 0,
+    llmCalls: 0,
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheCreationInputTokens: 0,
+    cacheReadInputTokens: 0,
+    estimatedCostUsd: 0,
+    lastTurnCostUsd: 0,
+    lastNarrator: null,
+  }
+}
+
+function addTurnUsage(summary: ClientBudgetSummary, usage: DMTurnUsage | undefined): ClientBudgetSummary {
+  if (!usage) return summary
+
+  return {
+    turns: summary.turns + 1,
+    llmCalls: summary.llmCalls + usage.llm.calls,
+    inputTokens: summary.inputTokens + usage.llm.inputTokens,
+    outputTokens: summary.outputTokens + usage.llm.outputTokens,
+    cacheCreationInputTokens: summary.cacheCreationInputTokens + usage.llm.cacheCreationInputTokens,
+    cacheReadInputTokens: summary.cacheReadInputTokens + usage.llm.cacheReadInputTokens,
+    estimatedCostUsd: Number((summary.estimatedCostUsd + usage.llm.estimatedCostUsd).toFixed(8)),
+    lastTurnCostUsd: usage.llm.estimatedCostUsd,
+    lastNarrator: usage.narrator,
+  }
+}
+
+function formatUsd(value: number): string {
+  if (value <= 0) return '$0'
+  if (value < 0.0001) return '<$0.0001'
+  return `$${value.toFixed(4)}`
+}
+
+function narratorLabel(value: DMTurnUsage['narrator'] | null): string {
+  switch (value) {
+    case 'director': return 'director'
+    case 'local': return 'local'
+    case 'llm': return 'LLM'
+    case 'rule': return 'regle'
+    case 'fallback': return 'fallback'
+    default: return '-'
   }
 }
 
@@ -158,6 +218,13 @@ function summarizeClientGameState(state: GameState): Record<string, unknown> {
     room: state.currentRoomId,
     roomsVisitedCount: state.roomsVisited.length,
     combatLogCount: state.combatLog.length,
+    sceneMemory: state.sceneMemory ? {
+      tension: state.sceneMemory.tension,
+      alertLevel: state.sceneMemory.alertLevel,
+      macDisposition: state.sceneMemory.macDisposition,
+      goblinMorale: state.sceneMemory.goblinMorale,
+      lastDirectorBeats: state.sceneMemory.lastDirectorBeats,
+    } : null,
   }
 }
 
@@ -234,6 +301,7 @@ export default function GamePage() {
   const [hasLoadedSession, setHasLoadedSession] = useState(false)
   // Résumé compressé des échanges anciens — stocké ici, renvoyé à chaque requête
   const [summaryContext, setSummaryContext] = useState<string | undefined>(undefined)
+  const [budgetSummary, setBudgetSummary] = useState<ClientBudgetSummary>(emptyBudgetSummary)
 
   // Restore the per-tab session after hydration. sessionStorage keeps refreshes coherent
   // while still isolating separate browser tabs from one another.
@@ -241,14 +309,17 @@ export default function GamePage() {
     const restoredSessionId = getOrCreateSessionId()
     const restoredGameState = readSessionJson<GameState>(SESSION_KEYS.gameState)
     const restoredMessages = readSessionJson<ChatMessage[]>(SESSION_KEYS.messages)
+    const restoredBudget = readSessionJson<ClientBudgetSummary>(SESSION_KEYS.budget)
 
     setSessionId(restoredSessionId)
     if (restoredGameState) setGameState(restoredGameState)
     setMessages(restoredMessages?.length ? restoredMessages : [createWelcomeMessage()])
+    if (restoredBudget) setBudgetSummary(restoredBudget)
     appendClientDebugLog(restoredSessionId, 'client.session.loaded', {
       restoredGameState: Boolean(restoredGameState),
       restoredMessages: restoredMessages?.length ?? 0,
       gameState: summarizeClientGameState(restoredGameState ?? INITIAL_GAME_STATE),
+      budget: restoredBudget ?? emptyBudgetSummary(),
     })
     syncClientDebugLog(restoredSessionId).catch(err => {
       console.error('Failed to sync client debug log:', err)
@@ -266,6 +337,7 @@ export default function GamePage() {
 
     writeSessionJson(SESSION_KEYS.gameState, gameState)
     writeSessionJson(SESSION_KEYS.messages, messages)
+    writeSessionJson(SESSION_KEYS.budget, budgetSummary)
 
     try {
       if (summaryContext) {
@@ -274,7 +346,7 @@ export default function GamePage() {
         sessionStorage.removeItem(SESSION_KEYS.summaryContext)
       }
     } catch { /* storage unavailable */ }
-  }, [gameState, hasLoadedSession, messages, summaryContext])
+  }, [budgetSummary, gameState, hasLoadedSession, messages, summaryContext])
 
   const logClientEvent = useCallback((event: string, payload: Record<string, unknown>) => {
     if (!hasLoadedSession) return
@@ -356,6 +428,7 @@ export default function GamePage() {
         inputMode: clientMeta.inputMode ?? 'text',
         narrative: truncateClientText(data.narrative ?? ''),
         toolsUsed: data.toolsUsed,
+        usage: data.usage,
         summaryContextLength: data.summaryContext?.length ?? 0,
         gameState: data.newGameState ? summarizeClientGameState(data.newGameState) : null,
       })
@@ -371,6 +444,10 @@ export default function GamePage() {
       // Si une compression a eu lieu, on stocke le nouveau résumé
       if (data.summaryContext) {
         setSummaryContext(data.summaryContext)
+      }
+
+      if (data.usage) {
+        setBudgetSummary(prev => addTurnUsage(prev, data.usage))
       }
 
       const newMessages: ChatMessage[] = []
@@ -436,12 +513,14 @@ export default function GamePage() {
       sessionStorage.removeItem(SESSION_KEYS.gameState)
       sessionStorage.removeItem(SESSION_KEYS.messages)
       sessionStorage.removeItem(SESSION_KEYS.summaryContext)
+      sessionStorage.removeItem(SESSION_KEYS.budget)
     } catch { /* storage unavailable */ }
 
     setSessionId(nextSessionId)
     setGameState(INITIAL_GAME_STATE)
     setMessages([createWelcomeMessage()])
     setSummaryContext(undefined)
+    setBudgetSummary(emptyBudgetSummary())
     setError(null)
     setInputValue('')
 
@@ -466,31 +545,34 @@ export default function GamePage() {
   }, [gameState, isLoading, messages.length, sessionId])
 
   const { label: phaseText, color: phaseColor } = phaseLabel(gameState.phase)
+  const alertLevel = gameState.sceneMemory?.alertLevel ?? 0
+  const alertColor = alertLevel >= 4 ? 'text-red-300' : alertLevel >= 2 ? 'text-amber-300' : 'text-stone-300'
 
   return (
     <div className="flex flex-col h-screen bg-stone-950 text-stone-100 overflow-hidden">
       {/* Top bar */}
-      <header className="flex-shrink-0 h-10 bg-stone-900 border-b border-amber-900/40 flex items-center px-4 gap-4">
-        <span className="font-bold text-amber-500 tracking-wider text-sm">⚔ AI DUNGEON MASTER</span>
-        <div className="h-4 w-px bg-stone-700" />
+      <header className="flex-shrink-0 min-h-10 bg-stone-900 border-b border-amber-900/40 flex flex-wrap items-center px-3 sm:px-4 py-1 gap-2 sm:gap-4">
+        <span className="font-bold text-amber-500 tracking-wider text-xs sm:text-sm">⚔ AI DUNGEON MASTER</span>
+        <div className="hidden sm:block h-4 w-px bg-stone-700" />
         <span className={`text-xs font-mono font-bold ${phaseColor}`}>{phaseText}</span>
-        <div className="h-4 w-px bg-stone-700" />
-        <span className="text-xs text-stone-500">
+        <div className="hidden sm:block h-4 w-px bg-stone-700" />
+        <span className="hidden sm:inline text-xs text-stone-500">
           {gameState.player.name} · {gameState.player.class} niv.{gameState.player.level}
         </span>
-        <span className="text-xs text-stone-500">
+        <span className="text-[11px] sm:text-xs text-stone-500">
           HP: <span className={gameState.player.hp.current < gameState.player.hp.max * 0.3 ? 'text-red-400' : 'text-stone-300'}>
             {gameState.player.hp.current}
           </span>/{gameState.player.hp.max}
         </span>
-        <span className="text-xs text-stone-500">CA: {gameState.player.ac}</span>
+        <span className="text-[11px] sm:text-xs text-stone-500">CA: {gameState.player.ac}</span>
         <button
           type="button"
           onClick={resetGame}
           disabled={isLoading || !hasLoadedSession}
-          className="ml-auto text-xs text-amber-200 bg-stone-800 hover:bg-stone-700 disabled:opacity-40 border border-amber-900/40 px-2 py-1 rounded transition-colors"
+          className="ml-auto text-[11px] sm:text-xs text-amber-200 bg-stone-800 hover:bg-stone-700 disabled:opacity-40 border border-amber-900/40 px-2 py-1 rounded transition-colors"
         >
-          Nouvelle partie
+          <span className="sm:hidden">Nouvelle</span>
+          <span className="hidden sm:inline">Nouvelle partie</span>
         </button>
         {error && (
           <span className="text-xs text-red-400 bg-red-900/20 px-2 py-0.5 rounded">
@@ -500,15 +582,39 @@ export default function GamePage() {
       </header>
 
       {/* Main layout */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-col lg:flex-row flex-1 overflow-hidden">
         {/* Left: Battlemap (65%) */}
-        <div className="flex-[65] min-w-0 p-2 overflow-hidden">
+        <div className="flex-[45] lg:flex-[65] min-w-0 min-h-0 p-2 overflow-hidden">
           <Battlemap gameState={gameState} cellSize={52} />
           {/* Carte : Grammy's Bakery (~880×800px) — grille 17×15 cases à 52px */}
         </div>
 
         {/* Right: Chat + CombatTracker (35%) */}
-        <div className="flex-[35] min-w-[320px] max-w-[480px] flex flex-col gap-2 p-2 overflow-hidden">
+        <div className="flex-[55] lg:flex-[35] min-w-0 lg:min-w-[320px] w-full lg:max-w-[480px] flex flex-col gap-2 p-2 overflow-hidden">
+          <div className="flex-shrink-0 border border-stone-800 bg-stone-900/70 px-3 py-2 text-[11px] text-stone-400">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div>
+                <div className="uppercase tracking-wide text-stone-600">Partie</div>
+                <div className="font-mono text-stone-200">{formatUsd(budgetSummary.estimatedCostUsd)}</div>
+              </div>
+              <div>
+                <div className="uppercase tracking-wide text-stone-600">Tour</div>
+                <div className="font-mono text-stone-200">{formatUsd(budgetSummary.lastTurnCostUsd)}</div>
+              </div>
+              <div>
+                <div className="uppercase tracking-wide text-stone-600">LLM</div>
+                <div className="font-mono text-stone-200">{budgetSummary.llmCalls} appel{budgetSummary.llmCalls > 1 ? 's' : ''}</div>
+              </div>
+              <div>
+                <div className="uppercase tracking-wide text-stone-600">Alerte</div>
+                <div className={`font-mono ${alertColor}`}>{alertLevel}/5</div>
+              </div>
+            </div>
+            <div className="mt-1 flex items-center justify-between gap-2 font-mono text-[10px] text-stone-500">
+              <span>cache {budgetSummary.cacheReadInputTokens}/{budgetSummary.cacheCreationInputTokens}</span>
+              <span>narrateur {narratorLabel(budgetSummary.lastNarrator)}</span>
+            </div>
+          </div>
           {gameState.phase === 'combat' && (
             <div className="flex-shrink-0">
               <CombatTracker gameState={gameState} />

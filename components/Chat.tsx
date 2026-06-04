@@ -797,10 +797,10 @@ export default function Chat({
 
   return (
     <div className="flex flex-col h-full bg-stone-900/50 rounded-lg border border-amber-900/30 overflow-hidden">
-      <div className="px-4 py-2.5 border-b border-amber-900/30 bg-stone-900/80 flex items-center gap-2 flex-shrink-0">
+      <div className="px-3 sm:px-4 py-2.5 border-b border-amber-900/30 bg-stone-900/80 flex flex-wrap items-center gap-2 flex-shrink-0">
         <div className="w-2 h-2 bg-amber-600 rounded-full" />
-        <span className="text-amber-500 font-semibold text-sm tracking-wide">Journal de l&apos;Aventure</span>
-        <div className="ml-auto flex items-center gap-1">
+        <span className="flex-1 min-w-[9rem] text-amber-500 font-semibold text-sm tracking-wide leading-tight">Journal de l&apos;Aventure</span>
+        <div className="w-full sm:w-auto sm:ml-auto flex items-center justify-start sm:justify-end gap-1 min-w-0">
           {availableVoices.length > 1 && (
             <select
               value={selectedVoiceURI ?? ''}
@@ -816,7 +816,7 @@ export default function Chat({
               }}
               title="Choisir la voix du narrateur"
               aria-label="Choisir la voix du narrateur"
-              className="h-7 max-w-32 rounded border border-stone-700 bg-stone-800 px-1.5 text-[11px] text-stone-200"
+              className="hidden sm:block h-7 max-w-32 rounded border border-stone-700 bg-stone-800 px-1.5 text-[11px] text-stone-200"
             >
               {availableVoices.slice(0, 8).map(voice => (
                 <option key={voice.voiceURI} value={voice.voiceURI}>
@@ -831,13 +831,14 @@ export default function Chat({
             disabled={!speechSynthesisSupported}
             title="Lire les réponses du DM à voix haute"
             aria-label="Lire les réponses du DM à voix haute"
-            className={`h-7 min-w-[4.25rem] rounded border px-2 text-[11px] font-semibold transition-colors ${
+            className={`hidden sm:flex h-7 min-w-[4.25rem] items-center justify-center rounded border px-2 text-[11px] font-semibold transition-colors ${
               speakerEnabled
                 ? 'border-amber-500/60 bg-amber-800/70 text-amber-50'
                 : 'border-stone-700 bg-stone-800 text-stone-300 hover:bg-stone-700'
             } disabled:opacity-40`}
           >
-            {speakerEnabled ? 'Voix ON' : 'Voix OFF'}
+            <span className="sm:hidden">Voix</span>
+            <span className="hidden sm:inline">{speakerEnabled ? 'Voix ON' : 'Voix OFF'}</span>
           </button>
           <button
             type="button"
@@ -845,7 +846,7 @@ export default function Chat({
             disabled={!recognitionSupported || isLoading}
             title="Parler au Dungeon Master"
             aria-label="Parler au Dungeon Master"
-            className={`h-7 min-w-[4rem] rounded border px-2 text-[11px] font-semibold transition-colors ${
+            className={`h-7 min-w-[3rem] sm:min-w-[4rem] rounded border px-1.5 sm:px-2 text-[10px] sm:text-[11px] font-semibold transition-colors ${
               isListening
                 ? 'border-red-400/70 bg-red-900/70 text-red-50'
                 : 'border-blue-500/50 bg-blue-950/60 text-blue-100 hover:bg-blue-900/70'

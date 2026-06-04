@@ -139,7 +139,8 @@ function updateSceneMemory(input: DirectorInput): SceneMemory {
 
   const combatEscalated = tools.includes('resolve_player_attack') || tools.includes('resolve_attack')
   if (combatEscalated) tension += 1
-  if (noisyThisTurn || combatEscalated) alertLevel += 1
+  if (noisyThisTurn) alertLevel += 1
+  if (combatEscalated) alertLevel += 1
   if (tools.includes('end_combat')) tension = Math.max(0, tension - 2)
 
   const goblinCasualties = input.newCombatLogEntries.filter(entry =>

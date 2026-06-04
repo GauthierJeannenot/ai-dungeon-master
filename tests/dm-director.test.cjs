@@ -117,6 +117,8 @@ test('director narrates simple attack results locally', () => {
   assert.match(decision.narrative ?? '', /Gobelin test/)
   assert.equal(decision.sceneMemory.madeNoise, true)
   assert.ok((decision.sceneMemory.tension ?? 0) >= 1)
+  assert.equal(decision.sceneMemory.alertLevel, 2)
+  assert.equal(decision.sceneMemory.goblinMorale, 'shaken')
 })
 
 test('director prefers accented player attack over earlier enemy attacks', () => {
@@ -194,4 +196,23 @@ test('director records noisy scene memory without a tool mutation', () => {
   assert.equal(decision.sceneMemory.madeNoise, true)
   assert.ok((decision.sceneMemory.tension ?? 0) > 0)
   assert.equal(decision.shouldUseLlmNarrator, true)
+})
+
+test('director does not increase alert every turn after old noise', () => {
+  const decision = buildDirectorDecision({
+    playerMessage: 'je regarde autour de moi',
+    actionIntent: baseIntent({ kind: 'observe', primitive: 'narrate', requiresEngine: false }),
+    gameState: baseGameState({
+      sceneMemory: {
+        madeNoise: true,
+        alertLevel: 1,
+        tension: 1,
+      },
+    }),
+    toolsUsed: [],
+    newCombatLogEntries: [],
+  })
+
+  assert.equal(decision.sceneMemory.madeNoise, true)
+  assert.equal(decision.sceneMemory.alertLevel, 1)
 })

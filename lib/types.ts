@@ -88,6 +88,7 @@ export interface SceneMemory {
   alertLevel?: number
   macDisposition?: 'neutral' | 'helpful' | 'offended'
   goblinMorale?: 'steady' | 'shaken' | 'broken'
+  patrolPressure?: 'quiet' | 'stirring' | 'hunting'
   lastDirectorBeats?: string[]
   lastWorldSignals?: string[]
   updatedAt?: string
@@ -188,6 +189,7 @@ export interface DMTurnUsage {
   llm: DMLlmUsageSummary
   operations: string[]
   narrator: 'director' | 'local' | 'llm' | 'fallback' | 'rule'
+  llmRoute: 'none' | 'short' | 'rich' | 'blocked'
 }
 
 // API request/response types
