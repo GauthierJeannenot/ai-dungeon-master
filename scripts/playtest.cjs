@@ -191,6 +191,99 @@ function officeGameState() {
   })
 }
 
+function apartmentRecipeGameState() {
+  return baseGameState({
+    player: {
+      ...baseGameState().player,
+      position: { x: 8, y: 9 },
+      inventory: [
+        ...baseGameState().player.inventory,
+        {
+          id: 'recipe_half_office',
+          name: 'moitie de recette du bureau',
+          type: 'misc',
+          description: 'Premier fragment de recette.',
+        },
+      ],
+    },
+    roomsVisited: ['9'],
+    currentRoomId: '9',
+    world: {
+      objects: {
+        recipe_half_office: {
+          id: 'recipe_half_office',
+          roomId: '5',
+          name: 'moitie de recette du bureau',
+          kind: 'clue',
+          visible: true,
+          discovered: true,
+          taken: true,
+          tags: ['recipe_half', 'quest_item', 'readable'],
+        },
+      },
+      npcs: {
+        grukk: {
+          id: 'grukk',
+          name: 'Grukk',
+          roomId: '9',
+          disposition: 'hostile',
+          known: true,
+          tags: ['goblin', 'boss'],
+          memory: {},
+        },
+      },
+      quests: {
+        grammy_recipe: {
+          id: 'grammy_recipe',
+          name: 'Retrouver la recette de Grammy',
+          progress: 1,
+          goal: 2,
+          completed: false,
+          flags: {},
+        },
+      },
+      alarms: {},
+      flags: {},
+      eventLog: [],
+    },
+  })
+}
+
+function bakeryHazardGameState() {
+  return baseGameState({
+    player: {
+      ...baseGameState().player,
+      position: { x: 8, y: 6 },
+    },
+    roomsVisited: ['8'],
+    currentRoomId: '8',
+  })
+}
+
+function downedCombatGameState() {
+  const state = combatGameState()
+  return {
+    ...state,
+    player: {
+      ...state.player,
+      hp: { current: 0, max: 20 },
+      conditions: ['unconscious'],
+      deathSaves: { successes: 1, failures: 1 },
+    },
+  }
+}
+
+function fleeingCombatGameState() {
+  const state = combatGameState()
+  return {
+    ...state,
+    player: {
+      ...state.player,
+      hp: { current: 5, max: 20 },
+    },
+  }
+}
+
 const scenarios = [
   {
     name: 'exploration-local',
@@ -223,7 +316,7 @@ const scenarios = [
         expectAffordances: ['unlock', 'force'],
       },
       {
-        message: "j'ouvre le tiroir",
+        message: "je l'ouvre",
         expectNoLlm: narrationMode === 'budget',
         category: 'world',
         expectTools: ['resolve_player_action'],
@@ -246,6 +339,13 @@ const scenarios = [
         expectEvents: ['object.taken', 'quest.item_found'],
       },
       {
+        message: 'je le lis',
+        expectNoLlm: narrationMode === 'budget',
+        category: 'world',
+        expectTools: ['resolve_player_action'],
+        expectEvents: ['clue.read'],
+      },
+      {
         message: 'je prends la recette encore',
         expectNoLlm: narrationMode === 'budget',
         category: 'world',
@@ -256,6 +356,91 @@ const scenarios = [
         message: 'je demande au systeme si la recette est vraiment dans mon inventaire',
         expectNoLlm: false,
         category: 'meta',
+      },
+    ],
+  },
+  {
+    name: 'apartment-recipe',
+    initialGameState: apartmentRecipeGameState(),
+    turns: [
+      {
+        message: "j'ouvre l'armoire",
+        expectNoLlm: narrationMode === 'budget',
+        category: 'world',
+        expectTools: ['resolve_player_action'],
+        expectEvents: ['object.opened', 'room.object_discovered'],
+        expectAffordances: ['take'],
+      },
+      {
+        message: 'je prends le papier',
+        expectNoLlm: narrationMode === 'budget',
+        category: 'world',
+        expectTools: ['resolve_player_action'],
+        expectEvents: ['object.taken', 'quest.item_found'],
+        expectAffordances: ['combine_recipe'],
+      },
+      {
+        message: 'je le lis',
+        expectNoLlm: narrationMode === 'budget',
+        category: 'world',
+        expectTools: ['resolve_player_action'],
+        expectEvents: ['clue.read'],
+      },
+      {
+        message: 'j assemble les deux fragments de recette',
+        expectNoLlm: narrationMode === 'budget',
+        category: 'world',
+        expectTools: ['resolve_player_action'],
+        expectEvents: ['quest.completed'],
+      },
+      {
+        message: 'je demande a Grukk pourquoi il voulait la recette',
+        expectNoLlm: narrationMode === 'budget',
+        category: 'social',
+        expectTools: ['resolve_player_action'],
+        expectEvents: ['npc.information_revealed'],
+      },
+    ],
+  },
+  {
+    name: 'hazards-and-refusals',
+    initialGameState: bakeryHazardGameState(),
+    turns: [
+      {
+        message: 'je desamorce les couteaux',
+        expectNoLlm: narrationMode === 'budget',
+        category: 'world',
+        expectTools: ['resolve_player_action'],
+        expectEvents: ['trap.disarmed'],
+        expectAffordances: ['use_object'],
+      },
+      {
+        message: 'je manipule le ratelier',
+        expectNoLlm: narrationMode === 'budget',
+        category: 'world',
+        expectTools: ['resolve_player_action'],
+        expectEvents: ['object.used'],
+      },
+      {
+        message: "j'ouvre les sacs de farine",
+        expectNoLlm: narrationMode === 'budget',
+        category: 'world',
+        expectTools: ['resolve_player_action'],
+        expectEvents: ['object.opened', 'room.object_discovered'],
+      },
+      {
+        message: 'je declenche le four enchante',
+        expectNoLlm: narrationMode === 'budget',
+        category: 'world',
+        expectTools: ['resolve_player_action'],
+        expectEvents: ['object.used', 'alarm.raised'],
+      },
+      {
+        message: 'je prends la recette invisible',
+        expectNoLlm: narrationMode === 'budget',
+        category: 'world',
+        expectTools: ['resolve_player_action'],
+        expectEvents: ['action.blocked'],
       },
     ],
   },
@@ -287,7 +472,74 @@ const scenarios = [
       'je raconte a Mac que je viens aider',
       'je cherche une odeur ou une piste utile',
       'je demande quelle entree semble la moins dangereuse',
+      'je reviens vers l entree pour comparer les options',
     ].map(message => ({ message, expectNoLlm: false, category: 'open' })),
+  },
+  {
+    name: 'social-natural',
+    initialGameState: baseGameState(),
+    turns: [
+      {
+        message: 'je lui demande ou est la recette',
+        expectNoLlm: narrationMode === 'budget',
+        category: 'social',
+        expectTools: ['resolve_player_action'],
+        expectEvents: ['npc.information_revealed'],
+      },
+      {
+        message: 'je persuade Mac de nous aider',
+        expectNoLlm: narrationMode === 'budget',
+        category: 'social',
+        expectTools: ['resolve_player_action'],
+        expectEvents: ['npc.disposition_changed'],
+      },
+      {
+        message: 'je montre la potion a Mac',
+        expectNoLlm: narrationMode === 'budget',
+        category: 'social',
+        expectTools: ['resolve_player_action'],
+        expectEvents: ['item.shown'],
+      },
+      {
+        message: 'j aide Mac a surveiller le seuil',
+        expectNoLlm: narrationMode === 'budget',
+        category: 'social',
+        expectTools: ['resolve_player_action'],
+        expectEvents: ['state.changed'],
+      },
+    ],
+  },
+  {
+    name: 'downed-and-flee',
+    initialGameState: downedCombatGameState(),
+    turns: [
+      {
+        message: 'donc je suis mort ou je peux agir?',
+        expectNoLlm: false,
+        category: 'meta',
+        expectAffordances: ['death_save'],
+      },
+      {
+        message: 'ok je tente de tenir',
+        expectNoLlm: narrationMode === 'budget',
+        category: 'combat',
+        expectTools: ['resolve_player_action'],
+        expectEvents: ['combat.death_save'],
+      },
+    ],
+  },
+  {
+    name: 'flee-action',
+    initialGameState: fleeingCombatGameState(),
+    turns: [
+      {
+        message: 'je fuis vers la sortie',
+        expectNoLlm: narrationMode === 'budget',
+        category: 'combat',
+        expectTools: ['resolve_player_action'],
+        expectEvents: ['escape.attempted'],
+      },
+    ],
   },
 ]
 

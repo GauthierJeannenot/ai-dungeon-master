@@ -10,9 +10,11 @@ import {
   WorldNpcState,
   WorldObjectState,
   WorldQuestState,
+  WorldRoomState,
   WorldState,
 } from '../lib/types'
 import { inferAdventureRoomId } from '../lib/adventure-map'
+import { createInitialWorldState } from '../lib/adventure-world'
 
 // Initial player template — overridable via context files
 const DEFAULT_PLAYER: PlayerState = {
@@ -39,152 +41,12 @@ const WORLD_EVENT_LOG_LIMIT = 200
 
 let state: GameState = createInitialState()
 
-function createInitialWorldState(): WorldState {
+function mergeRoomState(defaultRoom: WorldRoomState | undefined, incomingRoom: WorldRoomState): WorldRoomState {
   return {
-    objects: {
-      front_double_door: {
-        id: 'front_double_door',
-        roomId: '4',
-        name: 'double porte de la boulangerie',
-        kind: 'door',
-        visible: true,
-        discovered: true,
-        opened: false,
-        locked: false,
-        tags: ['door', 'street'],
-        description: 'La double porte qui separe la boutique de la rue.',
-      },
-      reserve_door: {
-        id: 'reserve_door',
-        roomId: '4',
-        name: 'porte de la reserve',
-        kind: 'door',
-        visible: true,
-        discovered: true,
-        opened: false,
-        locked: false,
-        tags: ['door', 'bakery'],
-        description: 'Une porte interieure qui mene vers la reserve enfarinee.',
-      },
-      office_drawer: {
-        id: 'office_drawer',
-        roomId: '5',
-        name: 'tiroir du bureau',
-        kind: 'container',
-        visible: false,
-        discovered: false,
-        opened: false,
-        locked: true,
-        contains: ['recipe_half_office'],
-        tags: ['drawer', 'recipe_cache'],
-        dc: { search: 12, unlock: 12, force: 13 },
-        description: 'Un tiroir bas, coince sous des factures graisseuses.',
-      },
-      recipe_half_office: {
-        id: 'recipe_half_office',
-        roomId: '5',
-        name: 'moitie de recette du bureau',
-        kind: 'clue',
-        visible: false,
-        discovered: false,
-        taken: false,
-        tags: ['recipe_half', 'quest_item'],
-        description: 'Un fragment de recette au coin brule.',
-      },
-      grammy_armoire: {
-        id: 'grammy_armoire',
-        roomId: '9',
-        name: 'armoire de Grammy',
-        kind: 'container',
-        visible: true,
-        discovered: true,
-        opened: false,
-        locked: false,
-        contains: ['recipe_half_apartment'],
-        tags: ['armoire', 'recipe_cache'],
-        dc: { search: 10 },
-        description: 'Une armoire haute dont la porte ferme mal.',
-      },
-      recipe_half_apartment: {
-        id: 'recipe_half_apartment',
-        roomId: '9',
-        name: 'moitie de recette de Grammy',
-        kind: 'clue',
-        visible: false,
-        discovered: false,
-        taken: false,
-        tags: ['recipe_half', 'quest_item'],
-        description: 'Un second fragment de recette glisse sous une pile de linges.',
-      },
-      enchanted_oven: {
-        id: 'enchanted_oven',
-        roomId: '8',
-        name: 'four enchante',
-        kind: 'fixture',
-        visible: true,
-        discovered: true,
-        used: false,
-        tags: ['oven', 'dangerous', 'noise'],
-        dc: { open: 12 },
-        description: 'Un four trop chaud, grave de runes de cuisine.',
-      },
-      violet_fungus_heap: {
-        id: 'violet_fungus_heap',
-        roomId: '3',
-        name: 'amas de champignons violets',
-        kind: 'trap',
-        visible: true,
-        discovered: true,
-        used: false,
-        tags: ['trap', 'poison'],
-        dc: { search: 13 },
-        description: 'Des champignons mous qui fremissent quand on approche.',
-      },
-    },
-    npcs: {
-      mac: {
-        id: 'mac',
-        name: 'Mac',
-        roomId: '1',
-        disposition: 'neutral',
-        known: true,
-        tags: ['bakery', 'quest_giver'],
-      },
-      dryad_orchard: {
-        id: 'dryad_orchard',
-        name: 'druidesse du verger',
-        roomId: '2',
-        disposition: 'neutral',
-        known: false,
-        tags: ['orchard', 'spirit'],
-      },
-      grukk: {
-        id: 'grukk',
-        name: 'Grukk',
-        roomId: '9',
-        disposition: 'hostile',
-        known: false,
-        tags: ['goblin', 'boss'],
-      },
-    },
-    quests: {
-      grammy_recipe: {
-        id: 'grammy_recipe',
-        name: 'Retrouver la recette de Grammy',
-        progress: 0,
-        goal: 2,
-        completed: false,
-        flags: {},
-      },
-    },
-    alarms: {
-      bakery_alert: {
-        level: 0,
-        raised: false,
-      },
-    },
-    flags: {},
-    eventLog: [],
+    ...defaultRoom,
+    ...incomingRoom,
+    tags: incomingRoom.tags ?? defaultRoom?.tags,
+    exits: incomingRoom.exits ?? defaultRoom?.exits,
   }
 }
 
@@ -193,6 +55,7 @@ function mergeObjectState(defaultObject: WorldObjectState | undefined, incomingO
     ...defaultObject,
     ...incomingObject,
     dc: { ...(defaultObject?.dc ?? {}), ...(incomingObject.dc ?? {}) },
+    aliases: incomingObject.aliases ?? defaultObject?.aliases,
     tags: incomingObject.tags ?? defaultObject?.tags,
     contains: incomingObject.contains ?? defaultObject?.contains,
   }
@@ -202,7 +65,9 @@ function mergeNpcState(defaultNpc: WorldNpcState | undefined, incomingNpc: World
   return {
     ...defaultNpc,
     ...incomingNpc,
+    aliases: incomingNpc.aliases ?? defaultNpc?.aliases,
     tags: incomingNpc.tags ?? defaultNpc?.tags,
+    memory: { ...(defaultNpc?.memory ?? {}), ...(incomingNpc.memory ?? {}) },
   }
 }
 
@@ -225,6 +90,11 @@ function ensureWorldState(): WorldState {
   const defaults = createInitialWorldState()
   const incoming = state.world
 
+  const rooms: Record<string, WorldRoomState> = structuredClone(defaults.rooms)
+  for (const [id, room] of Object.entries(incoming?.rooms ?? {})) {
+    rooms[id] = mergeRoomState(defaults.rooms[id], structuredClone(room))
+  }
+
   const objects: Record<string, WorldObjectState> = structuredClone(defaults.objects)
   for (const [id, object] of Object.entries(incoming?.objects ?? {})) {
     objects[id] = mergeObjectState(defaults.objects[id], structuredClone(object))
@@ -246,6 +116,7 @@ function ensureWorldState(): WorldState {
   }
 
   state.world = {
+    rooms,
     objects,
     npcs,
     quests,
@@ -449,6 +320,21 @@ export function updateNpcDisposition(npcId: string, disposition: WorldNpcDisposi
   return world.npcs[npcId]
 }
 
+export function updateNpcMemory(npcId: string, memory: Record<string, string | number | boolean>): WorldNpcState {
+  const world = ensureWorldState()
+  const npc = world.npcs[npcId]
+  if (!npc) throw new Error(`World NPC not found: ${npcId}`)
+  world.npcs[npcId] = {
+    ...npc,
+    known: true,
+    memory: {
+      ...(npc.memory ?? {}),
+      ...memory,
+    },
+  }
+  return world.npcs[npcId]
+}
+
 export function advanceWorldQuest(questId: string, flagId: string, amount = 1): WorldQuestState {
   const world = ensureWorldState()
   const quest = world.quests[questId]
@@ -462,6 +348,19 @@ export function advanceWorldQuest(questId: string, flagId: string, amount = 1): 
   return quest
 }
 
+export function completeWorldQuest(questId: string, flagId: string): WorldQuestState {
+  const world = ensureWorldState()
+  const quest = world.quests[questId]
+  if (!quest) throw new Error(`World quest not found: ${questId}`)
+  quest.flags ??= {}
+  quest.flags[flagId] = true
+  quest.progress = Math.max(quest.progress, quest.goal)
+  quest.completed = true
+  world.flags ??= {}
+  world.flags[flagId] = true
+  return quest
+}
+
 export function raiseWorldAlarm(alarmId: string, reason: string, amount = 1): WorldAlarmState {
   const world = ensureWorldState()
   const alarm = world.alarms[alarmId] ?? { level: 0, raised: false }
@@ -469,6 +368,11 @@ export function raiseWorldAlarm(alarmId: string, reason: string, amount = 1): Wo
   alarm.raised = true
   alarm.reason = reason
   world.alarms[alarmId] = alarm
+  state.sceneMemory = {
+    ...(state.sceneMemory ?? {}),
+    alertLevel: alarm.level,
+    updatedAt: new Date().toISOString(),
+  }
   return alarm
 }
 

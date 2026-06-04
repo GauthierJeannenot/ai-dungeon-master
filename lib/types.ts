@@ -94,12 +94,21 @@ export interface SceneMemory {
   updatedAt?: string
 }
 
+export interface WorldRoomState {
+  id: string
+  name: string
+  description?: string
+  tags?: string[]
+  exits?: string[]
+}
+
 export type WorldObjectKind = 'door' | 'container' | 'item' | 'clue' | 'fixture' | 'trap'
 
 export interface WorldObjectState {
   id: string
   roomId: string
   name: string
+  aliases?: string[]
   kind: WorldObjectKind
   visible: boolean
   discovered: boolean
@@ -107,6 +116,7 @@ export interface WorldObjectState {
   locked?: boolean
   taken?: boolean
   used?: boolean
+  disarmed?: boolean
   contains?: string[]
   tags?: string[]
   dc?: {
@@ -116,6 +126,7 @@ export interface WorldObjectState {
     unlock?: number
   }
   description?: string
+  readableText?: string
 }
 
 export type WorldNpcDisposition = 'hostile' | 'wary' | 'neutral' | 'helpful' | 'offended'
@@ -124,9 +135,11 @@ export interface WorldNpcState {
   id: string
   name: string
   roomId: string
+  aliases?: string[]
   disposition: WorldNpcDisposition
   known?: boolean
   tags?: string[]
+  memory?: Record<string, string | number | boolean>
 }
 
 export interface WorldQuestState {
@@ -145,6 +158,7 @@ export interface WorldAlarmState {
 }
 
 export interface WorldState {
+  rooms: Record<string, WorldRoomState>
   objects: Record<string, WorldObjectState>
   npcs: Record<string, WorldNpcState>
   quests: Record<string, WorldQuestState>
@@ -220,18 +234,26 @@ export type CanonicalPlayerActionKind =
   | 'attack'
   | 'move'
   | 'interact'
+  | 'examine'
+  | 'read'
   | 'search'
   | 'open'
   | 'take'
   | 'unlock'
   | 'force'
+  | 'disarm'
   | 'talk'
+  | 'ask'
+  | 'persuade'
   | 'threaten'
+  | 'show_item'
+  | 'give_item'
   | 'hide'
   | 'help'
   | 'flee'
   | 'stabilize'
   | 'use_object'
+  | 'combine_recipe'
   | 'ability_check'
   | 'social'
   | 'use_item'
@@ -250,13 +272,21 @@ export type EngineEventType =
   | 'item.used'
   | 'check.rolled'
   | 'room.event'
+  | 'room.examined'
   | 'room.object_discovered'
   | 'quest.item_found'
+  | 'quest.completed'
   | 'npc.disposition_changed'
+  | 'npc.information_revealed'
   | 'door.opened'
+  | 'trap.disarmed'
   | 'object.opened'
   | 'object.taken'
+  | 'object.examined'
+  | 'clue.read'
   | 'object.used'
+  | 'item.shown'
+  | 'item.given'
   | 'trap.triggered'
   | 'alarm.raised'
   | 'character.hidden'

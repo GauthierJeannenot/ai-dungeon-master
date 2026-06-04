@@ -1388,3 +1388,206 @@ test('MCP resolve_player_action records NPC disposition and object use events', 
     assert.ok(afterOven.world.eventLog.some(event => event.type === 'alarm.raised' && event.targetId === 'bakery_alert'))
   })
 })
+
+test('MCP initial world definition is data-driven across the full module', async () => {
+  await withMcpClient(async client => {
+    const state = await callTool(client, 'get_game_state')
+
+    assert.deepEqual(Object.keys(state.world.rooms).sort(), ['1', '2', '3', '4', '5', '7', '8', '9'])
+    assert.equal(state.world.rooms['5'].name, 'Bureau de Grammy')
+    assert.equal(state.world.rooms['9'].name, 'Appartement de Grammy')
+    assert.ok(state.world.objects.office_desk.aliases.includes('bureau'))
+    assert.ok(state.world.objects.animated_knife_rack.tags.includes('trap'))
+    assert.ok(state.world.objects.recipe_half_office.tags.includes('recipe_half'))
+    assert.ok(state.world.objects.recipe_half_apartment.tags.includes('recipe_half'))
+    assert.equal(state.world.npcs.mac.disposition, 'neutral')
+    assert.equal(state.world.npcs.dryad_orchard.known, false)
+    assert.equal(state.world.quests.grammy_recipe.goal, 2)
+  })
+})
+
+test('MCP resolve_player_action handles apartment recipe half and canonical recipe completion', async () => {
+  await withMcpClient(async client => {
+    const baseState = await callTool(client, 'get_game_state')
+    baseState.player.position = { x: 8, y: 9 }
+    baseState.roomsVisited = ['9']
+    baseState.currentRoomId = '9'
+    baseState.world.objects.recipe_half_office.taken = true
+    baseState.world.objects.recipe_half_office.discovered = true
+    baseState.world.objects.recipe_half_office.visible = true
+    baseState.world.quests.grammy_recipe.progress = 1
+    baseState.player.inventory.push({
+      id: 'recipe_half_office',
+      name: 'moitie de recette du bureau',
+      type: 'misc',
+      description: 'Premier fragment de recette.',
+    })
+
+    await callTool(client, 'replace_game_state', { gameState: baseState })
+
+    const opened = await callTool(client, 'resolve_player_action', {
+      action: { kind: 'open', targetName: 'armoire' },
+    })
+    assert.equal(opened.success, true)
+    assert.ok(opened.result.discoveredObjects.some(object => object.id === 'recipe_half_apartment'))
+
+    const take = await callTool(client, 'resolve_player_action', {
+      action: { kind: 'take', targetName: 'Grammy' },
+    })
+    assert.equal(take.success, true)
+    assert.equal(take.result.quest.progress, 2)
+
+    const read = await callTool(client, 'resolve_player_action', {
+      action: { kind: 'read', targetName: 'Grammy' },
+    })
+    assert.equal(read.success, true)
+    assert.equal(read.result.object.id, 'recipe_half_apartment')
+    assert.ok(read.result.text.includes('seconde moitie'))
+
+    const combined = await callTool(client, 'resolve_player_action', {
+      action: { kind: 'combine_recipe' },
+    })
+    assert.equal(combined.success, true)
+    assert.equal(combined.result.quest.completed, true)
+    assert.equal(combined.result.quest.flags.recipe_combined, true)
+
+    const stateAfter = await callTool(client, 'get_game_state')
+    assert.equal(stateAfter.world.quests.grammy_recipe.completed, true)
+    assert.equal(stateAfter.world.flags.recipe_combined, true)
+    assert.ok(stateAfter.world.eventLog.some(event => event.type === 'object.opened' && event.targetId === 'grammy_armoire'))
+    assert.ok(stateAfter.world.eventLog.some(event => event.type === 'clue.read' && event.targetId === 'recipe_half_apartment'))
+    assert.ok(stateAfter.world.eventLog.some(event => event.type === 'quest.completed' && event.targetId === 'grammy_recipe'))
+  })
+})
+
+test('MCP resolve_player_action makes disarm, help, and self-stabilize refusals explicit', async () => {
+  await withForcedDiceSequence('18', async () => {
+    await withMcpClient(async client => {
+      const baseState = await callTool(client, 'get_game_state')
+      baseState.player.position = { x: 8, y: 6 }
+      baseState.roomsVisited = ['8']
+      baseState.currentRoomId = '8'
+      await callTool(client, 'replace_game_state', { gameState: baseState })
+
+      const disarm = await callTool(client, 'resolve_player_action', {
+        action: { kind: 'disarm', targetName: 'couteaux' },
+      })
+      assert.equal(disarm.success, true)
+      assert.equal(disarm.result.object.disarmed, true)
+
+      const stateAfterDisarm = await callTool(client, 'get_game_state')
+      const hpAfterDisarm = stateAfterDisarm.player.hp.current
+      assert.ok(stateAfterDisarm.world.eventLog.some(event => event.type === 'trap.disarmed' && event.targetId === 'animated_knife_rack'))
+
+      const useDisarmed = await callTool(client, 'resolve_player_action', {
+        action: { kind: 'use_object', targetName: 'couteaux' },
+      })
+      assert.equal(useDisarmed.success, true)
+
+      let stateAfter = await callTool(client, 'get_game_state')
+      assert.equal(stateAfter.player.hp.current, hpAfterDisarm)
+      assert.ok(stateAfter.world.eventLog.some(event => event.type === 'object.used' && event.targetId === 'animated_knife_rack'))
+      assert.equal(stateAfter.world.eventLog.some(event => event.type === 'trap.triggered' && event.targetId === 'animated_knife_rack'), false)
+
+      stateAfter.player.position = { x: 4, y: 13 }
+      stateAfter.roomsVisited = ['1']
+      stateAfter.currentRoomId = '1'
+      await callTool(client, 'replace_game_state', { gameState: stateAfter })
+
+      const help = await callTool(client, 'resolve_player_action', {
+        action: { kind: 'help', targetName: 'Mac' },
+      })
+      assert.equal(help.success, true)
+      assert.equal(help.result.npc.id, 'mac')
+
+      stateAfter = await callTool(client, 'get_game_state')
+      assert.equal(stateAfter.world.flags.helping_mac, true)
+      assert.equal(stateAfter.world.npcs.mac.memory.helpedByPlayer, true)
+
+      stateAfter.player.hp.current = 0
+      stateAfter.player.conditions = ['unconscious']
+      await callTool(client, 'replace_game_state', { gameState: stateAfter })
+
+      const stabilize = await callTool(client, 'resolve_player_action', {
+        action: { kind: 'stabilize', targetId: 'player' },
+      })
+      assert.equal(stabilize.code, 'SELF_STABILIZE_UNSUPPORTED')
+
+      const finalState = await callTool(client, 'get_game_state')
+      assert.ok(finalState.world.eventLog.some(event =>
+        event.type === 'action.blocked' &&
+        event.metadata?.code === 'SELF_STABILIZE_UNSUPPORTED'
+      ))
+    })
+  })
+})
+
+test('MCP resolve_player_action separates ask, persuade, show, and give', async () => {
+  await withForcedDiceSequence('16', async () => {
+    await withMcpClient(async client => {
+      const baseState = await callTool(client, 'get_game_state')
+      baseState.player.position = { x: 4, y: 13 }
+      baseState.roomsVisited = ['1']
+      baseState.currentRoomId = '1'
+      baseState.player.inventory.push({
+        id: 'recipe_half_office',
+        name: 'moitie de recette du bureau',
+        type: 'misc',
+        description: 'Premier fragment de recette.',
+      })
+      await callTool(client, 'replace_game_state', { gameState: baseState })
+
+      const ask = await callTool(client, 'resolve_player_action', {
+        action: { kind: 'ask', targetName: 'Mac', topic: 'ou est la recette de Grammy' },
+      })
+      assert.equal(ask.success, true)
+      assert.ok(ask.result.information.includes('bureau'))
+
+      const persuade = await callTool(client, 'resolve_player_action', {
+        action: { kind: 'persuade', targetName: 'Mac', topic: 'aide moi a sauver la boulangerie' },
+      })
+      assert.equal(persuade.success, true)
+      assert.equal(persuade.result.npc.disposition, 'helpful')
+
+      const show = await callTool(client, 'resolve_player_action', {
+        action: { kind: 'show_item', targetName: 'Mac', itemName: 'recette' },
+      })
+      assert.equal(show.success, true)
+
+      const give = await callTool(client, 'resolve_player_action', {
+        action: { kind: 'give_item', targetName: 'Mac', itemName: 'potion' },
+      })
+      assert.equal(give.success, true)
+      assert.equal(give.result.item.id, 'potion1')
+
+      let stateAfter = await callTool(client, 'get_game_state')
+      assert.ok(stateAfter.world.eventLog.some(event => event.type === 'npc.information_revealed' && event.targetId === 'mac'))
+      assert.ok(stateAfter.world.eventLog.some(event => event.type === 'npc.disposition_changed' && event.targetId === 'mac'))
+      assert.ok(stateAfter.world.eventLog.some(event => event.type === 'item.shown' && event.metadata?.npcId === 'mac'))
+      assert.ok(stateAfter.world.eventLog.some(event => event.type === 'item.given' && event.metadata?.npcId === 'mac'))
+      assert.equal(stateAfter.player.inventory.some(item => item.id === 'potion1'), false)
+    })
+  })
+})
+
+test('MCP resolve_player_action failed threat raises a canonical alarm', async () => {
+  await withMcpClient(async client => {
+    const baseState = await callTool(client, 'get_game_state')
+    baseState.player.position = { x: 8, y: 9 }
+    baseState.roomsVisited = ['9']
+    baseState.currentRoomId = '9'
+    baseState.world.npcs.grukk.known = true
+    await callTool(client, 'replace_game_state', { gameState: baseState })
+
+    const threat = await callTool(client, 'resolve_player_action', {
+      action: { kind: 'threaten', targetName: 'Grukk', demand: 'donne la recette ou je te casse', dc: 99 },
+    })
+    assert.equal(threat.success, true)
+    assert.equal(threat.result.success, false)
+    assert.equal(threat.result.npc.disposition, 'hostile')
+
+    const finalState = await callTool(client, 'get_game_state')
+    assert.equal(finalState.world.alarms.bakery_alert.raised, true)
+    assert.ok(finalState.world.eventLog.some(event => event.type === 'alarm.raised' && event.targetId === 'bakery_alert'))
+  })
+})

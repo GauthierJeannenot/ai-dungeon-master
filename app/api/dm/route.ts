@@ -155,17 +155,25 @@ function parsePositiveInt(value: string | undefined, fallback: number): number {
 function isCanonicalWorldActionKind(kind: GameActionKind): boolean {
   return [
     'search',
+    'examine',
+    'read',
     'open',
     'take',
     'unlock',
     'force',
+    'disarm',
     'talk',
+    'ask',
+    'persuade',
     'threaten',
+    'show_item',
+    'give_item',
     'hide',
     'help',
     'flee',
     'stabilize',
     'use_object',
+    'combine_recipe',
   ].includes(kind)
 }
 
@@ -1737,6 +1745,61 @@ function detectNarrativeWorldContractIssue(
     }
   }
 
+  const narratesRecipeCompleted =
+    /\b(recette)\b.{0,100}\b(complete|assemblee|reconstituee|entiere|terminee|reparee)\b/.test(text) ||
+    /\b(deux|2)\b.{0,80}\b(moities|fragments|morceaux)\b.{0,80}\b(ensemble|assembl(?:e|es)|reunis?|recoll(?:e|es))\b/.test(text)
+  if (narratesRecipeCompleted) {
+    const recipeQuest = world.quests.grammy_recipe
+    const completedEvent = recentEventTypes.has('quest.completed')
+    const recipeComplete = Boolean(recipeQuest?.completed && recipeQuest.progress >= recipeQuest.goal)
+    if (!recipeComplete && !completedEvent) {
+      return {
+        reason: 'recipe_completed_without_engine_state',
+        matchedTriggers: ['recipe_complete_text_without_quest_completed_event'],
+        suggestedTools: ['resolve_player_action'],
+      }
+    }
+  }
+
+  const narratesTrapTriggered =
+    /\b(piege|champignons?|couteaux?|ratelier|mecanisme)\b.{0,100}\b(declenche|active|s active|blesse|empoisonne|jaillit|attaque|se referme)\b/.test(text)
+  if (narratesTrapTriggered) {
+    const triggeredTrapState = objects.some(object => object.kind === 'trap' && object.used && !object.disarmed)
+    const trapTriggeredEvent = recentEventTypes.has('trap.triggered')
+    if (!triggeredTrapState && !trapTriggeredEvent) {
+      return {
+        reason: 'trap_triggered_without_engine_state',
+        matchedTriggers: ['trap_trigger_text_without_trap_event'],
+        suggestedTools: ['resolve_player_action'],
+      }
+    }
+  }
+
+  const narratesTrapDisarmed =
+    /\b(piege|champignons?|couteaux?|ratelier|mecanisme)\b.{0,100}\b(desamorce|neutralise|desactive|inoffensif|sans danger)\b/.test(text)
+  if (narratesTrapDisarmed) {
+    const disarmedTrapState = objects.some(object => object.kind === 'trap' && object.disarmed)
+    const trapDisarmedEvent = recentEventTypes.has('trap.disarmed')
+    if (!disarmedTrapState && !trapDisarmedEvent) {
+      return {
+        reason: 'trap_disarmed_without_engine_state',
+        matchedTriggers: ['trap_disarmed_text_without_trap_disarmed_event'],
+        suggestedTools: ['resolve_player_action'],
+      }
+    }
+  }
+
+  const raisedAlarms = Object.entries(world.alarms).filter(([, alarm]) => alarm.raised && alarm.level > 0)
+  const narratesNoAlarm =
+    /\b(tout est calme|aucune alerte|personne n a entendu|personne ne remarque|personne ne reagit|le silence retombe|rien ne bouge)\b/.test(text)
+  if (raisedAlarms.length > 0 && narratesNoAlarm && !recentEventTypes.has('alarm.raised')) {
+    return {
+      reason: 'alarm_ignored_by_narration',
+      matchedTriggers: raisedAlarms.map(([alarmId, alarm]) => `alarm_${alarmId}_raised_level_${alarm.level}`),
+      suggestedTools: ['resolve_player_action'],
+    }
+  }
+
   return null
 }
 
@@ -2149,18 +2212,26 @@ const PLAYER_ACTION_KINDS = new Set<CanonicalPlayerActionKind>([
   'attack',
   'move',
   'interact',
+  'examine',
+  'read',
   'search',
   'open',
   'take',
   'unlock',
   'force',
+  'disarm',
   'talk',
+  'ask',
+  'persuade',
   'threaten',
+  'show_item',
+  'give_item',
   'hide',
   'help',
   'flee',
   'stabilize',
   'use_object',
+  'combine_recipe',
   'ability_check',
   'social',
   'use_item',
@@ -2424,6 +2495,180 @@ function extractWorldTargetName(message: string): string | undefined {
   return targetPatterns.find(([, pattern]) => pattern.test(text))?.[0]
 }
 
+function extractExpandedWorldTargetName(message: string): string | undefined {
+  const text = normalizeFrenchText(message)
+  const targetPatterns: Array<[string, RegExp]> = [
+    ['Mac', /\bmac|pommier|treant|arbre\b/],
+    ['Grukk', /\bgrukk|chef|hobgobelin\b/],
+    ['druidesse du verger', /\bdryade|druidesse|fee|fees|femme du verger\b/],
+    ['bureau', /\bbureau|paperasse|registres?\b/],
+    ['registre', /\bregistre|livre de comptes|commandes\b/],
+    ['tiroir', /\btiroirs?\b/],
+    ['armoire', /\barmoires?|placards?\b/],
+    ['coffre', /\bcoffres?\b/],
+    ['caisses', /\bcaisses?|marchandises\b/],
+    ['sacs de farine', /\bsacs?|farine|tas de farine\b/],
+    ['cle', /\bcles?|clefs?\b/],
+    ['note', /\bnotes?|ordre|bon de livraison|papier de livraison\b/],
+    ['four enchante', /\bfours?|fournee|runes?\b/],
+    ['couteaux', /\bcouteaux?|ratelier|outils animes?\b/],
+    ['champignons violets', /\bchampignons?|amas|violets?\b/],
+    ['porte de la reserve', /\bporte\b.{0,30}\breserve|reserve\b.{0,30}\bporte\b/],
+    ['double porte', /\bdouble porte|porte d entree|porte de l entree|entree\b/],
+    ['recette', /\brecette|fragment|moitie|parchemin|papier|indice\b/],
+  ]
+  return targetPatterns.find(([, pattern]) => pattern.test(text))?.[0] ?? extractWorldTargetName(message)
+}
+
+function extractWorldNpcTargetName(message: string): string | undefined {
+  const text = normalizeFrenchText(message)
+  const npcPatterns: Array<[string, RegExp]> = [
+    ['Mac', /\bmac|pommier|treant|arbre\b/],
+    ['Grukk', /\bgrukk|chef|hobgobelin\b/],
+    ['druidesse du verger', /\bdryade|druidesse|fee|fees|femme du verger\b/],
+  ]
+  return npcPatterns.find(([, pattern]) => pattern.test(text))?.[0]
+}
+
+function extractWorldItemName(message: string): string | undefined {
+  const text = normalizeFrenchText(message)
+  const itemPatterns: Array<[string, RegExp]> = [
+    ['recette', /\brecette|fragment|moitie|parchemin\b/],
+    ['cle', /\bcles?|clefs?\b/],
+    ['note', /\bnotes?|bon|ordre|papier\b/],
+    ['potion', /\bpotion\b/],
+  ]
+  return itemPatterns.find(([, pattern]) => pattern.test(text))?.[0]
+}
+
+function uniqueOrUndefined<T>(values: T[]): T | undefined {
+  const uniqueValues = [...new Set(values)]
+  return uniqueValues.length === 1 ? uniqueValues[0] : undefined
+}
+
+function hasAnaphoricObjectReference(message: string): boolean {
+  const text = normalizeFrenchText(message)
+  return /\b(?:l[' ]?(?:ouvre|ouvres|examines?|etudies?|empoches?|attrapes?)|le prends|la prends|le lis|la lis|ouvre[- ]?(?:le|la|ca)|lis[- ]?(?:le|la)|prends ca|ramasse ca|recupere ca|reprends ca|utilise ca|desamorce ca)\b/.test(text)
+}
+
+function hasAnaphoricNpcReference(message: string): boolean {
+  const text = normalizeFrenchText(message)
+  return /\b(?:lui parle|parle[- ]?lui|je lui parle|je lui demande|demande[- ]?lui|je l interroge|interroge[- ]?(?:le|la)|je lui montre|je lui donne|aide[- ]?(?:le|la)|je l aide)\b/.test(text)
+}
+
+function isAnaphoricObjectCandidateForKind(
+  kind: GameActionKind,
+  object: NonNullable<GameState['world']>['objects'][string],
+  gameState: GameState
+): boolean {
+  const visibleHere = object.roomId === gameState.currentRoomId && (object.visible || object.discovered)
+  const inventoryIds = new Set(gameState.player.inventory.map(item => item.id))
+  const readable = Boolean(object.readableText || object.tags?.includes('readable'))
+  switch (kind) {
+    case 'open':
+    case 'unlock':
+    case 'force':
+      return visibleHere && object.taken !== true && (object.kind === 'door' || object.kind === 'container' || object.opened !== undefined || object.locked !== undefined)
+    case 'take':
+      return visibleHere && object.taken !== true && ['item', 'clue'].includes(object.kind)
+    case 'read':
+      return readable && (visibleHere || inventoryIds.has(object.id))
+    case 'disarm':
+      return visibleHere && object.kind === 'trap' && object.disarmed !== true
+    case 'use_object':
+      return visibleHere && ['fixture', 'trap'].includes(object.kind)
+    case 'examine':
+      return visibleHere
+    default:
+      return false
+  }
+}
+
+function objectTargetNameFromAffordance(
+  affordance: PlayerAffordance,
+  gameState: GameState
+): string | undefined {
+  const prefixes = [
+    'world-open-',
+    'world-unlock-',
+    'world-force-',
+    'world-take-',
+    'world-read-',
+    'world-disarm-',
+    'world-use-',
+  ]
+  const prefix = prefixes.find(candidate => affordance.id.startsWith(candidate))
+  if (!prefix) return undefined
+  return gameState.world?.objects[affordance.id.slice(prefix.length)]?.name
+}
+
+function inferAnaphoricWorldTargetName(
+  message: string,
+  gameState: GameState,
+  kind: GameActionKind
+): string | undefined {
+  if (!gameState.world || !hasAnaphoricObjectReference(message)) return undefined
+
+  const recentTargetName = gameState.world.eventLog
+    .slice(-8)
+    .reverse()
+    .map(event => typeof event.targetId === 'string' ? gameState.world?.objects[event.targetId] : undefined)
+    .find(object => object && isAnaphoricObjectCandidateForKind(kind, object, gameState))
+    ?.name
+  if (recentTargetName) return recentTargetName
+
+  const affordedNames = derivePlayerAffordances(gameState)
+    .filter(affordance => affordance.kind === kind)
+    .map(affordance => objectTargetNameFromAffordance(affordance, gameState))
+    .filter((name): name is string => Boolean(name))
+  return uniqueOrUndefined(affordedNames)
+}
+
+function npcTargetNameFromAffordance(
+  affordance: PlayerAffordance,
+  gameState: GameState
+): string | undefined {
+  const prefixes = [
+    'world-talk-',
+    'world-ask-',
+    'world-persuade-',
+    'world-threaten-',
+    'world-show-item-',
+    'world-give-item-',
+  ]
+  const prefix = prefixes.find(candidate => affordance.id.startsWith(candidate))
+  if (!prefix) return undefined
+  return gameState.world?.npcs[affordance.id.slice(prefix.length)]?.name
+}
+
+function inferAnaphoricNpcTargetName(
+  message: string,
+  gameState: GameState,
+  kind: GameActionKind
+): string | undefined {
+  if (!gameState.world || !hasAnaphoricNpcReference(message)) return undefined
+
+  const recentTargetName = gameState.world.eventLog
+    .slice(-8)
+    .reverse()
+    .map(event => typeof event.targetId === 'string' ? gameState.world?.npcs[event.targetId] : undefined)
+    .find(npc => npc && npc.roomId === gameState.currentRoomId)
+    ?.name
+  if (recentTargetName) return recentTargetName
+
+  const affordedNames = derivePlayerAffordances(gameState)
+    .filter(affordance => affordance.kind === kind)
+    .map(affordance => npcTargetNameFromAffordance(affordance, gameState))
+    .filter((name): name is string => Boolean(name))
+  const uniqueAffordedName = uniqueOrUndefined(affordedNames)
+  if (uniqueAffordedName) return uniqueAffordedName
+
+  const knownNpcNames = Object.values(gameState.world.npcs)
+    .filter(npc => npc.roomId === gameState.currentRoomId && npc.known)
+    .map(npc => npc.name)
+  return uniqueOrUndefined(knownNpcNames)
+}
+
 function parseWorldActionInput(
   message: string,
   gameState: GameState,
@@ -2432,10 +2677,20 @@ function parseWorldActionInput(
   const kind = actionKind ?? classifyPlayerAction(message, gameState).kind
   if (!isCanonicalWorldActionKind(kind)) return null
 
-  const targetName = extractWorldTargetName(message)
+  const explicitTargetName = extractExpandedWorldTargetName(message)
+  const targetName = explicitTargetName ?? inferAnaphoricWorldTargetName(message, gameState, kind)
+  const explicitNpcTargetName = extractWorldNpcTargetName(message)
+  const npcTargetName = explicitNpcTargetName ?? inferAnaphoricNpcTargetName(message, gameState, kind)
+  const itemName = extractWorldItemName(message)
   switch (kind) {
+    case 'examine':
+      return targetName ? { kind: 'examine', targetName } : { kind: 'examine' }
+
+    case 'read':
+      return { kind: 'read', ...(targetName ? { targetName } : {}) }
+
     case 'search':
-      return targetName && /\b(tiroirs?|armoires?|coffres?|four|champignons?)\b/.test(normalizeFrenchText(message))
+      return targetName && /\b(tiroirs?|armoires?|coffres?|four|champignons?|caisses?|sacs?|bureau|appartement)\b/.test(normalizeFrenchText(message))
         ? { kind: 'search', targetName }
         : { kind: 'search' }
 
@@ -2451,25 +2706,56 @@ function parseWorldActionInput(
     case 'force':
       return { kind: 'force', ...(targetName ? { targetName } : {}) }
 
+    case 'disarm':
+      return { kind: 'disarm', ...(targetName ? { targetName } : {}) }
+
     case 'talk':
       return {
         kind: 'talk',
-        ...(targetName ? { targetName } : {}),
+        ...(npcTargetName ? { targetName: npcTargetName } : {}),
+        topic: message,
+      }
+
+    case 'ask':
+      return {
+        kind: 'ask',
+        ...(npcTargetName ? { targetName: npcTargetName } : {}),
+        topic: message,
+      }
+
+    case 'persuade':
+      return {
+        kind: 'persuade',
+        ...(npcTargetName ? { targetName: npcTargetName } : {}),
         topic: message,
       }
 
     case 'threaten':
       return {
         kind: 'threaten',
-        ...(targetName ? { targetName } : {}),
+        ...(npcTargetName ? { targetName: npcTargetName } : {}),
         demand: message,
+      }
+
+    case 'show_item':
+      return {
+        kind: 'show_item',
+        ...(npcTargetName ? { targetName: npcTargetName } : {}),
+        ...(itemName ? { itemName } : {}),
+      }
+
+    case 'give_item':
+      return {
+        kind: 'give_item',
+        ...(npcTargetName ? { targetName: npcTargetName } : {}),
+        ...(itemName ? { itemName } : {}),
       }
 
     case 'hide':
       return { kind: 'hide' }
 
     case 'help':
-      return { kind: 'help', ...(targetName ? { targetName } : {}) }
+      return { kind: 'help', ...(npcTargetName ? { targetName: npcTargetName } : {}) }
 
     case 'flee':
       return { kind: 'flee' }
@@ -2479,6 +2765,9 @@ function parseWorldActionInput(
 
     case 'use_object':
       return { kind: 'use_object', ...(targetName ? { targetName } : {}) }
+
+    case 'combine_recipe':
+      return { kind: 'combine_recipe' }
 
     default:
       return null
@@ -3362,15 +3651,23 @@ function buildEngineTruthPacket(
     `playerCanAct=${gameState.player.hp.current > 0 && !gameState.player.conditions.includes('unconscious')}`,
     `playerPosition=${formatPosition(gameState.player.position)}`,
     `currentRoomId=${gameState.currentRoomId ?? 'unknown'}`,
+    ...(gameState.currentRoomId && gameState.world?.rooms?.[gameState.currentRoomId]
+      ? [
+          `currentRoomName=${gameState.world.rooms[gameState.currentRoomId].name}`,
+          `currentRoomTags=${gameState.world.rooms[gameState.currentRoomId].tags?.join(',') || 'none'}`,
+          `currentRoomExits=${gameState.world.rooms[gameState.currentRoomId].exits?.join(',') || 'none'}`,
+        ]
+      : []),
+    `worldFlags=${JSON.stringify(gameState.world?.flags ?? {})}`,
     `aliveMonsters=${aliveMonsters.length}`,
     ...Object.values(gameState.world?.objects ?? {})
       .filter(object => object.roomId === gameState.currentRoomId)
-      .map(object => `worldObject=${object.id} name=${object.name} kind=${object.kind} visible=${object.visible} discovered=${object.discovered} opened=${Boolean(object.opened)} locked=${Boolean(object.locked)} taken=${Boolean(object.taken)} used=${Boolean(object.used)}`),
+      .map(object => `worldObject=${object.id} name=${object.name} kind=${object.kind} visible=${object.visible} discovered=${object.discovered} opened=${Boolean(object.opened)} locked=${Boolean(object.locked)} taken=${Boolean(object.taken)} used=${Boolean(object.used)} disarmed=${Boolean(object.disarmed)} readable=${Boolean(object.readableText || object.tags?.includes('readable'))}`),
     ...Object.values(gameState.world?.npcs ?? {})
       .filter(npc => npc.roomId === gameState.currentRoomId)
-      .map(npc => `worldNpc=${npc.id} name=${npc.name} disposition=${npc.disposition} known=${Boolean(npc.known)}`),
+      .map(npc => `worldNpc=${npc.id} name=${npc.name} disposition=${npc.disposition} known=${Boolean(npc.known)} memory=${JSON.stringify(npc.memory ?? {})}`),
     ...Object.values(gameState.world?.quests ?? {})
-      .map(quest => `quest=${quest.id} progress=${quest.progress}/${quest.goal} completed=${Boolean(quest.completed)}`),
+      .map(quest => `quest=${quest.id} progress=${quest.progress}/${quest.goal} completed=${Boolean(quest.completed)} flags=${JSON.stringify(quest.flags ?? {})}`),
     ...Object.entries(gameState.world?.alarms ?? {})
       .map(([alarmId, alarm]) => `alarm=${alarmId} raised=${alarm.raised} level=${alarm.level} reason=${alarm.reason ?? 'none'}`),
     ...engineResolution.events.map(event => `event=${event.type} outcome=${event.outcome ?? 'none'} summary=${event.summary}`),
@@ -3422,11 +3719,18 @@ function buildLocalEngineNarrative(
     const engineView = buildEngineResolutionView(gameState, newCombatLogEntries, newWorldEvents)
     const eventTypes = engineView.events.map(event => event.type)
     const latestWorldEvent = newWorldEvents.at(-1)
+    if (eventTypes.includes('room.examined') || eventTypes.includes('object.examined')) return latestWorldEvent?.summary ?? 'Tu examines sans ajouter de fait cache au monde.'
+    if (eventTypes.includes('clue.read')) return latestWorldEvent?.summary ?? 'Le texte lu devient un fait moteur clair.'
     if (eventTypes.includes('room.object_discovered')) return latestWorldEvent?.summary ?? 'Ta fouille revele un element concret.'
+    if (eventTypes.includes('quest.completed')) return latestWorldEvent?.summary ?? 'La quete est completee dans l etat moteur.'
     if (eventTypes.includes('object.opened') || eventTypes.includes('door.opened')) return latestWorldEvent?.summary ?? 'L ouverture est maintenant un fait moteur.'
     if (eventTypes.includes('object.taken') || eventTypes.includes('quest.item_found')) return latestWorldEvent?.summary ?? 'L objet rejoint ton inventaire.'
     if (eventTypes.includes('npc.disposition_changed')) return latestWorldEvent?.summary ?? 'La disposition du PNJ change selon le moteur.'
+    if (eventTypes.includes('npc.information_revealed')) return latestWorldEvent?.summary ?? 'Le PNJ livre une information fixee par le moteur.'
+    if (eventTypes.includes('item.shown')) return latestWorldEvent?.summary ?? 'L objet est montre sans quitter l inventaire.'
+    if (eventTypes.includes('item.given')) return latestWorldEvent?.summary ?? 'L objet quitte ton inventaire et passe au PNJ.'
     if (eventTypes.includes('alarm.raised')) return latestWorldEvent?.summary ?? 'L alerte monte dans le monde.'
+    if (eventTypes.includes('trap.disarmed')) return latestWorldEvent?.summary ?? 'Le piege est desamorce.'
     if (eventTypes.includes('trap.triggered')) return latestWorldEvent?.summary ?? 'Le piege se declenche.'
     if (eventTypes.includes('action.blocked')) return latestWorldEvent?.summary ?? "Ton geste n'est pas possible dans l'etat actuel."
     if (eventTypes.includes('entity.moved')) return buildOralFallbackNarrative(gameState, ['move_token'])

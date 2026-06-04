@@ -307,11 +307,25 @@ test('DM API resolves natural stateful world actions through canonical engine ev
   assert.equal(search.data.newGameState.world.objects.office_drawer.discovered, true)
   assert.ok(search.data.engine?.affordances?.some(action => action.kind === 'unlock' && action.enabled === true))
 
+  const lockedOpen = await postDm({
+    message: "je l'ouvre",
+    clientRequestId: `client-open-ana-${sessionId}`,
+    sessionId,
+    gameState: search.data.newGameState,
+    history: [],
+  })
+  assert.equal(lockedOpen.response.status, 200)
+  assert.ok(lockedOpen.data.toolsUsed.includes('resolve_player_action'))
+  assert.ok(lockedOpen.data.engine?.events?.some(event =>
+    event.type === 'action.blocked' &&
+    event.metadata?.code === 'OBJECT_LOCKED'
+  ))
+
   const force = await postDm({
     message: "j'enfonce le tiroir",
     clientRequestId: `client-force-${sessionId}`,
     sessionId,
-    gameState: search.data.newGameState,
+    gameState: lockedOpen.data.newGameState,
     history: [],
   })
   assert.equal(force.response.status, 200)
@@ -334,11 +348,22 @@ test('DM API resolves natural stateful world actions through canonical engine ev
   assert.ok(take.data.engine?.events?.some(event => event.type === 'quest.item_found'))
   assert.equal(take.data.newGameState.world.quests.grammy_recipe.progress, 1)
 
+  const read = await postDm({
+    message: 'je le lis',
+    clientRequestId: `client-read-ana-${sessionId}`,
+    sessionId,
+    gameState: take.data.newGameState,
+    history: [],
+  })
+  assert.equal(read.response.status, 200)
+  assert.ok(read.data.toolsUsed.includes('resolve_player_action'))
+  assert.ok(read.data.engine?.events?.some(event => event.type === 'clue.read' && event.targetId === 'recipe_half_office'))
+
   const duplicateTake = await postDm({
     message: 'je prends la recette encore',
     clientRequestId: `client-duplicate-${sessionId}`,
     sessionId,
-    gameState: take.data.newGameState,
+    gameState: read.data.newGameState,
     history: [],
   })
   assert.equal(duplicateTake.response.status, 200)
@@ -351,7 +376,7 @@ test('DM API canonical talk changes NPC disposition through world event', async 
   t.after(() => cleanupSession(sessionId))
 
   const { response, data } = await postDm({
-    message: 'je demande a Mac de nous aider pour la recette',
+    message: 'je parle gentiment a Mac de la recette',
     clientRequestId: `client-${sessionId}`,
     sessionId,
     gameState: baseGameState(),
@@ -363,4 +388,22 @@ test('DM API canonical talk changes NPC disposition through world event', async 
   assert.equal(data.newGameState.world.npcs.mac.disposition, 'helpful')
   assert.ok(data.engine?.events?.some(event => event.type === 'npc.disposition_changed' && event.targetId === 'mac'))
   assert.equal(data.usage?.llmRoute, 'rich')
+})
+
+test('DM API canonical ask reveals information without forcing disposition change', async t => {
+  const sessionId = `api-ask-${process.pid}-${Date.now()}`
+  t.after(() => cleanupSession(sessionId))
+
+  const { response, data } = await postDm({
+    message: 'je lui demande ou est la recette',
+    clientRequestId: `client-${sessionId}`,
+    sessionId,
+    gameState: baseGameState(),
+    history: [],
+  })
+
+  assert.equal(response.status, 200)
+  assert.ok(data.toolsUsed.includes('resolve_player_action'))
+  assert.equal(data.newGameState.world.npcs.mac.disposition, 'neutral')
+  assert.ok(data.engine?.events?.some(event => event.type === 'npc.information_revealed' && event.targetId === 'mac'))
 })

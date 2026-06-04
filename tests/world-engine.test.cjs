@@ -199,6 +199,82 @@ test('world engine derives object and NPC affordances from explicit world state'
   assert.equal(affordances.some(action => action.kind === 'take' && action.enabled), false)
 })
 
+test('world engine exposes readable inventory, trap, social, and recipe affordances', () => {
+  const state = baseGameState({
+    currentRoomId: '8',
+    roomsVisited: ['8'],
+    player: {
+      ...baseGameState().player,
+      inventory: [
+        ...baseGameState().player.inventory,
+        { id: 'recipe_half_office', name: 'Moitie de recette brulee', type: 'misc' },
+        { id: 'recipe_half_apartment', name: 'Moitie de recette graisseuse', type: 'misc' },
+      ],
+    },
+    world: {
+      rooms: {
+        '8': { id: '8', name: 'Sol de boulangerie', exits: ['5', '9'] },
+      },
+      objects: {
+        recipe_half_office: {
+          id: 'recipe_half_office',
+          roomId: '5',
+          name: 'moitie de recette brulee',
+          kind: 'clue',
+          visible: false,
+          discovered: true,
+          taken: true,
+          tags: ['recipe_half', 'readable'],
+          readableText: 'Premiere moitie.',
+        },
+        animated_knife_rack: {
+          id: 'animated_knife_rack',
+          roomId: '8',
+          name: 'ratelier de couteaux animes',
+          kind: 'trap',
+          visible: true,
+          discovered: true,
+          used: false,
+          disarmed: false,
+          tags: ['trap'],
+        },
+      },
+      npcs: {
+        mac: {
+          id: 'mac',
+          name: 'Mac',
+          roomId: '8',
+          disposition: 'neutral',
+          known: true,
+        },
+      },
+      quests: {
+        grammy_recipe: {
+          id: 'grammy_recipe',
+          name: 'Recette de Grammy',
+          progress: 2,
+          goal: 2,
+          completed: false,
+          flags: {},
+        },
+      },
+      alarms: {},
+      flags: {},
+      eventLog: [],
+    },
+  })
+
+  const affordances = worldEngine.derivePlayerAffordances(state)
+
+  assert.equal(affordances.find(action => action.id === 'world-read-recipe_half_office')?.enabled, true)
+  assert.equal(affordances.find(action => action.id === 'world-disarm-animated_knife_rack')?.enabled, true)
+  assert.equal(affordances.find(action => action.id === 'world-ask-mac')?.enabled, true)
+  assert.equal(affordances.find(action => action.id === 'world-persuade-mac')?.enabled, true)
+  assert.equal(affordances.find(action => action.id === 'world-show-item-mac')?.enabled, true)
+  assert.equal(affordances.find(action => action.id === 'world-give-item-mac')?.enabled, true)
+  assert.equal(affordances.find(action => action.id === 'world-combine-recipe')?.enabled, true)
+})
+
 test('world engine includes canonical world events in resolution views', () => {
   const worldEvent = {
     id: 'world-test',

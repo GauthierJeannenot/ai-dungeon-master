@@ -7,6 +7,7 @@ import {
   AbilityCheckResult,
   EngineEvent,
   EntityStats,
+  Item,
   WorldNpcDisposition,
   WorldNpcState,
   WorldObjectState,
@@ -24,18 +25,26 @@ type PlayerActionKind =
   | 'attack'
   | 'move'
   | 'interact'
+  | 'examine'
+  | 'read'
   | 'search'
   | 'open'
   | 'take'
   | 'unlock'
   | 'force'
+  | 'disarm'
   | 'talk'
+  | 'ask'
+  | 'persuade'
   | 'threaten'
+  | 'show_item'
+  | 'give_item'
   | 'hide'
   | 'help'
   | 'flee'
   | 'stabilize'
   | 'use_object'
+  | 'combine_recipe'
   | 'ability_check'
   | 'social'
   | 'use_item'
@@ -70,6 +79,17 @@ const PlayerActionSchema = z.discriminatedUnion('kind', [
     description: z.string().optional(),
   }),
   z.object({
+    kind: z.literal('examine'),
+    targetId: z.string().optional(),
+    targetName: z.string().optional(),
+    query: z.string().optional(),
+  }),
+  z.object({
+    kind: z.literal('read'),
+    targetId: z.string().optional(),
+    targetName: z.string().optional(),
+  }),
+  z.object({
     kind: z.literal('search'),
     targetId: z.string().optional(),
     targetName: z.string().optional(),
@@ -100,16 +120,50 @@ const PlayerActionSchema = z.discriminatedUnion('kind', [
     targetName: z.string().optional(),
   }),
   z.object({
+    kind: z.literal('disarm'),
+    targetId: z.string().optional(),
+    targetName: z.string().optional(),
+    dc: z.number().int().optional(),
+  }),
+  z.object({
     kind: z.literal('talk'),
     npcId: z.string().optional(),
     targetName: z.string().optional(),
     topic: z.string().optional(),
   }),
   z.object({
+    kind: z.literal('ask'),
+    npcId: z.string().optional(),
+    targetName: z.string().optional(),
+    topic: z.string().optional(),
+  }),
+  z.object({
+    kind: z.literal('persuade'),
+    npcId: z.string().optional(),
+    targetName: z.string().optional(),
+    topic: z.string().optional(),
+    dc: z.number().int().optional(),
+  }),
+  z.object({
     kind: z.literal('threaten'),
     npcId: z.string().optional(),
     targetName: z.string().optional(),
     demand: z.string().optional(),
+    dc: z.number().int().positive().optional(),
+  }),
+  z.object({
+    kind: z.literal('show_item'),
+    npcId: z.string().optional(),
+    targetName: z.string().optional(),
+    itemId: z.string().optional(),
+    itemName: z.string().optional(),
+  }),
+  z.object({
+    kind: z.literal('give_item'),
+    npcId: z.string().optional(),
+    targetName: z.string().optional(),
+    itemId: z.string().optional(),
+    itemName: z.string().optional(),
   }),
   z.object({
     kind: z.literal('hide'),
@@ -133,6 +187,9 @@ const PlayerActionSchema = z.discriminatedUnion('kind', [
     targetId: z.string().optional(),
     targetName: z.string().optional(),
     useType: z.string().optional(),
+  }),
+  z.object({
+    kind: z.literal('combine_recipe'),
   }),
   z.object({
     kind: z.literal('ability_check'),
@@ -311,6 +368,7 @@ function objectMatchesTarget(object: WorldObjectState, targetName?: string): boo
     object.id,
     object.name,
     object.kind,
+    ...(object.aliases ?? []),
     ...(object.tags ?? []),
   ].map(normalizeFrenchText)
 
@@ -328,6 +386,7 @@ function npcMatchesTarget(npc: WorldNpcState, targetName?: string): boolean {
   const haystacks = [
     npc.id,
     npc.name,
+    ...(npc.aliases ?? []),
     ...(npc.tags ?? []),
   ].map(normalizeFrenchText)
   if (haystacks.some(haystack => haystack === target || haystack.includes(target) || target.includes(haystack))) {
@@ -335,6 +394,13 @@ function npcMatchesTarget(npc: WorldNpcState, targetName?: string): boolean {
   }
   const parts = normalizedTargetParts(targetName)
   return parts.length > 0 && parts.some(part => haystacks.some(haystack => haystack.includes(part)))
+}
+
+function isObjectOpenable(object: WorldObjectState): boolean {
+  return object.kind === 'door' ||
+    object.kind === 'container' ||
+    object.opened !== undefined ||
+    object.locked !== undefined
 }
 
 function resolveWorldObjectTarget({
@@ -359,7 +425,7 @@ function resolveWorldObjectTarget({
     if (object.roomId !== roomId) return false
     if (object.taken) return false
     if (kinds && !kinds.includes(object.kind)) return false
-    if (onlyOpenable && !['door', 'container', 'fixture'].includes(object.kind)) return false
+    if (onlyOpenable && !isObjectOpenable(object)) return false
     if (onlyTakeable && !['item', 'clue'].includes(object.kind)) return false
     if (!includeHidden && !object.visible && !object.discovered) return false
     if (!objectMatchesTarget(object, targetName)) return false
@@ -418,6 +484,85 @@ function resolveWorldNpcTarget({
     return blockedAction('NPC_AMBIGUOUS', 'Several NPCs could match this action; the player must make the target clearer.', {
       roomId,
       candidates: candidates.map(npc => ({ id: npc.id, name: npc.name, disposition: npc.disposition })),
+    })
+  }
+
+  return candidates[0]
+}
+
+function inventoryItemMatches(item: Item, itemName?: string): boolean {
+  const target = normalizeFrenchText(itemName ?? '')
+  if (!target) return true
+  const haystacks = [
+    item.id,
+    item.name,
+    item.type,
+    item.description ?? '',
+  ].map(normalizeFrenchText)
+  if (haystacks.some(haystack => haystack === target || haystack.includes(target) || target.includes(haystack))) {
+    return true
+  }
+  const parts = normalizedTargetParts(itemName)
+  return parts.length > 0 && parts.some(part => haystacks.some(haystack => haystack.includes(part)))
+}
+
+function resolveInventoryItemTarget({
+  itemId,
+  itemName,
+}: {
+  itemId?: string
+  itemName?: string
+}): Item | ToolResponse {
+  const inventory = gs.getPlayer().inventory
+  const candidates = inventory.filter(item => {
+    if (itemId && item.id !== itemId) return false
+    if (!inventoryItemMatches(item, itemName)) return false
+    return true
+  })
+
+  if (candidates.length === 0) {
+    return blockedAction('INVENTORY_ITEM_NOT_FOUND', 'No matching item is currently in the player inventory.', {
+      itemId,
+      itemName,
+      inventory: inventory.map(item => ({ id: item.id, name: item.name, type: item.type })),
+    })
+  }
+
+  if (!itemId && !itemName && candidates.length > 1) {
+    return blockedAction('INVENTORY_ITEM_AMBIGUOUS', 'Several inventory items could match this action; the player must make the item clearer.', {
+      candidates: candidates.map(item => ({ id: item.id, name: item.name, type: item.type })),
+    })
+  }
+
+  return candidates[0]
+}
+
+function resolveReadableObjectTarget(targetId?: string, targetName?: string): WorldObjectState | ToolResponse {
+  const world = gs.getWorldState()
+  const inventoryIds = new Set(gs.getPlayer().inventory.map(item => item.id))
+  const roomId = gs.getState().currentRoomId
+  const candidates = Object.values(world.objects).filter(object => {
+    if (targetId && object.id !== targetId) return false
+    const inRoom = roomId && object.roomId === roomId && (object.visible || object.discovered)
+    const inInventory = inventoryIds.has(object.id)
+    if (!inRoom && !inInventory) return false
+    if (!object.readableText && !object.tags?.includes('readable')) return false
+    if (!objectMatchesTarget(object, targetName)) return false
+    return true
+  })
+
+  if (candidates.length === 0) {
+    return blockedAction('READABLE_OBJECT_NOT_AFFORDED', 'No matching readable clue is currently visible or in inventory.', {
+      targetId,
+      targetName,
+      inventoryIds: [...inventoryIds],
+      currentRoomId: roomId,
+    })
+  }
+
+  if (!targetId && !targetName && candidates.length > 1) {
+    return blockedAction('READABLE_OBJECT_AMBIGUOUS', 'Several readable clues could match this action; the player must make the target clearer.', {
+      candidates: candidates.map(object => ({ id: object.id, name: object.name })),
     })
   }
 
@@ -499,6 +644,9 @@ function discoverContainedObjects(container: WorldObjectState): WorldObjectState
 function maybeRecordRecipeFound(object: WorldObjectState): WorldQuestState | undefined {
   if (!object.tags?.includes('recipe_half')) return undefined
   const quest = gs.advanceWorldQuest('grammy_recipe', object.id, 1)
+  if (!quest.flags?.recipe_combined) {
+    quest.completed = false
+  }
   gs.recordWorldEvent({
     type: 'quest.item_found',
     summary: `${object.name} rejoint la progression de la recette.`,
@@ -827,6 +975,132 @@ function resolveDeathSave(): ToolResponse {
   })
 }
 
+function resolveExamineAction({
+  targetId,
+  targetName,
+  query,
+}: {
+  targetId?: string
+  targetName?: string
+  query?: string
+}): ToolResponse {
+  const availabilityError = assertWorldActionAvailable()
+  if (availabilityError) return availabilityError
+
+  const roomId = gs.getState().currentRoomId
+  const targetText = targetName ?? query
+
+  if (!targetId && !targetText) {
+    const world = gs.getWorldState()
+    const visibleObjects = Object.values(world.objects)
+      .filter(object => object.roomId === roomId && (object.visible || object.discovered) && !object.taken)
+      .map(object => ({
+        id: object.id,
+        name: object.name,
+        kind: object.kind,
+        opened: object.opened,
+        locked: object.locked,
+        disarmed: object.disarmed,
+        description: object.description,
+      }))
+    const knownNpcs = Object.values(world.npcs)
+      .filter(npc => npc.roomId === roomId && npc.known)
+      .map(npc => ({ id: npc.id, name: npc.name, disposition: npc.disposition }))
+    gs.recordWorldEvent({
+      type: 'room.examined',
+      summary: `La salle ${roomId ?? 'inconnue'} est examinee sans mutation cachee.`,
+      actorId: 'player',
+      outcome: 'success',
+      metadata: {
+        roomId,
+        visibleObjectIds: visibleObjects.map(object => object.id),
+        knownNpcIds: knownNpcs.map(npc => npc.id),
+      },
+    })
+    recordActionIfCombat()
+    return jsonResponse({
+      success: true,
+      roomId,
+      visibleObjects,
+      knownNpcs,
+      mechanicalSummary: `Examen de la salle: ${visibleObjects.length} objet(s) visible(s), ${knownNpcs.length} PNJ connu(s).`,
+    })
+  }
+
+  let object: WorldObjectState | ToolResponse
+  try {
+    object = resolveWorldObjectTarget({
+      targetId,
+      targetName: targetText,
+      includeHidden: false,
+    })
+  } catch (err) {
+    return rules.ruleErrorResult(err)
+  }
+  if ('content' in object) return object
+
+  gs.recordWorldEvent({
+    type: 'object.examined',
+    summary: `${object.name} est examine.`,
+    actorId: 'player',
+    targetId: object.id,
+    outcome: 'success',
+    metadata: {
+      roomId: object.roomId,
+      objectKind: object.kind,
+      opened: object.opened,
+      locked: object.locked,
+      disarmed: object.disarmed,
+    },
+  })
+  recordActionIfCombat()
+  return jsonResponse({
+    success: true,
+    object,
+    mechanicalSummary: object.description ?? `${object.name} examine.`,
+  })
+}
+
+function resolveReadAction({
+  targetId,
+  targetName,
+}: {
+  targetId?: string
+  targetName?: string
+}): ToolResponse {
+  const availabilityError = assertWorldActionAvailable()
+  if (availabilityError) return availabilityError
+
+  let object: WorldObjectState | ToolResponse
+  try {
+    object = resolveReadableObjectTarget(targetId, targetName)
+  } catch (err) {
+    return rules.ruleErrorResult(err)
+  }
+  if ('content' in object) return object
+
+  const text = object.readableText ?? object.description ?? `${object.name} ne contient qu un indice partiel.`
+  gs.recordWorldEvent({
+    type: 'clue.read',
+    summary: `${object.name} est lu.`,
+    actorId: 'player',
+    targetId: object.id,
+    outcome: 'success',
+    metadata: {
+      roomId: object.roomId,
+      text,
+    },
+  })
+  recordActionIfCombat()
+
+  return jsonResponse({
+    success: true,
+    object,
+    text,
+    mechanicalSummary: `${object.name}: ${text}`,
+  })
+}
+
 function resolveSearchAction({
   targetId,
   targetName,
@@ -862,7 +1136,7 @@ function resolveSearchAction({
   const world = gs.getWorldState()
   const containedBehindClosedObjects = new Set(
     Object.values(world.objects)
-      .filter(object => object.contains?.length && object.opened !== true)
+      .filter(object => object.contains?.length && isObjectOpenable(object) && object.opened !== true)
       .flatMap(object => object.contains ?? [])
   )
   const hiddenCandidates = Object.values(world.objects).filter(object => {
@@ -1128,6 +1402,87 @@ function resolveForceAction({
   })
 }
 
+function resolveDisarmAction({
+  targetId,
+  targetName,
+  dc,
+}: {
+  targetId?: string
+  targetName?: string
+  dc?: number
+}): ToolResponse {
+  const availabilityError = assertWorldActionAvailable()
+  if (availabilityError) return availabilityError
+
+  let object: WorldObjectState | ToolResponse
+  try {
+    object = resolveWorldObjectTarget({
+      targetId,
+      targetName,
+      kinds: ['trap'],
+    })
+  } catch (err) {
+    return rules.ruleErrorResult(err)
+  }
+  if ('content' in object) return object
+
+  if (object.disarmed) {
+    return blockedAction('TRAP_ALREADY_DISARMED', 'This trap is already disarmed.', {
+      objectId: object.id,
+      objectName: object.name,
+    })
+  }
+
+  const check = rollPlayerWorldCheck('dex', dc ?? object.dc?.unlock ?? 13, `Desamorcage: ${object.name}`, true)
+  if (check.success) {
+    const disarmed = gs.updateWorldObject(object.id, { disarmed: true, used: false })
+    gs.recordWorldEvent({
+      type: 'trap.disarmed',
+      summary: `${disarmed.name} est desamorce.`,
+      actorId: 'player',
+      targetId: disarmed.id,
+      outcome: 'success',
+      mechanicalDetail: check.mechanicalSummary,
+      metadata: {
+        roomId: disarmed.roomId,
+      },
+    })
+    recordActionIfCombat()
+    return jsonResponse({
+      success: true,
+      object: disarmed,
+      check,
+      mechanicalSummary: `${check.mechanicalSummary} | ${disarmed.name} desamorce.`,
+    })
+  }
+
+  const damageRoll = rollDice('1d6')
+  gs.updateWorldObject(object.id, { used: true })
+  const playerAfter = gs.updatePlayerHP(-damageRoll.total)
+  gs.recordWorldEvent({
+    type: 'trap.triggered',
+    summary: `${object.name} se declenche pendant le desamorcage.`,
+    actorId: 'player',
+    targetId: object.id,
+    outcome: 'failure',
+    mechanicalDetail: `${check.mechanicalSummary} | Degats: ${damageRoll.detail}`,
+    metadata: {
+      roomId: object.roomId,
+      damage: damageRoll.total,
+      playerHpAfter: playerAfter.hp.current,
+    },
+  })
+  recordActionIfCombat()
+  return jsonResponse({
+    success: false,
+    object: gs.getWorldObject(object.id),
+    check,
+    damageRoll,
+    hpAfter: playerAfter.hp.current,
+    mechanicalSummary: `${check.mechanicalSummary} | piege declenche | degats ${damageRoll.total}`,
+  })
+}
+
 function resolveTakeAction({
   targetId,
   targetName,
@@ -1285,14 +1640,94 @@ function resolveTalkAction({
   })
 }
 
-function resolveThreatenAction({
+function revealNpcInformation(npc: WorldNpcState, topic?: string, source = 'ask'): string {
+  const topicText = normalizeFrenchText(topic ?? '')
+  if (/\b(recette|grammy|fragment|moitie)\b/.test(topicText)) {
+    if (npc.id === 'mac') return 'Mac confirme que Grammy cachait ses papiers loin des fours: le bureau et l appartement sont les meilleures pistes.'
+    if (npc.id === 'dryad_orchard') return 'La dryade affirme que la recette a ete coupee en deux: une moitie au bureau, une autre dans l appartement.'
+    if (npc.id === 'grukk') return 'Grukk laisse comprendre qu il cherche lui aussi les deux morceaux de recette.'
+  }
+  if (/\b(entree|passage|quai|discret|danger|gobelins?)\b/.test(topicText)) {
+    if (npc.id === 'mac') return 'Mac recommande d eviter le vacarme des grandes portes si les gobelins sont deja en alerte.'
+    if (npc.id === 'dryad_orchard') return 'La dryade indique que le quai de chargement offre un angle plus discret que l entree principale.'
+  }
+  if (source === 'show') return `${npc.name} reconnait l objet et reagit selon sa disposition actuelle.`
+  return `${npc.name} donne une reponse prudente, sans changer encore de camp.`
+}
+
+function resolveAskAction({
   npcId,
   targetName,
-  demand,
+  topic,
 }: {
   npcId?: string
   targetName?: string
-  demand?: string
+  topic?: string
+}): ToolResponse {
+  const availabilityError = assertWorldActionAvailable()
+  if (availabilityError) return availabilityError
+
+  let npc: WorldNpcState | ToolResponse
+  try {
+    npc = resolveWorldNpcTarget({ npcId, targetName, includeUnknown: true })
+  } catch (err) {
+    return rules.ruleErrorResult(err)
+  }
+  if ('content' in npc) return npc
+
+  const knownNpc = gs.updateNpcMemory(npc.id, { lastAskedTopic: topic ?? 'general' })
+  const information = revealNpcInformation(knownNpc, topic, 'ask')
+  const hostileRefusal = knownNpc.disposition === 'hostile' && knownNpc.id !== 'grukk'
+  gs.recordWorldEvent({
+    type: 'npc.information_revealed',
+    summary: hostileRefusal ? `${knownNpc.name} refuse de donner une information utile.` : information,
+    actorId: 'player',
+    targetId: knownNpc.id,
+    outcome: hostileRefusal ? 'failure' : 'success',
+    metadata: {
+      roomId: knownNpc.roomId,
+      topic,
+      disposition: knownNpc.disposition,
+    },
+  })
+  gs.addLogEntry({
+    round: gs.getState().round,
+    turn: gs.getState().currentTurn ?? 'player',
+    action: `${gs.getPlayer().name} interroge ${knownNpc.name}`,
+    mechanicalDetail: hostileRefusal ? 'Information refusee.' : information,
+  })
+  recordActionIfCombat()
+  return jsonResponse({
+    success: !hostileRefusal,
+    npc: knownNpc,
+    information: hostileRefusal ? null : information,
+    mechanicalSummary: hostileRefusal ? `${knownNpc.name} refuse de repondre.` : information,
+  })
+}
+
+function dispositionAfterPersuasion(npc: WorldNpcState, success: boolean): WorldNpcDisposition {
+  if (success) {
+    if (npc.disposition === 'hostile') return 'wary'
+    if (npc.disposition === 'wary' || npc.disposition === 'neutral') return 'helpful'
+    if (npc.disposition === 'offended') return 'neutral'
+    return npc.disposition
+  }
+  if (npc.disposition === 'helpful') return 'neutral'
+  if (npc.disposition === 'neutral') return 'wary'
+  if (npc.disposition === 'wary') return 'offended'
+  return npc.disposition
+}
+
+function resolvePersuadeAction({
+  npcId,
+  targetName,
+  topic,
+  dc,
+}: {
+  npcId?: string
+  targetName?: string
+  topic?: string
+  dc?: number
 }): ToolResponse {
   const availabilityError = assertWorldActionAvailable()
   if (availabilityError) return availabilityError
@@ -1306,7 +1741,46 @@ function resolveThreatenAction({
   if ('content' in npc) return npc
 
   const before = structuredClone(npc)
-  const check = rollPlayerWorldCheck('cha', 13, `Intimidation: ${npc.name}`, true)
+  const targetDc = dc ?? (npc.disposition === 'hostile' ? 15 : npc.disposition === 'offended' ? 14 : 12)
+  const check = rollPlayerWorldCheck('cha', targetDc, `Persuasion: ${npc.name}`, true)
+  const nextDisposition = dispositionAfterPersuasion(npc, Boolean(check.success))
+  const after = gs.updateNpcDisposition(npc.id, nextDisposition)
+  gs.updateNpcMemory(npc.id, { lastPersuasionTopic: topic ?? 'general' })
+  recordNpcDispositionChange(before, after, check)
+  recordActionIfCombat()
+
+  return jsonResponse({
+    success: Boolean(check.success),
+    npc: after,
+    check,
+    mechanicalSummary: `${check.mechanicalSummary} | disposition ${before.disposition} -> ${after.disposition}`,
+  })
+}
+
+function resolveThreatenAction({
+  npcId,
+  targetName,
+  demand,
+  dc,
+}: {
+  npcId?: string
+  targetName?: string
+  demand?: string
+  dc?: number
+}): ToolResponse {
+  const availabilityError = assertWorldActionAvailable()
+  if (availabilityError) return availabilityError
+
+  let npc: WorldNpcState | ToolResponse
+  try {
+    npc = resolveWorldNpcTarget({ npcId, targetName, includeUnknown: true })
+  } catch (err) {
+    return rules.ruleErrorResult(err)
+  }
+  if ('content' in npc) return npc
+
+  const before = structuredClone(npc)
+  const check = rollPlayerWorldCheck('cha', dc ?? 13, `Intimidation: ${npc.name}`, true)
   const nextDisposition: WorldNpcDisposition = check.success
     ? npc.disposition === 'hostile' ? 'wary' : 'offended'
     : 'hostile'
@@ -1338,6 +1812,136 @@ function resolveThreatenAction({
     check,
     alarm,
     mechanicalSummary: `${check.mechanicalSummary} | disposition ${before.disposition} -> ${after.disposition}${alarm ? ` | alerte ${alarm.level}` : ''}`,
+  })
+}
+
+function resolveShowItemAction({
+  npcId,
+  targetName,
+  itemId,
+  itemName,
+}: {
+  npcId?: string
+  targetName?: string
+  itemId?: string
+  itemName?: string
+}): ToolResponse {
+  const availabilityError = assertWorldActionAvailable()
+  if (availabilityError) return availabilityError
+
+  let npc: WorldNpcState | ToolResponse
+  let item: Item | ToolResponse
+  try {
+    npc = resolveWorldNpcTarget({ npcId, targetName, includeUnknown: true })
+    if ('content' in npc) return npc
+    item = resolveInventoryItemTarget({ itemId, itemName })
+  } catch (err) {
+    return rules.ruleErrorResult(err)
+  }
+  if ('content' in item) return item
+
+  const before = structuredClone(npc)
+  const relevantRecipe = normalizeFrenchText(item.name).includes('recette') || item.id.includes('recipe_half')
+  const after = relevantRecipe && npc.disposition === 'neutral'
+    ? gs.updateNpcDisposition(npc.id, 'helpful')
+    : gs.updateNpcMemory(npc.id, { [`saw_${item.id}`]: true })
+  if ('disposition' in after) recordNpcDispositionChange(before, after)
+
+  const information = revealNpcInformation(after, item.name, 'show')
+  gs.recordWorldEvent({
+    type: 'item.shown',
+    summary: `${item.name} est montre a ${after.name}.`,
+    actorId: 'player',
+    targetId: item.id,
+    outcome: 'success',
+    metadata: {
+      npcId: after.id,
+      npcDisposition: after.disposition,
+      information,
+    },
+  })
+  if (information) {
+    gs.recordWorldEvent({
+      type: 'npc.information_revealed',
+      summary: information,
+      actorId: 'player',
+      targetId: after.id,
+      outcome: 'success',
+      metadata: {
+        itemId: item.id,
+        source: 'show_item',
+      },
+    })
+  }
+  recordActionIfCombat()
+  return jsonResponse({
+    success: true,
+    npc: after,
+    item,
+    information,
+    mechanicalSummary: `${item.name} montre a ${after.name}.`,
+  })
+}
+
+function resolveGiveItemAction({
+  npcId,
+  targetName,
+  itemId,
+  itemName,
+}: {
+  npcId?: string
+  targetName?: string
+  itemId?: string
+  itemName?: string
+}): ToolResponse {
+  const availabilityError = assertWorldActionAvailable()
+  if (availabilityError) return availabilityError
+
+  let npc: WorldNpcState | ToolResponse
+  let item: Item | ToolResponse
+  try {
+    npc = resolveWorldNpcTarget({ npcId, targetName, includeUnknown: true })
+    if ('content' in npc) return npc
+    item = resolveInventoryItemTarget({ itemId, itemName })
+  } catch (err) {
+    return rules.ruleErrorResult(err)
+  }
+  if ('content' in item) return item
+
+  const removed = gs.consumePlayerItem(candidate => candidate.id === item.id)
+  if (!removed) {
+    return blockedAction('INVENTORY_ITEM_NOT_FOUND', 'The item disappeared before it could be given.', {
+      itemId: item.id,
+    })
+  }
+
+  const before = structuredClone(npc)
+  const after = npc.disposition === 'hostile'
+    ? gs.updateNpcDisposition(npc.id, 'wary')
+    : npc.disposition === 'neutral' || npc.disposition === 'wary'
+      ? gs.updateNpcDisposition(npc.id, 'helpful')
+      : gs.updateNpcMemory(npc.id, { [`received_${removed.id}`]: true })
+  recordNpcDispositionChange(before, after)
+
+  gs.recordWorldEvent({
+    type: 'item.given',
+    summary: `${removed.name} est donne a ${after.name}.`,
+    actorId: 'player',
+    targetId: removed.id,
+    outcome: 'success',
+    metadata: {
+      npcId: after.id,
+      npcDisposition: after.disposition,
+      inventoryIdsAfter: gs.getPlayer().inventory.map(candidate => candidate.id),
+    },
+  })
+  recordActionIfCombat()
+  return jsonResponse({
+    success: true,
+    npc: after,
+    item: removed,
+    inventoryIds: gs.getPlayer().inventory.map(candidate => candidate.id),
+    mechanicalSummary: `${removed.name} donne a ${after.name}.`,
   })
 }
 
@@ -1426,38 +2030,54 @@ function resolveHelpAction({
     })
   }
 
-  gs.setWorldFlag(`helping_${targetId ?? normalizeFrenchText(targetName ?? 'unknown').replace(/\s+/g, '_')}`, true)
+  let npc: WorldNpcState | ToolResponse
+  try {
+    npc = resolveWorldNpcTarget({ npcId: targetId, targetName, includeUnknown: true })
+  } catch (err) {
+    return rules.ruleErrorResult(err)
+  }
+  if ('content' in npc) return npc
+
+  const helpedNpc = gs.updateNpcMemory(npc.id, { helpedByPlayer: true })
+  gs.setWorldFlag(`helping_${helpedNpc.id}`, true)
   gs.recordWorldEvent({
     type: 'state.changed',
-    summary: 'Le joueur se met en position d aider.',
+    summary: `Le joueur aide ${helpedNpc.name}.`,
     actorId: 'player',
-    targetId: targetId ?? targetName,
+    targetId: helpedNpc.id,
     outcome: 'success',
     metadata: {
-      targetId,
-      targetName,
+      npcDisposition: helpedNpc.disposition,
     },
   })
   recordActionIfCombat()
   return jsonResponse({
     success: true,
-    targetId,
-    targetName,
-    mechanicalSummary: `Aide preparee pour ${targetName ?? targetId ?? 'une cible'}`,
+    npc: helpedNpc,
+    mechanicalSummary: `Aide preparee pour ${helpedNpc.name}`,
   })
 }
 
 function resolveStabilizeAction(targetId?: string): ToolResponse {
+  const resolvedTarget = targetId ?? 'player'
+  const player = gs.getPlayer()
+  if (resolvedTarget === 'player' && (player.hp.current <= 0 || player.conditions.includes('unconscious'))) {
+    return blockedAction('SELF_STABILIZE_UNSUPPORTED', 'An unconscious player cannot stabilize themselves; use a death save or help from another actor.', {
+      targetId: resolvedTarget,
+      hp: player.hp,
+      conditions: player.conditions,
+      suggestedAction: 'death_save',
+    })
+  }
+
   const availabilityError = assertWorldActionAvailable()
   if (availabilityError) return availabilityError
 
-  const resolvedTarget = targetId ?? 'player'
   if (resolvedTarget !== 'player') {
     return blockedAction('STABILIZE_TARGET_UNSUPPORTED', 'Only the player can currently be stabilized by this lightweight world engine.', {
       targetId: resolvedTarget,
     })
   }
-  const player = gs.getPlayer()
   if (player.hp.current > 0) {
     return blockedAction('TARGET_NOT_DYING', 'The target is conscious and does not need stabilization.', {
       targetId: resolvedTarget,
@@ -1506,7 +2126,20 @@ function resolveUseObjectAction({
   let hpDamage = 0
   let alarm = undefined
 
-  if (updated.kind === 'trap' || updated.tags?.includes('trap')) {
+  if ((updated.kind === 'trap' || updated.tags?.includes('trap')) && updated.disarmed) {
+    gs.recordWorldEvent({
+      type: 'object.used',
+      summary: `${updated.name} est manipule sans danger: le piege est desamorce.`,
+      actorId: 'player',
+      targetId: updated.id,
+      outcome: 'success',
+      metadata: {
+        roomId: updated.roomId,
+        disarmed: true,
+        useType,
+      },
+    })
+  } else if (updated.kind === 'trap' || updated.tags?.includes('trap')) {
     const damageRoll = rollDice('1d6')
     hpDamage = damageRoll.total
     gs.updatePlayerHP(-hpDamage)
@@ -1570,10 +2203,71 @@ function resolveUseObjectAction({
   })
 }
 
+function resolveCombineRecipeAction(): ToolResponse {
+  const availabilityError = assertWorldActionAvailable()
+  if (availabilityError) return availabilityError
+
+  const world = gs.getWorldState()
+  const recipeQuest = world.quests.grammy_recipe
+  const recipeHalves = Object.values(world.objects).filter(object => object.tags?.includes('recipe_half'))
+  const takenHalfIds = recipeHalves.filter(object => object.taken).map(object => object.id)
+  const inventoryIds = new Set(gs.getPlayer().inventory.map(item => item.id))
+  const ownedHalfIds = recipeHalves
+    .filter(object => object.taken || inventoryIds.has(object.id))
+    .map(object => object.id)
+  const hasBothHalves = ownedHalfIds.length >= 2 || recipeQuest?.progress >= 2
+
+  if (!hasBothHalves) {
+    return blockedAction('RECIPE_INCOMPLETE', 'The recipe cannot be combined before both halves are found by the engine.', {
+      ownedHalfIds,
+      takenHalfIds,
+      questProgress: recipeQuest?.progress ?? 0,
+      questGoal: recipeQuest?.goal ?? 2,
+    })
+  }
+
+  if (recipeQuest?.completed && recipeQuest.flags?.recipe_combined) {
+    return jsonResponse({
+      success: true,
+      quest: recipeQuest,
+      mechanicalSummary: 'La recette est deja assemblee.',
+    })
+  }
+
+  const quest = gs.completeWorldQuest('grammy_recipe', 'recipe_combined')
+  gs.recordWorldEvent({
+    type: 'quest.completed',
+    summary: 'Les deux moities de recette sont assemblees.',
+    actorId: 'player',
+    targetId: quest.id,
+    outcome: 'success',
+    metadata: {
+      questId: quest.id,
+      ownedHalfIds,
+      progress: quest.progress,
+      goal: quest.goal,
+      completed: quest.completed,
+    },
+  })
+  const state = gs.getState()
+  state.sceneMemory = {
+    ...(state.sceneMemory ?? {}),
+    foundRecipeHalfCount: quest.progress,
+    updatedAt: new Date().toISOString(),
+  }
+  recordActionIfCombat()
+  return jsonResponse({
+    success: true,
+    quest,
+    ownedHalfIds,
+    mechanicalSummary: `Recette assemblee: ${quest.progress}/${quest.goal}.`,
+  })
+}
+
 export function registerActionTools(server: McpServer): void {
   server.tool(
     'resolve_player_action',
-    'Canonical player action facade. Use one compact action: attack, move, search, open, take, unlock, force, talk, threaten, hide, help, flee, stabilize, use_object, ability_check, social, use_item, wait, or death_save. The engine validates legality, mutates state, records canonical events, and returns the authoritative result.',
+    'Canonical player action facade. Use one compact action: attack, move, examine, read, search, open, take, unlock, force, disarm, talk, ask, persuade, threaten, show_item, give_item, hide, help, flee, stabilize, use_object, combine_recipe, ability_check, social, use_item, wait, or death_save. The engine validates legality, mutates state, records canonical events, and returns the authoritative result.',
     {
       action: PlayerActionSchema.describe('Compact player action to resolve through the rules engine.'),
     },
@@ -1596,6 +2290,19 @@ export function registerActionTools(server: McpServer): void {
 
         case 'interact':
           return wrapActionResult('interact', 'trigger_room_event', resolveRoomInteraction(action.roomId, action.eventType, action.description))
+
+        case 'examine':
+          return wrapActionResult('examine', 'world.examine', resolveExamineAction({
+            targetId: action.targetId,
+            targetName: action.targetName,
+            query: action.query,
+          }))
+
+        case 'read':
+          return wrapActionResult('read', 'world.read', resolveReadAction({
+            targetId: action.targetId,
+            targetName: action.targetName,
+          }))
 
         case 'search':
           return wrapActionResult('search', 'world.search', resolveSearchAction({
@@ -1632,6 +2339,13 @@ export function registerActionTools(server: McpServer): void {
             targetName: action.targetName,
           }))
 
+        case 'disarm':
+          return wrapActionResult('disarm', 'world.disarm', resolveDisarmAction({
+            targetId: action.targetId,
+            targetName: action.targetName,
+            dc: action.dc,
+          }))
+
         case 'talk':
           return wrapActionResult('talk', 'world.talk', resolveTalkAction({
             npcId: action.npcId,
@@ -1639,11 +2353,43 @@ export function registerActionTools(server: McpServer): void {
             topic: action.topic,
           }))
 
+        case 'ask':
+          return wrapActionResult('ask', 'world.ask', resolveAskAction({
+            npcId: action.npcId,
+            targetName: action.targetName,
+            topic: action.topic,
+          }))
+
+        case 'persuade':
+          return wrapActionResult('persuade', 'world.persuade', resolvePersuadeAction({
+            npcId: action.npcId,
+            targetName: action.targetName,
+            topic: action.topic,
+            dc: action.dc,
+          }))
+
         case 'threaten':
           return wrapActionResult('threaten', 'world.threaten', resolveThreatenAction({
             npcId: action.npcId,
             targetName: action.targetName,
             demand: action.demand,
+            dc: action.dc,
+          }))
+
+        case 'show_item':
+          return wrapActionResult('show_item', 'world.show_item', resolveShowItemAction({
+            npcId: action.npcId,
+            targetName: action.targetName,
+            itemId: action.itemId,
+            itemName: action.itemName,
+          }))
+
+        case 'give_item':
+          return wrapActionResult('give_item', 'world.give_item', resolveGiveItemAction({
+            npcId: action.npcId,
+            targetName: action.targetName,
+            itemId: action.itemId,
+            itemName: action.itemName,
           }))
 
         case 'hide':
@@ -1667,6 +2413,9 @@ export function registerActionTools(server: McpServer): void {
             targetName: action.targetName,
             useType: action.useType,
           }))
+
+        case 'combine_recipe':
+          return wrapActionResult('combine_recipe', 'world.combine_recipe', resolveCombineRecipeAction())
 
         case 'ability_check':
           return wrapActionResult('ability_check', 'roll_ability_check', resolveAbilityCheck({

@@ -232,6 +232,58 @@ function summarizeClientGameState(state: GameState): Record<string, unknown> {
   }
 }
 
+function summarizeClientWorldDebug(state: GameState): Record<string, unknown> | null {
+  if (!state.world) return null
+
+  const currentRoom = state.currentRoomId ? state.world.rooms?.[state.currentRoomId] : undefined
+  const roomObjects = Object.values(state.world.objects ?? {})
+    .filter(object => object.roomId === state.currentRoomId)
+    .map(object => ({
+      id: object.id,
+      name: object.name,
+      kind: object.kind,
+      visible: object.visible,
+      discovered: object.discovered,
+      opened: object.opened,
+      locked: object.locked,
+      taken: object.taken,
+      used: object.used,
+      disarmed: object.disarmed,
+      tags: object.tags,
+    }))
+  const roomNpcs = Object.values(state.world.npcs ?? {})
+    .filter(npc => npc.roomId === state.currentRoomId)
+    .map(npc => ({
+      id: npc.id,
+      name: npc.name,
+      disposition: npc.disposition,
+      known: npc.known,
+      memory: npc.memory,
+      tags: npc.tags,
+    }))
+
+  return {
+    currentRoom: currentRoom ? {
+      id: currentRoom.id,
+      name: currentRoom.name,
+      tags: currentRoom.tags,
+      exits: currentRoom.exits,
+    } : state.currentRoomId,
+    roomObjects,
+    roomNpcs,
+    quests: state.world.quests,
+    alarms: state.world.alarms,
+    flags: state.world.flags,
+    lastEvents: state.world.eventLog.slice(-8).map(event => ({
+      type: event.type,
+      outcome: event.outcome,
+      targetId: event.targetId,
+      summary: truncateClientText(event.summary, 180),
+      metadata: event.metadata,
+    })),
+  }
+}
+
 function readClientDebugLog(): ClientDebugEntry[] {
   try {
     const raw = localStorage.getItem(CLIENT_DEBUG_LOG_KEY)
@@ -460,6 +512,7 @@ export default function GamePage() {
         usage: data.usage,
         summaryContextLength: data.summaryContext?.length ?? 0,
         gameState: data.newGameState ? summarizeClientGameState(data.newGameState) : null,
+        worldDebug: data.newGameState ? summarizeClientWorldDebug(data.newGameState) : null,
       })
       syncClientDebugLog(activeSessionId).catch(err => {
         console.error('Failed to sync client debug log:', err)

@@ -133,11 +133,35 @@ test('game action language routes local objects to canonical world actions', () 
   assert.deepEqual(intent.suggestedTools, ['resolve_player_action'])
 })
 
-test('game action language routes conversational NPC asks to canonical talk', () => {
+test('game action language routes conversational NPC asks to canonical ask', () => {
   const intent = actions.classifyPlayerAction('je parle gentiment a Mac pour lui demander ce qu il sait', baseGameState())
-  assert.equal(intent.kind, 'talk')
+  assert.equal(intent.kind, 'ask')
   assert.equal(intent.primitive, 'world_action')
   assert.deepEqual(intent.suggestedTools, ['resolve_player_action'])
+})
+
+test('game action language routes natural world verbs and anaphora to canonical actions', () => {
+  const state = baseGameState({ currentRoomId: '5' })
+  const cases = [
+    ['je regarde', 'examine'],
+    ['je lis le papier', 'read'],
+    ["je l'ouvre", 'open'],
+    ['je le prends', 'take'],
+    ['je crochette la serrure', 'unlock'],
+    ['je desamorce le piege', 'disarm'],
+    ['je montre la recette a Mac', 'show_item'],
+    ['je donne la note a Grukk', 'give_item'],
+    ['je persuade la dryade de nous aider', 'persuade'],
+    ['je lui demande ou est la recette', 'ask'],
+    ['j assemble les deux fragments de recette', 'combine_recipe'],
+  ]
+
+  for (const [message, expectedKind] of cases) {
+    const intent = actions.classifyPlayerAction(message, state)
+    assert.equal(intent.kind, expectedKind, message)
+    assert.equal(intent.primitive, 'world_action', message)
+    assert.deepEqual(intent.suggestedTools, ['resolve_player_action'], message)
+  }
 })
 
 test('game action language routes coordinate phrases with vais as movement', () => {

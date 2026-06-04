@@ -11,18 +11,26 @@ export type GameActionKind =
   | 'attack'
   | 'move'
   | 'interact'
+  | 'examine'
+  | 'read'
   | 'search'
   | 'open'
   | 'take'
   | 'unlock'
   | 'force'
+  | 'disarm'
   | 'talk'
+  | 'ask'
+  | 'persuade'
   | 'threaten'
+  | 'show_item'
+  | 'give_item'
   | 'hide'
   | 'help'
   | 'flee'
   | 'stabilize'
   | 'use_object'
+  | 'combine_recipe'
   | 'use_item'
   | 'ability_check'
   | 'social'
@@ -184,25 +192,81 @@ export function classifyPlayerAction(message: string, gameState: GameState): Gam
     })
   }
 
+  const anaphoricReadIntent = /\b(?:le lis|la lis|l[' ]?etudies?|l[' ]?examine|lis[- ]?le|lis[- ]?la|je lis ca|dechiffre ca)\b/.test(text)
+  const readIntent = (
+    /\b(lis|lire|lecture|dechiffres?|dechiffrer|etudies?|etudier)\b/.test(text) &&
+    /\b(recette|fragment|moitie|papier|parchemin|note|registre|livre|bon|lettre|ordre)\b/.test(text)
+  ) || anaphoricReadIntent
+  const combineRecipeIntent = /\b(assembles?|assembler|combines?|combiner|reconstitues?|reconstituer|recouds?|recoller|complete|completer|utilises?|utiliser)\b/.test(text) &&
+    /\b(recette|fragments?|moities?|deux morceaux)\b/.test(text)
   const searchIntent = /\b(fouilles?|fouiller|cherches?|chercher|inspectes?|inspecter|examines?|examiner|regardes?|regarder)\b/.test(text) &&
-    /\b(piece|salle|bureau|tiroirs?|coffres?|armoires?|placards?|etagere|recette|indices?|cachette|reserve|four|objets?)\b/.test(text)
+    /\b(partout|piece|salle|bureau|tiroirs?|coffres?|armoires?|placards?|etagere|recette|indices?|cachette|reserve|four|objets?|caisses?|sacs?|farine|appartement)\b/.test(text)
+  const examineIntent = /\b(observes?|observer|regardes?|regarder|inspectes?|inspecter|examines?|examiner|decris|decrire|ecoutes?|ecouter)\b/.test(text) &&
+    (
+      /\b(porte|tiroir|coffre|armoire|four|couteaux?|champignons?|papier|registre|note|salle|piece|bureau|appartement|quai|verger|objet|caisses?|sacs?)\b/.test(text) ||
+      /\b(autour|alentours|ici|la piece|la salle|ce lieu|decor)\b/.test(text) ||
+      /^(?:je |j[' ])?(?:regarde|observe|inspecte|ecoute)\.?$/.test(text)
+    )
   const unlockIntent = /\b(crochetes?|crocheter|deverrouilles?|deverrouiller|deverouille|serrure)\b/.test(text)
   const forceObjectIntent = /\b(forces?|forcer|enfonces?|enfoncer|defonces?|defoncer|casses?|casser)\b/.test(text) &&
     /\b(porte|tiroir|coffre|armoire|serrure|verrou)\b/.test(text)
-  const openIntent = /\b(ouvres?|ouvrir|entrouvres?|soulever|souleves?)\b/.test(text) &&
-    /\b(porte|tiroir|coffre|armoire|four|couvercle|placard)\b/.test(text)
-  const takeWorldObjectIntent = /\b(prends?|prendre|ramasses?|ramasser|recuperes?|recuperer|empoches?|empocher|saisis|attrapes?|attraper)\b/.test(text) &&
+  const disarmIntent = /\b(desamorces?|desamorcer|desactives?|desactiver|neutralises?|neutraliser|securises?|securiser)\b/.test(text) &&
+    /\b(piege|champignons?|couteaux?|ratelier|mecanisme)\b/.test(text)
+  const anaphoricOpenIntent = /\b(?:l[' ]?ouvres?|ouvre[- ]?(?:le|la|ca)|j[' ]?ouvre ca|je l ouvre)\b/.test(text)
+  const openIntent = (
+    /\b(ouvres?|ouvrir|entrouvres?|soulever|souleves?)\b/.test(text) &&
+    /\b(porte|tiroir|coffre|armoire|four|couvercle|placard|sacs?|farine)\b/.test(text)
+  ) || anaphoricOpenIntent
+  const anaphoricTakeIntent = /\b(?:le prends|la prends|l[' ]?attrapes?|l[' ]?empoches?|prends ca|ramasse ca|recupere ca|reprends ca)\b/.test(text)
+  const takeWorldObjectIntent = (
+    /\b(prends?|prendre|reprends?|reprendre|ramasses?|ramasser|recuperes?|recuperer|empoches?|empocher|saisis|attrapes?|attraper)\b/.test(text) &&
     /\b(recette|fragment|moitie|indice|objet|papier|parchemin|cle|clef|potion|lettre)\b/.test(text)
-  const talkIntent = /\b(parles?|parler|discutes?|discuter|demandes?|demander|questionnes?|questionner|adresses?|adresser)\b/.test(text) &&
+  ) || anaphoricTakeIntent
+  const showItemIntent = /\b(montres?|montrer|presente|presentes|brandis|tends)\b/.test(text) &&
+    /\b(recette|fragment|papier|parchemin|note|cle|clef|objet|potion)\b/.test(text)
+  const giveItemIntent = /\b(donnes?|donner|offres?|offrir|tends|remets?|remettre|confies?|confier)\b/.test(text) &&
+    /\b(recette|fragment|papier|parchemin|note|cle|clef|objet|potion)\b/.test(text)
+  const anaphoricTalkIntent = /\b(?:lui parle|parle[- ]?lui|je lui parle|je discute avec lui|je discute avec elle)\b/.test(text)
+  const anaphoricAskIntent = /\b(?:je lui demande|demande[- ]?lui|je l interroge|interroge[- ]?le|interroge[- ]?la)\b/.test(text)
+  const talkIntent = (
+    /\b(parles?|parler|discutes?|discuter|demandes?|demander|questionnes?|questionner|adresses?|adresser)\b/.test(text) &&
     /\b(mac|pommier|treant|arbre|gobelins?|grukk|grammy|pnj|personne|lui|elle|eux|druidesse)\b/.test(text)
+  ) || anaphoricTalkIntent
+  const askIntent = (
+    /\b(demandes?|demander|questionnes?|questionner|interroges?|interroger)\b/.test(text) &&
+    /\b(mac|pommier|treant|arbre|gobelins?|grukk|grammy|pnj|personne|lui|elle|eux|druidesse|dryade)\b/.test(text)
+  ) || anaphoricAskIntent
+  const persuadeIntent = /\b(persuades?|persuader|convaincs?|convaincre|negocies?|negocier|rassures?|rassurer|baratines?|baratiner)\b/.test(text)
   const threatenIntent = /\b(menaces?|menacer|intimides?|intimider|pression|fais peur|soumet|soumission|rends toi|rendez vous)\b/.test(text)
-  const hideIntent = /\b(caches?|cacher|planques?|planquer|discretion|furtif|furtivement)\b/.test(text)
+  const hideIntent = /\b(caches?|cacher|planques?|planquer|discretion|furtif|furtivement|faufiles?|faufiler|sneak|sneaky)\b/.test(text)
   const fleeIntent = /\b(fuis|fuir|fuite|s enfuir|s'enfuir|retraite|bats en retraite|deguerpis)\b/.test(text)
   const helpIntent = /\b(aides?|aider|assistes?|assister|donnes? un coup de main)\b/.test(text)
   const stabilizeIntent = /\b(stabilises?|stabiliser|premiers secours|medecine|soignes?|soigner)\b/.test(text) &&
     /\b(moi|joueur|heros|allie|blesse|inconscient|agonisant)\b/.test(text)
   const useWorldObjectIntent = /\b(utilises?|utiliser|actives?|activer|touches?|toucher|manipules?|manipuler|declenches?|declencher)\b/.test(text) &&
-    /\b(four|levier|piege|champignons?|objet|runes?|mecanisme)\b/.test(text)
+    /\b(four|levier|piege|champignons?|objet|runes?|mecanisme|ratelier|couteaux?)\b/.test(text)
+
+  if (readIntent) {
+    return intent(text, {
+      kind: 'read',
+      primitive: 'world_action',
+      reason: 'world-read-intent',
+      requiresEngine: true,
+      suggestedTools: ['resolve_player_action'],
+      confidence: 'high',
+    })
+  }
+
+  if (combineRecipeIntent) {
+    return intent(text, {
+      kind: 'combine_recipe',
+      primitive: 'world_action',
+      reason: 'world-combine-recipe-intent',
+      requiresEngine: true,
+      suggestedTools: ['resolve_player_action'],
+      confidence: 'high',
+    })
+  }
 
   if (searchIntent) {
     return intent(text, {
@@ -220,6 +284,17 @@ export function classifyPlayerAction(message: string, gameState: GameState): Gam
       kind: 'unlock',
       primitive: 'world_action',
       reason: 'world-unlock-intent',
+      requiresEngine: true,
+      suggestedTools: ['resolve_player_action'],
+      confidence: 'high',
+    })
+  }
+
+  if (disarmIntent) {
+    return intent(text, {
+      kind: 'disarm',
+      primitive: 'world_action',
+      reason: 'world-disarm-intent',
       requiresEngine: true,
       suggestedTools: ['resolve_player_action'],
       confidence: 'high',
@@ -259,11 +334,55 @@ export function classifyPlayerAction(message: string, gameState: GameState): Gam
     })
   }
 
+  if (giveItemIntent) {
+    return intent(text, {
+      kind: 'give_item',
+      primitive: 'world_action',
+      reason: 'world-give-item-intent',
+      requiresEngine: true,
+      suggestedTools: ['resolve_player_action'],
+      confidence: 'high',
+    })
+  }
+
+  if (showItemIntent) {
+    return intent(text, {
+      kind: 'show_item',
+      primitive: 'world_action',
+      reason: 'world-show-item-intent',
+      requiresEngine: true,
+      suggestedTools: ['resolve_player_action'],
+      confidence: 'high',
+    })
+  }
+
   if (threatenIntent) {
     return intent(text, {
       kind: 'threaten',
       primitive: 'world_action',
       reason: 'world-threaten-intent',
+      requiresEngine: true,
+      suggestedTools: ['resolve_player_action'],
+      confidence: 'high',
+    })
+  }
+
+  if (persuadeIntent) {
+    return intent(text, {
+      kind: 'persuade',
+      primitive: 'world_action',
+      reason: 'world-persuade-intent',
+      requiresEngine: true,
+      suggestedTools: ['resolve_player_action'],
+      confidence: 'high',
+    })
+  }
+
+  if (askIntent) {
+    return intent(text, {
+      kind: 'ask',
+      primitive: 'world_action',
+      reason: 'world-ask-intent',
       requiresEngine: true,
       suggestedTools: ['resolve_player_action'],
       confidence: 'high',
@@ -278,6 +397,17 @@ export function classifyPlayerAction(message: string, gameState: GameState): Gam
       requiresEngine: true,
       suggestedTools: ['resolve_player_action'],
       confidence: 'high',
+    })
+  }
+
+  if (examineIntent) {
+    return intent(text, {
+      kind: 'examine',
+      primitive: 'world_action',
+      reason: 'world-examine-intent',
+      requiresEngine: true,
+      suggestedTools: ['resolve_player_action'],
+      confidence: 'medium',
     })
   }
 
@@ -456,7 +586,7 @@ export function classifyPlayerAction(message: string, gameState: GameState): Gam
 export function describeGameActionLanguageForPrompt(): string {
   return [
     'Le joueur peut dire n importe quoi, mais le moteur ne connait qu un petit langage d actions.',
-    'Primitives: attack, move, search, open, take, unlock, force, talk, threaten, hide, help, flee, stabilize, use_object, interact, use_item, ability_check, social, wait, death_save, query_state, observe.',
+    'Primitives: attack, move, examine, read, search, open, take, unlock, force, disarm, talk, ask, persuade, threaten, show_item, give_item, hide, help, flee, stabilize, use_object, combine_recipe, interact, use_item, ability_check, social, wait, death_save, query_state, observe.',
     'Quand le tool resolve_player_action est disponible, utilise-le comme facade canonique pour toute action joueur qui mute le monde.',
     'Ton role: traduire l intention vers une primitive autorisee, appeler le tool correspondant si un etat doit changer, puis narrer seulement les evenements renvoyes par le moteur.',
     'N invente jamais une nouvelle primitive ad hoc. Si l intention est creative, ramene-la a use_object, ability_check ou social avec une cible et un risque clairs.',

@@ -32,6 +32,13 @@ function affordance(fields: PlayerAffordance): PlayerAffordance {
   return fields
 }
 
+function isObjectOpenable(object: { kind: string; opened?: boolean; locked?: boolean }): boolean {
+  return object.kind === 'door' ||
+    object.kind === 'container' ||
+    object.opened !== undefined ||
+    object.locked !== undefined
+}
+
 export function derivePlayerAffordances(gameState: GameState): PlayerAffordance[] {
   const affordances: PlayerAffordance[] = []
   const playerDown = gameState.player.hp.current <= 0 || gameState.player.conditions.includes('unconscious')
@@ -259,7 +266,7 @@ export function derivePlayerAffordances(gameState: GameState): PlayerAffordance[
   const hiddenObjects = objects.filter(object => !object.visible || !object.discovered)
   const visibleObjects = objects.filter(object => object.visible || object.discovered)
   const unopenedObjects = visibleObjects.filter(object =>
-    ['door', 'container', 'fixture'].includes(object.kind) &&
+    isObjectOpenable(object) &&
     object.opened !== true
   )
   const takeableObjects = visibleObjects.filter(object =>
@@ -269,6 +276,31 @@ export function derivePlayerAffordances(gameState: GameState): PlayerAffordance[
   const usableObjects = visibleObjects.filter(object =>
     ['fixture', 'trap'].includes(object.kind)
   )
+  const inventoryIds = new Set(gameState.player.inventory.map(item => item.id))
+  const readableObjects = visibleObjects.filter(object =>
+    Boolean(object.readableText || object.tags?.includes('readable'))
+  )
+  const readableInventoryObjects = Object.values(gameState.world?.objects ?? {}).filter(object =>
+    inventoryIds.has(object.id) &&
+    Boolean(object.readableText || object.tags?.includes('readable')) &&
+    !readableObjects.some(visibleObject => visibleObject.id === object.id)
+  )
+  const disarmableTraps = visibleObjects.filter(object =>
+    object.kind === 'trap' && object.disarmed !== true
+  )
+  const recipeQuest = gameState.world?.quests.grammy_recipe
+  const ownedRecipeHalves = Object.values(gameState.world?.objects ?? {})
+    .filter(object => object.tags?.includes('recipe_half') && (object.taken || inventoryIds.has(object.id)))
+  const recipeAlreadyCombined = Boolean(recipeQuest?.flags?.recipe_combined || gameState.world?.flags?.recipe_combined)
+
+  affordances.push(affordance({
+    id: 'world-examine-current-room',
+    kind: 'examine',
+    label: 'Examiner sans muter',
+    enabled: true,
+    reason: 'Examiner produit un event moteur sans inventer de decouverte cachee.',
+    toolName: 'resolve_player_action',
+  }))
 
   affordances.push(affordance({
     id: 'world-search-current-room',
@@ -280,6 +312,17 @@ export function derivePlayerAffordances(gameState: GameState): PlayerAffordance[
       : 'Une fouille peut confirmer qu aucun element cache connu du moteur n est trouve.',
     toolName: 'resolve_player_action',
   }))
+
+  for (const object of [...readableObjects, ...readableInventoryObjects]) {
+    affordances.push(affordance({
+      id: `world-read-${object.id}`,
+      kind: 'read',
+      label: `Lire ${object.name}`,
+      enabled: true,
+      reason: 'Indice lisible visible ou deja revele.',
+      toolName: 'resolve_player_action',
+    }))
+  }
 
   for (const object of unopenedObjects) {
     affordances.push(affordance({
@@ -336,6 +379,17 @@ export function derivePlayerAffordances(gameState: GameState): PlayerAffordance[
     }))
   }
 
+  for (const object of disarmableTraps) {
+    affordances.push(affordance({
+      id: `world-disarm-${object.id}`,
+      kind: 'disarm',
+      label: `Desamorcer ${object.name}`,
+      enabled: true,
+      reason: 'Piege visible et pas encore desamorce.',
+      toolName: 'resolve_player_action',
+    }))
+  }
+
   for (const npc of npcs.filter(npc => npc.known)) {
     affordances.push(
       affordance({
@@ -347,6 +401,24 @@ export function derivePlayerAffordances(gameState: GameState): PlayerAffordance[
         toolName: 'resolve_player_action',
       }),
       affordance({
+        id: `world-ask-${npc.id}`,
+        kind: 'ask',
+        label: `Questionner ${npc.name}`,
+        enabled: true,
+        reason: 'Demander une information produit un event social explicite.',
+        toolName: 'resolve_player_action',
+      }),
+      affordance({
+        id: `world-persuade-${npc.id}`,
+        kind: 'persuade',
+        label: `Convaincre ${npc.name}`,
+        enabled: npc.disposition !== 'helpful',
+        reason: npc.disposition === 'helpful'
+          ? 'Le PNJ est deja utile; demander une information suffit.'
+          : 'Changer une disposition doit passer par un check moteur.',
+        toolName: 'resolve_player_action',
+      }),
+      affordance({
         id: `world-threaten-${npc.id}`,
         kind: 'threaten',
         label: `Menacer ${npc.name}`,
@@ -355,9 +427,42 @@ export function derivePlayerAffordances(gameState: GameState): PlayerAffordance[
           ? 'Menacer un allie utile serait incoherent sans intention plus claire.'
           : 'Une menace doit produire un check social et un event de disposition/alerte.',
         toolName: 'resolve_player_action',
+      }),
+      affordance({
+        id: `world-show-item-${npc.id}`,
+        kind: 'show_item',
+        label: `Montrer un objet a ${npc.name}`,
+        enabled: gameState.player.inventory.length > 0,
+        reason: gameState.player.inventory.length > 0
+          ? 'Un objet d inventaire peut etre montre sans quitter l inventaire.'
+          : 'Aucun objet en inventaire a montrer.',
+        toolName: 'resolve_player_action',
+      }),
+      affordance({
+        id: `world-give-item-${npc.id}`,
+        kind: 'give_item',
+        label: `Donner un objet a ${npc.name}`,
+        enabled: gameState.player.inventory.length > 0,
+        reason: gameState.player.inventory.length > 0
+          ? 'Donner un objet mute l inventaire et la relation.'
+          : 'Aucun objet en inventaire a donner.',
+        toolName: 'resolve_player_action',
       })
     )
   }
+
+  affordances.push(affordance({
+    id: 'world-combine-recipe',
+    kind: 'combine_recipe',
+    label: 'Assembler la recette',
+    enabled: Boolean(recipeQuest && !recipeAlreadyCombined && (recipeQuest.progress >= 2 || ownedRecipeHalves.length >= 2)),
+    reason: recipeAlreadyCombined
+      ? 'La recette est deja assemblee.'
+      : (recipeQuest?.progress ?? 0) >= 2 || ownedRecipeHalves.length >= 2
+        ? 'Les deux fragments sont acquis par le moteur.'
+        : 'Il manque encore un fragment de recette.',
+    toolName: 'resolve_player_action',
+  }))
 
   return affordances
 }
