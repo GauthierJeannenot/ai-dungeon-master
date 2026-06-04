@@ -46,6 +46,22 @@ export interface GameActionIntent {
 
 const NO_TOOLS: string[] = []
 
+export const GAME_ACTION_KINDS: GameActionKind[] = [
+  'attack',
+  'move',
+  'interact',
+  'use_item',
+  'ability_check',
+  'social',
+  'wait',
+  'death_save',
+  'query_state',
+  'guidance',
+  'encounter',
+  'observe',
+  'unknown',
+]
+
 function intent(
   normalizedText: string,
   fields: Omit<GameActionIntent, 'normalizedText'>
@@ -286,6 +302,147 @@ export function classifyPlayerAction(message: string, gameState: GameState): Gam
     suggestedTools: NO_TOOLS,
     confidence: 'low',
   })
+}
+
+/**
+ * Construit un GameActionIntent complet à partir d'un `kind` (typiquement
+ * renvoyé par le parser LLM) en réutilisant exactement la même cartographie
+ * primitive/tools/requiresEngine que le parser regex `classifyPlayerAction`.
+ * Cela garantit que les deux chemins (LLM et fallback regex) produisent des
+ * intents homogènes pour le reste du pipeline.
+ */
+export function buildIntentForKind(
+  kind: GameActionKind,
+  gameState: GameState,
+  normalizedText: string,
+  reason = 'llm-classified-intent'
+): GameActionIntent {
+  const inCombat = gameState.phase === 'combat'
+
+  switch (kind) {
+    case 'attack':
+      return intent(normalizedText, {
+        kind: 'attack',
+        primitive: 'resolve_attack',
+        reason,
+        requiresEngine: true,
+        suggestedTools: inCombat
+          ? ['resolve_player_attack', 'move_token']
+          : ['start_encounter', 'resolve_player_attack'],
+        confidence: 'high',
+      })
+    case 'move':
+      return intent(normalizedText, {
+        kind: 'move',
+        primitive: 'move',
+        reason,
+        requiresEngine: true,
+        suggestedTools: inCombat
+          ? ['move_token', 'resolve_player_attack']
+          : ['move_token', 'trigger_room_event', 'start_encounter'],
+        confidence: 'high',
+      })
+    case 'interact':
+      return intent(normalizedText, {
+        kind: 'interact',
+        primitive: 'interact',
+        reason,
+        requiresEngine: true,
+        suggestedTools: ['trigger_room_event', 'roll_ability_check', 'start_encounter'],
+        confidence: 'high',
+      })
+    case 'use_item':
+      return intent(normalizedText, {
+        kind: 'use_item',
+        primitive: 'use_item',
+        reason,
+        requiresEngine: true,
+        suggestedTools: ['use_healing_potion'],
+        confidence: 'high',
+      })
+    case 'social':
+      return intent(normalizedText, {
+        kind: 'social',
+        primitive: 'check',
+        reason,
+        requiresEngine: true,
+        suggestedTools: ['roll_ability_check'],
+        confidence: 'high',
+      })
+    case 'ability_check':
+      return intent(normalizedText, {
+        kind: 'ability_check',
+        primitive: 'check',
+        reason,
+        requiresEngine: true,
+        suggestedTools: ['roll_ability_check'],
+        confidence: 'medium',
+      })
+    case 'wait':
+      return intent(normalizedText, {
+        kind: 'wait',
+        primitive: 'wait',
+        reason,
+        requiresEngine: true,
+        suggestedTools: ['pass_turn'],
+        confidence: 'high',
+      })
+    case 'death_save':
+      return intent(normalizedText, {
+        kind: 'death_save',
+        primitive: 'check',
+        reason,
+        requiresEngine: true,
+        suggestedTools: ['roll_death_save'],
+        confidence: 'high',
+      })
+    case 'encounter':
+      return intent(normalizedText, {
+        kind: 'encounter',
+        primitive: 'interact',
+        reason,
+        requiresEngine: true,
+        suggestedTools: ['start_encounter', 'resolve_player_attack'],
+        confidence: 'medium',
+      })
+    case 'query_state':
+      return intent(normalizedText, {
+        kind: 'query_state',
+        primitive: 'query_state',
+        reason,
+        requiresEngine: false,
+        suggestedTools: NO_TOOLS,
+        confidence: 'high',
+      })
+    case 'guidance':
+      return intent(normalizedText, {
+        kind: 'guidance',
+        primitive: 'narrate',
+        reason,
+        requiresEngine: false,
+        suggestedTools: NO_TOOLS,
+        confidence: 'medium',
+      })
+    case 'observe':
+      return intent(normalizedText, {
+        kind: 'observe',
+        primitive: 'narrate',
+        reason,
+        requiresEngine: false,
+        suggestedTools: NO_TOOLS,
+        confidence: 'medium',
+      })
+    case 'unknown':
+    default:
+      return intent(normalizedText, {
+        kind: 'unknown',
+        primitive: 'narrate',
+        reason,
+        requiresEngine: false,
+        suggestedTools: NO_TOOLS,
+        confidence: 'low',
+      })
+  }
 }
 
 export function describeGameActionLanguageForPrompt(): string {

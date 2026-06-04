@@ -33,6 +33,14 @@ import {
   type GameActionKind,
   type GameActionPrimitive,
 } from '@/lib/game-actions'
+import {
+  ACTION_PARSER_TOOL,
+  ACTION_PARSER_TOOL_NAME,
+  buildActionParserSystemPrompt,
+  buildActionParserUserPrompt,
+  intentsFromParserMessage,
+  mockReportedIntents,
+} from '@/lib/action-parser'
 import { buildDirectorDecision } from '@/lib/dm-director'
 import { sanitizeAdventureModuleToolContracts } from '@/lib/dm-module-sanitizer'
 import {
@@ -52,6 +60,8 @@ const anthropic = new Anthropic({
 const MODEL = 'claude-haiku-4-5'
 const MAX_TOOL_ITERATIONS = 3
 const MAX_TOKENS = 400
+const LLM_ACTION_PARSER_ENABLED = (process.env.LLM_ACTION_PARSER ?? 'true').toLowerCase() !== 'false'
+const ACTION_PARSER_MAX_TOKENS = parsePositiveInt(process.env.LLM_ACTION_PARSER_MAX_TOKENS, 200)
 const FINAL_NARRATION_MAX_TOKENS = parsePositiveInt(process.env.LLM_FINAL_NARRATION_MAX_TOKENS, 260)
 const LLM_SHORT_NARRATION_MAX_TOKENS = parsePositiveInt(process.env.LLM_SHORT_NARRATION_MAX_TOKENS, FINAL_NARRATION_MAX_TOKENS)
 const LLM_RICH_NARRATION_MAX_TOKENS = parsePositiveInt(process.env.LLM_RICH_NARRATION_MAX_TOKENS, 420)
@@ -109,6 +119,7 @@ const sessionLlmCalls = new Map<string, number>()
 
 type LlmOperation =
   | 'history.compress'
+  | 'dm.classify_intents'
   | 'dm.iteration'
   | 'dm.final_narration'
   | 'dm.final_narration_fallback'
@@ -297,6 +308,14 @@ function mockToolMessage(name: string, input: Record<string, unknown>): Anthropi
 function createMockLlmMessage(params: MessageCreateParams, context: LlmCallContext): Anthropic.Message {
   if (context.operation === 'history.compress') {
     return mockTextMessage('Résumé mock: les échanges précédents sont conservés sous forme condensée pour les tests.')
+  }
+
+  if (context.operation === 'dm.classify_intents') {
+    const playerText = context.playerMessage || lastUserText(params.messages)
+    const specs = context.gameState
+      ? mockReportedIntents(playerText, context.gameState)
+      : [{ kind: 'unknown' as const }]
+    return mockToolMessage(ACTION_PARSER_TOOL_NAME, { intents: specs })
   }
 
   if (context.operation === 'dm.final_narration' || context.operation === 'dm.final_narration_fallback') {
@@ -1612,6 +1631,86 @@ function requiredMechanicalActionFromIntent(intent: GameActionIntent): RequiredM
 
 function detectRequiredMechanicalAction(message: string, gameState: GameState): RequiredMechanicalAction | null {
   return requiredMechanicalActionFromIntent(classifyPlayerAction(message, gameState))
+}
+
+const NARRATIVE_RICH_KINDS = new Set<GameActionKind>(['social', 'interact', 'guidance', 'observe'])
+
+/**
+ * Choisit l'intention qui doit piloter le ton de la narration finale quand une
+ * action contient plusieurs intentions. Un déplacement suivi d'une discussion
+ * (« je vais parler aux dryades ») doit produire une narration sociale riche.
+ */
+function pickNarrativeIntent(intents: GameActionIntent[]): GameActionIntent {
+  return intents.find(intent => NARRATIVE_RICH_KINDS.has(intent.kind)) ?? intents[0]
+}
+
+interface ParsedPlayerAction {
+  intents: GameActionIntent[]
+  source: 'llm' | 'fallback'
+}
+
+/**
+ * Parse l'action libre du joueur en une ou plusieurs intentions de jeu via un
+ * appel Claude dédié (operation dm.classify_intents). Bascule sur le parser
+ * regex `classifyPlayerAction` en cas d'erreur, de budget épuisé, de réponse
+ * vide ou si le parser LLM est désactivé.
+ */
+async function parsePlayerActionIntents(
+  message: string,
+  gameState: GameState,
+  sessionId: string | undefined,
+  requestId: string,
+  usageLog: AnthropicUsageLogEntry[],
+  inputMode: string,
+  clientRequestId: string | undefined
+): Promise<ParsedPlayerAction> {
+  const normalizedText = normalizeFrenchText(message)
+  const requestCallCount = usageLog.length + 1
+  const fallback = (reason: string): ParsedPlayerAction => {
+    logEvent('debug', 'dm.action.parser_fallback', { requestId, sessionId, reason })
+    return { intents: [classifyPlayerAction(message, gameState)], source: 'fallback' }
+  }
+
+  if (!LLM_ACTION_PARSER_ENABLED) return fallback('disabled')
+  if (LLM_MODE !== 'mock' && nextLlmCallWouldExceedBudget(requestCallCount, sessionId)) {
+    return fallback('budget')
+  }
+
+  try {
+    const response = await createLlmMessage({
+      model: MODEL,
+      max_tokens: ACTION_PARSER_MAX_TOKENS,
+      system: [textBlockWithPromptCache(buildActionParserSystemPrompt())],
+      tools: [ACTION_PARSER_TOOL],
+      tool_choice: { type: 'tool', name: ACTION_PARSER_TOOL_NAME },
+      messages: [{ role: 'user', content: buildActionParserUserPrompt(message, gameState) }],
+    }, {
+      requestId,
+      sessionId,
+      operation: 'dm.classify_intents',
+      requestCallCount,
+      gameState,
+      playerMessage: message,
+    })
+
+    usageLog.push(logAnthropicUsage({
+      requestId,
+      sessionId,
+      inputMode,
+      clientRequestId,
+      operation: 'dm.classify_intents',
+      model: MODEL,
+      usage: response.usage,
+      stopReason: response.stop_reason,
+    }))
+
+    const intents = intentsFromParserMessage(response, gameState, normalizedText)
+    if (intents.length === 0) return fallback('empty')
+    return { intents, source: 'llm' }
+  } catch (err) {
+    logEvent('warn', 'dm.action.parser_error', { requestId, sessionId, err })
+    return fallback('error')
+  }
 }
 
 function isPlayerAtZeroHp(gameState: GameState): boolean {
@@ -3277,7 +3376,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       }
     }
 
-    const actionIntent = classifyPlayerAction(message, currentGameState)
+    const parsedAction = await parsePlayerActionIntents(message, currentGameState, sessionId, requestId, usageLog, inputMode, clientRequestId)
+    const actionIntent = parsedAction.intents[0]
+    const secondaryIntents = parsedAction.intents.slice(1)
+    const narrativeIntent = pickNarrativeIntent(parsedAction.intents)
     const requiredMechanicalAction = requiredMechanicalActionFromIntent(actionIntent)
     logEvent('info', 'dm.action.intent', {
       requestId,
@@ -3285,6 +3387,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       sessionId,
       inputMode,
       actionIntent,
+      secondaryIntents,
+      narrativeIntentKind: narrativeIntent.kind,
+      parserSource: parsedAction.source,
       requiresEngine: actionIntent.requiresEngine,
       suggestedTools: actionIntent.suggestedTools,
       gameState: summarizeGameState(currentGameState),
@@ -3349,12 +3454,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       !sawMcpToolError &&
       toolsUsed.length > 0 &&
       toolsUsed.every(toolName => DIRECTOR_LOCAL_FINAL_TOOLS.has(toolName)) &&
-      actionIntent.kind !== 'social' &&
-      actionIntent.kind !== 'interact'
+      narrativeIntent.kind !== 'social' &&
+      narrativeIntent.kind !== 'interact'
     const needsLlmIteration = !engineFirst.handled
     const needsFinalNarrationHistory = engineFirst.handled && toolsUsed.length > 0 && !sawMcpToolError && !engineFirstLocalNarrationCandidate
     const iterationLlmRoute = needsLlmIteration
-      ? selectIterationLlmRoute(actionIntent, usageLog.length + 1, sessionId)
+      ? selectIterationLlmRoute(narrativeIntent, usageLog.length + 1, sessionId)
       : 'none'
     if (iterationLlmRoute === 'blocked') {
       llmRoute = mergeLlmRoute(llmRoute, 'blocked')
@@ -3386,7 +3491,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     // ── Construction des messages pour l'appel LLM ──────────────────────────
     const systemBlocks = buildSystemBlocks(currentGameState, activeSummary)
-    const llmTools = withToolPromptCache(selectToolsForLlm(mcpTools, currentGameState, actionIntent))
+    const baseLlmTools = selectToolsForLlm(mcpTools, currentGameState, actionIntent)
+    const secondaryToolNames = new Set(secondaryIntents.flatMap(intent => intent.suggestedTools))
+    const extraSecondaryTools = mcpTools.filter(
+      tool => secondaryToolNames.has(tool.name) && !baseLlmTools.some(base => base.name === tool.name)
+    )
+    const llmTools = withToolPromptCache([...baseLlmTools, ...extraSecondaryTools])
     const messages: Anthropic.MessageParam[] = [
       ...historyMessages,
       { role: 'user', content: message },
@@ -3756,7 +3866,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         toolsUsed: [...new Set(toolsUsed)],
       })
     } else if (!narrative && iterations >= MAX_TOOL_ITERATIONS) {
-      const fallbackLlmRoute = selectFinalNarrationLlmRoute(actionIntent, toolsUsed, usageLog.length + 1, sessionId)
+      const fallbackLlmRoute = selectFinalNarrationLlmRoute(narrativeIntent, toolsUsed, usageLog.length + 1, sessionId)
       if (fallbackLlmRoute === 'blocked') {
         llmRoute = mergeLlmRoute(llmRoute, 'blocked')
         narrative = buildDirectiveSceneNarrative(currentGameState)
@@ -3942,7 +4052,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const directorDecision = !sawMcpToolError
       ? buildDirectorDecision({
         playerMessage: message,
-        actionIntent,
+        actionIntent: narrativeIntent,
         gameState: currentGameState,
         toolsUsed,
         newCombatLogEntries,
@@ -4001,7 +4111,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         narrativeLength: narrative.length,
       })
     } else if (toolsUsed.length > 0 && !sawMcpToolError && directorDecision?.shouldUseLlmNarrator !== false) {
-      const finalLlmRoute = selectFinalNarrationLlmRoute(actionIntent, toolsUsed, usageLog.length + 1, sessionId)
+      const finalLlmRoute = selectFinalNarrationLlmRoute(narrativeIntent, toolsUsed, usageLog.length + 1, sessionId)
       if (finalLlmRoute === 'blocked') {
         llmRoute = mergeLlmRoute(llmRoute, 'blocked')
         const fallbackNarrative = buildOralFallbackNarrative(currentGameState, toolsUsed)

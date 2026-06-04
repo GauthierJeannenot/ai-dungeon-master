@@ -165,7 +165,7 @@ test('DM API resolves an exploration move through MCP in mock mode', async t => 
   assert.ok(data.narrative.length > 0)
   assert.doesNotMatch(data.narrative, /\[Mock\]/)
   assert.equal(typeof data.newGameState.sceneMemory?.updatedAt, 'string')
-  assert.equal(data.usage?.llm.calls, 0)
+  assert.equal(data.usage?.llm.calls, 1)
   assert.equal(data.usage?.narrator, 'director')
   assert.equal(data.usage?.llmRoute, 'none')
 })
@@ -195,9 +195,28 @@ test('DM API resolves a combat attack through MCP in mock mode', async t => {
   assert.doesNotMatch(data.narrative, /\[Mock\]/)
   assert.equal(data.newGameState.sceneMemory?.madeNoise, true)
   assert.equal(data.newGameState.sceneMemory?.goblinMorale, 'shaken')
-  assert.equal(data.usage?.llm.calls, 0)
+  assert.equal(data.usage?.llm.calls, 1)
   assert.equal(data.usage?.narrator, 'director')
   assert.equal(data.usage?.llmRoute, 'none')
+})
+
+test('DM API handles a multi-intent action (move then social) with rich narration', async t => {
+  const sessionId = `api-multi-${process.pid}-${Date.now()}`
+  t.after(() => cleanupSession(sessionId))
+
+  const { response, data } = await postDm({
+    message: 'je vais parler aux dryades',
+    clientRequestId: `client-${sessionId}`,
+    sessionId,
+    gameState: baseGameState(),
+    history: [],
+  })
+
+  assert.equal(response.status, 200)
+  assert.equal(data.usage?.llmRoute, 'rich')
+  assert.ok((data.usage?.llm.calls ?? 0) >= 1)
+  assert.equal(typeof data.narrative, 'string')
+  assert.ok(data.narrative.length > 0)
 })
 
 test('DM API routes open social scenes through rich mock LLM narration', async t => {
@@ -213,8 +232,8 @@ test('DM API routes open social scenes through rich mock LLM narration', async t
   })
 
   assert.equal(response.status, 200)
-  assert.ok((data.usage?.llm.calls ?? 0) >= 1)
-  assert.ok((data.usage?.llm.calls ?? 0) <= 2)
+  assert.ok((data.usage?.llm.calls ?? 0) >= 2)
+  assert.ok((data.usage?.llm.calls ?? 0) <= 3)
   assert.equal(data.usage?.llmRoute, 'rich')
   assert.equal(data.usage?.narrator, 'llm')
 })
