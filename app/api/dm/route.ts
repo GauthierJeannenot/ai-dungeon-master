@@ -18,7 +18,7 @@ import {
   inferAdventureRoomId as inferMappedAdventureRoomId,
   relativeAdventureRoomIdForText,
 } from '@/lib/adventure-map'
-import { DMRequest, DMResponse, GameState, ConversationTurn, CombatLogEntry, MonsterState, type DMTurnUsage } from '@/lib/types'
+import { DMRequest, DMResponse, GameState, ConversationTurn, CombatLogEntry, MonsterState, type DMTurnUsage, type EngineEvent, type PlayerAffordance } from '@/lib/types'
 import {
   isDoorTraversalIntent,
   normalizeFrenchText,
@@ -42,6 +42,7 @@ import {
   type AnthropicUsageLogEntry,
 } from '@/lib/anthropic-usage'
 import { logEvent, summarizeGameState } from '@/lib/server-logger'
+import { buildEngineResolutionView } from '@/lib/world-engine'
 
 export const maxDuration = 60
 
@@ -2950,6 +2951,8 @@ interface EngineTruthPacket {
   }
   toolsUsed: string[]
   state: ReturnType<typeof summarizeGameState>
+  events: EngineEvent[]
+  affordances: PlayerAffordance[]
   combatLog: Array<Pick<CombatLogEntry, 'round' | 'turn' | 'action' | 'mechanicalDetail'>>
   allowedFacts: string[]
 }
@@ -2989,6 +2992,7 @@ function buildEngineTruthPacket(
   gameState: GameState,
   newCombatLogEntries: CombatLogEntry[]
 ): EngineTruthPacket {
+  const engineResolution = buildEngineResolutionView(gameState, newCombatLogEntries)
   const aliveMonsters = Object.values(gameState.monsters)
     .filter(monster => monster.isAlive)
     .map(monster => ({
@@ -3009,6 +3013,8 @@ function buildEngineTruthPacket(
     `playerPosition=${formatPosition(gameState.player.position)}`,
     `currentRoomId=${gameState.currentRoomId ?? 'unknown'}`,
     `aliveMonsters=${aliveMonsters.length}`,
+    ...engineResolution.events.map(event => `event=${event.type} outcome=${event.outcome ?? 'none'} summary=${event.summary}`),
+    ...engineResolution.affordances.map(action => `affordance=${action.kind} enabled=${action.enabled} tool=${action.toolName ?? 'none'} reason=${action.reason}`),
     ...aliveMonsters.map(monster => `monster=${monster.name} id=${monster.id} hp=${monster.hp} position=${monster.position}`),
   ]
 
@@ -3025,6 +3031,8 @@ function buildEngineTruthPacket(
     },
     toolsUsed: [...new Set(toolsUsed)],
     state: summarizeGameState(gameState),
+    events: engineResolution.events,
+    affordances: engineResolution.affordances,
     combatLog: newCombatLogEntries.map(entry => ({
       round: entry.round,
       turn: entry.turn,
@@ -3117,7 +3125,7 @@ async function generateFinalNarration(
     `Paquet moteur faisant autorité. Tu ne peux affirmer que ces faits, les logs mécaniques, ou une conséquence sensorielle directe:\n${formatEngineTruthPacket(engineTruthPacket)}`,
     buildDownedPlayerFinalNarrationInstruction(gameState),
     `Logs mécaniques lisibles:\n${formatCombatLogEntries(newCombatLogEntries)}`,
-    `Structure obligatoire: conséquence visible du résultat mécanique, puis réaction du décor ou d'un PNJ seulement si elle est soutenue par le paquet moteur, le module ou l'historique, puis piste, prise ou tension jouable en fiction. Tout fait absent du paquet moteur doit rester hors champ, hypothèse, piste ou ne pas être mentionné. Ne crée pas de nouvelle menace présente si le moteur n'a pas créé l'entité ou le danger.`,
+    `Structure obligatoire: narre d'abord les events moteur canoniques du paquet, puis réaction du décor ou d'un PNJ seulement si elle est soutenue par le paquet moteur, le module ou l'historique, puis une piste ou tension jouable compatible avec les affordances enabled. Tout fait absent du paquet moteur doit rester hors champ, hypothèse, piste ou ne pas être mentionné. Ne crée pas de nouvelle menace présente si le moteur n'a pas créé l'entité ou le danger.`,
     `Écris la réponse finale au joueur en français correct, au présent, en 2-4 phrases courtes, 120 mots maximum. Elle doit être naturelle à l'oral et donner de l'élan: mouvement, réplique, menace, opportunité ou information exploitable. Termine toujours par une ponctuation finale. Respecte strictement les résultats mécaniques. N'annonce aucune action future non résolue. Pas de Markdown, pas de liste, pas de parenthèse, pas d'excuse, pas de méta, pas de menu, pas de mention du système, du moteur, des tools, de MCP ou de l'IA. Pas de coordonnées ni d'ID technique sauf demande explicite du joueur. Ne déclare pas de fin de quête/campagne ni de conclusion alternative sauf demande explicite. Pas de time-skip: seulement la prochaine minute jouable. Si le joueur critique le style, la longueur, le système ou un bug, ne réponds pas à la critique: applique la correction silencieusement et reprends la scène en fiction.`,
   ].filter(Boolean).join('\n\n')
 
@@ -4222,6 +4230,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       narrative: narrative || 'Le Dungeon Master réfléchit...',
       newGameState: currentGameState,
       toolsUsed: [...new Set(toolsUsed)],
+      engine: {
+        events: engineTruthPacket.events,
+        affordances: engineTruthPacket.affordances,
+      },
       usage: turnUsage,
       // Renvoie le nouveau résumé au client seulement si une compression a eu lieu
       summaryContext: newSummary,
@@ -4265,6 +4277,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       cacheCreationInputTokens: turnUsage.llm.cacheCreationInputTokens,
       cacheReadInputTokens: turnUsage.llm.cacheReadInputTokens,
       toolsUsed: [...new Set(toolsUsed)],
+      engineEventTypes: engineTruthPacket.events.map(event => event.type),
+      playerAffordances: engineTruthPacket.affordances.map(action => ({
+        kind: action.kind,
+        enabled: action.enabled,
+        toolName: action.toolName,
+      })),
       compressedHistory: Boolean(newSummary),
       historyProcessed,
       narrativeLength: dmResponse.narrative.length,

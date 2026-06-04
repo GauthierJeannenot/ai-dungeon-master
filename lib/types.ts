@@ -156,6 +156,57 @@ export interface AbilityCheckResult {
   mechanicalSummary: string
 }
 
+export type CanonicalPlayerActionKind =
+  | 'attack'
+  | 'move'
+  | 'interact'
+  | 'ability_check'
+  | 'social'
+  | 'use_item'
+  | 'wait'
+  | 'death_save'
+  | 'observe'
+
+export type EngineEventType =
+  | 'combat.attack'
+  | 'combat.death_save'
+  | 'combat.turn_passed'
+  | 'combat.started'
+  | 'combat.ended'
+  | 'entity.moved'
+  | 'entity.hp_changed'
+  | 'item.used'
+  | 'check.rolled'
+  | 'room.event'
+  | 'state.changed'
+
+export interface EngineEvent {
+  id: string
+  type: EngineEventType
+  summary: string
+  actorId?: string
+  targetId?: string
+  round?: number
+  turn?: string
+  mechanicalDetail?: string
+  outcome?: 'hit' | 'miss' | 'success' | 'failure' | 'critical' | 'blocked' | 'unknown'
+  visibleToPlayer: boolean
+}
+
+export interface PlayerAffordance {
+  id: string
+  kind: CanonicalPlayerActionKind
+  label: string
+  enabled: boolean
+  reason: string
+  toolName?: string
+}
+
+export interface EngineResolutionView {
+  events: EngineEvent[]
+  affordances: PlayerAffordance[]
+}
+
 // Un tour de conversation envoyé au LLM (player/dm uniquement — pas mechanical)
 export interface ConversationTurn {
   role: 'player' | 'dm'
@@ -212,6 +263,7 @@ export interface DMResponse {
   narrative: string
   newGameState: GameState
   toolsUsed: string[]
+  engine?: EngineResolutionView
   usage?: DMTurnUsage
   // Nouveau résumé retourné si une compression a eu lieu pendant cette requête
   summaryContext?: string
