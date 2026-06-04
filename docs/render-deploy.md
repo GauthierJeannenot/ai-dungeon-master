@@ -20,9 +20,9 @@ The explicit `npm ci --include=dev` matters because `NODE_ENV=production` can ot
 
 ## GitHub Actions
 
-Render Blueprint auto-deploys from `render.yaml` after GitHub checks pass, so a GitHub Actions deploy workflow is not strictly required.
+Render Blueprint auto-deploys from `render.yaml` after GitHub checks pass. That is the only automatic deployment path.
 
-This repository also includes `.github/workflows/render-deploy.yml` so the Actions sidebar has a visible `Deploy to Render` workflow. To make that workflow actively trigger a deploy, create a Render Deploy Hook for the service and add it as the GitHub repository secret `RENDER_DEPLOY_HOOK_URL`. If the secret is missing, the workflow exits successfully with a notice and Render Blueprint auto-deploy remains the deployment path.
+This repository also includes `.github/workflows/render-deploy.yml` as a manual fallback button in the Actions sidebar. To make that manual workflow trigger a deploy, create a Render Deploy Hook for the service and add it as the GitHub repository secret `RENDER_DEPLOY_HOOK_URL`. It deliberately does not run after CI, to avoid double-deploying when Render Blueprint auto-deploy is already enabled.
 
 ## Setup
 

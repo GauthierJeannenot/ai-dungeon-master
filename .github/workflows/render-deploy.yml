@@ -1,10 +1,6 @@
 name: Deploy to Render
 
 on:
-  workflow_run:
-    workflows: [CI]
-    branches: [master]
-    types: [completed]
   workflow_dispatch:
 
 concurrency:
@@ -13,9 +9,8 @@ concurrency:
 
 jobs:
   deploy:
-    name: Deploy to Render
+    name: Trigger Render deploy hook
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     env:
       RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
 
@@ -24,7 +19,7 @@ jobs:
         if: env.RENDER_DEPLOY_HOOK_URL == ''
         run: |
           echo "::notice::RENDER_DEPLOY_HOOK_URL is not configured; skipping Render deploy hook."
-          echo "::notice::Render Blueprint auto-deploy can still deploy from render.yaml after checks pass."
+          echo "::notice::Render Blueprint auto-deploy remains the automatic deployment path from render.yaml."
 
       - name: Trigger Render deploy hook
         if: env.RENDER_DEPLOY_HOOK_URL != ''

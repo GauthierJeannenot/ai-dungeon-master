@@ -177,7 +177,7 @@ Voir [docs/render-deploy.md](docs/render-deploy.md) pour les logs, limites du fr
 
 Activé par défaut (`autoDeployTrigger: checksPass` dans `render.yaml`). Chaque push sur `master` redéploie après CI verte côté Render.
 
-Un workflow GitHub Actions `Deploy to Render` existe aussi pour rendre le déploiement visible dans l'onglet Actions. Pour qu'il déclenche réellement Render, crée un Deploy Hook dans Render et ajoute son URL dans le secret GitHub `RENDER_DEPLOY_HOOK_URL`. Sans ce secret, le workflow passe en mode notice et laisse le Blueprint Render gérer l'auto-deploy.
+Un workflow GitHub Actions `Deploy to Render` existe aussi comme bouton manuel dans l'onglet Actions. Pour qu'il déclenche réellement Render, crée un Deploy Hook dans Render et ajoute son URL dans le secret GitHub `RENDER_DEPLOY_HOOK_URL`. Il ne tourne pas après CI afin d'éviter un double déploiement avec le Blueprint Render.
 
 ---
 
