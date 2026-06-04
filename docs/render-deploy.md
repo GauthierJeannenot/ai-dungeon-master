@@ -18,6 +18,12 @@ The root `render.yaml` creates one free Node web service:
 
 The explicit `npm ci --include=dev` matters because `NODE_ENV=production` can otherwise omit build-time dependencies.
 
+## GitHub Actions
+
+Render Blueprint auto-deploys from `render.yaml` after GitHub checks pass, so a GitHub Actions deploy workflow is not strictly required.
+
+This repository also includes `.github/workflows/render-deploy.yml` so the Actions sidebar has a visible `Deploy to Render` workflow. To make that workflow actively trigger a deploy, create a Render Deploy Hook for the service and add it as the GitHub repository secret `RENDER_DEPLOY_HOOK_URL`. If the secret is missing, the workflow exits successfully with a notice and Render Blueprint auto-deploy remains the deployment path.
+
 ## Setup
 
 1. Open Render.
@@ -63,4 +69,4 @@ Render free is simple, not durable:
 - no persistent disk on the free web service;
 - sessions can be lost server-side.
 
-The browser blackbox logger still helps because it republishes recent client actions after a refresh. For a truly durable deployment, use a host with persistent storage, such as Fly.io with a volume or a small paid VPS.
+The browser blackbox logger still helps because it republishes recent client actions after a refresh. For a truly durable deployment, use a host with persistent storage, such as a small paid VPS or a managed database/object store for sessions and logs.

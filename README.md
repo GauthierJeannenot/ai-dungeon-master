@@ -142,7 +142,7 @@ GitHub repo
     │       │
     │       ├── GitHub Actions CI → type-check + build
     │       │
-    │       └── Auto-deploy → Render Blueprint ou Fly.io
+    │       └── Auto-deploy → Render Blueprint
     │
     └── Serveur persistant Node.js
             ├── Next.js (app + API routes)
@@ -151,39 +151,7 @@ GitHub repo
 
 ---
 
-### Option A — Fly.io
-
-**Avantages** : volume persistant, logs consultables, déploiement GitHub Actions déjà présent via `.github/workflows/fly-deploy.yml`.
-
-#### 1. Créer l'app et le volume
-
-```bash
-fly launch
-fly volumes create data --region cdg --size 1
-```
-
-#### 2. Configurer les variables d'environnement
-
-```bash
-fly secrets set ANTHROPIC_API_KEY=sk-ant-ta-vraie-cle
-fly secrets set NODE_ENV=production
-```
-
-#### 3. Premier déploiement
-
-```bash
-fly deploy
-```
-
-#### 4. Activer le déploiement via GitHub Actions
-
-1. Crée un token de déploiement Fly : `fly tokens create deploy`
-2. Dans GitHub → Settings → Secrets → `FLY_API_TOKEN` → colle le token
-3. Le workflow `.github/workflows/fly-deploy.yml` se déclenche automatiquement après le workflow CI sur `main` ou `master`
-
----
-
-### Option B — Render (gratuit permanent)
+### Option A — Render (gratuit permanent)
 
 **Avantages** : free tier sans limite de temps (750h/mois)  
 **Inconvénient** : mise en veille après 15 min d'inactivité (cold start ~30 sec)
@@ -207,11 +175,13 @@ Voir [docs/render-deploy.md](docs/render-deploy.md) pour les logs, limites du fr
 
 #### 3. Auto-deploy
 
-Activé par défaut (`autoDeployTrigger: checksPass` dans `render.yaml`). Chaque push sur `master` redéploie après CI verte.
+Activé par défaut (`autoDeployTrigger: checksPass` dans `render.yaml`). Chaque push sur `master` redéploie après CI verte côté Render.
+
+Un workflow GitHub Actions `Deploy to Render` existe aussi pour rendre le déploiement visible dans l'onglet Actions. Pour qu'il déclenche réellement Render, crée un Deploy Hook dans Render et ajoute son URL dans le secret GitHub `RENDER_DEPLOY_HOOK_URL`. Sans ce secret, le workflow passe en mode notice et laisse le Blueprint Render gérer l'auto-deploy.
 
 ---
 
-### Option C — Koyeb (free tier permanent, sans mise en veille)
+### Option B — Koyeb (free tier permanent, sans mise en veille)
 
 **Avantages** : 2 instances gratuites permanentes, pas de mise en veille  
 **Coût** : gratuit
@@ -265,7 +235,7 @@ APP_LOG_OBJECT_KEY_LIMIT=80
 APP_LOG_BUFFER_ENABLED=true
 APP_LOG_BUFFER_LIMIT=1000
 APP_LOG_PERSIST_ENABLED=true
-APP_LOG_PERSIST_DIR=/data/logs
+APP_LOG_PERSIST_DIR=/tmp/ai-dm/logs
 APP_LOG_PERSIST_MAX_BYTES=20000000
 APP_DEBUG_LOG_PUBLIC_READ=true
 ```
@@ -276,20 +246,13 @@ Les logs sont conserves a trois niveaux :
 
 - stdout/stderr hebergeur, avec le prefixe `[ai-dm:<event>]`
 - buffer memoire rapide, utile pendant que le process tourne
-- fichier JSONL local (`.data/logs/server.jsonl` en local, `/data/logs/server.jsonl` sur Fly, ou le chemin `APP_LOG_PERSIST_DIR` si un volume persistant est monte)
+- fichier JSONL local (`.data/logs/server.jsonl` en local, ou le chemin `APP_LOG_PERSIST_DIR` configure par l'hebergeur)
 
-Sans aucune configuration hebergeur/GitHub supplementaire, le navigateur garde aussi une boite noire de playtest dans `localStorage` et la republie au serveur via `/api/debug/client-logs`. Les entrees recentes restent dans le navigateur meme apres une sync reussie, afin qu'un simple refresh puisse les republier si Fly/une autre plateforme a servi les logs depuis une machine differente ou a perdu le buffer serveur. Apres un redeploiement, il suffit de rafraichir ou de rejouer depuis le meme navigateur pour revoir les dernieres actions sous l'evenement `client.blackbox.entry` dans `/api/debug/logs`.
+Sans aucune configuration hebergeur/GitHub supplementaire, le navigateur garde aussi une boite noire de playtest dans `localStorage` et la republie au serveur via `/api/debug/client-logs`. Les entrees recentes restent dans le navigateur meme apres une sync reussie, afin qu'un simple refresh puisse les republier si Render ou une autre plateforme a perdu le buffer serveur. Apres un redeploiement, il suffit de rafraichir ou de rejouer depuis le meme navigateur pour revoir les dernieres actions sous l'evenement `client.blackbox.entry` dans `/api/debug/logs`.
 
-Sur Fly, `fly.toml` force `APP_LOG_PERSIST_DIR=/data/logs` pour que le fichier JSONL soit conserve sur le volume monte. Si vous avez un autre volume, `APP_LOG_PERSIST_DIR=/chemin/du/volume` permet de forcer le repertoire. Ce n'est pas requis pour la boite noire navigateur.
+Sur Render free, `render.yaml` force `APP_LOG_PERSIST_DIR=/tmp/ai-dm/logs`. Ce stockage reste ephemere; la boite noire navigateur aide a republier les derniers tours apres refresh/redeploy.
 
-Lecture via CLI hebergeur :
-
-```bash
-fly logs -a ai-dungeon-master
-fly logs -a ai-dungeon-master | grep 'ai-dm:dm.request'
-fly logs -a ai-dungeon-master | grep 'dm-'
-fly logs -a ai-dungeon-master | grep 'mcp.tool'
-```
+Lecture via hebergeur : utilisez l'onglet Logs du service Render.
 
 Lecture via endpoint HTTP protege :
 

@@ -46,10 +46,6 @@ const SECRET_KEY_PATTERN = /api[_-]?key|authorization|bearer|cookie|password|sec
 const TEXT_KEY_PATTERN = /content|message|narrative|prompt|summary|text/i
 
 function defaultPersistDir(): string {
-  if (process.env.FLY_APP_NAME || process.env.FLY_MACHINE_ID || process.env.FLY_REGION) {
-    return path.join('/data', 'logs')
-  }
-
   return path.join(/* turbopackIgnore: true */ process.cwd(), '.data', 'logs')
 }
 
@@ -446,12 +442,6 @@ export function logEvent(
     event,
     service: 'ai-dungeon-master',
     env: process.env.NODE_ENV,
-    fly: {
-      appName: process.env.FLY_APP_NAME,
-      machineId: process.env.FLY_MACHINE_ID,
-      region: process.env.FLY_REGION,
-      allocationId: process.env.FLY_ALLOC_ID,
-    },
     ...fields,
   }
 

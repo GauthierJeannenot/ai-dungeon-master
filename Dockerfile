@@ -7,7 +7,8 @@
 # the MCP engine as a stdio subprocess (node mcp-server/dist/mcp-server/index.js)
 # and persists session JSON to disk. It therefore runs as a persistent
 # container (not serverless). Session state lives on a persistent volume mounted
-# at /data on hosts that provide a persistent volume, such as Fly.io.
+# under GAME_SESSION_STORE_DIR. Render free uses ephemeral /tmp storage; hosts
+# with a persistent volume can point GAME_SESSION_STORE_DIR at that volume.
 # ---------------------------------------------------------------------------
 
 # ---- Stage 1: build (full deps + next build + tsc for the MCP engine) ----

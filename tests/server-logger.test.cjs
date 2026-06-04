@@ -77,15 +77,14 @@ test('server logger filters by clientRequestId and deduplicates persisted/buffer
   assert.equal(filtered.entries[0].payload.clientRequestId, 'client-a')
 })
 
-test('server logger defaults to the mounted Fly volume for persisted logs', () => {
+test('server logger defaults persisted logs to the local data directory', () => {
   const logger = loadTsModule('lib/server-logger.ts', {
     APP_LOG_PERSIST_ENABLED: 'true',
     APP_LOG_BUFFER_ENABLED: 'false',
     APP_LOG_LEVEL: 'debug',
-    FLY_APP_NAME: 'ai-dungeon-master',
   })
 
   const result = logger.getLogEvents({ limit: 1 })
   assert.equal(result.persistent, true)
-  assert.equal(result.persistFile, path.join('/data', 'logs', 'server.jsonl'))
+  assert.equal(result.persistFile, path.join(process.cwd(), '.data', 'logs', 'server.jsonl'))
 })
