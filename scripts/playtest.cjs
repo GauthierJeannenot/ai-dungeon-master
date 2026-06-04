@@ -160,6 +160,37 @@ function combatGameState() {
   })
 }
 
+function officeGameState() {
+  return baseGameState({
+    player: {
+      ...baseGameState().player,
+      position: { x: 5, y: 9 },
+    },
+    roomsVisited: ['5'],
+    currentRoomId: '5',
+    world: {
+      objects: {
+        office_drawer: {
+          id: 'office_drawer',
+          roomId: '5',
+          name: 'tiroir du bureau',
+          kind: 'container',
+          visible: false,
+          discovered: false,
+          opened: false,
+          locked: true,
+          dc: { search: 1, unlock: 1, force: 1 },
+        },
+      },
+      npcs: {},
+      quests: {},
+      alarms: {},
+      flags: {},
+      eventLog: [],
+    },
+  })
+}
+
 const scenarios = [
   {
     name: 'exploration-local',
@@ -178,6 +209,55 @@ const scenarios = [
       'je vais en (9,11)',
       'je vais en (8,11)',
     ].map(message => ({ message, expectNoLlm: narrationMode === 'budget', category: 'simple' })),
+  },
+  {
+    name: 'world-stateful',
+    initialGameState: officeGameState(),
+    turns: [
+      {
+        message: 'je fouille le bureau',
+        expectNoLlm: narrationMode === 'budget',
+        category: 'world',
+        expectTools: ['resolve_player_action'],
+        expectEvents: ['room.object_discovered'],
+        expectAffordances: ['unlock', 'force'],
+      },
+      {
+        message: "j'ouvre le tiroir",
+        expectNoLlm: narrationMode === 'budget',
+        category: 'world',
+        expectTools: ['resolve_player_action'],
+        expectEvents: ['action.blocked'],
+        expectAffordances: ['unlock', 'force'],
+      },
+      {
+        message: 'je force le tiroir',
+        expectNoLlm: narrationMode === 'budget',
+        category: 'world',
+        expectTools: ['resolve_player_action'],
+        expectEvents: ['alarm.raised', 'object.opened', 'room.object_discovered'],
+        expectAffordances: ['take'],
+      },
+      {
+        message: 'je prends le fragment de recette',
+        expectNoLlm: narrationMode === 'budget',
+        category: 'world',
+        expectTools: ['resolve_player_action'],
+        expectEvents: ['object.taken', 'quest.item_found'],
+      },
+      {
+        message: 'je prends la recette encore',
+        expectNoLlm: narrationMode === 'budget',
+        category: 'world',
+        expectTools: ['resolve_player_action'],
+        expectEvents: ['action.blocked'],
+      },
+      {
+        message: 'je demande au systeme si la recette est vraiment dans mon inventaire',
+        expectNoLlm: false,
+        category: 'meta',
+      },
+    ],
   },
   {
     name: 'combat-local',
@@ -309,6 +389,10 @@ async function run() {
       emptyNarratives: [],
       mockLeaksOnSimpleTurns: [],
       roboticNarratives: [],
+      missingEngineViews: [],
+      missingExpectedTools: [],
+      missingExpectedEvents: [],
+      missingExpectedAffordances: [],
     },
     targetViolations: [],
   }
@@ -347,10 +431,19 @@ async function run() {
             status,
             durationMs,
             toolsUsed: data.toolsUsed ?? [],
+            engineEvents: data.engine?.events?.map(event => ({
+              type: event.type,
+              outcome: event.outcome,
+              targetId: event.targetId,
+              summary: event.summary,
+            })) ?? [],
             engineEventTypes: data.engine?.events?.map(event => event.type) ?? [],
             enabledAffordances: data.engine?.affordances
               ?.filter(action => action.enabled)
               .map(action => action.kind) ?? [],
+            blockedAffordances: data.engine?.affordances
+              ?.filter(action => !action.enabled)
+              .map(action => ({ kind: action.kind, reason: action.reason })) ?? [],
             narrator: usage?.narrator ?? 'unknown',
             llmRoute: usage?.llmRoute ?? 'unknown',
             llmCalls: usage?.llm?.calls ?? 0,
@@ -374,6 +467,24 @@ async function run() {
           }
           if (!data.narrative) {
             report.quality.emptyNarratives.push({ scenario: scenario.name, index: index + 1 })
+          }
+          if (status < 400 && !data.engine) {
+            report.quality.missingEngineViews.push(turnReport)
+          }
+          for (const expectedTool of turn.expectTools ?? []) {
+            if (!turnReport.toolsUsed.includes(expectedTool)) {
+              report.quality.missingExpectedTools.push({ ...turnReport, expectedTool })
+            }
+          }
+          for (const expectedEvent of turn.expectEvents ?? []) {
+            if (!turnReport.engineEventTypes.includes(expectedEvent)) {
+              report.quality.missingExpectedEvents.push({ ...turnReport, expectedEvent })
+            }
+          }
+          for (const expectedAffordance of turn.expectAffordances ?? []) {
+            if (!turnReport.enabledAffordances.includes(expectedAffordance)) {
+              report.quality.missingExpectedAffordances.push({ ...turnReport, expectedAffordance })
+            }
           }
           if (turn.expectNoLlm && turnReport.llmCalls > report.targets.maxSimpleTurnLlmCalls) {
             report.quality.simpleTurnLlmViolations.push(turnReport)
@@ -435,6 +546,18 @@ async function run() {
   }
   if (report.quality.roboticNarratives.length > 0) {
     report.targetViolations.push(`${report.quality.roboticNarratives.length} turns matched robotic narration patterns`)
+  }
+  if (report.quality.missingEngineViews.length > 0) {
+    report.targetViolations.push(`${report.quality.missingEngineViews.length} turns missed engine debug views`)
+  }
+  if (report.quality.missingExpectedTools.length > 0) {
+    report.targetViolations.push(`${report.quality.missingExpectedTools.length} expected tools were not used`)
+  }
+  if (report.quality.missingExpectedEvents.length > 0) {
+    report.targetViolations.push(`${report.quality.missingExpectedEvents.length} expected engine events were not emitted`)
+  }
+  if (report.quality.missingExpectedAffordances.length > 0) {
+    report.targetViolations.push(`${report.quality.missingExpectedAffordances.length} expected affordances were not enabled`)
   }
 
   if (reportPath) {

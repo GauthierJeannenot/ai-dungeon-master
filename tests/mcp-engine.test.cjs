@@ -1288,3 +1288,103 @@ test('MCP combat scenario resolves movement, attacks, turn order, and combat end
     })
   })
 })
+
+test('MCP resolve_player_action resolves stateful office search, force, and recipe pickup', async () => {
+  await withForcedDiceSequence('10,8', async () => {
+    await withMcpClient(async client => {
+      const baseState = await callTool(client, 'get_game_state')
+      baseState.player.position = { x: 5, y: 9 }
+      baseState.roomsVisited = ['5']
+      baseState.currentRoomId = '5'
+
+      await callTool(client, 'replace_game_state', { gameState: baseState })
+
+      const search = await callTool(client, 'resolve_player_action', {
+        action: { kind: 'search' },
+      })
+      assert.equal(search.success, true)
+      assert.ok(search.result.discoveredObjects.some(object => object.id === 'office_drawer'))
+
+      let stateAfter = await callTool(client, 'get_game_state')
+      assert.equal(stateAfter.world.objects.office_drawer.discovered, true)
+      assert.equal(stateAfter.world.objects.office_drawer.visible, true)
+      assert.ok(stateAfter.world.eventLog.some(event => event.type === 'room.object_discovered' && event.targetId === 'office_drawer'))
+
+      const lockedOpen = await callTool(client, 'resolve_player_action', {
+        action: { kind: 'open', targetName: 'tiroir' },
+      })
+      assert.equal(lockedOpen.code, 'OBJECT_LOCKED')
+
+      const forced = await callTool(client, 'resolve_player_action', {
+        action: { kind: 'force', targetName: 'tiroir' },
+      })
+      assert.equal(forced.success, true)
+      assert.equal(forced.result.object.opened, true)
+      assert.ok(forced.result.discoveredObjects.some(object => object.id === 'recipe_half_office'))
+
+      stateAfter = await callTool(client, 'get_game_state')
+      assert.equal(stateAfter.world.objects.office_drawer.opened, true)
+      assert.equal(stateAfter.world.objects.office_drawer.locked, false)
+      assert.equal(stateAfter.world.objects.recipe_half_office.discovered, true)
+      assert.equal(stateAfter.world.alarms.bakery_alert.raised, true)
+      assert.ok(stateAfter.world.eventLog.some(event => event.type === 'alarm.raised'))
+      assert.ok(stateAfter.world.eventLog.some(event => event.type === 'object.opened' && event.targetId === 'office_drawer'))
+
+      const take = await callTool(client, 'resolve_player_action', {
+        action: { kind: 'take', targetName: 'recette' },
+      })
+      assert.equal(take.success, true)
+      assert.equal(take.result.quest.progress, 1)
+
+      stateAfter = await callTool(client, 'get_game_state')
+      assert.equal(stateAfter.world.objects.recipe_half_office.taken, true)
+      assert.equal(stateAfter.world.quests.grammy_recipe.progress, 1)
+      assert.ok(stateAfter.player.inventory.some(item => item.id === 'recipe_half_office'))
+      assert.ok(stateAfter.world.eventLog.some(event => event.type === 'object.taken' && event.targetId === 'recipe_half_office'))
+      assert.ok(stateAfter.world.eventLog.some(event => event.type === 'quest.item_found' && event.targetId === 'recipe_half_office'))
+
+      const duplicateTake = await callTool(client, 'resolve_player_action', {
+        action: { kind: 'take', targetName: 'recette' },
+      })
+      assert.equal(duplicateTake.code, 'WORLD_OBJECT_NOT_AFFORDED')
+
+      stateAfter = await callTool(client, 'get_game_state')
+      assert.equal(stateAfter.world.quests.grammy_recipe.progress, 1)
+      assert.ok(stateAfter.world.eventLog.some(event => event.type === 'action.blocked'))
+    })
+  })
+})
+
+test('MCP resolve_player_action records NPC disposition and object use events', async () => {
+  await withMcpClient(async client => {
+    const baseState = await callTool(client, 'get_game_state')
+    await callTool(client, 'replace_game_state', { gameState: baseState })
+
+    const talk = await callTool(client, 'resolve_player_action', {
+      action: { kind: 'talk', targetName: 'Mac', topic: 'aide moi pour la recette de Grammy' },
+    })
+    assert.equal(talk.success, true)
+    assert.equal(talk.result.npc.disposition, 'helpful')
+
+    let stateAfter = await callTool(client, 'get_game_state')
+    assert.equal(stateAfter.world.npcs.mac.disposition, 'helpful')
+    assert.ok(stateAfter.world.eventLog.some(event => event.type === 'npc.disposition_changed' && event.targetId === 'mac'))
+
+    stateAfter.player.position = { x: 8, y: 6 }
+    stateAfter.roomsVisited = ['1', '8']
+    stateAfter.currentRoomId = '8'
+    await callTool(client, 'replace_game_state', { gameState: stateAfter })
+
+    const oven = await callTool(client, 'resolve_player_action', {
+      action: { kind: 'use_object', targetName: 'four' },
+    })
+    assert.equal(oven.success, true)
+    assert.equal(oven.result.object.used, true)
+    assert.equal(oven.result.alarm.raised, true)
+
+    const afterOven = await callTool(client, 'get_game_state')
+    assert.equal(afterOven.world.objects.enchanted_oven.used, true)
+    assert.ok(afterOven.world.eventLog.some(event => event.type === 'object.used' && event.targetId === 'enchanted_oven'))
+    assert.ok(afterOven.world.eventLog.some(event => event.type === 'alarm.raised' && event.targetId === 'bakery_alert'))
+  })
+})

@@ -126,18 +126,18 @@ test('game action language does not turn status questions into attacks', () => {
   assert.equal(intent.requiresEngine, false)
 })
 
-test('game action language routes local objects to interact instead of move', () => {
+test('game action language routes local objects to canonical world actions', () => {
   const intent = actions.classifyPlayerAction("j'ouvre le tiroir du bureau", baseGameState({ currentRoomId: '5' }))
-  assert.equal(intent.kind, 'interact')
-  assert.equal(intent.primitive, 'interact')
-  assert.deepEqual(intent.suggestedTools, ['trigger_room_event', 'roll_ability_check', 'start_encounter'])
+  assert.equal(intent.kind, 'open')
+  assert.equal(intent.primitive, 'world_action')
+  assert.deepEqual(intent.suggestedTools, ['resolve_player_action'])
 })
 
-test('game action language routes conversational NPC asks to social checks', () => {
+test('game action language routes conversational NPC asks to canonical talk', () => {
   const intent = actions.classifyPlayerAction('je parle gentiment a Mac pour lui demander ce qu il sait', baseGameState())
-  assert.equal(intent.kind, 'social')
-  assert.equal(intent.primitive, 'check')
-  assert.deepEqual(intent.suggestedTools, ['roll_ability_check'])
+  assert.equal(intent.kind, 'talk')
+  assert.equal(intent.primitive, 'world_action')
+  assert.deepEqual(intent.suggestedTools, ['resolve_player_action'])
 })
 
 test('game action language routes coordinate phrases with vais as movement', () => {

@@ -154,6 +154,17 @@ function downedCombatGameState() {
   }
 }
 
+function officeGameState() {
+  return baseGameState({
+    player: {
+      ...baseGameState().player,
+      position: { x: 5, y: 9 },
+    },
+    roomsVisited: ['5'],
+    currentRoomId: '5',
+  })
+}
+
 async function postDm(body) {
   const response = await POST(new Request('http://localhost/api/dm', {
     method: 'POST',
@@ -271,4 +282,85 @@ test('DM API routes downed player status guidance through final LLM narration', 
   assert.deepEqual(data.usage?.operations, ['dm.final_narration'])
   assert.equal(data.usage?.llmRoute, 'rich')
   assert.equal(data.usage?.narrator, 'llm')
+})
+
+test('DM API resolves natural stateful world actions through canonical engine events', async t => {
+  const sessionId = `api-world-${process.pid}-${Date.now()}`
+  const previousDice = process.env.AI_DM_TEST_DICE_SEQUENCE
+  process.env.AI_DM_TEST_DICE_SEQUENCE = '10,8'
+  t.after(async () => {
+    if (previousDice === undefined) delete process.env.AI_DM_TEST_DICE_SEQUENCE
+    else process.env.AI_DM_TEST_DICE_SEQUENCE = previousDice
+    await cleanupSession(sessionId)
+  })
+
+  const search = await postDm({
+    message: 'je fouille le bureau',
+    clientRequestId: `client-search-${sessionId}`,
+    sessionId,
+    gameState: officeGameState(),
+    history: [],
+  })
+  assert.equal(search.response.status, 200)
+  assert.ok(search.data.toolsUsed.includes('resolve_player_action'))
+  assert.ok(search.data.engine?.events?.some(event => event.type === 'room.object_discovered' && event.targetId === 'office_drawer'))
+  assert.equal(search.data.newGameState.world.objects.office_drawer.discovered, true)
+  assert.ok(search.data.engine?.affordances?.some(action => action.kind === 'unlock' && action.enabled === true))
+
+  const force = await postDm({
+    message: "j'enfonce le tiroir",
+    clientRequestId: `client-force-${sessionId}`,
+    sessionId,
+    gameState: search.data.newGameState,
+    history: [],
+  })
+  assert.equal(force.response.status, 200)
+  assert.ok(force.data.toolsUsed.includes('resolve_player_action'))
+  assert.ok(force.data.engine?.events?.some(event => event.type === 'object.opened' && event.targetId === 'office_drawer'))
+  assert.ok(force.data.engine?.events?.some(event => event.type === 'alarm.raised'))
+  assert.equal(force.data.newGameState.world.objects.recipe_half_office.discovered, true)
+  assert.ok(force.data.engine?.affordances?.some(action => action.kind === 'take' && action.enabled === true))
+
+  const take = await postDm({
+    message: 'je prends le fragment de recette',
+    clientRequestId: `client-take-${sessionId}`,
+    sessionId,
+    gameState: force.data.newGameState,
+    history: [],
+  })
+  assert.equal(take.response.status, 200)
+  assert.ok(take.data.toolsUsed.includes('resolve_player_action'))
+  assert.ok(take.data.engine?.events?.some(event => event.type === 'object.taken' && event.targetId === 'recipe_half_office'))
+  assert.ok(take.data.engine?.events?.some(event => event.type === 'quest.item_found'))
+  assert.equal(take.data.newGameState.world.quests.grammy_recipe.progress, 1)
+
+  const duplicateTake = await postDm({
+    message: 'je prends la recette encore',
+    clientRequestId: `client-duplicate-${sessionId}`,
+    sessionId,
+    gameState: take.data.newGameState,
+    history: [],
+  })
+  assert.equal(duplicateTake.response.status, 200)
+  assert.ok(duplicateTake.data.engine?.events?.some(event => event.type === 'action.blocked'))
+  assert.equal(duplicateTake.data.newGameState.world.quests.grammy_recipe.progress, 1)
+})
+
+test('DM API canonical talk changes NPC disposition through world event', async t => {
+  const sessionId = `api-talk-${process.pid}-${Date.now()}`
+  t.after(() => cleanupSession(sessionId))
+
+  const { response, data } = await postDm({
+    message: 'je demande a Mac de nous aider pour la recette',
+    clientRequestId: `client-${sessionId}`,
+    sessionId,
+    gameState: baseGameState(),
+    history: [],
+  })
+
+  assert.equal(response.status, 200)
+  assert.ok(data.toolsUsed.includes('resolve_player_action'))
+  assert.equal(data.newGameState.world.npcs.mac.disposition, 'helpful')
+  assert.ok(data.engine?.events?.some(event => event.type === 'npc.disposition_changed' && event.targetId === 'mac'))
+  assert.equal(data.usage?.llmRoute, 'rich')
 })

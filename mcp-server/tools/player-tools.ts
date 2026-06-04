@@ -119,6 +119,7 @@ const GameStateSchema = z.object({
   currentRoomId: z.string().nullable(),
   encountersTriggered: z.array(z.string()).optional().default([]),
   sceneMemory: SceneMemorySchema.optional(),
+  world: z.any().optional(),
 }).superRefine((state, ctx) => {
   if (state.player.hp.current > state.player.hp.max) {
     ctx.addIssue({

@@ -151,3 +151,78 @@ test('world engine converts mechanical logs into canonical events', () => {
   assert.equal(events[1].outcome, 'failure')
   assert.equal(events.every(event => event.visibleToPlayer), true)
 })
+
+test('world engine derives object and NPC affordances from explicit world state', () => {
+  const state = baseGameState({
+    currentRoomId: '5',
+    roomsVisited: ['5'],
+    world: {
+      objects: {
+        office_drawer: {
+          id: 'office_drawer',
+          roomId: '5',
+          name: 'tiroir du bureau',
+          kind: 'container',
+          visible: true,
+          discovered: true,
+          opened: false,
+          locked: true,
+          contains: ['recipe_half_office'],
+          tags: ['drawer', 'recipe_cache'],
+          dc: { unlock: 12, force: 13 },
+        },
+        recipe_half_office: {
+          id: 'recipe_half_office',
+          roomId: '5',
+          name: 'moitie de recette',
+          kind: 'clue',
+          visible: false,
+          discovered: false,
+          taken: false,
+          tags: ['recipe_half'],
+        },
+      },
+      npcs: {},
+      quests: {},
+      alarms: {},
+      flags: {},
+      eventLog: [],
+    },
+  })
+
+  const affordances = worldEngine.derivePlayerAffordances(state)
+
+  assert.equal(affordances.find(action => action.kind === 'search')?.enabled, true)
+  assert.equal(affordances.find(action => action.id === 'world-open-office_drawer')?.enabled, false)
+  assert.equal(affordances.find(action => action.id === 'world-unlock-office_drawer')?.enabled, true)
+  assert.equal(affordances.find(action => action.id === 'world-force-office_drawer')?.enabled, true)
+  assert.equal(affordances.some(action => action.kind === 'take' && action.enabled), false)
+})
+
+test('world engine includes canonical world events in resolution views', () => {
+  const worldEvent = {
+    id: 'world-test',
+    type: 'door.opened',
+    summary: 'La porte est ouverte.',
+    actorId: 'player',
+    targetId: 'front_double_door',
+    outcome: 'success',
+    visibleToPlayer: true,
+  }
+  const state = baseGameState({
+    world: {
+      objects: {},
+      npcs: {},
+      quests: {},
+      alarms: {},
+      flags: {},
+      eventLog: [worldEvent],
+    },
+  })
+
+  const view = worldEngine.buildEngineResolutionView(state, [], [worldEvent])
+
+  assert.equal(view.events[0].type, 'door.opened')
+  assert.equal(view.events[0].targetId, 'front_double_door')
+  assert.ok(view.affordances.some(action => action.kind === 'search' && action.enabled))
+})

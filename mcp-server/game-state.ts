@@ -1,4 +1,17 @@
-import { GameState, MonsterState, Condition, PlayerState, Item } from '../lib/types'
+import {
+  GameState,
+  MonsterState,
+  Condition,
+  PlayerState,
+  Item,
+  EngineEvent,
+  WorldAlarmState,
+  WorldNpcDisposition,
+  WorldNpcState,
+  WorldObjectState,
+  WorldQuestState,
+  WorldState,
+} from '../lib/types'
 import { inferAdventureRoomId } from '../lib/adventure-map'
 
 // Initial player template — overridable via context files
@@ -22,7 +35,226 @@ const DEFAULT_PLAYER: PlayerState = {
   ],
 }
 
+const WORLD_EVENT_LOG_LIMIT = 200
+
 let state: GameState = createInitialState()
+
+function createInitialWorldState(): WorldState {
+  return {
+    objects: {
+      front_double_door: {
+        id: 'front_double_door',
+        roomId: '4',
+        name: 'double porte de la boulangerie',
+        kind: 'door',
+        visible: true,
+        discovered: true,
+        opened: false,
+        locked: false,
+        tags: ['door', 'street'],
+        description: 'La double porte qui separe la boutique de la rue.',
+      },
+      reserve_door: {
+        id: 'reserve_door',
+        roomId: '4',
+        name: 'porte de la reserve',
+        kind: 'door',
+        visible: true,
+        discovered: true,
+        opened: false,
+        locked: false,
+        tags: ['door', 'bakery'],
+        description: 'Une porte interieure qui mene vers la reserve enfarinee.',
+      },
+      office_drawer: {
+        id: 'office_drawer',
+        roomId: '5',
+        name: 'tiroir du bureau',
+        kind: 'container',
+        visible: false,
+        discovered: false,
+        opened: false,
+        locked: true,
+        contains: ['recipe_half_office'],
+        tags: ['drawer', 'recipe_cache'],
+        dc: { search: 12, unlock: 12, force: 13 },
+        description: 'Un tiroir bas, coince sous des factures graisseuses.',
+      },
+      recipe_half_office: {
+        id: 'recipe_half_office',
+        roomId: '5',
+        name: 'moitie de recette du bureau',
+        kind: 'clue',
+        visible: false,
+        discovered: false,
+        taken: false,
+        tags: ['recipe_half', 'quest_item'],
+        description: 'Un fragment de recette au coin brule.',
+      },
+      grammy_armoire: {
+        id: 'grammy_armoire',
+        roomId: '9',
+        name: 'armoire de Grammy',
+        kind: 'container',
+        visible: true,
+        discovered: true,
+        opened: false,
+        locked: false,
+        contains: ['recipe_half_apartment'],
+        tags: ['armoire', 'recipe_cache'],
+        dc: { search: 10 },
+        description: 'Une armoire haute dont la porte ferme mal.',
+      },
+      recipe_half_apartment: {
+        id: 'recipe_half_apartment',
+        roomId: '9',
+        name: 'moitie de recette de Grammy',
+        kind: 'clue',
+        visible: false,
+        discovered: false,
+        taken: false,
+        tags: ['recipe_half', 'quest_item'],
+        description: 'Un second fragment de recette glisse sous une pile de linges.',
+      },
+      enchanted_oven: {
+        id: 'enchanted_oven',
+        roomId: '8',
+        name: 'four enchante',
+        kind: 'fixture',
+        visible: true,
+        discovered: true,
+        used: false,
+        tags: ['oven', 'dangerous', 'noise'],
+        dc: { open: 12 },
+        description: 'Un four trop chaud, grave de runes de cuisine.',
+      },
+      violet_fungus_heap: {
+        id: 'violet_fungus_heap',
+        roomId: '3',
+        name: 'amas de champignons violets',
+        kind: 'trap',
+        visible: true,
+        discovered: true,
+        used: false,
+        tags: ['trap', 'poison'],
+        dc: { search: 13 },
+        description: 'Des champignons mous qui fremissent quand on approche.',
+      },
+    },
+    npcs: {
+      mac: {
+        id: 'mac',
+        name: 'Mac',
+        roomId: '1',
+        disposition: 'neutral',
+        known: true,
+        tags: ['bakery', 'quest_giver'],
+      },
+      dryad_orchard: {
+        id: 'dryad_orchard',
+        name: 'druidesse du verger',
+        roomId: '2',
+        disposition: 'neutral',
+        known: false,
+        tags: ['orchard', 'spirit'],
+      },
+      grukk: {
+        id: 'grukk',
+        name: 'Grukk',
+        roomId: '9',
+        disposition: 'hostile',
+        known: false,
+        tags: ['goblin', 'boss'],
+      },
+    },
+    quests: {
+      grammy_recipe: {
+        id: 'grammy_recipe',
+        name: 'Retrouver la recette de Grammy',
+        progress: 0,
+        goal: 2,
+        completed: false,
+        flags: {},
+      },
+    },
+    alarms: {
+      bakery_alert: {
+        level: 0,
+        raised: false,
+      },
+    },
+    flags: {},
+    eventLog: [],
+  }
+}
+
+function mergeObjectState(defaultObject: WorldObjectState | undefined, incomingObject: WorldObjectState): WorldObjectState {
+  return {
+    ...defaultObject,
+    ...incomingObject,
+    dc: { ...(defaultObject?.dc ?? {}), ...(incomingObject.dc ?? {}) },
+    tags: incomingObject.tags ?? defaultObject?.tags,
+    contains: incomingObject.contains ?? defaultObject?.contains,
+  }
+}
+
+function mergeNpcState(defaultNpc: WorldNpcState | undefined, incomingNpc: WorldNpcState): WorldNpcState {
+  return {
+    ...defaultNpc,
+    ...incomingNpc,
+    tags: incomingNpc.tags ?? defaultNpc?.tags,
+  }
+}
+
+function mergeQuestState(defaultQuest: WorldQuestState | undefined, incomingQuest: WorldQuestState): WorldQuestState {
+  return {
+    ...defaultQuest,
+    ...incomingQuest,
+    flags: { ...(defaultQuest?.flags ?? {}), ...(incomingQuest.flags ?? {}) },
+  }
+}
+
+function mergeAlarmState(defaultAlarm: WorldAlarmState | undefined, incomingAlarm: WorldAlarmState): WorldAlarmState {
+  return {
+    ...defaultAlarm,
+    ...incomingAlarm,
+  }
+}
+
+function ensureWorldState(): WorldState {
+  const defaults = createInitialWorldState()
+  const incoming = state.world
+
+  const objects: Record<string, WorldObjectState> = structuredClone(defaults.objects)
+  for (const [id, object] of Object.entries(incoming?.objects ?? {})) {
+    objects[id] = mergeObjectState(defaults.objects[id], structuredClone(object))
+  }
+
+  const npcs: Record<string, WorldNpcState> = structuredClone(defaults.npcs)
+  for (const [id, npc] of Object.entries(incoming?.npcs ?? {})) {
+    npcs[id] = mergeNpcState(defaults.npcs[id], structuredClone(npc))
+  }
+
+  const quests: Record<string, WorldQuestState> = structuredClone(defaults.quests)
+  for (const [id, quest] of Object.entries(incoming?.quests ?? {})) {
+    quests[id] = mergeQuestState(defaults.quests[id], structuredClone(quest))
+  }
+
+  const alarms: Record<string, WorldAlarmState> = structuredClone(defaults.alarms)
+  for (const [id, alarm] of Object.entries(incoming?.alarms ?? {})) {
+    alarms[id] = mergeAlarmState(defaults.alarms[id], structuredClone(alarm))
+  }
+
+  state.world = {
+    objects,
+    npcs,
+    quests,
+    alarms,
+    flags: { ...defaults.flags, ...(incoming?.flags ?? {}) },
+    eventLog: structuredClone(incoming?.eventLog ?? []).slice(-WORLD_EVENT_LOG_LIMIT),
+  }
+  return state.world
+}
 
 function createInitialState(): GameState {
   const initialRoomId = inferAdventureRoomId(DEFAULT_PLAYER.position)
@@ -39,6 +271,7 @@ function createInitialState(): GameState {
     roomsVisited: initialRoomId ? [initialRoomId] : [],
     currentRoomId: initialRoomId,
     encountersTriggered: [],
+    world: createInitialWorldState(),
   }
 }
 
@@ -73,6 +306,7 @@ function syncDyingPlayerState(): void {
 }
 
 export function getState(): GameState {
+  ensureWorldState()
   return state
 }
 
@@ -89,6 +323,7 @@ export function replaceState(nextState: GameState): GameState {
     roomsVisited: structuredClone(nextState.roomsVisited ?? []),
     encountersTriggered: structuredClone(nextState.encountersTriggered ?? []),
   }
+  ensureWorldState()
   syncPlayerRoomFromPosition()
   syncDyingPlayerState()
   return state
@@ -152,6 +387,112 @@ export function consumePlayerItem(predicate: (item: Item) => boolean): Item | nu
   if (index < 0) return null
   const [item] = state.player.inventory.splice(index, 1)
   return item ?? null
+}
+
+export function getWorldState(): WorldState {
+  return ensureWorldState()
+}
+
+export function recordWorldEvent(event: Omit<EngineEvent, 'id' | 'visibleToPlayer'> & { id?: string; visibleToPlayer?: boolean }): EngineEvent {
+  const world = ensureWorldState()
+  const recorded: EngineEvent = {
+    ...event,
+    id: event.id ?? `world-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    visibleToPlayer: event.visibleToPlayer ?? true,
+  }
+  world.eventLog.push(recorded)
+  if (world.eventLog.length > WORLD_EVENT_LOG_LIMIT) {
+    world.eventLog = world.eventLog.slice(-WORLD_EVENT_LOG_LIMIT)
+  }
+  return recorded
+}
+
+export function getWorldObject(objectId: string): WorldObjectState | undefined {
+  return ensureWorldState().objects[objectId]
+}
+
+export function updateWorldObject(objectId: string, patch: Partial<WorldObjectState>): WorldObjectState {
+  const world = ensureWorldState()
+  const object = world.objects[objectId]
+  if (!object) throw new Error(`World object not found: ${objectId}`)
+  world.objects[objectId] = {
+    ...object,
+    ...patch,
+    dc: { ...(object.dc ?? {}), ...(patch.dc ?? {}) },
+    tags: patch.tags ?? object.tags,
+    contains: patch.contains ?? object.contains,
+  }
+  return world.objects[objectId]
+}
+
+export function discoverWorldObject(objectId: string): WorldObjectState {
+  return updateWorldObject(objectId, { visible: true, discovered: true })
+}
+
+export function openWorldObject(objectId: string): WorldObjectState {
+  return updateWorldObject(objectId, { visible: true, discovered: true, opened: true, locked: false })
+}
+
+export function takeWorldObject(objectId: string): WorldObjectState {
+  return updateWorldObject(objectId, { visible: true, discovered: true, taken: true })
+}
+
+export function updateNpcDisposition(npcId: string, disposition: WorldNpcDisposition): WorldNpcState {
+  const world = ensureWorldState()
+  const npc = world.npcs[npcId]
+  if (!npc) throw new Error(`World NPC not found: ${npcId}`)
+  world.npcs[npcId] = {
+    ...npc,
+    disposition,
+    known: true,
+  }
+  return world.npcs[npcId]
+}
+
+export function advanceWorldQuest(questId: string, flagId: string, amount = 1): WorldQuestState {
+  const world = ensureWorldState()
+  const quest = world.quests[questId]
+  if (!quest) throw new Error(`World quest not found: ${questId}`)
+  quest.flags ??= {}
+  if (!quest.flags[flagId]) {
+    quest.progress = Math.min(quest.goal, quest.progress + amount)
+    quest.flags[flagId] = true
+  }
+  quest.completed = quest.progress >= quest.goal
+  return quest
+}
+
+export function raiseWorldAlarm(alarmId: string, reason: string, amount = 1): WorldAlarmState {
+  const world = ensureWorldState()
+  const alarm = world.alarms[alarmId] ?? { level: 0, raised: false }
+  alarm.level = Math.max(0, alarm.level + amount)
+  alarm.raised = true
+  alarm.reason = reason
+  world.alarms[alarmId] = alarm
+  return alarm
+}
+
+export function setWorldFlag(flagId: string, value: boolean): void {
+  const world = ensureWorldState()
+  world.flags ??= {}
+  world.flags[flagId] = value
+}
+
+export function stabilizePlayer(reason: string): PlayerState {
+  const player = state.player
+  player.deathSaves = { successes: 0, failures: 0, stable: true }
+  if (!player.conditions.includes('unconscious')) {
+    player.conditions.push('unconscious')
+  }
+  player.hp.current = 0
+  recordWorldEvent({
+    type: 'character.stabilized',
+    summary: reason,
+    actorId: 'player',
+    targetId: 'player',
+    outcome: 'success',
+  })
+  return player
 }
 
 export function rollPlayerDeathSave(roll: number): {

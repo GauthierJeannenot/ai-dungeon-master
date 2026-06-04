@@ -11,6 +11,18 @@ export type GameActionKind =
   | 'attack'
   | 'move'
   | 'interact'
+  | 'search'
+  | 'open'
+  | 'take'
+  | 'unlock'
+  | 'force'
+  | 'talk'
+  | 'threaten'
+  | 'hide'
+  | 'help'
+  | 'flee'
+  | 'stabilize'
+  | 'use_object'
   | 'use_item'
   | 'ability_check'
   | 'social'
@@ -26,6 +38,7 @@ export type GameActionPrimitive =
   | 'resolve_attack'
   | 'move'
   | 'interact'
+  | 'world_action'
   | 'use_item'
   | 'check'
   | 'wait'
@@ -171,6 +184,158 @@ export function classifyPlayerAction(message: string, gameState: GameState): Gam
     })
   }
 
+  const searchIntent = /\b(fouilles?|fouiller|cherches?|chercher|inspectes?|inspecter|examines?|examiner|regardes?|regarder)\b/.test(text) &&
+    /\b(piece|salle|bureau|tiroirs?|coffres?|armoires?|placards?|etagere|recette|indices?|cachette|reserve|four|objets?)\b/.test(text)
+  const unlockIntent = /\b(crochetes?|crocheter|deverrouilles?|deverrouiller|deverouille|serrure)\b/.test(text)
+  const forceObjectIntent = /\b(forces?|forcer|enfonces?|enfoncer|defonces?|defoncer|casses?|casser)\b/.test(text) &&
+    /\b(porte|tiroir|coffre|armoire|serrure|verrou)\b/.test(text)
+  const openIntent = /\b(ouvres?|ouvrir|entrouvres?|soulever|souleves?)\b/.test(text) &&
+    /\b(porte|tiroir|coffre|armoire|four|couvercle|placard)\b/.test(text)
+  const takeWorldObjectIntent = /\b(prends?|prendre|ramasses?|ramasser|recuperes?|recuperer|empoches?|empocher|saisis|attrapes?|attraper)\b/.test(text) &&
+    /\b(recette|fragment|moitie|indice|objet|papier|parchemin|cle|clef|potion|lettre)\b/.test(text)
+  const talkIntent = /\b(parles?|parler|discutes?|discuter|demandes?|demander|questionnes?|questionner|adresses?|adresser)\b/.test(text) &&
+    /\b(mac|pommier|treant|arbre|gobelins?|grukk|grammy|pnj|personne|lui|elle|eux|druidesse)\b/.test(text)
+  const threatenIntent = /\b(menaces?|menacer|intimides?|intimider|pression|fais peur|soumet|soumission|rends toi|rendez vous)\b/.test(text)
+  const hideIntent = /\b(caches?|cacher|planques?|planquer|discretion|furtif|furtivement)\b/.test(text)
+  const fleeIntent = /\b(fuis|fuir|fuite|s enfuir|s'enfuir|retraite|bats en retraite|deguerpis)\b/.test(text)
+  const helpIntent = /\b(aides?|aider|assistes?|assister|donnes? un coup de main)\b/.test(text)
+  const stabilizeIntent = /\b(stabilises?|stabiliser|premiers secours|medecine|soignes?|soigner)\b/.test(text) &&
+    /\b(moi|joueur|heros|allie|blesse|inconscient|agonisant)\b/.test(text)
+  const useWorldObjectIntent = /\b(utilises?|utiliser|actives?|activer|touches?|toucher|manipules?|manipuler|declenches?|declencher)\b/.test(text) &&
+    /\b(four|levier|piege|champignons?|objet|runes?|mecanisme)\b/.test(text)
+
+  if (searchIntent) {
+    return intent(text, {
+      kind: 'search',
+      primitive: 'world_action',
+      reason: 'world-search-intent',
+      requiresEngine: true,
+      suggestedTools: ['resolve_player_action'],
+      confidence: 'high',
+    })
+  }
+
+  if (unlockIntent) {
+    return intent(text, {
+      kind: 'unlock',
+      primitive: 'world_action',
+      reason: 'world-unlock-intent',
+      requiresEngine: true,
+      suggestedTools: ['resolve_player_action'],
+      confidence: 'high',
+    })
+  }
+
+  if (forceObjectIntent) {
+    return intent(text, {
+      kind: 'force',
+      primitive: 'world_action',
+      reason: 'world-force-intent',
+      requiresEngine: true,
+      suggestedTools: ['resolve_player_action'],
+      confidence: 'high',
+    })
+  }
+
+  if (openIntent) {
+    return intent(text, {
+      kind: 'open',
+      primitive: 'world_action',
+      reason: 'world-open-intent',
+      requiresEngine: true,
+      suggestedTools: ['resolve_player_action'],
+      confidence: 'high',
+    })
+  }
+
+  if (takeWorldObjectIntent) {
+    return intent(text, {
+      kind: 'take',
+      primitive: 'world_action',
+      reason: 'world-take-intent',
+      requiresEngine: true,
+      suggestedTools: ['resolve_player_action'],
+      confidence: 'high',
+    })
+  }
+
+  if (threatenIntent) {
+    return intent(text, {
+      kind: 'threaten',
+      primitive: 'world_action',
+      reason: 'world-threaten-intent',
+      requiresEngine: true,
+      suggestedTools: ['resolve_player_action'],
+      confidence: 'high',
+    })
+  }
+
+  if (talkIntent) {
+    return intent(text, {
+      kind: 'talk',
+      primitive: 'world_action',
+      reason: 'world-talk-intent',
+      requiresEngine: true,
+      suggestedTools: ['resolve_player_action'],
+      confidence: 'high',
+    })
+  }
+
+  if (hideIntent) {
+    return intent(text, {
+      kind: 'hide',
+      primitive: 'world_action',
+      reason: 'world-hide-intent',
+      requiresEngine: true,
+      suggestedTools: ['resolve_player_action'],
+      confidence: 'high',
+    })
+  }
+
+  if (fleeIntent) {
+    return intent(text, {
+      kind: 'flee',
+      primitive: 'world_action',
+      reason: 'world-flee-intent',
+      requiresEngine: true,
+      suggestedTools: ['resolve_player_action'],
+      confidence: 'high',
+    })
+  }
+
+  if (stabilizeIntent) {
+    return intent(text, {
+      kind: 'stabilize',
+      primitive: 'world_action',
+      reason: 'world-stabilize-intent',
+      requiresEngine: true,
+      suggestedTools: ['resolve_player_action'],
+      confidence: 'high',
+    })
+  }
+
+  if (helpIntent) {
+    return intent(text, {
+      kind: 'help',
+      primitive: 'world_action',
+      reason: 'world-help-intent',
+      requiresEngine: true,
+      suggestedTools: ['resolve_player_action'],
+      confidence: 'medium',
+    })
+  }
+
+  if (useWorldObjectIntent) {
+    return intent(text, {
+      kind: 'use_object',
+      primitive: 'world_action',
+      reason: 'world-use-object-intent',
+      requiresEngine: true,
+      suggestedTools: ['resolve_player_action'],
+      confidence: 'high',
+    })
+  }
+
   const attackIntent = obviousAttackIntent
   const directMovementIntent = /\b(deplaces?|deplacer|avances?|avancer|bouges?|bouger|aller|vers|entres?|entrer|rentres?|retournes?|retourner|rejoins?|rejoindre|retrouves?|retrouver|rends|traverses?|approches?|explores?|explorer|aventures?|aventurer|continues?|continuer|plus loin|montes?|monter|grimpes?|grimpe|empruntes?|prends|fuis|fuite|recules?|glisses?|glisser)\b/.test(text)
   const doorMovementIntent = isDoorTraversalIntent(text)
@@ -291,10 +456,10 @@ export function classifyPlayerAction(message: string, gameState: GameState): Gam
 export function describeGameActionLanguageForPrompt(): string {
   return [
     'Le joueur peut dire n importe quoi, mais le moteur ne connait qu un petit langage d actions.',
-    'Primitives: attack, move, interact, use_item, ability_check, social, wait, death_save, query_state, observe.',
+    'Primitives: attack, move, search, open, take, unlock, force, talk, threaten, hide, help, flee, stabilize, use_object, interact, use_item, ability_check, social, wait, death_save, query_state, observe.',
     'Quand le tool resolve_player_action est disponible, utilise-le comme facade canonique pour toute action joueur qui mute le monde.',
     'Ton role: traduire l intention vers une primitive autorisee, appeler le tool correspondant si un etat doit changer, puis narrer seulement les evenements renvoyes par le moteur.',
-    'N invente jamais une nouvelle primitive ad hoc. Si l intention est creative, ramene-la a interact, ability_check ou social avec une cible et un risque clairs.',
+    'N invente jamais une nouvelle primitive ad hoc. Si l intention est creative, ramene-la a use_object, ability_check ou social avec une cible et un risque clairs.',
     'Si aucune primitive n est claire, clarifie en fiction au lieu de muter le state.',
   ].join('\n')
 }

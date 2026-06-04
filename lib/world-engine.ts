@@ -16,6 +16,18 @@ function hasHealingPotion(gameState: GameState): boolean {
   return gameState.player.inventory.some(item => item.type === 'potion')
 }
 
+function currentRoomObjects(gameState: GameState) {
+  const roomId = gameState.currentRoomId
+  if (!roomId || !gameState.world) return []
+  return Object.values(gameState.world.objects).filter(object => object.roomId === roomId && !object.taken)
+}
+
+function currentRoomNpcs(gameState: GameState) {
+  const roomId = gameState.currentRoomId
+  if (!roomId || !gameState.world) return []
+  return Object.values(gameState.world.npcs).filter(npc => npc.roomId === roomId)
+}
+
 function affordance(fields: PlayerAffordance): PlayerAffordance {
   return fields
 }
@@ -113,6 +125,14 @@ export function derivePlayerAffordances(gameState: GameState): PlayerAffordance[
           toolName: 'resolve_player_action',
         }),
         affordance({
+          id: 'combat-threaten',
+          kind: 'threaten',
+          label: 'Menacer ou intimider',
+          enabled: true,
+          reason: 'Une pression sociale hostile doit produire un check et un event de disposition.',
+          toolName: 'resolve_player_action',
+        }),
+        affordance({
           id: 'combat-social-pressure',
           kind: 'social',
           label: 'Parlementer ou intimider',
@@ -138,6 +158,22 @@ export function derivePlayerAffordances(gameState: GameState): PlayerAffordance[
         label: 'Passer ou tenir sa position',
         enabled: true,
         reason: 'Le joueur peut laisser filer son tour.',
+        toolName: 'resolve_player_action',
+      }),
+      affordance({
+        id: 'combat-hide',
+        kind: 'hide',
+        label: 'Se cacher',
+        enabled: true,
+        reason: 'Le joueur peut tenter une discretion moteur au lieu de narration libre.',
+        toolName: 'resolve_player_action',
+      }),
+      affordance({
+        id: 'combat-flee',
+        kind: 'flee',
+        label: 'Fuir',
+        enabled: true,
+        reason: 'Une fuite doit etre resolue par le moteur.',
         toolName: 'resolve_player_action',
       })
     )
@@ -218,6 +254,111 @@ export function derivePlayerAffordances(gameState: GameState): PlayerAffordance[
     }))
   }
 
+  const objects = currentRoomObjects(gameState)
+  const npcs = currentRoomNpcs(gameState)
+  const hiddenObjects = objects.filter(object => !object.visible || !object.discovered)
+  const visibleObjects = objects.filter(object => object.visible || object.discovered)
+  const unopenedObjects = visibleObjects.filter(object =>
+    ['door', 'container', 'fixture'].includes(object.kind) &&
+    object.opened !== true
+  )
+  const takeableObjects = visibleObjects.filter(object =>
+    ['item', 'clue'].includes(object.kind) &&
+    object.taken !== true
+  )
+  const usableObjects = visibleObjects.filter(object =>
+    ['fixture', 'trap'].includes(object.kind)
+  )
+
+  affordances.push(affordance({
+    id: 'world-search-current-room',
+    kind: 'search',
+    label: 'Fouiller la zone',
+    enabled: true,
+    reason: hiddenObjects.length > 0
+      ? 'Des elements non reveles peuvent etre recherches par le moteur.'
+      : 'Une fouille peut confirmer qu aucun element cache connu du moteur n est trouve.',
+    toolName: 'resolve_player_action',
+  }))
+
+  for (const object of unopenedObjects) {
+    affordances.push(affordance({
+      id: `world-open-${object.id}`,
+      kind: 'open',
+      label: `Ouvrir ${object.name}`,
+      enabled: !object.locked,
+      reason: object.locked
+        ? 'Objet verrouille: utiliser unlock ou force.'
+        : 'Objet visible et pas encore ouvert.',
+      toolName: 'resolve_player_action',
+    }))
+    if (object.locked) {
+      affordances.push(
+        affordance({
+          id: `world-unlock-${object.id}`,
+          kind: 'unlock',
+          label: `Crocheter ${object.name}`,
+          enabled: true,
+          reason: 'Objet verrouille et visible; un test moteur peut l ouvrir.',
+          toolName: 'resolve_player_action',
+        }),
+        affordance({
+          id: `world-force-${object.id}`,
+          kind: 'force',
+          label: `Forcer ${object.name}`,
+          enabled: true,
+          reason: 'Objet verrouille et visible; le forcer peut ouvrir mais augmente le risque d alarme.',
+          toolName: 'resolve_player_action',
+        })
+      )
+    }
+  }
+
+  for (const object of takeableObjects) {
+    affordances.push(affordance({
+      id: `world-take-${object.id}`,
+      kind: 'take',
+      label: `Prendre ${object.name}`,
+      enabled: true,
+      reason: 'Objet decouvert, visible, et pas encore pris.',
+      toolName: 'resolve_player_action',
+    }))
+  }
+
+  for (const object of usableObjects) {
+    affordances.push(affordance({
+      id: `world-use-${object.id}`,
+      kind: 'use_object',
+      label: `Utiliser ${object.name}`,
+      enabled: true,
+      reason: 'Objet de salle visible avec une interaction moteur explicite.',
+      toolName: 'resolve_player_action',
+    }))
+  }
+
+  for (const npc of npcs.filter(npc => npc.known)) {
+    affordances.push(
+      affordance({
+        id: `world-talk-${npc.id}`,
+        kind: 'talk',
+        label: `Parler avec ${npc.name}`,
+        enabled: true,
+        reason: `PNJ present; disposition actuelle: ${npc.disposition}.`,
+        toolName: 'resolve_player_action',
+      }),
+      affordance({
+        id: `world-threaten-${npc.id}`,
+        kind: 'threaten',
+        label: `Menacer ${npc.name}`,
+        enabled: npc.disposition !== 'helpful',
+        reason: npc.disposition === 'helpful'
+          ? 'Menacer un allie utile serait incoherent sans intention plus claire.'
+          : 'Une menace doit produire un check social et un event de disposition/alerte.',
+        toolName: 'resolve_player_action',
+      })
+    )
+  }
+
   return affordances
 }
 
@@ -275,10 +416,14 @@ export function deriveEngineEventsFromCombatLogEntries(entries: CombatLogEntry[]
 
 export function buildEngineResolutionView(
   gameState: GameState,
-  newCombatLogEntries: CombatLogEntry[]
+  newCombatLogEntries: CombatLogEntry[],
+  newWorldEvents: EngineEvent[] = []
 ): EngineResolutionView {
   return {
-    events: deriveEngineEventsFromCombatLogEntries(newCombatLogEntries),
+    events: [
+      ...newWorldEvents,
+      ...deriveEngineEventsFromCombatLogEntries(newCombatLogEntries),
+    ],
     affordances: derivePlayerAffordances(gameState),
   }
 }

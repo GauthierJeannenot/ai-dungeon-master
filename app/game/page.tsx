@@ -434,11 +434,28 @@ export default function GamePage() {
         toolsUsed: data.toolsUsed,
         engine: data.engine ? {
           eventTypes: data.engine.events.map(event => event.type),
+          events: data.engine.events.map(event => ({
+            type: event.type,
+            outcome: event.outcome,
+            actorId: event.actorId,
+            targetId: event.targetId,
+            summary: truncateClientText(event.summary, 180),
+            metadata: event.metadata,
+          })),
           affordances: data.engine.affordances.map(action => ({
+            id: action.id,
             kind: action.kind,
+            label: action.label,
             enabled: action.enabled,
             toolName: action.toolName,
+            reason: action.reason,
           })),
+          enabledAffordances: data.engine.affordances
+            .filter(action => action.enabled)
+            .map(action => ({ kind: action.kind, label: action.label, reason: action.reason })),
+          blockedAffordances: data.engine.affordances
+            .filter(action => !action.enabled)
+            .map(action => ({ kind: action.kind, label: action.label, reason: action.reason })),
         } : undefined,
         usage: data.usage,
         summaryContextLength: data.summaryContext?.length ?? 0,

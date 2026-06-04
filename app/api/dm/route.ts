@@ -152,6 +152,23 @@ function parsePositiveInt(value: string | undefined, fallback: number): number {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback
 }
 
+function isCanonicalWorldActionKind(kind: GameActionKind): boolean {
+  return [
+    'search',
+    'open',
+    'take',
+    'unlock',
+    'force',
+    'talk',
+    'threaten',
+    'hide',
+    'help',
+    'flee',
+    'stabilize',
+    'use_object',
+  ].includes(kind)
+}
+
 function parsePromptCacheTtl(value: string | undefined): '5m' | '1h' {
   if (!value) return '5m'
   if (value === '5m' || value === '1h') return value
@@ -206,6 +223,7 @@ function selectIterationLlmRoute(actionIntent: GameActionIntent, requestCallCoun
   if (
     actionIntent.kind === 'social' ||
     actionIntent.kind === 'interact' ||
+    isCanonicalWorldActionKind(actionIntent.kind) ||
     actionIntent.kind === 'guidance' ||
     actionIntent.kind === 'observe'
   ) {
@@ -225,6 +243,7 @@ function selectFinalNarrationLlmRoute(
   if (
     actionIntent.kind === 'social' ||
     actionIntent.kind === 'interact' ||
+    isCanonicalWorldActionKind(actionIntent.kind) ||
     actionIntent.kind === 'guidance' ||
     actionIntent.kind === 'observe'
   ) {
@@ -348,6 +367,11 @@ function createMockLlmMessage(params: MessageCreateParams, context: LlmCallConte
 
   if (gameState.phase === 'combat' && /passe|attend|attends|patient|ne fais rien/.test(text) && toolAvailable('pass_turn', context.tools)) {
     return mockToolMessage('pass_turn', { reason: 'Le joueur attend.' })
+  }
+
+  const mockWorldAction = parseWorldActionInput(context.playerMessage || lastUserText(params.messages), gameState)
+  if (mockWorldAction && toolAvailable('resolve_player_action', context.tools)) {
+    return mockToolMessage('resolve_player_action', canonicalPlayerActionInput(mockWorldAction))
   }
 
   if (gameState.phase === 'exploration' && /gobelin|combat|debarque|perisse|fuyez|attaque/.test(text) && toolAvailable('start_encounter', context.tools)) {
@@ -1440,6 +1464,7 @@ function selectToolsForLlm(
     if (actionIntent.kind === 'wait') return pickTools(allTools, ['resolve_player_action'])
     if (actionIntent.kind === 'death_save') return pickTools(allTools, ['resolve_player_action'])
     if (actionIntent.kind === 'use_item') return pickTools(allTools, ['resolve_player_action'])
+    if (isCanonicalWorldActionKind(actionIntent.kind)) return pickTools(allTools, ['resolve_player_action', 'get_entity_stats'])
     if (actionIntent.kind === 'social') return pickTools(allTools, ['resolve_player_action', 'get_entity_stats'])
     if (actionIntent.kind === 'ability_check') return pickTools(allTools, ['resolve_player_action'])
     if (actionIntent.kind === 'observe' || actionIntent.kind === 'guidance' || actionIntent.kind === 'query_state' || actionIntent.kind === 'unknown') {
@@ -1467,6 +1492,10 @@ function selectToolsForLlm(
 
   if (actionIntent.kind === 'use_item') {
     return pickTools(allTools, ['resolve_player_action'])
+  }
+
+  if (isCanonicalWorldActionKind(actionIntent.kind)) {
+    return pickTools(allTools, ['resolve_player_action', 'get_entity_stats'])
   }
 
   if (actionIntent.kind === 'social' || actionIntent.kind === 'ability_check') {
@@ -1626,6 +1655,89 @@ function detectNarrativeStateContractIssue(
     matchedTriggers,
     suggestedTools: ['start_encounter'],
   }
+}
+
+function detectNarrativeWorldContractIssue(
+  responseText: string,
+  gameState: GameState,
+  toolsUsed: string[] = []
+): NarrativeStateContractIssue | null {
+  if (!responseText || !gameState.world) return null
+
+  const text = normalizeFrenchText(responseText)
+  const world = gameState.world
+  const objects = Object.values(world.objects)
+  const npcs = Object.values(world.npcs)
+  const recentEvents = world.eventLog.slice(-8)
+  const recentEventTypes = new Set(recentEvents.map(event => event.type))
+
+  const narratesRecipeAcquired =
+    /\b(trouves?|trouve|decouvres?|decouvre|ramasses?|ramasse|prends?|prend|recuperes?|recupere|empoches?|empoche)\b.{0,80}\b(recette|fragment|moitie|parchemin|papier)\b/.test(text) ||
+    /\b(recette|fragment|moitie|parchemin|papier)\b.{0,80}\b(trouve|decouvert|ramasse|pris|recupere|dans ta main|dans ton sac|inventaire)\b/.test(text)
+  if (narratesRecipeAcquired) {
+    const recipeTaken = objects.some(object => object.tags?.includes('recipe_half') && object.taken)
+    const recipeFoundEvent = recentEventTypes.has('quest.item_found') || recentEventTypes.has('object.taken')
+    if (!recipeTaken && !recipeFoundEvent) {
+      return {
+        reason: 'recipe_found_without_engine_state',
+        matchedTriggers: ['recipe_acquired_text_without_quest_item_found'],
+        suggestedTools: ['resolve_player_action'],
+      }
+    }
+  }
+
+  const narratesDoorOpened =
+    /\b(porte|battants?|serrure|verrou)\b.{0,80}\b(s'ouvre|s ouvre|ouverte|ouvert|cedent?|cede|deverrouillee?|deverrouille|franchissable)\b/.test(text) ||
+    /\b(ouvres?|ouvrez|forces?|force|crochetes?|crochete)\b.{0,80}\b(porte|tiroir|coffre|armoire)\b/.test(text)
+  if (narratesDoorOpened) {
+    const openObjectExists = objects.some(object => ['door', 'container'].includes(object.kind) && object.opened)
+    const openedEvent = recentEventTypes.has('door.opened') || recentEventTypes.has('object.opened')
+    if (!openObjectExists && !openedEvent) {
+      return {
+        reason: 'object_opened_without_engine_state',
+        matchedTriggers: ['opened_text_without_open_event'],
+        suggestedTools: ['resolve_player_action'],
+      }
+    }
+  }
+
+  const narratesObjectDiscovered =
+    /\b(decouvres?|decouvre|trouves?|trouve|revele|apparait|apercois|apercoit)\b.{0,80}\b(tiroir|coffre|armoire|indice|parchemin|fragment|recette)\b/.test(text)
+  if (narratesObjectDiscovered) {
+    const discoveredRelevantObject = objects.some(object =>
+      object.discovered &&
+      (
+        object.tags?.includes('recipe_half') ||
+        object.tags?.includes('recipe_cache') ||
+        ['container', 'clue', 'item'].includes(object.kind)
+      )
+    )
+    const discoveryEvent = recentEventTypes.has('room.object_discovered') || recentEventTypes.has('quest.item_found')
+    if (!discoveredRelevantObject && !discoveryEvent) {
+      return {
+        reason: 'object_discovered_without_engine_state',
+        matchedTriggers: ['discovery_text_without_object_discovered_event'],
+        suggestedTools: ['resolve_player_action'],
+      }
+    }
+  }
+
+  const narratesNpcConvinced =
+    /\b(convaincu|convaincs?|accepte|cede|te croit|t'aide|t aide|devient amical|devient allie|se rallie|cooperer|coopere)\b/.test(text) &&
+    /\b(mac|grukk|dryade|druidesse|pommier|gobelin|pnj|il|elle)\b/.test(text)
+  if (narratesNpcConvinced) {
+    const compatibleNpcState = npcs.some(npc => npc.disposition === 'helpful' || npc.disposition === 'wary')
+    const dispositionEvent = recentEventTypes.has('npc.disposition_changed') || toolsUsed.includes('roll_ability_check')
+    if (!compatibleNpcState && !dispositionEvent) {
+      return {
+        reason: 'npc_convinced_without_engine_state',
+        matchedTriggers: ['npc_convinced_text_without_disposition_event'],
+        suggestedTools: ['resolve_player_action'],
+      }
+    }
+  }
+
+  return null
 }
 
 function detectNarrativeRoomContractIssue(
@@ -2037,6 +2149,18 @@ const PLAYER_ACTION_KINDS = new Set<CanonicalPlayerActionKind>([
   'attack',
   'move',
   'interact',
+  'search',
+  'open',
+  'take',
+  'unlock',
+  'force',
+  'talk',
+  'threaten',
+  'hide',
+  'help',
+  'flee',
+  'stabilize',
+  'use_object',
   'ability_check',
   'social',
   'use_item',
@@ -2280,6 +2404,87 @@ function summarizeMcpResultForNarration(toolName: string, result: unknown): stri
   return "L'action se resout dans la scene."
 }
 
+function extractWorldTargetName(message: string): string | undefined {
+  const text = normalizeFrenchText(message)
+
+  const targetPatterns: Array<[string, RegExp]> = [
+    ['Mac', /\bmac|pommier|treant\b/],
+    ['Grukk', /\bgrukk|chef\b/],
+    ['druidesse du verger', /\bdryade|druidesse|fee|fees|fées|verger\b/],
+    ['tiroir', /\btiroirs?\b/],
+    ['armoire', /\barmoires?|placards?\b/],
+    ['coffre', /\bcoffres?\b/],
+    ['four enchante', /\bfours?|fournee|runes?\b/],
+    ['champignons violets', /\bchampignons?|amas|violets?\b/],
+    ['porte de la reserve', /\bporte\b.{0,30}\breserve|reserve\b.{0,30}\bporte\b/],
+    ['double porte', /\bdouble porte|porte d entree|porte de l entree|entree\b/],
+    ['recette', /\brecette|fragment|moitie|parchemin|papier|indice\b/],
+  ]
+
+  return targetPatterns.find(([, pattern]) => pattern.test(text))?.[0]
+}
+
+function parseWorldActionInput(
+  message: string,
+  gameState: GameState,
+  actionKind?: GameActionKind
+): Record<string, unknown> | null {
+  const kind = actionKind ?? classifyPlayerAction(message, gameState).kind
+  if (!isCanonicalWorldActionKind(kind)) return null
+
+  const targetName = extractWorldTargetName(message)
+  switch (kind) {
+    case 'search':
+      return targetName && /\b(tiroirs?|armoires?|coffres?|four|champignons?)\b/.test(normalizeFrenchText(message))
+        ? { kind: 'search', targetName }
+        : { kind: 'search' }
+
+    case 'open':
+      return { kind: 'open', ...(targetName ? { targetName } : {}) }
+
+    case 'take':
+      return { kind: 'take', ...(targetName ? { targetName } : {}) }
+
+    case 'unlock':
+      return { kind: 'unlock', ...(targetName ? { targetName } : {}) }
+
+    case 'force':
+      return { kind: 'force', ...(targetName ? { targetName } : {}) }
+
+    case 'talk':
+      return {
+        kind: 'talk',
+        ...(targetName ? { targetName } : {}),
+        topic: message,
+      }
+
+    case 'threaten':
+      return {
+        kind: 'threaten',
+        ...(targetName ? { targetName } : {}),
+        demand: message,
+      }
+
+    case 'hide':
+      return { kind: 'hide' }
+
+    case 'help':
+      return { kind: 'help', ...(targetName ? { targetName } : {}) }
+
+    case 'flee':
+      return { kind: 'flee' }
+
+    case 'stabilize':
+      return { kind: 'stabilize', targetId: 'player' }
+
+    case 'use_object':
+      return { kind: 'use_object', ...(targetName ? { targetName } : {}) }
+
+    default:
+      return null
+  }
+}
+
 function canonicalPlayerActionInput(action: Record<string, unknown>): Record<string, unknown> {
   return { action }
 }
@@ -2501,9 +2706,13 @@ async function resolveServerFirstAction(
   }
 
   if (!toolName) {
+    const worldActionInput = parseWorldActionInput(message, gameState, actionIntent.kind)
     const attackInput = parsePlayerAttackInput(message, gameState)
     const encounterRepairInput = parseEncounterRepairInput(message, gameState)
-    if (attackInput) {
+    if (worldActionInput) {
+      toolName = 'resolve_player_action'
+      input = canonicalPlayerActionInput(worldActionInput)
+    } else if (attackInput) {
       toolName = 'resolve_player_action'
       input = canonicalPlayerActionInput({
         kind: 'attack',
@@ -3130,9 +3339,10 @@ function buildEngineTruthPacket(
   actionIntent: GameActionIntent,
   toolsUsed: string[],
   gameState: GameState,
-  newCombatLogEntries: CombatLogEntry[]
+  newCombatLogEntries: CombatLogEntry[],
+  newWorldEvents: EngineEvent[] = []
 ): EngineTruthPacket {
-  const engineResolution = buildEngineResolutionView(gameState, newCombatLogEntries)
+  const engineResolution = buildEngineResolutionView(gameState, newCombatLogEntries, newWorldEvents)
   const aliveMonsters = Object.values(gameState.monsters)
     .filter(monster => monster.isAlive)
     .map(monster => ({
@@ -3153,6 +3363,16 @@ function buildEngineTruthPacket(
     `playerPosition=${formatPosition(gameState.player.position)}`,
     `currentRoomId=${gameState.currentRoomId ?? 'unknown'}`,
     `aliveMonsters=${aliveMonsters.length}`,
+    ...Object.values(gameState.world?.objects ?? {})
+      .filter(object => object.roomId === gameState.currentRoomId)
+      .map(object => `worldObject=${object.id} name=${object.name} kind=${object.kind} visible=${object.visible} discovered=${object.discovered} opened=${Boolean(object.opened)} locked=${Boolean(object.locked)} taken=${Boolean(object.taken)} used=${Boolean(object.used)}`),
+    ...Object.values(gameState.world?.npcs ?? {})
+      .filter(npc => npc.roomId === gameState.currentRoomId)
+      .map(npc => `worldNpc=${npc.id} name=${npc.name} disposition=${npc.disposition} known=${Boolean(npc.known)}`),
+    ...Object.values(gameState.world?.quests ?? {})
+      .map(quest => `quest=${quest.id} progress=${quest.progress}/${quest.goal} completed=${Boolean(quest.completed)}`),
+    ...Object.entries(gameState.world?.alarms ?? {})
+      .map(([alarmId, alarm]) => `alarm=${alarmId} raised=${alarm.raised} level=${alarm.level} reason=${alarm.reason ?? 'none'}`),
     ...engineResolution.events.map(event => `event=${event.type} outcome=${event.outcome ?? 'none'} summary=${event.summary}`),
     ...engineResolution.affordances.map(action => `affordance=${action.kind} enabled=${action.enabled} tool=${action.toolName ?? 'none'} reason=${action.reason}`),
     ...aliveMonsters.map(monster => `monster=${monster.name} id=${monster.id} hp=${monster.hp} position=${monster.position}`),
@@ -3190,14 +3410,25 @@ function formatEngineTruthPacket(packet: EngineTruthPacket): string {
 function buildLocalEngineNarrative(
   gameState: GameState,
   toolsUsed: string[],
-  newCombatLogEntries: CombatLogEntry[]
+  newCombatLogEntries: CombatLogEntry[],
+  newWorldEvents: EngineEvent[] = []
 ): string | null {
   const uniqueTools = [...new Set(toolsUsed)]
-  if (uniqueTools.length !== 1 || newCombatLogEntries.length > 1) return null
+  if (!uniqueTools.includes('resolve_player_action') && uniqueTools.length !== 1) return null
+  if (newCombatLogEntries.length > 1 && newWorldEvents.length === 0) return null
 
   const [toolName] = uniqueTools
-  if (toolName === 'resolve_player_action') {
-    const eventTypes = buildEngineResolutionView(gameState, newCombatLogEntries).events.map(event => event.type)
+  if (uniqueTools.includes('resolve_player_action')) {
+    const engineView = buildEngineResolutionView(gameState, newCombatLogEntries, newWorldEvents)
+    const eventTypes = engineView.events.map(event => event.type)
+    const latestWorldEvent = newWorldEvents.at(-1)
+    if (eventTypes.includes('room.object_discovered')) return latestWorldEvent?.summary ?? 'Ta fouille revele un element concret.'
+    if (eventTypes.includes('object.opened') || eventTypes.includes('door.opened')) return latestWorldEvent?.summary ?? 'L ouverture est maintenant un fait moteur.'
+    if (eventTypes.includes('object.taken') || eventTypes.includes('quest.item_found')) return latestWorldEvent?.summary ?? 'L objet rejoint ton inventaire.'
+    if (eventTypes.includes('npc.disposition_changed')) return latestWorldEvent?.summary ?? 'La disposition du PNJ change selon le moteur.'
+    if (eventTypes.includes('alarm.raised')) return latestWorldEvent?.summary ?? 'L alerte monte dans le monde.'
+    if (eventTypes.includes('trap.triggered')) return latestWorldEvent?.summary ?? 'Le piege se declenche.'
+    if (eventTypes.includes('action.blocked')) return latestWorldEvent?.summary ?? "Ton geste n'est pas possible dans l'etat actuel."
     if (eventTypes.includes('entity.moved')) return buildOralFallbackNarrative(gameState, ['move_token'])
     if (eventTypes.includes('item.used')) {
       const player = gameState.player
@@ -3488,6 +3719,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     logRoomStateAnomaly(currentGameState, requestId, sessionId, 'after-mcp-sync')
     const combatLogStartLength = currentGameState.combatLog.length
+    const worldEventStartLength = currentGameState.world?.eventLog.length ?? 0
 
     if (currentGameState.phase === 'combat' && currentGameState.currentTurn && currentGameState.currentTurn !== 'player') {
       try {
@@ -3767,6 +3999,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         }
 
         const narrativeStateIssue =
+          detectNarrativeWorldContractIssue(responseText, currentGameState, toolsUsed) ??
           detectNarrativeStateContractIssue(responseText, currentGameState, toolsUsed) ??
           detectNarrativeRoomContractIssue(responseText, currentGameState, toolsUsed)
         if (narrativeStateIssue) {
@@ -4199,6 +4432,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     const newCombatLogEntries = currentGameState.combatLog.slice(combatLogStartLength)
+    const newWorldEvents = currentGameState.world?.eventLog.slice(worldEventStartLength) ?? []
 
     if (sawMcpToolError) {
       const ruleNarrative = buildMcpRuleErrorNarrative(latestMcpErrorResult, currentGameState, toolsUsed)
@@ -4240,7 +4474,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       })
     }
 
-    const engineTruthPacket = buildEngineTruthPacket(actionIntent, toolsUsed, currentGameState, newCombatLogEntries)
+    const engineTruthPacket = buildEngineTruthPacket(actionIntent, toolsUsed, currentGameState, newCombatLogEntries, newWorldEvents)
     if (toolsUsed.length > 0 && !sawMcpToolError) {
       logEvent('info', 'dm.engine.truth_packet', {
         requestId,
@@ -4250,7 +4484,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     const localEngineNarrative = !sawMcpToolError
-      ? buildLocalEngineNarrative(currentGameState, toolsUsed, newCombatLogEntries)
+      ? buildLocalEngineNarrative(currentGameState, toolsUsed, newCombatLogEntries, newWorldEvents)
       : null
     const directorNarrative = directorDecision?.narrative ?? null
     const draftNarrative = narrative || directorNarrative || localEngineNarrative || ''
@@ -4366,6 +4600,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     const finalNarrativeStateIssue =
+      detectNarrativeWorldContractIssue(narrative, currentGameState, toolsUsed) ??
       detectNarrativeStateContractIssue(narrative, currentGameState, toolsUsed) ??
       detectNarrativeRoomContractIssue(narrative, currentGameState, toolsUsed)
     if (finalNarrativeStateIssue) {

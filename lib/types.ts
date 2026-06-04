@@ -94,6 +94,65 @@ export interface SceneMemory {
   updatedAt?: string
 }
 
+export type WorldObjectKind = 'door' | 'container' | 'item' | 'clue' | 'fixture' | 'trap'
+
+export interface WorldObjectState {
+  id: string
+  roomId: string
+  name: string
+  kind: WorldObjectKind
+  visible: boolean
+  discovered: boolean
+  opened?: boolean
+  locked?: boolean
+  taken?: boolean
+  used?: boolean
+  contains?: string[]
+  tags?: string[]
+  dc?: {
+    search?: number
+    open?: number
+    force?: number
+    unlock?: number
+  }
+  description?: string
+}
+
+export type WorldNpcDisposition = 'hostile' | 'wary' | 'neutral' | 'helpful' | 'offended'
+
+export interface WorldNpcState {
+  id: string
+  name: string
+  roomId: string
+  disposition: WorldNpcDisposition
+  known?: boolean
+  tags?: string[]
+}
+
+export interface WorldQuestState {
+  id: string
+  name: string
+  progress: number
+  goal: number
+  completed?: boolean
+  flags?: Record<string, boolean>
+}
+
+export interface WorldAlarmState {
+  level: number
+  raised: boolean
+  reason?: string
+}
+
+export interface WorldState {
+  objects: Record<string, WorldObjectState>
+  npcs: Record<string, WorldNpcState>
+  quests: Record<string, WorldQuestState>
+  alarms: Record<string, WorldAlarmState>
+  flags?: Record<string, boolean>
+  eventLog: EngineEvent[]
+}
+
 export interface GameState {
   phase: GamePhase
   player: PlayerState
@@ -108,6 +167,7 @@ export interface GameState {
   currentRoomId: string | null
   encountersTriggered?: string[]
   sceneMemory?: SceneMemory
+  world?: WorldState
 }
 
 export interface DiceRollResult {
@@ -160,6 +220,18 @@ export type CanonicalPlayerActionKind =
   | 'attack'
   | 'move'
   | 'interact'
+  | 'search'
+  | 'open'
+  | 'take'
+  | 'unlock'
+  | 'force'
+  | 'talk'
+  | 'threaten'
+  | 'hide'
+  | 'help'
+  | 'flee'
+  | 'stabilize'
+  | 'use_object'
   | 'ability_check'
   | 'social'
   | 'use_item'
@@ -178,6 +250,19 @@ export type EngineEventType =
   | 'item.used'
   | 'check.rolled'
   | 'room.event'
+  | 'room.object_discovered'
+  | 'quest.item_found'
+  | 'npc.disposition_changed'
+  | 'door.opened'
+  | 'object.opened'
+  | 'object.taken'
+  | 'object.used'
+  | 'trap.triggered'
+  | 'alarm.raised'
+  | 'character.hidden'
+  | 'escape.attempted'
+  | 'character.stabilized'
+  | 'action.blocked'
   | 'state.changed'
 
 export interface EngineEvent {
@@ -191,6 +276,7 @@ export interface EngineEvent {
   mechanicalDetail?: string
   outcome?: 'hit' | 'miss' | 'success' | 'failure' | 'critical' | 'blocked' | 'unknown'
   visibleToPlayer: boolean
+  metadata?: Record<string, unknown>
 }
 
 export interface PlayerAffordance {
