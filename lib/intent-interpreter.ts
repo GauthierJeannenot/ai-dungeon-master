@@ -573,7 +573,7 @@ function isMagicEnvironmental(text: string): boolean {
     /\b(cree|creer|creation|invoque|conjure|verse|repand|sous|devant|derriere|sur|dans|bloquer|eteindre|glisser)\b/.test(text)
 }
 
-function improvisationTypeForText(text: string): IntentImprovisationType {
+export function improvisationTypeForText(text: string): IntentImprovisationType {
   const analysis = analyzeFictionImprovisation(text)
   if (analysis.socialViolation) return 'social_transgression'
   if (isImprovisedTool(text)) return 'improvised_tool_object'
@@ -583,7 +583,7 @@ function improvisationTypeForText(text: string): IntentImprovisationType {
   return 'non_mechanical_flavor'
 }
 
-function buildImproviseOutput(message: string, gameState: GameState, type: IntentImprovisationType, confidence = 0.86): IntentInterpreterOutput {
+export function buildImproviseOutput(message: string, gameState: GameState, type: IntentImprovisationType, confidence = 0.86): IntentInterpreterOutput {
   const targetName = targetNameFromText(normalizeFrenchText(message), gameState)
   const tags = [type, ...analyzeFictionImprovisation(message).tags].filter(Boolean)
   const canonicalAction: Record<string, unknown> = {

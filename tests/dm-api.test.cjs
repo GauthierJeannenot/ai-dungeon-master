@@ -421,6 +421,27 @@ test('DM API resolves prod transgression against Mac through engine state', asyn
   assert.doesNotMatch(data.narrative, /situation ne le permet pas|intention cherche une prise|geste se bloque/i)
 })
 
+test('DM API never emits a canned clarification for a creative orchard action', async t => {
+  const sessionId = `api-orchard-pee-${process.pid}-${Date.now()}`
+  t.after(() => cleanupSession(sessionId))
+
+  const { response, data } = await postDm({
+    message: "je pisse sur l'arbre",
+    clientRequestId: `client-${sessionId}`,
+    sessionId,
+    gameState: orchardGameState(),
+    history: [],
+  })
+
+  assert.equal(response.status, 200)
+  assert.equal(data.turnTrace?.intent.kind, 'improvise')
+  assert.ok(data.toolsUsed.includes('resolve_player_action'))
+  assert.ok(data.engine?.events?.some(event => event.type === 'fiction.fact_created'))
+  // The exact "default prompt" the user flagged in prod must never surface.
+  assert.doesNotMatch(data.narrative, /il me manque une cible nette|les prises claires sont/i)
+  assert.doesNotMatch(data.narrative, DEFAULT_SCENE_NARRATIVE_PATTERN)
+})
+
 test('DM API routes open social scenes through rich mock LLM narration', async t => {
   const sessionId = `api-social-${process.pid}-${Date.now()}`
   t.after(() => cleanupSession(sessionId))

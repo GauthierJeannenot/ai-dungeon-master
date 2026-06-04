@@ -57,7 +57,9 @@ import {
 import { normalizeLlmToolInput } from '@/lib/tool-input-normalizer'
 import { actionExecution, buildTurnTrace } from '@/lib/turn-trace'
 import {
+  buildImproviseOutput,
   buildIntentInterpreterInputSummary,
+  improvisationTypeForText,
   interpretPlayerIntentMock,
   validateIntentInterpreterOutput,
   type IntentInterpreterInputSummary,
@@ -2078,6 +2080,63 @@ function unresolvedIntentFromInterpreter(message: string, output: IntentInterpre
     suggestedTools: [],
     confidence: output ? numericConfidenceToActionConfidence(output.confidence) : 'low',
     normalizedText: normalizeFrenchText(message),
+  }
+}
+
+// Meta intents (questions, guidance, state queries) already reach the narrator
+// cleanly via intentFromInterpreterOutput — they must NEVER be rewritten into an
+// improvisation. Only kinds that map to a non-null narrate intent belong here;
+// anything else (e.g. a bare "observe" with no canonical action) must be allowed
+// to fall through to the improvise rewrite so it never hits a canned dead-end.
+const META_INTERPRETER_INTENT_KINDS = new Set<string>([
+  'guidance',
+  'query_state',
+  'query',
+  'question',
+  'status_question',
+  'meta_question',
+])
+
+// Movement-style intents have dedicated handling (coordinate moves, traversal,
+// portal prompts) and must not be converted to improvisations either.
+const MOVEMENT_INTERPRETER_INTENT_KINDS = new Set<string>(['move', 'movement', 'traverse'])
+const MOVEMENT_INTERPRETER_ACTION_KINDS = new Set<string>([
+  'move',
+  'traverse',
+  'open',
+  'unlock',
+  'force',
+  'use_object',
+])
+
+function isMovementInterpreterOutput(output: IntentInterpreterOutput): boolean {
+  const intentKind = typeof output.intentKind === 'string' ? output.intentKind.toLowerCase() : ''
+  if (MOVEMENT_INTERPRETER_INTENT_KINDS.has(intentKind)) return true
+  const action = isObjectRecord(output.canonicalAction) ? output.canonicalAction : null
+  const kind = action && typeof action.kind === 'string' ? action.kind : null
+  return Boolean(kind && MOVEMENT_INTERPRETER_ACTION_KINDS.has(kind))
+}
+
+// Hard guarantee against canned "default prompt" dead-ends: any non-meta,
+// non-movement turn that the interpreter could not resolve into a real engine
+// action (or that it flagged for clarification) is rewritten as an improvise
+// action. That routes it through resolve_player_action + live LLM narration
+// instead of the canned clarification / no-fallback narrative builders.
+function ensureFlexibleInterpreterOutput(
+  output: IntentInterpreterOutput | null,
+  message: string,
+  gameState: GameState
+): IntentInterpreterOutput | null {
+  if (!output) return output
+  const intentKind = typeof output.intentKind === 'string' ? output.intentKind.toLowerCase() : ''
+  if (META_INTERPRETER_INTENT_KINDS.has(intentKind)) return output
+  if (isMovementInterpreterOutput(output)) return output
+  if (interpreterCanonicalAction(output)) return output
+
+  const improviseType = improvisationTypeForText(normalizeFrenchText(message))
+  return {
+    ...buildImproviseOutput(message, gameState, improviseType),
+    source: output.source,
   }
 }
 
@@ -4413,6 +4472,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       inputMode,
       clientRequestId,
     })
+    if (intentInterpreter.used) {
+      intentInterpreter.output = ensureFlexibleInterpreterOutput(
+        intentInterpreter.output,
+        message,
+        currentGameState
+      )
+    }
     const interpretedActionIntent = intentFromInterpreterOutput(message, intentInterpreter.output)
     const actionIntent = interpretedActionIntent ??
       (intentInterpreter.used ? unresolvedIntentFromInterpreter(message, intentInterpreter.output) : preliminaryActionIntent)
