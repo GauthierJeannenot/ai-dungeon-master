@@ -46,6 +46,39 @@ const FICTION_FACT_TARGET_EVENTS = new Set<EngineEventType>([
   'fiction.fact_expired',
 ])
 
+const CANONICAL_ACTION_KINDS = new Set([
+  'attack',
+  'move',
+  'interact',
+  'examine',
+  'read',
+  'search',
+  'open',
+  'take',
+  'unlock',
+  'force',
+  'disarm',
+  'talk',
+  'ask',
+  'persuade',
+  'threaten',
+  'show_item',
+  'give_item',
+  'hide',
+  'help',
+  'flee',
+  'stabilize',
+  'use_object',
+  'combine_recipe',
+  'ability_check',
+  'social',
+  'use_item',
+  'wait',
+  'death_save',
+  'observe',
+  'improvise',
+])
+
 function issue(code: string, path: string, message: string): WorldValidationIssue {
   return { code, path, message }
 }
@@ -265,6 +298,23 @@ function validateFictionFact(factId: string, fact: FictionFactState, world: Worl
   for (const [key, value] of Object.entries(fact.metadata ?? {})) {
     if (value === null || !['string', 'number', 'boolean'].includes(typeof value)) {
       issues.push(issue('FICTION_FACT_METADATA_INVALID', `${path}.metadata.${key}`, 'Fiction fact metadata values must be scalar.'))
+    }
+  }
+  for (const [index, affordance] of (fact.softAffordances ?? []).entries()) {
+    const affordancePath = `${path}.softAffordances.${index}`
+    if (!CANONICAL_ACTION_KINDS.has(affordance.kind)) {
+      issues.push(issue('FICTION_FACT_AFFORDANCE_KIND_INVALID', `${affordancePath}.kind`, 'Fiction fact affordance kind must be canonical.'))
+    }
+    if (!affordance.label?.trim()) {
+      issues.push(issue('FICTION_FACT_AFFORDANCE_LABEL_MISSING', `${affordancePath}.label`, 'Fiction fact affordance label is required.'))
+    }
+    for (const [aliasIndex, alias] of (affordance.aliases ?? []).entries()) {
+      if (!alias.trim()) {
+        issues.push(issue('FICTION_FACT_AFFORDANCE_ALIAS_EMPTY', `${affordancePath}.aliases.${aliasIndex}`, 'Fiction fact affordance aliases cannot be empty.'))
+      }
+    }
+    if (affordance.canonicalAction !== undefined && (typeof affordance.canonicalAction !== 'object' || affordance.canonicalAction === null || Array.isArray(affordance.canonicalAction))) {
+      issues.push(issue('FICTION_FACT_AFFORDANCE_ACTION_INVALID', `${affordancePath}.canonicalAction`, 'Fiction fact canonicalAction must be an object when provided.'))
     }
   }
 }

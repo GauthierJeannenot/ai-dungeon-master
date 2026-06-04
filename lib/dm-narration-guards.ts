@@ -160,26 +160,30 @@ export function buildDirectiveSceneNarrative(gameState: GameState): string {
       : "Le combat continue sans pause. Quelque chose heurte le sol derrière toi, et l'air se charge d'une menace immédiate."
   }
 
-  switch (gameState.currentRoomId) {
-    case '1':
-      return "La façade de la boulangerie grince sous le vent. Derrière la grande porte, un choc sourd répond presque à ton souffle; sur le flanc, le quai de chargement reste entrouvert dans l'ombre."
-    case '2':
-      return "Dans le verger, les branches se referment comme des doigts au-dessus de toi. Une pomme tombe seule dans l'herbe, puis roule vers le mur de la boulangerie où la piste devient plus fraîche."
-    case '3':
-      return "Le tas de déchets soupire sous les gravats, avec une odeur aigre de cave humide. Un éclat métallique dépasse près de ta botte, tandis que la boulangerie craque plus loin."
-    case '4':
-      return "Dans l'entrée, les traces les plus fraîches rayent la poussière vers les fours. Au-dessus, l'appartement de Grammy laisse filtrer une odeur de fourrure et de viande sèche."
-    case '5':
-      return "Le bureau semble mort, mais un tiroir mal fermé tremble encore contre le bois. Entre deux registres moisis, un papier plus récent dépasse, taché de sucre et de boue."
-    case '7':
-      return "Au quai de chargement, la porte latérale bat doucement contre son rail. De l'autre côté, les fours claquent dans le noir comme des mâchoires mal réglées."
-    case '8':
-      return "Au sol de la boulangerie, les fours claquent et les poutres grincent au-dessus de toi. La réserve pue la farine rance, et quelque chose vient de faire tomber un moule derrière une table renversée."
-    case '9':
-      return "Dans l'appartement de Grammy, l'odeur de fourrure et de viande séchée colle aux rideaux. Un trophée mal fixé pivote sur le mur, comme si quelqu'un venait juste de le frôler."
-    default:
-      return "La piste se brouille, mais elle n'est pas morte. Un courant d'air froid file le long du sol et désigne une ouverture que tu n'avais pas remarquée."
+  const surface = buildSceneSurface(gameState)
+  const roomName = surface.currentRoom?.name ?? getCurrentRoomName(gameState) ?? 'la zone actuelle'
+  const latestEvent = [...(gameState.world?.eventLog ?? [])].reverse().find(event => event.visibleToPlayer && event.summary?.trim())
+  if (latestEvent) {
+    return `${latestEvent.summary} Depuis ${roomName}, choisis une cible ou un effet concret et je le resous proprement.`
   }
+
+  const npc = surface.npcs.find(entry => entry.known)
+  if (npc) {
+    return `${npc.name} est toujours la, disposition ${npc.disposition}; tes mots ou tes gestes peuvent vraiment changer la suite.`
+  }
+
+  const affordance = surface.affordances.find(entry => entry.enabled && entry.target?.name)
+  if (affordance?.target?.name) {
+    return `Dans ${roomName}, la prise la plus nette reste ${affordance.target.name}; nomme l'action ou l'effet voulu et je l'applique sans inventer.`
+  }
+
+  const exit = surface.exits[0]
+  if (exit) {
+    return `Depuis ${roomName}, ${exit.name} reste accessible; donne-moi l'approche exacte et je fais avancer la position.`
+  }
+
+  return `Dans ${roomName}, rien ne change encore: precise une cible, une parole, ou un effet improvise, et je le traite comme un fait de jeu.`
+
 }
 
 export function buildOralFallbackNarrative(gameState: GameState, toolsUsed: string[]): string {
@@ -211,8 +215,8 @@ export function buildOralFallbackNarrative(gameState: GameState, toolsUsed: stri
     .filter(Boolean)
     .slice(0, 4)
   return options.length > 0
-    ? `Rien de nouveau n'est tranche par le moteur. Les prises concretes ici sont: ${options.join(', ')}.`
-    : "Rien de nouveau n'est tranche par le moteur; precise la cible ou l'effet voulu."
+    ? `Aucun effet net ne se produit encore. Les prises concretes ici sont: ${options.join(', ')}.`
+    : "Aucun effet net ne se produit encore; precise la cible ou l'effet voulu."
 }
 
 export function looksLikeGenericSceneFallback(text: string): boolean {

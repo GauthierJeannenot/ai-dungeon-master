@@ -125,6 +125,15 @@ test('world validation accepts and validates fiction facts', () => {
     status: 'active',
     source: "sort creation d'eau",
     tags: ['water', 'wet_surface'],
+    softAffordances: [{
+      kind: 'improvise',
+      label: 'Exploiter la surface mouillee',
+      aliases: ['utiliser l eau'],
+      canonicalAction: {
+        kind: 'improvise',
+        usesFactIds: ['fact-r4-water-under-door'],
+      },
+    }],
   }
   world.eventLog.push({
     id: 'fiction-created',
@@ -148,6 +157,12 @@ test('world validation catches malformed fiction facts and event targets', () =>
     roomId: 'missing-room',
     status: 'floating',
     tags: [''],
+    softAffordances: [{
+      kind: 'not_a_real_action',
+      label: '',
+      aliases: [''],
+      canonicalAction: [],
+    }],
     metadata: { nested: { no: true } },
   }
   world.eventLog.push({
@@ -166,6 +181,10 @@ test('world validation catches malformed fiction facts and event targets', () =>
   assert.ok(codes.includes('FICTION_FACT_STATUS_INVALID'))
   assert.ok(codes.includes('FICTION_FACT_ROOM_UNKNOWN'))
   assert.ok(codes.includes('FICTION_FACT_TAG_EMPTY'))
+  assert.ok(codes.includes('FICTION_FACT_AFFORDANCE_KIND_INVALID'))
+  assert.ok(codes.includes('FICTION_FACT_AFFORDANCE_LABEL_MISSING'))
+  assert.ok(codes.includes('FICTION_FACT_AFFORDANCE_ALIAS_EMPTY'))
+  assert.ok(codes.includes('FICTION_FACT_AFFORDANCE_ACTION_INVALID'))
   assert.ok(codes.includes('FICTION_FACT_METADATA_INVALID'))
   assert.ok(codes.includes('EVENT_TARGET_FICTION_FACT_UNKNOWN'))
 })

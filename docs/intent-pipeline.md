@@ -35,6 +35,7 @@ Le pipeline cible est:
 - Applique les mutations via action canonique.
 - Produit les `EngineEvent`.
 - Persiste les faits fictionnels dans `world.fictionFacts`.
+- Transforme les faits fictionnels actifs en affordances souples quand c'est utile.
 - Refuse proprement si une action n'est pas afforded.
 
 `Narrateur final`
@@ -109,6 +110,20 @@ Une improvisation acceptee peut produire:
 - `state.changed`;
 - `improvisation.resolved`.
 
+Depuis la v2, un `fictionFact` peut aussi porter des `softAffordances`.
+Ces affordances ne sont pas des boutons imposes au joueur: elles servent a la resolution naturelle future.
+Exemple: une flaque creee par "creation d'eau" expose une action souple "exploiter la surface mouillee", qui route vers:
+
+```json
+{
+  "kind": "improvise",
+  "usesFactIds": ["fact-r4-water-under-door"],
+  "tags": ["wet_surface", "use_fiction_fact"]
+}
+```
+
+Le fait reste donc dans la source de verite, mais le moteur ne pretend pas modeliser toute la physique de l'eau.
+
 ## Clarifier ou refuser
 
 Clarifier quand:
@@ -150,6 +165,46 @@ Si le pipeline ne produit aucun event utile:
 Les erreurs de regle doivent rester observables: si un tool canonique refuse sans event exploitable, la route reflete un `action.blocked` dans le TurnTrace/world log pour eviter un refus invisible.
 
 Le budget LLM est donc soft par defaut. Un blocage dur n'est actif que si `LLM_HARD_BUDGET_ENABLED=true`.
+
+Les vieux fallbacks visibles du type "Le Dungeon Master reflechit" ne sont pas une sortie valide de tour.
+Si la narration finale est vide, le serveur doit produire une clarification contextuelle depuis l'intent, la `SceneSurface` et les affordances, puis logguer le remplacement.
+
+## TurnPipeline
+
+La politique de tour vit dans `lib/turn-pipeline.ts`:
+
+- detection des actions canoniques monde;
+- selection consultative des tools LLM;
+- choix `short/rich/blocked` pour iteration et narration finale;
+- fusion des routes LLM.
+
+`app/api/dm/route.ts` reste l'enveloppe HTTP/session/MCP, mais la politique n'est plus enfermee dans la route.
+La prochaine extraction doit sortir l'orchestration complete en stages:
+
+1. `intentStage`;
+2. `planningStage`;
+3. `engineStage`;
+4. `reactionStage`;
+5. `narrationStage`;
+6. `contractStage`;
+7. `traceStage`.
+
+## Evaluation d'intention
+
+`npm run eval:intent` lance `scripts/evaluate-intent-interpreter.cjs` sur `tests/fixtures/intent-interpreter-eval.json`.
+
+Le but n'est pas de prouver que le mock comprend tout.
+Le but est de transformer les problemes de prod en cas scores:
+
+- message joueur;
+- etat initial approximatif;
+- `intentKind` attendu;
+- `canonicalAction.kind` attendu;
+- type d'improvisation attendu;
+- clarification attendue ou interdite.
+
+Quand les logs prod contiennent un `TurnTrace`, on peut aussi scorer la sortie `intentInterpreterOutput` deja enregistree.
+Cette boucle doit remplacer l'accumulation de regex au cas par cas.
 
 ## Ajouter une action canonique
 

@@ -1432,6 +1432,10 @@ test('MCP resolve_player_action persists creative improvisation as fiction facts
     assert.equal(fact.status, 'active')
     assert.ok(fact.tags.includes('water'))
     assert.ok(fact.tags.includes('wet_surface'))
+    assert.ok(fact.softAffordances.some(action => action.kind === 'improvise'))
+    assert.ok(fact.softAffordances.some(action =>
+      action.canonicalAction?.usesFactIds?.includes(fact.id)
+    ))
 
     let stateAfter = await callTool(client, 'get_game_state')
     assert.equal(stateAfter.world.fictionFacts[fact.id].text, fact.text)

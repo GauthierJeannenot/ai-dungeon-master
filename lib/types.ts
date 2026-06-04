@@ -171,6 +171,16 @@ export interface WorldAlarmState {
 
 export type FictionFactStatus = 'active' | 'used' | 'expired'
 
+export interface FictionFactSoftAffordance {
+  id?: string
+  kind: CanonicalPlayerActionKind
+  label: string
+  aliases?: string[]
+  reason?: string
+  enabled?: boolean
+  canonicalAction?: Record<string, unknown>
+}
+
 export interface FictionFactState {
   id: string
   text: string
@@ -181,6 +191,7 @@ export interface FictionFactState {
   createdAt?: string
   updatedAt?: string
   expires?: 'turn' | 'scene' | 'location' | 'never' | string | null
+  softAffordances?: FictionFactSoftAffordance[]
   metadata?: Record<string, string | number | boolean>
 }
 
@@ -355,7 +366,7 @@ export interface PlayerAffordance {
   blockedReason?: string
   target?: {
     id: string
-    type: 'object' | 'npc' | 'inventory' | 'room' | 'self' | 'system'
+    type: 'object' | 'npc' | 'inventory' | 'room' | 'self' | 'system' | 'fiction_fact'
     name?: string
   }
   canonicalAction?: Record<string, unknown>

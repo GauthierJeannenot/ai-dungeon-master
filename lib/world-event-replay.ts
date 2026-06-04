@@ -227,6 +227,7 @@ function applyEvent(world: WorldState, event: EngineEvent, issues: WorldEventRep
           createdAt: typeof factPatch.createdAt === 'string' ? factPatch.createdAt : undefined,
           updatedAt: typeof factPatch.updatedAt === 'string' ? factPatch.updatedAt : undefined,
           expires: typeof factPatch.expires === 'string' || factPatch.expires === null ? factPatch.expires : undefined,
+          softAffordances: Array.isArray(factPatch.softAffordances) ? factPatch.softAffordances : undefined,
           metadata: factPatch.metadata,
         }
       }

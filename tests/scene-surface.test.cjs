@@ -151,3 +151,34 @@ test('initial narrative cannot mention a door without a matching scene affordanc
     action.enabled
   ))
 })
+
+test('scene surface exposes active fiction facts as soft affordances', () => {
+  const state = baseGameState({ currentRoomId: '4', roomsVisited: ['1', '4'] })
+  state.world.fictionFacts['fact-r4-water-under-door'] = {
+    id: 'fact-r4-water-under-door',
+    text: "De l'eau magique s'etale sous la porte.",
+    roomId: '4',
+    status: 'active',
+    source: "sort creation d'eau",
+    tags: ['water', 'wet_surface'],
+  }
+
+  const surface = sceneSurface.buildSceneSurface(state)
+  const fact = surface.facts.find(entry => entry.id === 'fact-r4-water-under-door')
+  const affordance = surface.affordances.find(action =>
+    action.target?.type === 'fiction_fact' &&
+    action.target.id === 'fact-r4-water-under-door'
+  )
+
+  assert.ok(fact)
+  assert.ok(fact.softAffordances.some(action => action.kind === 'improvise'))
+  assert.ok(affordance)
+  assert.equal(affordance.kind, 'improvise')
+  assert.equal(affordance.enabled, true)
+  assert.deepEqual(affordance.canonicalAction.usesFactIds, ['fact-r4-water-under-door'])
+  assert.ok(surface.targets.some(target =>
+    target.type === 'fiction_fact' &&
+    target.id === 'fact-r4-water-under-door' &&
+    target.kinds.includes('improvise')
+  ))
+})

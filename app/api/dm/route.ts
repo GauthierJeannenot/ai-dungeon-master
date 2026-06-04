@@ -31,6 +31,13 @@ import {
   type GameActionKind,
   type GameActionPrimitive,
 } from '@/lib/game-actions'
+import {
+  isCanonicalWorldActionKind,
+  mergeLlmRoute,
+  selectFinalNarrationLlmRoute,
+  selectIterationLlmRoute,
+  selectToolsForLlm,
+} from '@/lib/turn-pipeline'
 import { buildDirectorDecision } from '@/lib/dm-director'
 import {
   logAnthropicUsage,
@@ -211,32 +218,6 @@ function parsePositiveInt(value: string | undefined, fallback: number): number {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback
 }
 
-function isCanonicalWorldActionKind(kind: GameActionKind): boolean {
-  return [
-    'search',
-    'examine',
-    'read',
-    'open',
-    'take',
-    'unlock',
-    'force',
-    'disarm',
-    'talk',
-    'ask',
-    'persuade',
-    'threaten',
-    'show_item',
-    'give_item',
-    'hide',
-    'help',
-    'flee',
-    'stabilize',
-    'use_object',
-    'combine_recipe',
-    'improvise',
-  ].includes(kind)
-}
-
 function parsePromptCacheTtl(value: string | undefined): '5m' | '1h' {
   if (!value) return '5m'
   if (value === '5m' || value === '1h') return value
@@ -275,51 +256,8 @@ function nextLlmCallWouldExceedBudget(requestCallCount: number, sessionId: strin
   return LLM_MAX_CALLS_PER_SESSION > 0 && nextSessionCalls > LLM_MAX_CALLS_PER_SESSION
 }
 
-function mergeLlmRoute(current: LlmRoute, next: LlmRoute): LlmRoute {
-  if (next === 'blocked') return 'blocked'
-  if (current === 'blocked') return 'blocked'
-  if (current === 'rich' || next === 'rich') return 'rich'
-  if (current === 'short' || next === 'short') return 'short'
-  return 'none'
-}
-
 function maxTokensForLlmRoute(route: LlmRoute): number {
   return route === 'rich' ? LLM_RICH_NARRATION_MAX_TOKENS : LLM_SHORT_NARRATION_MAX_TOKENS
-}
-
-function selectIterationLlmRoute(actionIntent: GameActionIntent, requestCallCount: number, sessionId: string | undefined): LlmRoute {
-  if (nextLlmCallWouldExceedBudget(requestCallCount, sessionId)) return 'blocked'
-  if (
-    actionIntent.kind === 'social' ||
-    actionIntent.kind === 'interact' ||
-    isCanonicalWorldActionKind(actionIntent.kind) ||
-    actionIntent.kind === 'guidance' ||
-    actionIntent.kind === 'observe'
-  ) {
-    return 'rich'
-  }
-
-  return 'short'
-}
-
-function selectFinalNarrationLlmRoute(
-  actionIntent: GameActionIntent,
-  toolsUsed: string[],
-  requestCallCount: number,
-  sessionId: string | undefined
-): LlmRoute {
-  if (nextLlmCallWouldExceedBudget(requestCallCount, sessionId)) return 'blocked'
-  if (
-    actionIntent.kind === 'social' ||
-    actionIntent.kind === 'interact' ||
-    isCanonicalWorldActionKind(actionIntent.kind) ||
-    actionIntent.kind === 'guidance' ||
-    actionIntent.kind === 'observe'
-  ) {
-    return 'rich'
-  }
-  if (toolsUsed.length > 0) return 'short'
-  return 'short'
 }
 
 function normalizeBudgetSessionId(sessionId: string | undefined): string {
@@ -900,16 +838,6 @@ const TOOL_INTENT_SATISFIERS: Record<string, string[]> = {
   'encounter-or-attack-intent': ['resolve_player_action', 'start_encounter', 'resolve_player_attack'],
 }
 
-const LLM_TOOL_SETS = {
-  explorationAmbient: ['roll_ability_check', 'trigger_room_event', 'get_entity_stats'],
-  explorationDefault: ['resolve_player_action', 'get_entity_stats'],
-  explorationMovement: ['resolve_player_action', 'start_encounter', 'get_entity_stats'],
-  explorationEncounter: ['resolve_player_action', 'start_encounter', 'get_entity_stats'],
-  combatPlayer: ['resolve_player_action', 'end_combat', 'get_entity_stats'],
-  combatNonPlayer: ['roll_ability_check', 'roll_dice', 'get_entity_stats'],
-  dialogue: ['resolve_player_action', 'get_entity_stats', 'apply_condition'],
-} as const
-
 type PlayerAttackTargetHint = 'nearest' | 'right' | 'left' | 'front' | 'back' | 'wounded'
 type AbilityKey = 'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha'
 type PendingAbilityCheck = {
@@ -927,81 +855,6 @@ function hasToolSatisfyingMechanicalAction(
   const satisfiers = TOOL_INTENT_SATISFIERS[requiredAction.reason] ?? requiredAction.suggestedTools
   const satisfierSet = new Set(satisfiers)
   return toolsUsed.some(toolName => satisfierSet.has(toolName))
-}
-
-function pickTools(allTools: Anthropic.Tool[], names: readonly string[]): Anthropic.Tool[] {
-  const byName = new Map(allTools.map(tool => [tool.name, tool]))
-  return names
-    .map(name => byName.get(name))
-    .filter((tool): tool is Anthropic.Tool => Boolean(tool))
-}
-
-function selectToolsForLlm(
-  allTools: Anthropic.Tool[],
-  gameState: GameState,
-  actionIntent: GameActionIntent
-): Anthropic.Tool[] {
-  if (allTools.length === 0) return []
-
-  if (gameState.phase === 'combat') {
-    if (gameState.currentTurn !== 'player') return pickTools(allTools, LLM_TOOL_SETS.combatNonPlayer)
-
-    if (actionIntent.kind === 'attack') return pickTools(allTools, ['resolve_player_action'])
-    if (actionIntent.kind === 'move') return pickTools(allTools, ['resolve_player_action'])
-    if (actionIntent.kind === 'wait') return pickTools(allTools, ['resolve_player_action'])
-    if (actionIntent.kind === 'death_save') return pickTools(allTools, ['resolve_player_action'])
-    if (actionIntent.kind === 'use_item') return pickTools(allTools, ['resolve_player_action'])
-    if (actionIntent.kind === 'state_reconcile') return pickTools(allTools, ['resolve_player_action'])
-    if (isCanonicalWorldActionKind(actionIntent.kind)) return pickTools(allTools, ['resolve_player_action', 'get_entity_stats'])
-    if (actionIntent.kind === 'social') return pickTools(allTools, ['resolve_player_action', 'get_entity_stats'])
-    if (actionIntent.kind === 'ability_check') return pickTools(allTools, ['resolve_player_action'])
-    if (actionIntent.kind === 'unknown') return pickTools(allTools, ['resolve_player_action', 'get_entity_stats'])
-    if (actionIntent.kind === 'observe' || actionIntent.kind === 'guidance' || actionIntent.kind === 'query_state') {
-      return pickTools(allTools, ['get_entity_stats'])
-    }
-
-    return pickTools(allTools, LLM_TOOL_SETS.combatPlayer)
-  }
-
-  if (gameState.phase === 'dialogue') {
-    return pickTools(allTools, LLM_TOOL_SETS.dialogue)
-  }
-
-  if (actionIntent.kind === 'move') {
-    return pickTools(allTools, LLM_TOOL_SETS.explorationMovement)
-  }
-
-  if (actionIntent.kind === 'state_reconcile') {
-    return pickTools(allTools, ['resolve_player_action'])
-  }
-
-  if (actionIntent.kind === 'attack' || actionIntent.kind === 'encounter') {
-    return pickTools(allTools, LLM_TOOL_SETS.explorationEncounter)
-  }
-
-  if (actionIntent.kind === 'interact') {
-    return pickTools(allTools, ['resolve_player_action', 'start_encounter', 'get_entity_stats'])
-  }
-
-  if (actionIntent.kind === 'use_item') {
-    return pickTools(allTools, ['resolve_player_action'])
-  }
-
-  if (isCanonicalWorldActionKind(actionIntent.kind)) {
-    return pickTools(allTools, ['resolve_player_action', 'get_entity_stats'])
-  }
-
-  if (actionIntent.kind === 'social' || actionIntent.kind === 'ability_check') {
-    return pickTools(allTools, ['resolve_player_action', 'get_entity_stats'])
-  }
-
-  if (actionIntent.kind === 'unknown') return pickTools(allTools, ['resolve_player_action', 'get_entity_stats'])
-
-  if (actionIntent.kind === 'observe' || actionIntent.kind === 'guidance' || actionIntent.kind === 'query_state') {
-    return pickTools(allTools, ['get_entity_stats'])
-  }
-
-  return pickTools(allTools, LLM_TOOL_SETS.explorationDefault)
 }
 
 function aliveMonsters(gameState: GameState): MonsterState[] {
@@ -4586,7 +4439,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           : (toolsUsed.length > 0 && !engineFirstLocalNarrationCandidate)
       )
     const iterationLlmRoute = needsLlmIteration
-      ? selectIterationLlmRoute(actionIntent, usageLog.length + 1, sessionId)
+      ? selectIterationLlmRoute(actionIntent, nextLlmCallWouldExceedBudget(usageLog.length + 1, sessionId))
       : 'none'
     if (iterationLlmRoute === 'blocked') {
       llmRoute = mergeLlmRoute(llmRoute, 'blocked')
@@ -5107,7 +4960,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         toolsUsed: [...new Set(toolsUsed)],
       })
     } else if (!narrative && iterations >= MAX_TOOL_ITERATIONS) {
-      const fallbackLlmRoute = selectFinalNarrationLlmRoute(actionIntent, toolsUsed, usageLog.length + 1, sessionId)
+      const fallbackLlmRoute = selectFinalNarrationLlmRoute(
+        actionIntent,
+        toolsUsed,
+        nextLlmCallWouldExceedBudget(usageLog.length + 1, sessionId)
+      )
       if (fallbackLlmRoute === 'blocked') {
         llmRoute = mergeLlmRoute(llmRoute, 'blocked')
         const socialFallbackNarrative = buildSocialFallbackNarrative(currentGameState, actionIntent, toolsUsed)
@@ -5378,7 +5235,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     )
 
     if (shouldTryFinalLlmNarration) {
-      const finalLlmRoute = selectFinalNarrationLlmRoute(actionIntent, toolsUsed, usageLog.length + 1, sessionId)
+      const finalLlmRoute = selectFinalNarrationLlmRoute(
+        actionIntent,
+        toolsUsed,
+        nextLlmCallWouldExceedBudget(usageLog.length + 1, sessionId)
+      )
       if (finalLlmRoute === 'blocked') {
         llmRoute = mergeLlmRoute(llmRoute, 'blocked')
         const socialFallbackNarrative = buildSocialFallbackNarrative(currentGameState, actionIntent, toolsUsed, newWorldEvents)
@@ -5520,6 +5381,20 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       narrative = serverCorrection
     }
 
+    if (!narrative.trim()) {
+      const replacementNarrative = buildContextualNoFallbackNarrative(currentGameState, actionIntent, intentInterpreter)
+      logEvent('warn', 'dm.narrative.empty_replaced', {
+        requestId,
+        sessionId,
+        actionIntent,
+        intentInterpreter: intentInterpreter.output,
+        replacementNarrative,
+        toolsUsed: [...new Set(toolsUsed)],
+      })
+      narrative = replacementNarrative
+      narratorSource = 'rule'
+    }
+
     const refusalCode = engineFirstRefusalCode ?? mcpErrorCode(latestMcpErrorResult)
     const worldDiff = buildWorldDebugDiff(worldDebugBeforeTurn, currentGameState.world, newWorldEvents)
 
@@ -5551,7 +5426,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       affordances: engineTruthPacket.affordances,
       worldDiff,
       newCombatLogEntries,
-      finalNarration: narrative || 'Le Dungeon Master reflechit...',
+      finalNarration: narrative,
       narrator: turnUsage.narrator,
       llmRoute: turnUsage.llmRoute,
       refusalCode,
@@ -5568,7 +5443,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const persistedHistory = [
       ...(activeSummary ? recentHistory.slice(-HISTORY_KEEP_RECENT) : requestHistory),
       { role: 'player', content: message } satisfies ConversationTurn,
-      { role: 'dm', content: narrative || 'Le Dungeon Master réfléchit...' } satisfies ConversationTurn,
+      { role: 'dm', content: narrative } satisfies ConversationTurn,
     ]
 
     try {
@@ -5588,7 +5463,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     const dmResponse: DMResponse = {
-      narrative: narrative || 'Le Dungeon Master réfléchit...',
+      narrative,
       newGameState: currentGameState,
       toolsUsed: [...new Set(toolsUsed)],
       engine: {

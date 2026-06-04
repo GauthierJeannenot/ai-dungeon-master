@@ -1,6 +1,7 @@
 import type {
   CanonicalPlayerActionKind,
   FictionFactState,
+  FictionFactSoftAffordance,
   GameState,
   Item,
   PlayerAffordance,
@@ -10,6 +11,7 @@ import type {
   WorldState,
 } from './types'
 import { normalizeFrenchText } from './dm-intent'
+import { inferFictionFactSoftAffordances } from './fiction-affordances'
 import {
   canCombineRecipe,
   isRecipeAlreadyCombined,
@@ -84,11 +86,12 @@ export interface SceneSurfaceFictionFact {
   status: FictionFactState['status']
   source?: string
   tags: string[]
+  softAffordances: FictionFactSoftAffordance[]
 }
 
 export interface SceneSurfaceTarget {
   id: string
-  type: 'object' | 'npc' | 'inventory' | 'room'
+  type: 'object' | 'npc' | 'inventory' | 'room' | 'fiction_fact'
   name: string
   aliases: string[]
   kinds: CanonicalPlayerActionKind[]
@@ -138,6 +141,10 @@ function objectTarget(object: Pick<SceneSurfaceObject, 'id' | 'name'>): PlayerAf
 
 function npcTarget(npc: Pick<SceneSurfaceNpc, 'id' | 'name'>): PlayerAffordance['target'] {
   return { id: npc.id, type: 'npc', name: npc.name }
+}
+
+function fictionFactTarget(fact: Pick<SceneSurfaceFictionFact, 'id' | 'text'>): PlayerAffordance['target'] {
+  return { id: fact.id, type: 'fiction_fact', name: fact.text }
 }
 
 function objectCanonicalAction(kind: CanonicalPlayerActionKind, object: Pick<SceneSurfaceObject, 'id' | 'name'>): Record<string, unknown> {
@@ -493,6 +500,31 @@ function deriveSceneSurfaceAffordances(
     canonicalAction: { kind: 'combine_recipe' },
   }))
 
+  for (const fact of surfaceBase.facts) {
+    for (const softAffordance of fact.softAffordances) {
+      affordances.push(affordance({
+        id: softAffordance.id ?? `fiction-use-${fact.id}`,
+        kind: softAffordance.kind,
+        label: softAffordance.label,
+        enabled: fact.status === 'active' && softAffordance.enabled !== false,
+        reason: softAffordance.reason ?? 'Fait fictionnel actif et reutilisable par une action canonique.',
+        toolName: 'resolve_player_action',
+        target: fictionFactTarget(fact),
+        aliases: [
+          ...(softAffordance.aliases ?? []),
+          ...fact.tags,
+          fact.text,
+        ],
+        canonicalAction: softAffordance.canonicalAction ?? {
+          kind: 'improvise',
+          intent: softAffordance.label,
+          usesFactIds: [fact.id],
+          tags: ['use_fiction_fact'],
+        },
+      }))
+    }
+  }
+
   return affordances
 }
 
@@ -500,6 +532,7 @@ function buildTargets(
   objects: SceneSurfaceObject[],
   npcs: SceneSurfaceNpc[],
   inventory: SceneSurfaceInventoryItem[],
+  facts: SceneSurfaceFictionFact[],
   destinations: LocationDestination[]
 ): SceneSurfaceTarget[] {
   return [
@@ -530,6 +563,13 @@ function buildTargets(
       name: item.name,
       aliases: [item.type],
       kinds: ['use_item', 'show_item', 'give_item'] as CanonicalPlayerActionKind[],
+    })),
+    ...facts.map(fact => ({
+      id: fact.id,
+      type: 'fiction_fact' as const,
+      name: fact.text,
+      aliases: [...fact.tags, ...fact.softAffordances.flatMap(affordance => affordance.aliases ?? [])],
+      kinds: unique(fact.softAffordances.map(affordance => affordance.kind)),
     })),
   ]
 }
@@ -612,6 +652,7 @@ export function buildSceneSurface(gameState: GameState): SceneSurface {
       status: fact.status,
       source: fact.source,
       tags: fact.tags ?? [],
+      softAffordances: inferFictionFactSoftAffordances(fact),
     }))
     .sort((a, b) => a.id.localeCompare(b.id, 'fr'))
   const surfaceBase = {
@@ -626,7 +667,7 @@ export function buildSceneSurface(gameState: GameState): SceneSurface {
     facts,
   }
   const affordances = deriveSceneSurfaceAffordances(surfaceBase, gameState)
-  const targets = buildTargets(objects, npcs, inventory, destinations)
+  const targets = buildTargets(objects, npcs, inventory, facts, destinations)
   const narratableFacts = narratableFactsForSurface(surfaceBase)
   return {
     ...surfaceBase,

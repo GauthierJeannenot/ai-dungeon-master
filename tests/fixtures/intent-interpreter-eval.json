@@ -1,0 +1,86 @@
+{
+  "name": "intent-interpreter-core-eval",
+  "scenarios": [
+    {
+      "name": "social-and-questions",
+      "initialGameState": "base",
+      "turns": [
+        {
+          "message": "ou sont les gobelins",
+          "expectIntentKind": "ask",
+          "expectCanonicalKind": "ask",
+          "expectClarification": false
+        },
+        {
+          "message": "salut je suis la pour recuperer la recette de Grammy",
+          "expectIntentKind": "ask",
+          "expectCanonicalKind": "ask",
+          "expectClarification": false
+        },
+        {
+          "message": "je peux faire quoi?",
+          "expectIntentKind": "guidance",
+          "expectClarification": false
+        }
+      ]
+    },
+    {
+      "name": "creative-improvisation",
+      "initialGameState": "bakery-entrance",
+      "turns": [
+        {
+          "message": "je cree de l'eau sous la porte",
+          "expectIntentKind": "improvise",
+          "expectCanonicalKind": "improvise",
+          "expectImprovisationType": "environmental_change",
+          "expectClarification": false
+        },
+        {
+          "message": "je prends un tabouret pour bloquer la porte",
+          "expectIntentKind": "improvise",
+          "expectCanonicalKind": "improvise",
+          "expectImprovisationType": "improvised_tool_object",
+          "expectClarification": false
+        },
+        {
+          "message": "je fais diversion",
+          "expectIntentKind": "improvise",
+          "expectCanonicalKind": "improvise",
+          "expectImprovisationType": "distraction_noise",
+          "expectClarification": false
+        }
+      ]
+    },
+    {
+      "name": "absurd-social",
+      "initialGameState": "orchard",
+      "turns": [
+        {
+          "message": "je pisse sur l'arbre",
+          "expectIntentKind": "improvise",
+          "expectCanonicalKind": "improvise",
+          "expectImprovisationType": "social_transgression",
+          "expectClarification": false
+        }
+      ]
+    },
+    {
+      "name": "combat",
+      "initialGameState": "grukk-combat",
+      "turns": [
+        {
+          "message": "j'attque le gobelin 1",
+          "expectIntentKind": "attack",
+          "expectCanonicalKind": "attack",
+          "expectClarification": false
+        },
+        {
+          "message": "arretez de m'attaquer on fait la paix",
+          "expectIntentKind": "social_deescalation",
+          "expectCanonicalKind": "social",
+          "expectClarification": false
+        }
+      ]
+    }
+  ]
+}

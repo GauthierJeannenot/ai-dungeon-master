@@ -7,6 +7,7 @@
     "dev:mock": "node scripts/dev-mock.cjs",
     "playtest": "node scripts/playtest.cjs",
     "replay:session-log": "node scripts/replay-session-log.cjs",
+    "eval:intent": "node scripts/evaluate-intent-interpreter.cjs --strict",
     "playtest:mock": "npm run build:mcp && node scripts/playtest.cjs --mode mock --narration-mode quality",
     "playtest:budget": "npm run build:mcp && node scripts/playtest.cjs --mode mock --narration-mode budget",
     "build:mcp": "tsc -p mcp-server/tsconfig.json",
