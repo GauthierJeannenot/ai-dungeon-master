@@ -142,7 +142,7 @@ GitHub repo
     │       │
     │       ├── GitHub Actions CI → type-check + build
     │       │
-    │       └── Auto-deploy → Railway ou Render
+    │       └── Auto-deploy → Fly.io
     │
     └── Serveur persistant Node.js
             ├── Next.js (app + API routes)
@@ -151,50 +151,35 @@ GitHub repo
 
 ---
 
-### Option A — Railway (recommandé)
+### Option A — Fly.io (production actuelle)
 
-**Avantages** : pas de mise en veille, meilleure DX, `railway.json` inclus  
-**Coût** : $5 de crédits gratuits à l'inscription (≈ 2-3 mois pour un petit projet)
+**Avantages** : volume persistant, logs consultables, déploiement GitHub Actions déjà présent via `.github/workflows/fly-deploy.yml`.
 
-#### 1. Créer le projet Railway
+#### 1. Créer l'app et le volume
 
 ```bash
-# Installer Railway CLI
-npm install -g @railway/cli
-
-# Se connecter
-railway login
-
-# Lier le repo courant à un projet Railway (crée le projet si besoin)
-railway init
+fly launch
+fly volumes create data --region cdg --size 1
 ```
 
 #### 2. Configurer les variables d'environnement
 
 ```bash
-railway variables set ANTHROPIC_API_KEY=sk-ant-ta-vraie-cle
-railway variables set NODE_ENV=production
+fly secrets set ANTHROPIC_API_KEY=sk-ant-ta-vraie-cle
+fly secrets set NODE_ENV=production
 ```
 
 #### 3. Premier déploiement
 
 ```bash
-railway up
+fly deploy
 ```
 
-#### 4. Activer l'auto-deploy GitHub
+#### 4. Activer le déploiement via GitHub Actions
 
-Dans le dashboard Railway → ton projet → **Settings → Source** → connecte ton repo GitHub → branche `main`.
-
-À partir de là, chaque `git push origin main` déclenche un redéploiement automatique.
-
-#### 5. Activer le déploiement via GitHub Actions (optionnel)
-
-Si tu veux un pipeline CI qui valide avant de déployer :
-
-1. Dans Railway → Settings → Tokens → **Create token**
-2. Dans GitHub → Settings → Secrets → `RAILWAY_TOKEN` → colle le token
-3. Le workflow `.github/workflows/deploy-railway.yml` se déclenche automatiquement sur push main
+1. Crée un token de déploiement Fly : `fly tokens create deploy`
+2. Dans GitHub → Settings → Secrets → `FLY_API_TOKEN` → colle le token
+3. Le workflow `.github/workflows/fly-deploy.yml` se déclenche automatiquement après le workflow CI sur `main` ou `master`
 
 ---
 
@@ -296,13 +281,6 @@ Sur Fly, `fly.toml` force `APP_LOG_PERSIST_DIR=/data/logs` pour que le fichier J
 Lecture via CLI hebergeur :
 
 ```bash
-# Railway
-railway logs
-railway logs | grep 'ai-dm:dm.request'
-railway logs | grep 'dm-'
-railway logs | grep 'mcp.tool'
-
-# Fly.io
 fly logs -a ai-dungeon-master
 fly logs -a ai-dungeon-master | grep 'ai-dm:dm.request'
 fly logs -a ai-dungeon-master | grep 'dm-'
@@ -324,7 +302,7 @@ curl -X DELETE -H "Authorization: Bearer un-token-long-aleatoire" \
   "https://votre-app.example.com/api/debug/logs"
 ```
 
-L'endpoint `GET /api/debug/logs` retourne les logs persistants si le fichier JSONL existe, sinon les logs recents gardes en memoire par le process Node. Pendant le debug live, la lecture est publique par defaut pour permettre une surveillance externe sans acces Railway; remettez `APP_DEBUG_LOG_PUBLIC_READ=false` ou retirez ce mode apres la session. `DELETE /api/debug/logs` reste protege par `APP_DEBUG_LOG_TOKEN` et efface a la fois le buffer memoire et le fichier JSONL local. Utilisez de preference le header `Authorization: Bearer ...`. Le parametre `?token=` est desactive par defaut; activez-le seulement pour depannage manuel avec `APP_DEBUG_LOG_TOKEN_QUERY_ENABLED=true`, car il peut fuiter dans des historiques navigateur/proxy.
+L'endpoint `GET /api/debug/logs` retourne les logs persistants si le fichier JSONL existe, sinon les logs recents gardes en memoire par le process Node. Pendant le debug live, la lecture est publique par defaut pour permettre une surveillance externe sans acces hebergeur; remettez `APP_DEBUG_LOG_PUBLIC_READ=false` ou retirez ce mode apres la session. `DELETE /api/debug/logs` reste protege par `APP_DEBUG_LOG_TOKEN` et efface a la fois le buffer memoire et le fichier JSONL local. Utilisez de preference le header `Authorization: Bearer ...`. Le parametre `?token=` est desactive par defaut; activez-le seulement pour depannage manuel avec `APP_DEBUG_LOG_TOKEN_QUERY_ENABLED=true`, car il peut fuiter dans des historiques navigateur/proxy.
 
 Les logs incluent notamment `requestId`, `sessionId`, appels Anthropic, usage tokens/cout estime, appels MCP, erreurs de regles, resume compact du `GameState`, persistance session et durees. Les valeurs ressemblant a des secrets/tokens sont masquees automatiquement.
 

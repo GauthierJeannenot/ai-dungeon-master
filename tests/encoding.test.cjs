@@ -68,6 +68,7 @@ test('tracked text files do not contain common mojibake sequences', () => {
 
   for (const file of trackedFiles) {
     if (BINARY_EXTENSIONS.has(extensionOf(file))) continue
+    if (!fs.existsSync(file)) continue
 
     const buffer = fs.readFileSync(file)
     if (isProbablyBinary(buffer)) continue
