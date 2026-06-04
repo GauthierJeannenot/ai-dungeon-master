@@ -4,6 +4,7 @@ import { rollDice, getAbilityModifier, d20WithModifier } from '../dice'
 import * as gs from '../game-state'
 import * as rules from '../rules'
 import { EntityStats, AttackResult, SavingThrowResult, AbilityCheckResult, Condition } from '../../lib/types'
+import { startCombat } from './phase-tools'
 
 // Weapon damage dice by weapon name (D&D 5e)
 const WEAPON_DAMAGE: Record<string, string> = {
@@ -78,22 +79,35 @@ export function selectPlayerTarget(
   const state = gs.getState()
   const player = state.player
   if (targetName) {
+    const query = normalizeTargetText(targetName).trim()
     const namedCandidates = Object.values(state.monsters).filter(monster => monsterMatchesTargetName(monster, targetName))
-    const livingNamedCandidates = namedCandidates.filter(monster => monster.isAlive)
 
-    if (livingNamedCandidates.length === 1) return livingNamedCandidates[0].id
-    if (namedCandidates.length === 1) return namedCandidates[0].id
-    if (livingNamedCandidates.length > 1 || namedCandidates.length > 1) {
-      throw new rules.RuleViolation('TARGET_AMBIGUOUS', 'More than one monster matches the player attack target name.', {
+    if (namedCandidates.length === 0) {
+      throw new rules.RuleViolation('TARGET_NOT_FOUND', 'No monster matches the player attack target name.', {
         targetName,
-        candidateIds: (livingNamedCandidates.length > 1 ? livingNamedCandidates : namedCandidates).map(monster => monster.id),
+        livingMonsterIds: Object.values(state.monsters).filter(monster => monster.isAlive).map(monster => monster.id),
       })
     }
 
-    throw new rules.RuleViolation('TARGET_NOT_FOUND', 'No monster matches the player attack target name.', {
-      targetName,
-      livingMonsterIds: Object.values(state.monsters).filter(monster => monster.isAlive).map(monster => monster.id),
+    // Tier 1: an exact name match is unambiguous even when sibling monsters share
+    // a type (e.g. "Gobelin patrouille 1" must not also pull in "Gobelin patrouille 2").
+    const exactMatches = namedCandidates.filter(monster => normalizeTargetText(monster.name) === query)
+    const pool = exactMatches.length > 0 ? exactMatches : namedCandidates
+
+    // Prefer living candidates, but fall back to the pool when all are dead.
+    const living = pool.filter(monster => monster.isAlive)
+    const resolvable = living.length > 0 ? living : pool
+
+    if (resolvable.length === 1) return resolvable[0].id
+
+    // Multiple plausible targets (fuzzy "gobelin" with several goblins): pick the
+    // nearest to the player deterministically instead of dead-ending the attack.
+    resolvable.sort((a, b) => {
+      const distanceDelta = distanceCells(a.position, player.position) - distanceCells(b.position, player.position)
+      if (distanceDelta !== 0) return distanceDelta
+      return a.id.localeCompare(b.id)
     })
+    return resolvable[0].id
   }
 
   let candidates = Object.values(state.monsters).filter(monster => monster.isAlive)
@@ -252,6 +266,45 @@ export interface ResolvePlayerAttackInput {
   rangeCells?: number
 }
 
+/**
+ * Combat différé : si le joueur attaque une créature posée sur la grille pendant
+ * l'exploration (typiquement un PNJ neutre, ex. gobelins/dryades spawné via
+ * spawn_monster), on engage automatiquement le combat. La cible et ses semblables
+ * non-amicaux deviennent hostiles, l'initiative est lancée et le joueur agit en
+ * premier — ainsi resolve_player_attack reste un seul appel d'outil cohérent avec
+ * l'intention « j'attaque le gobelin ». Les PNJ amicaux et les créatures d'un autre
+ * type restent en dehors du combat tant que le joueur ne les attaque pas.
+ */
+function ensureCombatForPlayerAttack(targetId: string): { engaged: boolean; combatants?: string[] } {
+  const state = gs.getState()
+  if (state.phase === 'combat') return { engaged: false }
+
+  const target = gs.getEntity(targetId)
+  if (!target || !('disposition' in target)) return { engaged: false }
+  const targetType = (target as { type?: string }).type
+
+  const combatants = Object.values(state.monsters).filter(monster => {
+    if (!monster.isAlive) return false
+    if (monster.id === targetId) return true
+    // Déjà hostile (ou legacy sans disposition) → rejoint le combat.
+    if (monster.disposition === undefined || monster.disposition === 'hostile') return true
+    // Semblables non-amicaux (même type) → la patrouille réagit ensemble.
+    if (monster.disposition !== 'friendly' && monster.type === targetType) return true
+    return false
+  })
+
+  // Bascule les combattants en hostile (réf. vivantes du state).
+  for (const monster of combatants) {
+    const entity = gs.getEntity(monster.id)
+    if (entity && 'disposition' in entity) {
+      (entity as { disposition?: string }).disposition = 'hostile'
+    }
+  }
+
+  startCombat(['player', ...combatants.map(monster => monster.id)], { playerActsFirst: true })
+  return { engaged: true, combatants: ['player', ...combatants.map(monster => monster.id)] }
+}
+
 export function resolvePlayerAttack({
   targetId,
   targetName,
@@ -264,7 +317,29 @@ export function resolvePlayerAttack({
 }: ResolvePlayerAttackInput) {
   try {
     const resolvedTargetId = selectPlayerTarget(targetId, targetName, targetHint ?? 'nearest')
-    return resolveAttack('player', resolvedTargetId, weaponOrSpell ?? 'longsword', advantage, disadvantage, customDamageDice, rangeCells)
+    const engagement = ensureCombatForPlayerAttack(resolvedTargetId)
+    const attack = resolveAttack('player', resolvedTargetId, weaponOrSpell ?? 'longsword', advantage, disadvantage, customDamageDice, rangeCells)
+    if (engagement.engaged) {
+      const state = gs.getState()
+      const text = attack.content?.[0]?.type === 'text' ? attack.content[0].text : '{}'
+      let parsed: Record<string, unknown>
+      try { parsed = JSON.parse(text) } catch { parsed = { raw: text } }
+      return {
+        content: [{
+          type: 'text' as const,
+          text: JSON.stringify({
+            ...parsed,
+            combatEngaged: true,
+            phase: state.phase,
+            round: state.round,
+            currentTurn: state.currentTurn,
+            initiativeOrder: state.initiativeOrder,
+            combatants: engagement.combatants,
+          }),
+        }],
+      }
+    }
+    return attack
   } catch (err) {
     return rules.ruleErrorResult(err)
   }

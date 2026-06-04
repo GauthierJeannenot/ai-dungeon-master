@@ -406,6 +406,69 @@ test('MCP start_encounter forces hostile disposition even for neutral templates'
   })
 })
 
+test('MCP resolve_player_attack auto-engages combat against neutral creatures on the grid', async () => {
+  await withMcpClient(async client => {
+    const baseState = await callTool(client, 'get_game_state')
+    await callTool(client, 'replace_game_state', { gameState: baseState })
+    // Player default position is (4,13); place goblins in melee range.
+
+    const goblin1 = await callTool(client, 'spawn_monster', {
+      monsterType: 'goblin', cell: { x: 5, y: 13 }, name: 'Gobelin patrouille 1', disposition: 'neutral',
+    })
+    const goblin2 = await callTool(client, 'spawn_monster', {
+      monsterType: 'goblin', cell: { x: 4, y: 12 }, name: 'Gobelin patrouille 2', disposition: 'neutral',
+    })
+    // A neutral creature of a DIFFERENT type must stay out of the fight.
+    const dryad = await callTool(client, 'spawn_monster', {
+      monsterType: 'dryad', cell: { x: 3, y: 13 }, disposition: 'neutral',
+    })
+
+    // Still exploration before the attack.
+    let state = await callTool(client, 'get_game_state')
+    assert.equal(state.phase, 'exploration')
+
+    const attack = await callTool(client, 'resolve_player_attack', {
+      targetName: 'Gobelin patrouille 1',
+    })
+
+    // Combat engaged in one call, player acts first, exact-named goblin targeted.
+    assert.equal(attack.combatEngaged, true)
+    assert.equal(attack.phase, 'combat')
+    assert.equal(attack.currentTurn, 'player')
+    assert.equal(attack.targetId, goblin1.id)
+
+    state = await callTool(client, 'get_game_state')
+    assert.equal(state.phase, 'combat')
+    // Both goblins (same type) joined and turned hostile; the dryad did not.
+    assert.equal(state.monsters[goblin1.id].disposition, 'hostile')
+    assert.equal(state.monsters[goblin2.id].disposition, 'hostile')
+    assert.equal(state.monsters[dryad.id].disposition, 'neutral')
+    assert.ok(state.initiativeOrder.includes(goblin1.id))
+    assert.ok(state.initiativeOrder.includes(goblin2.id))
+    assert.ok(state.initiativeOrder.includes('player'))
+    assert.ok(!state.initiativeOrder.includes(dryad.id))
+  })
+})
+
+test('MCP resolve_player_attack picks nearest when a fuzzy name is ambiguous', async () => {
+  await withMcpClient(async client => {
+    const baseState = await callTool(client, 'get_game_state')
+    await callTool(client, 'replace_game_state', { gameState: baseState })
+
+    const near = await callTool(client, 'spawn_monster', {
+      monsterType: 'goblin', cell: { x: 5, y: 13 }, name: 'Gobelin proche', disposition: 'neutral',
+    })
+    await callTool(client, 'spawn_monster', {
+      monsterType: 'goblin', cell: { x: 9, y: 9 }, name: 'Gobelin loin', disposition: 'neutral',
+    })
+
+    // "gobelin" matches both; the engine resolves to the nearest instead of erroring.
+    const attack = await callTool(client, 'resolve_player_attack', { targetName: 'gobelin' })
+    assert.notEqual(attack.code, 'TARGET_AMBIGUOUS')
+    assert.equal(attack.targetId, near.id)
+  })
+})
+
 test('MCP rules reject attacks outside the active turn and range', async () => {
   await withMcpClient(async client => {
     const baseState = await callTool(client, 'get_game_state')

@@ -236,7 +236,7 @@ function createMonster(
   }
 }
 
-function startCombat(combatants: string[], options?: { playerActsFirst?: boolean }): {
+export function startCombat(combatants: string[], options?: { playerActsFirst?: boolean }): {
   phase: 'combat'
   initiativeOrder: string[]
   initiatives: Array<{ id: string; initiative: number; roll: string }>

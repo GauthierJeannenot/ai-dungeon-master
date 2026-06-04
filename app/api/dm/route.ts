@@ -841,6 +841,7 @@ RÈGLES MÉCANIQUES:
 - Les tools MCP refusent les actions illégales (mauvais tour, cible morte, hors portée, déplacement trop long). Si un tool renvoie une erreur, narre sobrement pourquoi l'action échoue ou demande une action valide.
 - Déplacement explicite du joueur → move_token AVANT de narrer.
 - Début de combat / rencontre de salle → start_encounter en un seul tool seulement si le trigger du module est atteint, narre, STOP. Ne jamais inventer d'IDs de monstres.
+- Si une créature est DÉJÀ sur la carte (posée plus tôt via spawn_monster, neutre ou hostile) et que le joueur l'attaque → appelle directement resolve_player_attack (targetName ou targetId). Cet outil bascule la créature et ses semblables en hostiles, démarre le combat (joueur en premier) ET résout l'attaque en un seul appel. N'utilise PAS start_encounter pour des créatures déjà présentes (ça les dupliquerait ou serait bloqué).
 - Rencontres connues: bakery_floor_goblins (salle 8), loading_dock_patrol (salle 7), grammy_apartment_guards (salle 9), violet_fungus_heap (salle 3).
 - Salle 7: entrer discrètement par le quai ne déclenche pas la patrouille; elle apparaît seulement si le joueur l'affronte, fait du bruit, se montre ou rate une approche.
 - Salle 8: entrer sur le sol de la boulangerie ne déclenche pas seul les gobelins. Ils tombent des poutres si le joueur touche/manipule les objets enchantés ou ouvre un four, ou s'il les provoque explicitement.
