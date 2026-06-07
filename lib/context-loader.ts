@@ -37,6 +37,65 @@ export function loadContextFiles(): ContextFiles {
 // Invalidate cache (useful for hot-reload in dev)
 export function invalidateContextCache(): void {
   cached = null
+  cachedParsedModule = null
+}
+
+export interface ParsedAdventureModule {
+  index: string                  // En-tête + carte + table des transitions + annexes : toujours dans le prompt statique.
+  rooms: Record<string, string>  // roomId -> section "## Salle N ..." complète, injectée dynamiquement selon la position.
+}
+
+let cachedParsedModule: ParsedAdventureModule | null = null
+
+// Découpe le module d'aventure en un index permanent et des sections par salle.
+// Objectif contexte : n'envoyer au LLM que le détail de la salle courante (via le
+// bloc dynamique) au lieu des ~8 salles à chaque appel, tout en gardant la carte,
+// la table des points d'entrée et les annexes (récompenses, finale, monstres,
+// notes) toujours accessibles dans l'index statique mis en cache.
+export function parseAdventureModule(moduleText: string): ParsedAdventureModule {
+  const roomHeaderRegex = /^## Salle\s+(\d+)\b/gm
+  const roomMatches: { id: string; start: number }[] = []
+  let match: RegExpExecArray | null
+  while ((match = roomHeaderRegex.exec(moduleText)) !== null) {
+    roomMatches.push({ id: match[1], start: match.index })
+  }
+
+  // Aucune section de salle reconnue (module au format différent / fallback) :
+  // on garde le module entier dans l'index — comportement historique, sûr.
+  if (roomMatches.length === 0) {
+    return { index: moduleText.trim(), rooms: {} }
+  }
+
+  // Position de TOUS les en-têtes de niveau 2, pour délimiter chaque section
+  // (y compris le début des annexes situées après la dernière salle).
+  const anyHeaderRegex = /^## .+$/gm
+  const headerStarts: number[] = []
+  let header: RegExpExecArray | null
+  while ((header = anyHeaderRegex.exec(moduleText)) !== null) {
+    headerStarts.push(header.index)
+  }
+
+  const preIndex = moduleText.slice(0, roomMatches[0].start)
+
+  const rooms: Record<string, string> = {}
+  for (const room of roomMatches) {
+    const nextHeaderStart = headerStarts.find(pos => pos > room.start)
+    rooms[room.id] = moduleText.slice(room.start, nextHeaderStart ?? moduleText.length).trim()
+  }
+
+  // Annexes = tout ce qui suit le dernier en-tête de salle. Conservé dans l'index.
+  const lastRoomStart = roomMatches[roomMatches.length - 1].start
+  const appendixStart = headerStarts.find(pos => pos > lastRoomStart)
+  const postIndex = appendixStart != null ? moduleText.slice(appendixStart) : ''
+
+  const index = [preIndex.trim(), postIndex.trim()].filter(Boolean).join('\n\n')
+  return { index, rooms }
+}
+
+export function loadAdventureModuleParsed(): ParsedAdventureModule {
+  if (cachedParsedModule) return cachedParsedModule
+  cachedParsedModule = parseAdventureModule(loadContextFiles().adventureModule)
+  return cachedParsedModule
 }
 
 const DEFAULT_PLAYER_CHARACTER = `

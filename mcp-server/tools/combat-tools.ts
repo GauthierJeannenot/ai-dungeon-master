@@ -270,6 +270,125 @@ export function resolvePlayerAttack({
   }
 }
 
+// ── TOURS DES MONSTRES (résolution déterministe en un seul appel) ─────────────────
+
+// Libellé d'arme par type de monstre. Les dégâts et le bonus d'attaque viennent
+// TOUJOURS du damageDice/attackBonus du monstre — ceci n'affecte que le texte du log
+// et la portée par défaut (un nom inconnu = mêlée 1 case dans rules.ts).
+const MONSTER_NATURAL_WEAPON: Record<string, string> = {
+  goblin: 'cimeterre',
+  goblin_minion: 'cimeterre',
+  goblin_boss: 'cimeterre',
+  hobgoblin: 'épée',
+  hobgoblin_captain: 'épée',
+  skeleton: 'épée courte',
+  zombie: 'coup',
+  violet_fungus: 'touche putride',
+  wolf: 'morsure',
+  bandit: 'cimeterre',
+  dryad: 'gourdin',
+  awakened_tree: 'coup',
+}
+
+function monsterWeaponLabel(type: string): string {
+  return MONSTER_NATURAL_WEAPON[type.toLowerCase()] ?? 'attaque'
+}
+
+// Conditions qui font perdre son tour au monstre.
+const INCAPACITATING_CONDITIONS: ReadonlySet<Condition> = new Set<Condition>([
+  'incapacitated', 'paralyzed', 'petrified', 'stunned', 'unconscious',
+])
+
+interface MonsterTurnRecord {
+  id: string
+  name: string
+  action: 'attack' | 'approach' | 'hold' | 'incapacitated'
+  from: { x: number; y: number }
+  to: { x: number; y: number }
+  moved: number
+  attack: AttackResult | null
+  note?: string
+}
+
+// Déplace un monstre case par case vers la cible en respectant le budget de mouvement,
+// les limites de la carte et l'occupation (validateMove rejette les cases illégales).
+// Monotone par axe : converge sans osciller et s'arrête dès qu'il est au contact, à court
+// de mouvement, ou totalement bloqué. Retourne le nombre de cases réellement parcourues.
+function stepMonsterToward(monsterId: string, target: { x: number; y: number }): number {
+  let stepsTaken = 0
+
+  while (true) {
+    const monster = gs.getMonster(monsterId)
+    if (!monster) break
+    if (distanceCells(monster.position, target) <= 1) break // déjà au contact (mêlée)
+
+    const used = gs.getMovementUsed(monsterId)
+    const max = Math.floor(monster.speed / 5)
+    if (used >= max) break
+
+    const dx = Math.sign(target.x - monster.position.x)
+    const dy = Math.sign(target.y - monster.position.y)
+    const candidates = [
+      { x: monster.position.x + dx, y: monster.position.y + dy }, // diagonale (réduit les deux axes)
+      { x: monster.position.x + dx, y: monster.position.y },      // horizontale
+      { x: monster.position.x, y: monster.position.y + dy },      // verticale
+    ].filter(cell => cell.x !== monster.position.x || cell.y !== monster.position.y)
+
+    let moved = false
+    for (const cell of candidates) {
+      try {
+        const { distance } = rules.validateMove(monsterId, cell)
+        gs.moveToken(monsterId, cell.x, cell.y)
+        rules.recordMove(monsterId, distance)
+        moved = true
+        stepsTaken++
+        break
+      } catch {
+        // hors limites / occupée / hors budget — on tente la direction suivante
+      }
+    }
+    if (!moved) break // toutes les directions utiles sont bloquées
+  }
+
+  return stepsTaken
+}
+
+// Joue le tour d'UN monstre : attente (allié/neutre/hold), incapacité, sinon avance vers
+// le joueur et attaque s'il est au contact. N'achève jamais un joueur déjà à terre.
+function resolveMonsterTurn(monsterId: string, holdIds: ReadonlySet<string>): MonsterTurnRecord {
+  const monster = gs.getMonster(monsterId)!
+  const from = { ...monster.position }
+  const name = monster.name
+
+  if (monster.hostile === false || holdIds.has(monsterId)) {
+    return { id: monsterId, name, action: 'hold', from, to: from, moved: 0, attack: null }
+  }
+  if (monster.conditions.some(condition => INCAPACITATING_CONDITIONS.has(condition))) {
+    return { id: monsterId, name, action: 'incapacitated', from, to: from, moved: 0, attack: null }
+  }
+
+  const player = gs.getPlayer()
+  const moved = stepMonsterToward(monsterId, player.position)
+  const to = { ...gs.getMonster(monsterId)!.position }
+
+  // Joueur déjà à terre : on s'approche/menace mais on n'achève pas (laisse une chance
+  // aux jets de sauvegarde contre la mort — évite le « swarm instakill »).
+  if (player.hp.current <= 0) {
+    return { id: monsterId, name, action: 'approach', from, to, moved, attack: null, note: 'player_down' }
+  }
+
+  if (distanceCells(to, player.position) <= 1) {
+    const result = resolveAttack(monsterId, 'player', monsterWeaponLabel(monster.type))
+    const errored = 'isError' in result && result.isError
+    if (!errored) {
+      return { id: monsterId, name, action: 'attack', from, to, moved, attack: JSON.parse(result.content[0].text) as AttackResult }
+    }
+    return { id: monsterId, name, action: 'approach', from, to, moved, attack: null, note: 'attack_unavailable' }
+  }
+
+  return { id: monsterId, name, action: 'approach', from, to, moved, attack: null }
+}
+
 export function registerCombatTools(server: McpServer): void {
   // Pure dice roller — the DM can call this for any roll
   server.tool(
@@ -319,6 +438,78 @@ export function registerCombatTools(server: McpServer): void {
     },
     async ({ targetId, targetName, targetHint, weaponOrSpell, advantage, disadvantage, customDamageDice, rangeCells }) => {
       return resolvePlayerAttack({ targetId, targetName, targetHint, weaponOrSpell, advantage, disadvantage, customDamageDice, rangeCells })
+    }
+  )
+
+  // Resolves EVERY consecutive monster turn in a single call (move + attack + advance),
+  // collapsing what used to be many round-trips into one tool call + one narration.
+  server.tool(
+    'run_monster_turns',
+    "Resolves every consecutive non-player turn in ONE call: each living hostile monster moves toward the player and attacks if in melee reach, then the turn advances, repeating until it is the player's turn again (or combat ends). Call this exactly once right after the player ends their turn (next_turn or pass_turn). Allies/neutrals and any IDs in holdIds skip their turn; monsters never finish off a downed player. Returns a per-monster breakdown plus combatShouldEnd so you can narrate all monster turns at once.",
+    {
+      holdIds: z.array(z.string()).optional().describe('Monster IDs that should skip their turn (e.g. charmed, parleying, or held). Non-hostile creatures skip automatically.'),
+    },
+    async ({ holdIds }) => {
+      const state = gs.getState()
+      if (state.phase !== 'combat') {
+        return rules.ruleErrorResult(new rules.RuleViolation('NOT_IN_COMBAT', 'run_monster_turns requires an active combat.', { phase: state.phase }))
+      }
+      if (!state.currentTurn) {
+        return rules.ruleErrorResult(new rules.RuleViolation('EMPTY_INITIATIVE', 'No active turn to resolve.', { initiativeOrder: state.initiativeOrder }))
+      }
+      if (state.currentTurn === 'player') {
+        return rules.ruleErrorResult(new rules.RuleViolation('PLAYER_TURN_ACTIVE', "It is the player's turn. End it first with next_turn or pass_turn, then call run_monster_turns.", { currentTurn: state.currentTurn }))
+      }
+
+      const hold = new Set(holdIds ?? [])
+      const resolvedTurns: MonsterTurnRecord[] = []
+      const startRound = state.round
+      const maxIterations = state.initiativeOrder.length * 4 + 4
+      let iterations = 0
+
+      while (iterations < maxIterations) {
+        iterations++
+        const current = gs.getState()
+
+        if (current.player.deathSaves?.dead) break
+        if (Object.values(current.monsters).filter(monster => monster.isAlive).length === 0) break
+
+        const turn = current.currentTurn
+        if (!turn || turn === 'player') break
+
+        const monster = gs.getMonster(turn)
+        if (!monster || !monster.isAlive) {
+          gs.advanceTurn()
+          continue
+        }
+
+        resolvedTurns.push(resolveMonsterTurn(turn, hold))
+        gs.advanceTurn()
+      }
+
+      const after = gs.getState()
+      const livingMonsters = Object.values(after.monsters).filter(monster => monster.isAlive)
+      const playerDead = Boolean(after.player.deathSaves?.dead)
+      const playerDown = after.player.hp.current <= 0 && !playerDead
+
+      const summary = {
+        turnsResolved: resolvedTurns.length,
+        resolvedTurns,
+        currentTurn: after.currentTurn,
+        round: after.round,
+        roundsAdvanced: after.round - startRound,
+        player: {
+          hp: after.player.hp,
+          position: after.player.position,
+          conditions: after.player.conditions,
+          down: playerDown,
+          dead: playerDead,
+        },
+        monstersRemaining: livingMonsters.length,
+        combatShouldEnd: livingMonsters.length === 0 || playerDead,
+      }
+
+      return { content: [{ type: 'text', text: JSON.stringify(summary) }] }
     }
   )
 

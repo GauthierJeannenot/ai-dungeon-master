@@ -66,6 +66,7 @@ export interface MonsterState {
   initiative?: number
   isAlive: boolean
   xpAwarded?: boolean
+  hostile?: boolean     // false = allié/neutre : ne joue pas de tour offensif (défaut: hostile)
 }
 
 export interface CombatLogEntry {
@@ -207,10 +208,25 @@ export interface WorldState {
   eventLog: EngineEvent[]
 }
 
+// PNJ de premier ordre, rendu sur la battlemap par son propre token. Distinct des
+// MonsterState (combattants) et du WorldNpcState (moteur "world" retiré). Un PNJ peut
+// être présent mais invisible (visible:false) tant qu'il ne s'est pas révélé au joueur.
+export interface NpcState {
+  id: string
+  name: string
+  kind: string                       // 'awakened_tree', 'dryad', …
+  position: { x: number; y: number }
+  roomId: string | null              // null = visible quelle que soit la salle
+  disposition: WorldNpcDisposition
+  visible: boolean                   // false = présent mais pas encore révélé au joueur
+  description?: string
+}
+
 export interface GameState {
   phase: GamePhase
   player: PlayerState
   monsters: Record<string, MonsterState>   // serializable (no Map)
+  npcs?: Record<string, NpcState>          // PNJ avec token (hors combattants)
   initiativeOrder: string[]
   currentTurn: string | null
   round: number

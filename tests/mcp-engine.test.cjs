@@ -137,26 +137,6 @@ test('replaceState infers current room from player position', () => {
   assert.deepEqual(state.roomsVisited, ['4'])
 })
 
-test('replaceState preserves scene memory', () => {
-  const source = JSON.parse(JSON.stringify(gameState.getState()))
-  source.sceneMemory = {
-    madeNoise: true,
-    tension: 2,
-    alertLevel: 3,
-    macDisposition: 'offended',
-    goblinMorale: 'shaken',
-    patrolPressure: 'stirring',
-    lastDirectorBeats: ['noise-made'],
-    lastWorldSignals: ['Du bruit porte plus loin.'],
-    updatedAt: '2026-06-04T00:00:00.000Z',
-  }
-
-  gameState.replaceState(source)
-  const state = gameState.getState()
-
-  assert.deepEqual(state.sceneMemory, source.sceneMemory)
-})
-
 test('advanceTurn removes dead monsters from initiative', () => {
   gameState.spawnMonster(makeMonster('goblin_a'))
   gameState.spawnMonster(makeMonster('goblin_b'))
@@ -219,22 +199,10 @@ test('MCP server accepts replace_game_state and move_token toCell contracts', as
   await withMcpClient(async client => {
     const state = await callTool(client, 'get_game_state')
     state.player.position = { x: 4, y: 13 }
-    state.sceneMemory = {
-      madeNoise: true,
-      tension: 2,
-      alertLevel: 3,
-      macDisposition: 'offended',
-      goblinMorale: 'shaken',
-      patrolPressure: 'hunting',
-      lastDirectorBeats: ['noise-made'],
-      lastWorldSignals: ['Du bruit porte plus loin.'],
-      updatedAt: '2026-06-04T00:00:00.000Z',
-    }
 
     await callTool(client, 'replace_game_state', { gameState: state })
     const afterReplace = await callTool(client, 'get_game_state')
     assert.deepEqual(afterReplace.player.position, { x: 4, y: 13 })
-    assert.deepEqual(afterReplace.sceneMemory, state.sceneMemory)
 
     await callTool(client, 'move_token', {
       tokenId: 'player',
@@ -564,84 +532,6 @@ test('MCP resolve_player_attack resolves a named target before nearest fallback'
       assert.equal(stateAfter.monsters[grukk.id].hp.current, attack.targetHpAfter)
       assert.equal(stateAfter.monsters[guard.id].hp.current, 20)
     })
-  })
-})
-
-test('MCP resolve_player_action resolves canonical attack, move, and item actions', async () => {
-  await withForcedDiceSequence('20,1,1,3,4', async () => {
-    await withMcpClient(async client => {
-      const baseState = await callTool(client, 'get_game_state')
-      const state = makeCombatState(baseState)
-      state.player.hp.current = 10
-      state.player.inventory = [
-        ...state.player.inventory,
-        { id: 'potion_extra', name: 'Potion de soin', type: 'potion', description: 'Restaure 2d4+2 HP' },
-      ]
-      state.monsters.goblin_a.position = { x: 2, y: 0 }
-
-      await callTool(client, 'replace_game_state', { gameState: state })
-
-      const move = await callTool(client, 'resolve_player_action', {
-        action: {
-          kind: 'move',
-          toCell: { x: 1, y: 0 },
-        },
-      })
-
-      assert.equal(move.kind, 'move')
-      assert.equal(move.toolEquivalent, 'move_token')
-      assert.equal(move.result.distanceMoved, 1)
-      assert.deepEqual(move.gameState.player.position, { x: 1, y: 0 })
-      assert.equal(move.gameState.movementUsed.player, 1)
-
-      const attack = await callTool(client, 'resolve_player_action', {
-        action: {
-          kind: 'attack',
-          targetHint: 'nearest',
-          weaponOrSpell: 'longsword',
-          customDamageDice: '1d2',
-        },
-      })
-
-      assert.equal(attack.kind, 'attack')
-      assert.equal(attack.toolEquivalent, 'resolve_player_attack')
-      assert.equal(attack.result.targetId, 'goblin_a')
-      assert.equal(attack.result.hit, true)
-      assert.equal(attack.gameState.actionUsed.player, true)
-
-      const advanced = await callTool(client, 'next_turn', { actorId: 'player' })
-      assert.equal(advanced.currentTurn, 'goblin_a')
-      const monsterPass = await callTool(client, 'next_turn', { actorId: 'goblin_a', skipAction: true })
-      assert.equal(monsterPass.currentTurn, 'player')
-
-      const potion = await callTool(client, 'resolve_player_action', {
-        action: {
-          kind: 'use_item',
-          itemId: 'potion_extra',
-        },
-      })
-
-      assert.equal(potion.kind, 'use_item')
-      assert.equal(potion.toolEquivalent, 'use_healing_potion')
-      assert.equal(potion.result.hpBefore, 10)
-      assert.equal(potion.result.hpAfter, 19)
-      assert.equal(potion.gameState.player.hp.current, 19)
-    })
-  })
-})
-
-test('MCP resolve_player_action propagates canonical action errors', async () => {
-  await withMcpClient(async client => {
-    const result = await callTool(client, 'resolve_player_action', {
-      action: {
-        kind: 'ability_check',
-        entityId: 'missing_entity',
-        ability: 'wis',
-      },
-    })
-
-    assert.equal(result.code, 'ENTITY_NOT_FOUND')
-    assert.equal(result.success, undefined)
   })
 })
 
@@ -1289,398 +1179,108 @@ test('MCP combat scenario resolves movement, attacks, turn order, and combat end
   })
 })
 
-test('MCP resolve_player_action resolves stateful office search, force, and recipe pickup', async () => {
-  await withForcedDiceSequence('10,8', async () => {
+test('MCP run_monster_turns resolves every monster turn in one call and returns to the player', async () => {
+  // Deux gobelins (4 jets : touche+dégâts chacun). Le joueur a une CA basse → ils touchent.
+  await withForcedDiceSequence('10,4,10,4', async () => {
     await withMcpClient(async client => {
       const baseState = await callTool(client, 'get_game_state')
-      baseState.player.position = { x: 5, y: 9 }
-      baseState.roomsVisited = ['5']
-      baseState.currentRoomId = '5'
+      const state = {
+        ...baseState,
+        phase: 'combat',
+        currentTurn: 'goblin_a',
+        round: 1,
+        initiativeOrder: ['player', 'goblin_a', 'goblin_b'],
+        movementUsed: {},
+        actionUsed: {},
+        player: {
+          ...baseState.player,
+          position: { x: 5, y: 5 },
+          ac: 10,
+          hp: { current: 30, max: 30 },
+          conditions: [],
+        },
+        monsters: {
+          goblin_a: { ...makeMonster('goblin_a'), position: { x: 5, y: 7 } },
+          goblin_b: { ...makeMonster('goblin_b'), position: { x: 7, y: 5 } },
+        },
+      }
+      await callTool(client, 'replace_game_state', { gameState: state })
 
-      await callTool(client, 'replace_game_state', { gameState: baseState })
+      const result = await callTool(client, 'run_monster_turns', {})
 
-      const search = await callTool(client, 'resolve_player_action', {
-        action: { kind: 'search' },
-      })
-      assert.equal(search.success, true)
-      assert.ok(search.result.discoveredObjects.some(object => object.id === 'office_drawer'))
+      assert.equal(result.turnsResolved, 2)
+      assert.equal(result.resolvedTurns.length, 2)
+      for (const turn of result.resolvedTurns) {
+        assert.equal(turn.action, 'attack')
+        assert.equal(turn.attack.hit, true)
+        assert.equal(turn.attack.targetId, 'player')
+      }
+      assert.equal(result.currentTurn, 'player')
+      assert.equal(result.round, 2)
+      assert.equal(result.roundsAdvanced, 1)
+      assert.equal(result.monstersRemaining, 2)
+      assert.equal(result.combatShouldEnd, false)
+      assert.equal(result.player.hp.current, 18) // 30 - 6 - 6
+      assert.equal(result.player.down, false)
 
-      let stateAfter = await callTool(client, 'get_game_state')
-      assert.equal(stateAfter.world.objects.office_drawer.discovered, true)
-      assert.equal(stateAfter.world.objects.office_drawer.visible, true)
-      assert.ok(stateAfter.world.eventLog.some(event => event.type === 'room.object_discovered' && event.targetId === 'office_drawer'))
-
-      const lockedOpen = await callTool(client, 'resolve_player_action', {
-        action: { kind: 'open', targetName: 'tiroir' },
-      })
-      assert.equal(lockedOpen.code, 'OBJECT_LOCKED')
-
-      const forced = await callTool(client, 'resolve_player_action', {
-        action: { kind: 'force', targetName: 'tiroir' },
-      })
-      assert.equal(forced.success, true)
-      assert.equal(forced.result.object.opened, true)
-      assert.ok(forced.result.discoveredObjects.some(object => object.id === 'recipe_half_office'))
-
-      stateAfter = await callTool(client, 'get_game_state')
-      assert.equal(stateAfter.world.objects.office_drawer.opened, true)
-      assert.equal(stateAfter.world.objects.office_drawer.locked, false)
-      assert.equal(stateAfter.world.objects.recipe_half_office.discovered, true)
-      assert.equal(stateAfter.world.alarms.bakery_alert.raised, true)
-      assert.ok(stateAfter.world.eventLog.some(event => event.type === 'alarm.raised'))
-      assert.ok(stateAfter.world.eventLog.some(event => event.type === 'object.opened' && event.targetId === 'office_drawer'))
-
-      const take = await callTool(client, 'resolve_player_action', {
-        action: { kind: 'take', targetName: 'recette' },
-      })
-      assert.equal(take.success, true)
-      assert.equal(take.result.quest.progress, 1)
-
-      stateAfter = await callTool(client, 'get_game_state')
-      assert.equal(stateAfter.world.objects.recipe_half_office.taken, true)
-      assert.equal(stateAfter.world.quests.grammy_recipe.progress, 1)
-      assert.ok(stateAfter.player.inventory.some(item => item.id === 'recipe_half_office'))
-      assert.ok(stateAfter.world.eventLog.some(event => event.type === 'object.taken' && event.targetId === 'recipe_half_office'))
-      assert.ok(stateAfter.world.eventLog.some(event => event.type === 'quest.item_found' && event.targetId === 'recipe_half_office'))
-
-      const duplicateTake = await callTool(client, 'resolve_player_action', {
-        action: { kind: 'take', targetName: 'recette' },
-      })
-      assert.equal(duplicateTake.code, 'WORLD_OBJECT_NOT_AFFORDED')
-
-      stateAfter = await callTool(client, 'get_game_state')
-      assert.equal(stateAfter.world.quests.grammy_recipe.progress, 1)
-      assert.ok(stateAfter.world.eventLog.some(event => event.type === 'action.blocked'))
+      const after = await callTool(client, 'get_game_state')
+      assert.equal(after.currentTurn, 'player')
+      // Les deux gobelins ont rejoint le corps à corps (distance Chebyshev ≤ 1).
+      for (const id of ['goblin_a', 'goblin_b']) {
+        const m = after.monsters[id]
+        const dist = Math.max(Math.abs(m.position.x - 5), Math.abs(m.position.y - 5))
+        assert.ok(dist <= 1, `${id} devrait être au contact (distance ${dist})`)
+      }
     })
   })
 })
 
-test('MCP resolve_player_action records NPC disposition and object use events', async () => {
+test('MCP run_monster_turns rejects the player turn, holds allies, and spares a downed player', async () => {
   await withMcpClient(async client => {
     const baseState = await callTool(client, 'get_game_state')
-    await callTool(client, 'replace_game_state', { gameState: baseState })
 
-    const talk = await callTool(client, 'resolve_player_action', {
-      action: { kind: 'talk', targetName: 'Mac', topic: 'aide moi pour la recette de Grammy' },
-    })
-    assert.equal(talk.success, true)
-    assert.equal(talk.result.npc.disposition, 'helpful')
+    // Contrat : interdit pendant le tour du joueur.
+    await callTool(client, 'replace_game_state', { gameState: makeCombatState(baseState) })
+    const rejected = await callTool(client, 'run_monster_turns', {})
+    assert.equal(rejected.code, 'PLAYER_TURN_ACTIVE')
 
-    let stateAfter = await callTool(client, 'get_game_state')
-    assert.equal(stateAfter.world.npcs.mac.disposition, 'helpful')
-    assert.ok(stateAfter.world.eventLog.some(event => event.type === 'npc.disposition_changed' && event.targetId === 'mac'))
-
-    stateAfter.player.position = { x: 8, y: 6 }
-    stateAfter.roomsVisited = ['1', '8']
-    stateAfter.currentRoomId = '8'
-    await callTool(client, 'replace_game_state', { gameState: stateAfter })
-
-    const oven = await callTool(client, 'resolve_player_action', {
-      action: { kind: 'use_object', targetName: 'four' },
-    })
-    assert.equal(oven.success, true)
-    assert.equal(oven.result.object.used, true)
-    assert.equal(oven.result.alarm.raised, true)
-
-    const afterOven = await callTool(client, 'get_game_state')
-    assert.equal(afterOven.world.objects.enchanted_oven.used, true)
-    assert.ok(afterOven.world.eventLog.some(event => event.type === 'object.used' && event.targetId === 'enchanted_oven'))
-    assert.ok(afterOven.world.eventLog.some(event => event.type === 'alarm.raised' && event.targetId === 'bakery_alert'))
-  })
-})
-
-test('MCP initial world definition is data-driven across the full module', async () => {
-  await withMcpClient(async client => {
-    const state = await callTool(client, 'get_game_state')
-
-    assert.deepEqual(Object.keys(state.world.rooms).sort(), ['1', '2', '3', '4', '5', '7', '8', '9'])
-    assert.equal(state.world.rooms['5'].name, 'Bureau de Grammy')
-    assert.equal(state.world.rooms['9'].name, 'Appartement de Grammy')
-    assert.ok(state.world.objects.office_desk.aliases.includes('bureau'))
-    assert.ok(state.world.objects.animated_knife_rack.tags.includes('trap'))
-    assert.ok(state.world.objects.recipe_half_office.tags.includes('recipe_half'))
-    assert.ok(state.world.objects.recipe_half_apartment.tags.includes('recipe_half'))
-    assert.equal(state.world.npcs.mac.disposition, 'neutral')
-    assert.equal(state.world.npcs.dryad_orchard.known, false)
-    assert.equal(state.world.quests.grammy_recipe.goal, 2)
-  })
-})
-
-test('MCP resolve_player_action persists creative improvisation as fiction facts', async () => {
-  await withMcpClient(async client => {
-    const baseState = await callTool(client, 'get_game_state')
-    baseState.player.position = { x: 10, y: 10 }
-    baseState.roomsVisited = ['4']
-    baseState.currentRoomId = '4'
-    await callTool(client, 'replace_game_state', { gameState: baseState })
-
-    const improvised = await callTool(client, 'resolve_player_action', {
-      action: {
-        kind: 'improvise',
-        intent: "je lance creation d'eau sous la porte pour mouiller le sol",
-        method: "sort creation d'eau",
-        desiredEffect: "de l'eau magique s'etale sous la porte et mouille le sol",
+    // Joueur à terre + un allié non hostile (Mac) : le gobelin s'approche sans achever,
+    // l'allié passe son tour, et la main revient au joueur.
+    const downedState = {
+      ...baseState,
+      phase: 'combat',
+      currentTurn: 'goblin_a',
+      round: 1,
+      initiativeOrder: ['player', 'goblin_a', 'mac'],
+      movementUsed: {},
+      actionUsed: {},
+      player: {
+        ...baseState.player,
+        position: { x: 5, y: 5 },
+        hp: { current: 0, max: 20 },
+        deathSaves: { successes: 0, failures: 0 },
+        conditions: [],
       },
-    })
-
-    assert.equal(improvised.success, true)
-    assert.equal(improvised.kind, 'improvise')
-    assert.equal(improvised.toolEquivalent, 'world.improvise')
-    assert.equal(improvised.result.createdFacts.length, 1)
-    const fact = improvised.result.createdFacts[0]
-    assert.equal(fact.roomId, '4')
-    assert.equal(fact.status, 'active')
-    assert.ok(fact.tags.includes('water'))
-    assert.ok(fact.tags.includes('wet_surface'))
-    assert.ok(fact.softAffordances.some(action => action.kind === 'improvise'))
-    assert.ok(fact.softAffordances.some(action =>
-      action.canonicalAction?.usesFactIds?.includes(fact.id)
-    ))
-
-    let stateAfter = await callTool(client, 'get_game_state')
-    assert.equal(stateAfter.world.fictionFacts[fact.id].text, fact.text)
-    assert.ok(stateAfter.world.eventLog.some(event => event.type === 'fiction.fact_created' && event.targetId === fact.id))
-    assert.ok(stateAfter.world.eventLog.some(event => event.type === 'improvisation.resolved'))
-
-    const reused = await callTool(client, 'resolve_player_action', {
-      action: {
-        kind: 'improvise',
-        intent: "j'utilise l'eau au sol pour faire glisser le gobelin",
-        usesFactIds: [fact.id],
-        createsFacts: [{
-          text: "Le sol mouille devient une zone glissante exploitable.",
-          tags: ['wet_surface', 'slippery'],
-        }],
+      monsters: {
+        goblin_a: { ...makeMonster('goblin_a'), position: { x: 5, y: 8 } },
+        mac: { ...makeMonster('mac'), name: 'Mac le Tréant', position: { x: 8, y: 5 }, hostile: false },
       },
-    })
-    assert.equal(reused.success, true)
+    }
+    await callTool(client, 'replace_game_state', { gameState: downedState })
 
-    stateAfter = await callTool(client, 'get_game_state')
-    assert.equal(stateAfter.world.fictionFacts[fact.id].status, 'used')
-    assert.ok(stateAfter.world.eventLog.some(event => event.type === 'fiction.fact_used' && event.targetId === fact.id))
-    assert.ok(Object.values(stateAfter.world.fictionFacts).some(existing => existing.tags.includes('slippery')))
-  })
-})
+    const result = await callTool(client, 'run_monster_turns', {})
 
-test('MCP resolve_player_action turns transgressive NPC improvise into relation state', async () => {
-  await withMcpClient(async client => {
-    const baseState = await callTool(client, 'get_game_state')
-    baseState.player.position = { x: 4, y: 13 }
-    baseState.roomsVisited = ['1']
-    baseState.currentRoomId = '1'
-    await callTool(client, 'replace_game_state', { gameState: baseState })
-
-    const transgression = await callTool(client, 'resolve_player_action', {
-      action: {
-        kind: 'improvise',
-        intent: 'je fais pipi sur mac',
-      },
-    })
-
-    assert.equal(transgression.success, true)
-    assert.equal(transgression.kind, 'improvise')
-    assert.equal(transgression.result.createdFacts.length, 1)
-    assert.equal(transgression.result.npcReaction.npc.id, 'mac')
-    assert.equal(transgression.result.npcReaction.from, 'neutral')
-    assert.equal(transgression.result.npcReaction.to, 'offended')
-    const fact = transgression.result.createdFacts[0]
-    assert.equal(fact.roomId, '1')
-    assert.ok(fact.text.includes('Mac'))
-    assert.ok(fact.tags.includes('bodily_transgression'))
-    assert.ok(fact.tags.includes('humiliation') || fact.tags.includes('improvised'))
-
-    const stateAfter = await callTool(client, 'get_game_state')
-    assert.equal(stateAfter.world.npcs.mac.disposition, 'offended')
-    assert.equal(stateAfter.world.npcs.mac.memory.offendedByPlayer, true)
-    assert.equal(stateAfter.world.flags.npc_mac_offended_by_player, true)
-    assert.ok(stateAfter.world.eventLog.some(event => event.type === 'fiction.fact_created' && event.targetId === fact.id))
-    assert.ok(stateAfter.world.eventLog.some(event => event.type === 'npc.disposition_changed' && event.targetId === 'mac'))
-    assert.ok(stateAfter.world.eventLog.some(event => event.type === 'state.changed' && event.metadata?.reason === 'transgressive_improvisation_memory'))
-  })
-})
-
-test('MCP resolve_player_action handles apartment recipe half and canonical recipe completion', async () => {
-  await withMcpClient(async client => {
-    const baseState = await callTool(client, 'get_game_state')
-    baseState.player.position = { x: 8, y: 9 }
-    baseState.roomsVisited = ['9']
-    baseState.currentRoomId = '9'
-    baseState.world.objects.recipe_half_office.taken = true
-    baseState.world.objects.recipe_half_office.discovered = true
-    baseState.world.objects.recipe_half_office.visible = true
-    baseState.world.quests.grammy_recipe.progress = 1
-    baseState.player.inventory.push({
-      id: 'recipe_half_office',
-      name: 'moitie de recette du bureau',
-      type: 'misc',
-      description: 'Premier fragment de recette.',
-    })
-
-    await callTool(client, 'replace_game_state', { gameState: baseState })
-
-    const opened = await callTool(client, 'resolve_player_action', {
-      action: { kind: 'open', targetName: 'armoire' },
-    })
-    assert.equal(opened.success, true)
-    assert.ok(opened.result.discoveredObjects.some(object => object.id === 'recipe_half_apartment'))
-
-    const take = await callTool(client, 'resolve_player_action', {
-      action: { kind: 'take', targetName: 'Grammy' },
-    })
-    assert.equal(take.success, true)
-    assert.equal(take.result.quest.progress, 2)
-
-    const read = await callTool(client, 'resolve_player_action', {
-      action: { kind: 'read', targetName: 'Grammy' },
-    })
-    assert.equal(read.success, true)
-    assert.equal(read.result.object.id, 'recipe_half_apartment')
-    assert.ok(read.result.text.includes('seconde moitie'))
-
-    const combined = await callTool(client, 'resolve_player_action', {
-      action: { kind: 'combine_recipe' },
-    })
-    assert.equal(combined.success, true)
-    assert.equal(combined.result.quest.completed, true)
-    assert.equal(combined.result.quest.flags.recipe_combined, true)
-
-    const stateAfter = await callTool(client, 'get_game_state')
-    assert.equal(stateAfter.world.quests.grammy_recipe.completed, true)
-    assert.equal(stateAfter.world.flags.recipe_combined, true)
-    assert.ok(stateAfter.world.eventLog.some(event => event.type === 'object.opened' && event.targetId === 'grammy_armoire'))
-    assert.ok(stateAfter.world.eventLog.some(event => event.type === 'clue.read' && event.targetId === 'recipe_half_apartment'))
-    assert.ok(stateAfter.world.eventLog.some(event => event.type === 'quest.completed' && event.targetId === 'grammy_recipe'))
-  })
-})
-
-test('MCP resolve_player_action makes disarm, help, and self-stabilize refusals explicit', async () => {
-  await withForcedDiceSequence('18', async () => {
-    await withMcpClient(async client => {
-      const baseState = await callTool(client, 'get_game_state')
-      baseState.player.position = { x: 8, y: 6 }
-      baseState.roomsVisited = ['8']
-      baseState.currentRoomId = '8'
-      await callTool(client, 'replace_game_state', { gameState: baseState })
-
-      const disarm = await callTool(client, 'resolve_player_action', {
-        action: { kind: 'disarm', targetName: 'couteaux' },
-      })
-      assert.equal(disarm.success, true)
-      assert.equal(disarm.result.object.disarmed, true)
-
-      const stateAfterDisarm = await callTool(client, 'get_game_state')
-      const hpAfterDisarm = stateAfterDisarm.player.hp.current
-      assert.ok(stateAfterDisarm.world.eventLog.some(event => event.type === 'trap.disarmed' && event.targetId === 'animated_knife_rack'))
-
-      const useDisarmed = await callTool(client, 'resolve_player_action', {
-        action: { kind: 'use_object', targetName: 'couteaux' },
-      })
-      assert.equal(useDisarmed.success, true)
-
-      let stateAfter = await callTool(client, 'get_game_state')
-      assert.equal(stateAfter.player.hp.current, hpAfterDisarm)
-      assert.ok(stateAfter.world.eventLog.some(event => event.type === 'object.used' && event.targetId === 'animated_knife_rack'))
-      assert.equal(stateAfter.world.eventLog.some(event => event.type === 'trap.triggered' && event.targetId === 'animated_knife_rack'), false)
-
-      stateAfter.player.position = { x: 4, y: 13 }
-      stateAfter.roomsVisited = ['1']
-      stateAfter.currentRoomId = '1'
-      await callTool(client, 'replace_game_state', { gameState: stateAfter })
-
-      const help = await callTool(client, 'resolve_player_action', {
-        action: { kind: 'help', targetName: 'Mac' },
-      })
-      assert.equal(help.success, true)
-      assert.equal(help.result.npc.id, 'mac')
-
-      stateAfter = await callTool(client, 'get_game_state')
-      assert.equal(stateAfter.world.flags.helping_mac, true)
-      assert.equal(stateAfter.world.npcs.mac.memory.helpedByPlayer, true)
-
-      stateAfter.player.hp.current = 0
-      stateAfter.player.conditions = ['unconscious']
-      await callTool(client, 'replace_game_state', { gameState: stateAfter })
-
-      const stabilize = await callTool(client, 'resolve_player_action', {
-        action: { kind: 'stabilize', targetId: 'player' },
-      })
-      assert.equal(stabilize.code, 'SELF_STABILIZE_UNSUPPORTED')
-
-      const finalState = await callTool(client, 'get_game_state')
-      assert.ok(finalState.world.eventLog.some(event =>
-        event.type === 'action.blocked' &&
-        event.metadata?.code === 'SELF_STABILIZE_UNSUPPORTED'
-      ))
-    })
-  })
-})
-
-test('MCP resolve_player_action separates ask, persuade, show, and give', async () => {
-  await withForcedDiceSequence('16', async () => {
-    await withMcpClient(async client => {
-      const baseState = await callTool(client, 'get_game_state')
-      baseState.player.position = { x: 4, y: 13 }
-      baseState.roomsVisited = ['1']
-      baseState.currentRoomId = '1'
-      baseState.player.inventory.push({
-        id: 'recipe_half_office',
-        name: 'moitie de recette du bureau',
-        type: 'misc',
-        description: 'Premier fragment de recette.',
-      })
-      await callTool(client, 'replace_game_state', { gameState: baseState })
-
-      const ask = await callTool(client, 'resolve_player_action', {
-        action: { kind: 'ask', targetName: 'Mac', topic: 'ou est la recette de Grammy' },
-      })
-      assert.equal(ask.success, true)
-      assert.ok(ask.result.information.includes('bureau'))
-
-      const persuade = await callTool(client, 'resolve_player_action', {
-        action: { kind: 'persuade', targetName: 'Mac', topic: 'aide moi a sauver la boulangerie' },
-      })
-      assert.equal(persuade.success, true)
-      assert.equal(persuade.result.npc.disposition, 'helpful')
-
-      const show = await callTool(client, 'resolve_player_action', {
-        action: { kind: 'show_item', targetName: 'Mac', itemName: 'recette' },
-      })
-      assert.equal(show.success, true)
-
-      const give = await callTool(client, 'resolve_player_action', {
-        action: { kind: 'give_item', targetName: 'Mac', itemName: 'potion' },
-      })
-      assert.equal(give.success, true)
-      assert.equal(give.result.item.id, 'potion1')
-
-      let stateAfter = await callTool(client, 'get_game_state')
-      assert.ok(stateAfter.world.eventLog.some(event => event.type === 'npc.information_revealed' && event.targetId === 'mac'))
-      assert.ok(stateAfter.world.eventLog.some(event => event.type === 'npc.disposition_changed' && event.targetId === 'mac'))
-      assert.ok(stateAfter.world.eventLog.some(event => event.type === 'item.shown' && event.metadata?.npcId === 'mac'))
-      assert.ok(stateAfter.world.eventLog.some(event => event.type === 'item.given' && event.metadata?.npcId === 'mac'))
-      assert.equal(stateAfter.player.inventory.some(item => item.id === 'potion1'), false)
-    })
-  })
-})
-
-test('MCP resolve_player_action failed threat raises a canonical alarm', async () => {
-  await withMcpClient(async client => {
-    const baseState = await callTool(client, 'get_game_state')
-    baseState.player.position = { x: 8, y: 9 }
-    baseState.roomsVisited = ['9']
-    baseState.currentRoomId = '9'
-    baseState.world.npcs.grukk.known = true
-    await callTool(client, 'replace_game_state', { gameState: baseState })
-
-    const threat = await callTool(client, 'resolve_player_action', {
-      action: { kind: 'threaten', targetName: 'Grukk', demand: 'donne la recette ou je te casse', dc: 99 },
-    })
-    assert.equal(threat.success, true)
-    assert.equal(threat.result.success, false)
-    assert.equal(threat.result.npc.disposition, 'hostile')
-
-    const finalState = await callTool(client, 'get_game_state')
-    assert.equal(finalState.world.alarms.bakery_alert.raised, true)
-    assert.ok(finalState.world.eventLog.some(event => event.type === 'alarm.raised' && event.targetId === 'bakery_alert'))
+    assert.equal(result.turnsResolved, 2)
+    const byId = Object.fromEntries(result.resolvedTurns.map(turn => [turn.id, turn]))
+    assert.equal(byId.goblin_a.action, 'approach')
+    assert.equal(byId.goblin_a.note, 'player_down')
+    assert.equal(byId.goblin_a.attack, null)
+    assert.equal(byId.mac.action, 'hold')
+    assert.equal(byId.mac.attack, null)
+    assert.equal(result.player.hp.current, 0)
+    assert.equal(result.player.down, true)
+    assert.equal(result.player.dead, false)
+    assert.equal(result.currentTurn, 'player')
+    assert.equal(result.combatShouldEnd, false)
   })
 })

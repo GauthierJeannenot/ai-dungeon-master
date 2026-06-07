@@ -79,6 +79,18 @@ const MonsterStateSchema = z.object({
   initiative: z.number().optional(),
   isAlive: z.boolean(),
   xpAwarded: z.boolean().optional(),
+  hostile: z.boolean().optional(),
+})
+
+const NpcStateSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  kind: z.string(),
+  position: PositionSchema,
+  roomId: z.string().nullable(),
+  disposition: z.enum(['hostile', 'wary', 'neutral', 'helpful', 'offended']),
+  visible: z.boolean(),
+  description: z.string().optional(),
 })
 
 const CombatLogEntrySchema = z.object({
@@ -109,6 +121,7 @@ const GameStateSchema = z.object({
   phase: z.enum(['exploration', 'combat', 'dialogue']),
   player: PlayerStateSchema,
   monsters: z.record(z.string(), MonsterStateSchema),
+  npcs: z.record(z.string(), NpcStateSchema).optional(),
   initiativeOrder: z.array(z.string()),
   currentTurn: z.string().nullable(),
   round: z.number().int().min(0),

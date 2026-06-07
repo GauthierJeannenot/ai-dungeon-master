@@ -4,7 +4,6 @@ import { registerPlayerTools } from './tools/player-tools'
 import { registerCombatTools } from './tools/combat-tools'
 import { registerPhaseTools } from './tools/phase-tools'
 import { registerEnvTools } from './tools/env-tools'
-import { registerActionTools } from './tools/action-tools'
 
 const server = new McpServer({
   name: 'ai-dungeon-master-engine',
@@ -15,7 +14,6 @@ registerPlayerTools(server)
 registerCombatTools(server)
 registerPhaseTools(server)
 registerEnvTools(server)
-registerActionTools(server)
 
 async function main() {
   const transport = new StdioServerTransport()

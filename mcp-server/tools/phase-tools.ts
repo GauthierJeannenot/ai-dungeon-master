@@ -169,6 +169,7 @@ const MONSTER_TEMPLATES: Record<string, Omit<MonsterState, 'id' | 'name' | 'posi
     attackBonus: 6,  // avec Poigne du druide (Shillelagh)
     damageDice: '1d8+3',  // gourdin + Shillelagh
     speed: 30,
+    hostile: false,  // non hostile dans l'aventure : ne joue pas de tour offensif automatique
     // Charme féerique : JS SAG DD 14 ou charmé 24h — géré par DM AI via apply_condition
     // Résistance magie : Avantage sur JS contre sorts
   },
@@ -185,6 +186,7 @@ const MONSTER_TEMPLATES: Record<string, Omit<MonsterState, 'id' | 'name' | 'posi
     attackBonus: 6,
     damageDice: '3d6+4',  // coup (contondants)
     speed: 20,
+    hostile: false,  // non hostile : ne joue pas de tour offensif automatique
     // Vulnérabilité : feu × 2
     // Fausse apparence : ressemble à un pommier ordinaire
   },

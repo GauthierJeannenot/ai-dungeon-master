@@ -34,6 +34,12 @@ RUN npm ci --omit=dev
 FROM node:20-slim AS runner
 WORKDIR /app
 
+# gosu : permet de démarrer en root (pour réaligner les permissions du volume
+# persistant monté au runtime) puis de redescendre en utilisateur non-privilégié `node`.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends gosu \
+    && rm -rf /var/lib/apt/lists/*
+
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     PORT=8080 \
@@ -53,7 +59,11 @@ COPY next.config.ts package.json package-lock.json ./
 RUN mkdir -p /data/sessions .data \
     && chown -R node:node /app /data
 
-USER node
 EXPOSE 8080
 
-CMD ["npm", "start"]
+# Pas de `USER node` ici : un hébergeur comme Railway monte le volume persistant sur
+# /data en root:root au runtime, ce qui MASQUE le `chown` fait au build → l'écriture
+# des sessions échouerait (EACCES) et le conteneur crasherait. On démarre donc en root,
+# on réaligne /data sur l'utilisateur applicatif, puis on lance le serveur en non-root
+# via gosu.
+ENTRYPOINT ["/bin/sh", "-c", "mkdir -p /data/sessions && chown -R node:node /data || true; exec gosu node npm start"]

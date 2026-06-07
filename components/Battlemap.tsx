@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { centerCellForAdventureRoom } from '@/lib/adventure-map'
 import type { GameState, MonsterState, PlayerState, WorldNpcDisposition } from '@/lib/types'
 
 interface BattlemapProps {
@@ -19,8 +18,8 @@ interface MapNpcToken {
   id: string
   name: string
   disposition: WorldNpcDisposition
-  faction?: string
-  roomId: string
+  kind?: string
+  roomId: string | null
   position: { x: number; y: number }
 }
 
@@ -78,7 +77,7 @@ export default function Battlemap({ gameState, cellSize = 48 }: BattlemapProps) 
 
     setPrevPositions(newPositions)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gameState.player.position, gameState.monsters, gameState.world?.npcs, gameState.currentRoomId])
+  }, [gameState.player.position, gameState.monsters, gameState.npcs, gameState.currentRoomId])
 
   const handleTokenClick = useCallback((
     e: React.MouseEvent,
@@ -193,41 +192,28 @@ export default function Battlemap({ gameState, cellSize = 48 }: BattlemapProps) 
 }
 
 function deriveNpcTokens(gameState: GameState): MapNpcToken[] {
-  const currentRoomId = gameState.currentRoomId
-  if (!currentRoomId || !gameState.world?.npcs) return []
+  if (!gameState.npcs) return []
 
+  const currentRoomId = gameState.currentRoomId
+  // PNJ devenus combattants : on évite le doublon token PNJ + token monstre.
   const occupiedMonsterNames = new Set(
     Object.values(gameState.monsters)
       .filter(monster => monster.isAlive)
       .map(monster => monster.name.toLowerCase())
   )
-  const center = centerCellForAdventureRoom(currentRoomId) ?? gameState.player.position
-  const offsets = [
-    { x: -1, y: 0 },
-    { x: 1, y: 0 },
-    { x: 0, y: -1 },
-    { x: 0, y: 1 },
-    { x: -1, y: -1 },
-    { x: 1, y: 1 },
-  ]
 
-  return Object.values(gameState.world.npcs)
-    .filter(npc => npc.roomId === currentRoomId)
-    .filter(npc => npc.disposition !== 'hostile' || !occupiedMonsterNames.has(npc.name.toLowerCase()))
-    .map((npc, index) => {
-      const offset = offsets[index % offsets.length]
-      return {
-        id: npc.id,
-        name: npc.name,
-        disposition: npc.disposition,
-        faction: npc.faction,
-        roomId: npc.roomId,
-        position: {
-          x: Math.max(0, center.x + offset.x),
-          y: Math.max(0, center.y + offset.y),
-        },
-      }
-    })
+  return Object.values(gameState.npcs)
+    .filter(npc => npc.visible)
+    .filter(npc => npc.roomId === null || npc.roomId === currentRoomId)
+    .filter(npc => !occupiedMonsterNames.has(npc.name.toLowerCase()))
+    .map(npc => ({
+      id: npc.id,
+      name: npc.name,
+      disposition: npc.disposition,
+      kind: npc.kind,
+      roomId: npc.roomId,
+      position: { x: npc.position.x, y: npc.position.y },
+    }))
 }
 
 function npcTokenStyle(disposition: WorldNpcDisposition): { background: string; shadow: string; ring: string; label: string } {
@@ -433,7 +419,7 @@ function EntityTooltip({
       {isNpc && (
         <div className="text-stone-300 text-xs mb-2">
           PNJ {npcTokenStyle(entity.disposition).label.toLowerCase()}
-          {entity.faction ? ` | ${entity.faction}` : ''}
+          {entity.kind ? ` | ${entity.kind}` : ''}
         </div>
       )}
       {isMonster && (

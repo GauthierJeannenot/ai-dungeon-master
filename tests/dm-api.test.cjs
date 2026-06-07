@@ -54,8 +54,6 @@ const { POST } = require(path.join(process.cwd(), 'app/api/dm/route.ts'))
 const { closeMCPClient } = require(path.join(process.cwd(), 'lib/mcp-client.ts'))
 const { deleteSession } = require(path.join(process.cwd(), 'lib/session-store.ts'))
 
-const DEFAULT_SCENE_NARRATIVE_PATTERN = /facade de la boulangerie grince|dans le verger, les branches|au quai de chargement, la porte laterale|dans l'entree, les traces|au sol de la boulangerie|dans l'appartement de grammy/i
-
 test.after(() => {
   restoreTsRequire()
   fs.rmSync(sessionStoreDir, { recursive: true, force: true })
@@ -131,104 +129,6 @@ function combatGameState() {
   })
 }
 
-function downedCombatGameState() {
-  const state = combatGameState()
-  return {
-    ...state,
-    player: {
-      ...state.player,
-      hp: { current: 0, max: 20 },
-      conditions: ['unconscious'],
-      deathSaves: { successes: 0, failures: 2 },
-    },
-    actionUsed: {},
-    movementUsed: {},
-    combatLog: [
-      {
-        id: 'log-downed',
-        round: 2,
-        turn: 'goblin_a',
-        action: 'Gobelin test attaque Heros',
-        mechanicalDetail: 'Heros tombe a 0 PV | A TERRE (0 succes, 2 echecs mort)',
-        timestamp: Date.now(),
-      },
-    ],
-  }
-}
-
-function officeGameState() {
-  return baseGameState({
-    player: {
-      ...baseGameState().player,
-      position: { x: 5, y: 9 },
-    },
-    roomsVisited: ['5'],
-    currentRoomId: '5',
-  })
-}
-
-function bakeryEntranceGameState() {
-  return baseGameState({
-    player: {
-      ...baseGameState().player,
-      position: { x: 12, y: 11 },
-    },
-    roomsVisited: ['1', '4'],
-    currentRoomId: '4',
-  })
-}
-
-function bakeryFloorGameState() {
-  return baseGameState({
-    player: {
-      ...baseGameState().player,
-      position: { x: 9, y: 7 },
-    },
-    roomsVisited: ['1', '4', '8'],
-    currentRoomId: '8',
-  })
-}
-
-function loadingDockGameState() {
-  return baseGameState({
-    player: {
-      ...baseGameState().player,
-      position: { x: 4, y: 6 },
-    },
-    roomsVisited: ['1', '4', '7'],
-    currentRoomId: '7',
-  })
-}
-
-function orchardGameState() {
-  return baseGameState({
-    player: {
-      ...baseGameState().player,
-      position: { x: 9, y: 2 },
-    },
-    roomsVisited: ['1', '2'],
-    currentRoomId: '2',
-  })
-}
-
-function lowHpPotionCombatGameState() {
-  const state = combatGameState()
-  return {
-    ...state,
-    player: {
-      ...state.player,
-      hp: { current: 1, max: 20 },
-      ac: 5,
-    },
-    monsters: {
-      goblin_a: makeGoblin({
-        attackBonus: 10,
-        damageDice: '1d6+2',
-      }),
-    },
-  }
-}
-
 async function postDm(body) {
   const response = await POST(new Request('http://localhost/api/dm', {
     method: 'POST',
@@ -247,7 +147,13 @@ async function cleanupSession(sessionId) {
   await deleteSession(sessionId).catch(() => undefined)
 }
 
-test('DM API resolves an exploration move through MCP in mock mode', async t => {
+test('DM API rejects an empty message with 400', async () => {
+  const { response, data } = await postDm({ message: '   ', sessionId: `api-empty-${process.pid}` })
+  assert.equal(response.status, 400)
+  assert.equal(typeof data.error, 'string')
+})
+
+test('DM API resolves an exploration move via the move_token tool', async t => {
   const sessionId = `api-move-${process.pid}-${Date.now()}`
   t.after(() => cleanupSession(sessionId))
 
@@ -255,31 +161,25 @@ test('DM API resolves an exploration move through MCP in mock mode', async t => 
     message: 'je vais en (11,13)',
     clientRequestId: `client-${sessionId}`,
     sessionId,
+    gameState: baseGameState(),
     history: [],
   })
 
   assert.equal(response.status, 200)
-  assert.ok(data.toolsUsed.includes('resolve_player_action'))
+  assert.ok(data.toolsUsed.includes('move_token'))
   assert.deepEqual(data.newGameState.player.position, { x: 11, y: 13 })
   assert.equal(typeof data.narrative, 'string')
   assert.ok(data.narrative.length > 0)
-  assert.doesNotMatch(data.narrative, /\[Mock\]/)
-  assert.doesNotMatch(data.narrative, /case|decor se replace/i)
-  assert.equal(typeof data.newGameState.sceneMemory?.updatedAt, 'string')
-  assert.ok(data.engine?.events?.some(event => event.type === 'entity.moved'))
-  assert.ok(data.engine?.affordances?.some(action => action.kind === 'move' && action.enabled === true))
-  assert.equal(data.turnTrace?.schemaVersion, 1)
-  assert.equal(data.turnTrace?.input.raw, 'je vais en (11,13)')
-  assert.ok(data.turnTrace?.actions.some(action => action.toolName === 'resolve_player_action' && action.executed))
-  assert.ok(data.turnTrace?.engineEvents.some(event => event.type === 'entity.moved'))
-  assert.ok(data.turnTrace?.worldDiff)
-  assert.deepEqual(data.turnTrace?.contradictions, [])
-  assert.equal(data.usage?.llm.calls, 1)
+  // L'architecture déterministe a disparu : pas de moteur, ni de trace.
+  assert.equal(data.engine, undefined)
+  assert.equal(data.turnTrace, undefined)
+  assert.equal(data.newGameState.world, undefined)
   assert.equal(data.usage?.narrator, 'llm')
-  assert.equal(data.usage?.llmRoute, 'short')
+  assert.equal(data.usage?.llmRoute, 'rich')
+  assert.ok(data.usage?.llm.calls >= 1)
 })
 
-test('DM API resolves a combat attack through MCP in mock mode', async t => {
+test('DM API resolves a combat attack via the resolve_attack tool', async t => {
   const sessionId = `api-attack-${process.pid}-${Date.now()}`
   const previousDice = process.env.AI_DM_TEST_DICE_SEQUENCE
   process.env.AI_DM_TEST_DICE_SEQUENCE = '20,8,8'
@@ -298,107 +198,20 @@ test('DM API resolves a combat attack through MCP in mock mode', async t => {
   })
 
   assert.equal(response.status, 200)
-  assert.ok(data.toolsUsed.includes('resolve_player_action'))
-  assert.equal(data.newGameState.monsters.goblin_a.isAlive, false)
-  assert.ok(data.newGameState.combatLog.some(entry => /attaque/i.test(entry.action)))
-  assert.doesNotMatch(data.narrative, /\[Mock\]/)
-  assert.equal(data.newGameState.sceneMemory?.madeNoise, true)
-  assert.equal(data.newGameState.sceneMemory?.goblinMorale, 'shaken')
-  assert.ok(data.engine?.events?.some(event => event.type === 'combat.attack'))
-  assert.ok(data.engine?.affordances?.some(action => action.kind === 'move' && action.enabled === true))
-  assert.equal(data.usage?.llm.calls, 1)
-  assert.equal(data.usage?.narrator, 'llm')
-  assert.equal(data.usage?.llmRoute, 'short')
+  assert.ok(data.toolsUsed.includes('resolve_attack'))
+  // Le gobelin doit avoir encaissé des dégâts (ou être mort).
+  const goblin = data.newGameState.monsters.goblin_a
+  assert.ok(!goblin || goblin.hp.current < 7)
+  assert.equal(typeof data.narrative, 'string')
+  assert.ok(data.narrative.length > 0)
 })
 
-test('DM API resolves typoed combat attacks through the canonical action facade', async t => {
-  const sessionId = `api-typo-attack-${process.pid}-${Date.now()}`
-  const previousDice = process.env.AI_DM_TEST_DICE_SEQUENCE
-  process.env.AI_DM_TEST_DICE_SEQUENCE = '20,8,8'
-  t.after(async () => {
-    if (previousDice === undefined) delete process.env.AI_DM_TEST_DICE_SEQUENCE
-    else process.env.AI_DM_TEST_DICE_SEQUENCE = previousDice
-    await cleanupSession(sessionId)
-  })
-
-  const { response, data } = await postDm({
-    message: "j'attque le gobelin 1",
-    clientRequestId: `client-${sessionId}`,
-    sessionId,
-    gameState: combatGameState(),
-    history: [],
-  })
-
-  assert.equal(response.status, 200)
-  assert.equal(data.turnTrace?.intent.kind, 'attack')
-  assert.ok(data.toolsUsed.includes('resolve_player_action'))
-  assert.ok(data.engine?.events?.some(event => event.type === 'combat.attack'))
-  assert.ok(data.newGameState.combatLog.some(entry => /attaque/i.test(entry.action)))
-  assert.doesNotMatch(data.narrative, /celui a|celui à|lequel cibles-tu/i)
-})
-
-test('DM API routes combat peace pleas as social checks instead of attacks', async t => {
-  const sessionId = `api-combat-peace-${process.pid}-${Date.now()}`
-  const previousDice = process.env.AI_DM_TEST_DICE_SEQUENCE
-  process.env.AI_DM_TEST_DICE_SEQUENCE = '20,20,20'
-  t.after(async () => {
-    if (previousDice === undefined) delete process.env.AI_DM_TEST_DICE_SEQUENCE
-    else process.env.AI_DM_TEST_DICE_SEQUENCE = previousDice
-    await cleanupSession(sessionId)
-  })
-
-  const { response, data } = await postDm({
-    message: "ok ok, arretez de m'attaquer on fait la paix",
-    clientRequestId: `client-${sessionId}`,
-    sessionId,
-    gameState: combatGameState(),
-    history: [],
-  })
-
-  assert.equal(response.status, 200)
-  assert.equal(data.turnTrace?.intent.kind, 'social')
-  assert.equal(data.turnTrace?.intent.reason, 'intent-interpreter-social_deescalation')
-  assert.equal(data.turnTrace?.intentInterpreterOutput?.intentKind, 'social_deescalation')
-  assert.ok(data.toolsUsed.includes('resolve_player_action'))
-  assert.ok(data.toolsUsed.includes('roll_ability_check'))
-  assert.equal(data.engine?.events?.some(event => event.type === 'combat.attack'), false)
-  assert.ok(data.newGameState.combatLog.some(entry => /Persuasion|Intimidation/i.test(entry.action)))
-})
-
-test('DM API resolves creative improvisation as persistent fiction instead of default fallback', async t => {
-  const sessionId = `api-improvise-${process.pid}-${Date.now()}`
+test('DM API narrates a free-form action without a primary game tool', async t => {
+  const sessionId = `api-narrate-${process.pid}-${Date.now()}`
   t.after(() => cleanupSession(sessionId))
 
   const { response, data } = await postDm({
-    message: "je lance creation d'eau sous la porte pour mouiller le sol",
-    clientRequestId: `client-${sessionId}`,
-    sessionId,
-    gameState: bakeryEntranceGameState(),
-    history: [],
-  })
-
-  assert.equal(response.status, 200)
-  assert.ok(data.toolsUsed.includes('resolve_player_action'))
-  assert.equal(data.turnTrace?.intent.kind, 'improvise')
-  assert.ok(data.turnTrace?.actions.some(action => action.toolName === 'resolve_player_action' && action.executed))
-  assert.ok(data.engine?.events?.some(event => event.type === 'fiction.fact_created'))
-  assert.ok(data.engine?.events?.some(event => event.type === 'improvisation.resolved'))
-  assert.ok(Object.values(data.newGameState.world.fictionFacts).some(fact =>
-    fact.text.includes("eau") &&
-    fact.roomId === '4' &&
-    fact.status === 'active'
-  ))
-  assert.ok(data.turnTrace?.worldDiff?.fictionFacts)
-  assert.doesNotMatch(data.narrative, DEFAULT_SCENE_NARRATIVE_PATTERN)
-  assert.doesNotMatch(data.narrative, /situation ne le permet pas|intention cherche une prise|geste se bloque/i)
-})
-
-test('DM API resolves prod transgression against Mac through engine state', async t => {
-  const sessionId = `api-transgressive-mac-${process.pid}-${Date.now()}`
-  t.after(() => cleanupSession(sessionId))
-
-  const { response, data } = await postDm({
-    message: 'je fais pipi sur mac',
+    message: "je hume l'air et j'écoute les bruits autour de moi",
     clientRequestId: `client-${sessionId}`,
     sessionId,
     gameState: baseGameState(),
@@ -406,597 +219,55 @@ test('DM API resolves prod transgression against Mac through engine state', asyn
   })
 
   assert.equal(response.status, 200)
-  assert.ok(data.toolsUsed.includes('resolve_player_action'))
-  assert.equal(data.turnTrace?.intent.kind, 'improvise')
-  assert.equal(data.turnTrace?.intent.reason, 'intent-interpreter-improvise')
-  assert.equal(data.turnTrace?.intentInterpreterOutput?.improvisation?.type, 'social_transgression')
-  assert.ok(data.engine?.events?.some(event => event.type === 'fiction.fact_created'))
-  assert.ok(data.engine?.events?.some(event => event.type === 'npc.disposition_changed' && event.targetId === 'mac'))
-  assert.equal(data.newGameState.world.npcs.mac.disposition, 'offended')
-  assert.equal(data.newGameState.world.npcs.mac.memory.offendedByPlayer, true)
-  assert.equal(data.newGameState.world.flags.npc_mac_offended_by_player, true)
-  assert.ok(data.turnTrace?.worldDiff?.fictionFacts)
-  assert.ok(data.turnTrace?.worldDiff?.npcs?.mac)
-  assert.doesNotMatch(data.narrative, DEFAULT_SCENE_NARRATIVE_PATTERN)
-  assert.doesNotMatch(data.narrative, /situation ne le permet pas|intention cherche une prise|geste se bloque/i)
+  assert.equal(typeof data.narrative, 'string')
+  assert.ok(data.narrative.length > 0)
+  const primaryTools = ['resolve_attack', 'move_token', 'roll_ability_check', 'use_healing_potion']
+  assert.ok(!data.toolsUsed.some(tool => primaryTools.includes(tool)))
 })
 
-test('DM API never emits a canned clarification for a creative orchard action', async t => {
-  const sessionId = `api-orchard-pee-${process.pid}-${Date.now()}`
-  t.after(() => cleanupSession(sessionId))
-
-  const { response, data } = await postDm({
-    message: "je pisse sur l'arbre",
-    clientRequestId: `client-${sessionId}`,
-    sessionId,
-    gameState: orchardGameState(),
-    history: [],
-  })
-
-  assert.equal(response.status, 200)
-  assert.equal(data.turnTrace?.intent.kind, 'improvise')
-  assert.ok(data.toolsUsed.includes('resolve_player_action'))
-  assert.ok(data.engine?.events?.some(event => event.type === 'fiction.fact_created'))
-  // The exact "default prompt" the user flagged in prod must never surface.
-  assert.doesNotMatch(data.narrative, /il me manque une cible nette|les prises claires sont/i)
-  assert.doesNotMatch(data.narrative, DEFAULT_SCENE_NARRATIVE_PATTERN)
-})
-
-test('DM API routes open social scenes through rich mock LLM narration', async t => {
-  const sessionId = `api-social-${process.pid}-${Date.now()}`
-  t.after(() => cleanupSession(sessionId))
-
-  const { response, data } = await postDm({
-    message: 'je negocie avec Mac pour le convaincre de nous aider',
-    clientRequestId: `client-${sessionId}`,
-    sessionId,
-    gameState: baseGameState(),
-    history: [],
-  })
-
-  assert.equal(response.status, 200)
-  assert.ok((data.usage?.llm.calls ?? 0) >= 1)
-  assert.ok((data.usage?.llm.calls ?? 0) <= 2)
-  assert.equal(data.usage?.llmRoute, 'rich')
-  assert.equal(data.usage?.narrator, 'llm')
-})
-
-test('DM API routes downed player status guidance through final LLM narration', async t => {
-  const sessionId = `api-downed-status-${process.pid}-${Date.now()}`
-  t.after(() => cleanupSession(sessionId))
-
-  const { response, data } = await postDm({
-    message: 'donc je suis mort la?',
-    clientRequestId: `client-${sessionId}`,
-    sessionId,
-    gameState: downedCombatGameState(),
-    history: [],
-  })
-
-  assert.equal(response.status, 200)
-  assert.deepEqual(data.toolsUsed, [])
-  assert.equal(data.newGameState.player.hp.current, 0)
-  assert.equal(data.newGameState.currentTurn, 'player')
-  assert.ok(data.engine?.affordances?.some(action => action.kind === 'death_save' && action.enabled === true))
-  assert.ok(data.engine?.affordances?.some(action => action.kind === 'attack' && action.enabled === false))
-  assert.equal(data.usage?.llm.calls, 1)
-  assert.deepEqual(data.usage?.operations, ['dm.final_narration'])
-  assert.equal(data.usage?.llmRoute, 'rich')
-  assert.equal(data.usage?.narrator, 'llm')
-})
-
-test('DM API automatically resolves natural death save requests while player is down', async t => {
-  const previousDice = process.env.AI_DM_TEST_DICE_SEQUENCE
-  process.env.AI_DM_TEST_DICE_SEQUENCE = '12,12,12,12'
-  t.after(() => {
-    if (previousDice === undefined) delete process.env.AI_DM_TEST_DICE_SEQUENCE
-    else process.env.AI_DM_TEST_DICE_SEQUENCE = previousDice
-  })
-
-  for (const message of ['je fais mon jet de mort', 'bah c est toi qui jettes les des']) {
-    const sessionId = `api-death-save-${process.pid}-${Date.now()}-${message.length}`
-    t.after(() => cleanupSession(sessionId))
-
-    const { response, data } = await postDm({
-      message,
-      clientRequestId: `client-${sessionId}`,
-      sessionId,
-      gameState: downedCombatGameState(),
-      history: [],
-    })
-
-    assert.equal(response.status, 200, message)
-    assert.ok(data.toolsUsed.includes('resolve_player_action'), message)
-    assert.ok(data.engine?.events?.some(event => event.type === 'combat.death_save'), message)
-    assert.doesNotMatch(data.narrative, /a toi de lancer|lance(?:r)? toi|lance(?:r)? le de|jettes? toi/i, message)
-  }
-})
-
-test('DM API resolves sensory movement toward smell origin from room 4', async t => {
-  const sessionId = `api-sensory-move-${process.pid}-${Date.now()}`
-  t.after(() => cleanupSession(sessionId))
-
-  const { response, data } = await postDm({
-    message: "je vais vers l'origine de l'odeur",
-    clientRequestId: `client-${sessionId}`,
-    sessionId,
-    gameState: bakeryEntranceGameState(),
-    history: [],
-  })
-
-  assert.equal(response.status, 200)
-  assert.ok(data.toolsUsed.includes('resolve_player_action'))
-  assert.ok(data.engine?.events?.some(event => event.type === 'entity.moved'))
-  assert.equal(data.newGameState.currentRoomId, '8')
-  assert.equal(data.newGameState.phase, 'exploration')
-  assert.deepEqual(data.newGameState.player.position, { x: 9, y: 7 })
-})
-
-test('DM API resolves npc and landmark destinations through the location index', async t => {
-  const cases = [
-    ['tres bien je vais aller voir les dryades dans ce cas', baseGameState()],
-    ['je me dirige vers les dryades', baseGameState()],
-    ['je vais voir ta soeur', baseGameState()],
-    ['je sors du quai de chargement et vais vers le verger', loadingDockGameState()],
-  ]
-
-  for (const [index, [message, gameState]] of cases.entries()) {
-    const sessionId = `api-location-destination-${process.pid}-${Date.now()}-${index}`
-    t.after(() => cleanupSession(sessionId))
-
-    const { response, data } = await postDm({
-      message,
-      clientRequestId: `client-${sessionId}`,
-      sessionId,
-      gameState,
-      history: [],
-    })
-
-    assert.equal(response.status, 200, message)
-    assert.ok(data.toolsUsed.includes('resolve_player_action'), message)
-    assert.ok(data.toolsUsed.includes('move_token'), message)
-    assert.ok(data.engine?.events?.some(event => event.type === 'entity.moved'), message)
-    assert.equal(data.newGameState.currentRoomId, '2', message)
-    assert.deepEqual(data.newGameState.player.position, { x: 9, y: 2 }, message)
-    assert.equal(data.debug?.targetResolution?.status, 'resolved', message)
-    assert.equal(data.debug?.targetResolution?.target?.roomId, '2', message)
-    assert.notEqual(data.newGameState.currentRoomId, '7', message)
-  }
-})
-
-test('DM API blocks unresolved movement intents before default narration', async t => {
-  const cases = [
-    ['je pars vers la cachette secrete', baseGameState(), /destination|repere concret|destinations claires/i],
-    ['je sors du quai de chargement', loadingDockGameState(), /sortie claire|Verger|Tas de dechets|Sol de la boulangerie/i],
-  ]
-
-  for (const [index, [message, gameState, narrativePattern]] of cases.entries()) {
-    const sessionId = `api-unresolved-move-${process.pid}-${Date.now()}-${index}`
-    t.after(() => cleanupSession(sessionId))
-
-    const { response, data } = await postDm({
-      message,
-      clientRequestId: `client-${sessionId}`,
-      sessionId,
-      gameState,
-      history: [],
-    })
-
-    assert.equal(response.status, 200, message)
-    assert.deepEqual(data.toolsUsed, [], message)
-    assert.ok(data.debug?.refusalCode?.startsWith('UNRESOLVED_MOVE'), message)
-    assert.equal(data.turnTrace?.refusalCode, data.debug?.refusalCode, message)
-    assert.equal(data.turnTrace?.actions?.[0]?.toolName, 'unresolved_intent', message)
-    assert.equal(data.turnTrace?.actions?.[0]?.executed, false, message)
-    assert.equal(data.usage?.llm.calls, 0, message)
-    assert.equal(data.usage?.llmRoute, 'none', message)
-    assert.match(data.narrative, narrativePattern, message)
-    assert.doesNotMatch(data.narrative, /facade de la boulangerie grince|porte laterale bat doucement/i, message)
-  }
-})
-
-test('DM API reconciles explicit room corrections through canonical movement', async t => {
-  for (const [index, message] of ['non je suis au verger', 'bouge mon token dans le verger'].entries()) {
-    const sessionId = `api-location-reconcile-${process.pid}-${Date.now()}-${index}`
-    t.after(() => cleanupSession(sessionId))
-
-    const { response, data } = await postDm({
-      message,
-      clientRequestId: `client-${sessionId}`,
-      sessionId,
-      gameState: loadingDockGameState(),
-      history: [],
-    })
-
-    assert.equal(response.status, 200, message)
-    assert.ok(data.toolsUsed.includes('resolve_player_action'), message)
-    assert.ok(data.toolsUsed.includes('move_token'), message)
-    assert.ok(data.engine?.events?.some(event => event.type === 'entity.moved'), message)
-    assert.equal(data.newGameState.currentRoomId, '2', message)
-    assert.deepEqual(data.newGameState.player.position, { x: 9, y: 2 }, message)
-    assert.equal(data.turnTrace?.intent?.kind, 'state_reconcile', message)
-    assert.equal(data.turnTrace?.targetResolution?.status, 'resolved', message)
-    assert.equal(data.turnTrace?.targetResolution?.roomId, '2', message)
-    assert.ok(data.turnTrace?.actions.some(action => action.toolName === 'resolve_player_action' && action.executed), message)
-    assert.match(data.narrative, /verger/i, message)
-    assert.doesNotMatch(data.narrative, /quai/i, message)
-    assert.equal(data.usage?.llm.calls, 0, message)
-    assert.equal(data.usage?.llmRoute, 'none', message)
-  }
-})
-
-test('DM API refuses location reconciliation without a target room instead of teleporting', async t => {
-  const sessionId = `api-location-reconcile-missing-${process.pid}-${Date.now()}`
-  t.after(() => cleanupSession(sessionId))
-
-  const { response, data } = await postDm({
-    message: 'il faut me bouger',
-    clientRequestId: `client-${sessionId}`,
-    sessionId,
-    gameState: loadingDockGameState(),
-    history: [],
-  })
-
-  assert.equal(response.status, 200)
-  assert.deepEqual(data.toolsUsed, [])
-  assert.equal(data.newGameState.currentRoomId, '7')
-  assert.deepEqual(data.newGameState.player.position, { x: 4, y: 6 })
-  assert.equal(data.turnTrace?.intent?.kind, 'state_reconcile')
-  assert.equal(data.turnTrace?.targetResolution?.status, 'missing_target')
-  assert.match(data.narrative, /salle claire|verger|quai/i)
-  assert.equal(data.usage?.llm.calls, 0)
-  assert.equal(data.usage?.llmRoute, 'none')
-})
-
-test('DM API resolves the narrated initial front door through scene surface affordances', async t => {
-  const previousDice = process.env.AI_DM_TEST_DICE_SEQUENCE
-  process.env.AI_DM_TEST_DICE_SEQUENCE = '20,20,20,20'
-  t.after(() => {
-    if (previousDice === undefined) delete process.env.AI_DM_TEST_DICE_SEQUENCE
-    else process.env.AI_DM_TEST_DICE_SEQUENCE = previousDice
-  })
-
-  for (const [index, message] of [
-    'JE CASSE LA PORTE',
-    'je detruis la porte et je rentre dans le batiment',
-    'je pousse la porte',
-    'je rentre',
-    "je vais a l'interieur",
-  ].entries()) {
-    const sessionId = `api-front-door-${process.pid}-${Date.now()}-${index}`
-    t.after(() => cleanupSession(sessionId))
-
-    const { response, data } = await postDm({
-      message,
-      clientRequestId: `client-${sessionId}`,
-      sessionId,
-      gameState: baseGameState(),
-      history: [],
-    })
-
-    assert.equal(response.status, 200, message)
-    assert.ok(data.toolsUsed.includes('resolve_player_action'), message)
-    assert.notEqual(data.debug?.refusalCode, 'WORLD_OBJECT_NOT_AFFORDED', message)
-    assert.ok(data.debug?.actionPlan, message)
-    assert.ok(data.debug?.sceneSurface?.objects?.some?.(object => object.id === 'front_double_door'), message)
-    assert.ok(data.engine?.events?.some(event => event.type === 'door.opened' && event.targetId === 'front_double_door'), message)
-    if (/casse|detruis/i.test(message)) assert.ok(data.toolsUsed.includes('world.force'), message)
-    if (!/casse|detruis/i.test(message) && /pousse|rentre|interieur/i.test(message)) assert.ok(data.toolsUsed.includes('world.open'), message)
-    if (/rentre|interieur|pousse|detruis/i.test(message)) {
-      assert.ok(data.debug.actionPlan.steps.length >= 2, message)
-      assert.ok(data.toolsUsed.includes('move_token'), message)
-      assert.ok(data.engine?.events?.some(event => event.type === 'entity.moved'), message)
-      assert.equal(data.newGameState.currentRoomId, '4', message)
-    } else {
-      assert.equal(data.debug.actionPlan.steps.length, 1, message)
-    }
-  }
-})
-
-test('DM API does not over-clarify portal followups that are clear from recent engine events', async t => {
-  const sessionId = `api-portal-followup-${process.pid}-${Date.now()}`
-  t.after(() => cleanupSession(sessionId))
-
-  const opened = await postDm({
-    message: "j'ouvre les portes de la boulangerie",
-    clientRequestId: `client-open-${sessionId}`,
-    sessionId,
-    gameState: baseGameState(),
-    history: [],
-  })
-
-  assert.equal(opened.response.status, 200)
-  assert.ok(opened.data.toolsUsed.includes('resolve_player_action'))
-  assert.ok(opened.data.engine?.events?.some(event => event.type === 'door.opened' && event.targetId === 'front_double_door'))
-  assert.equal(opened.data.engine?.events?.some(event => event.type === 'entity.moved'), false)
-  assert.equal(opened.data.newGameState.currentRoomId, '1')
-
-  const moved = await postDm({
-    message: "tu ne m'as pas deplace",
-    clientRequestId: `client-move-${sessionId}`,
-    sessionId,
-    gameState: opened.data.newGameState,
-    history: [
-      { role: 'player', content: "j'ouvre les portes de la boulangerie" },
-      { role: 'dm', content: opened.data.narrative },
-    ],
-  })
-
-  assert.equal(moved.response.status, 200)
-  assert.ok(moved.data.toolsUsed.includes('resolve_player_action'))
-  assert.ok(moved.data.engine?.events?.some(event => event.type === 'entity.moved'))
-  assert.equal(moved.data.debug?.refusalCode, null)
-  assert.equal(moved.data.newGameState.currentRoomId, '4')
-  assert.doesNotMatch(moved.data.narrative, /destination assez claire|repere concret|precise/i)
-})
-
-test('DM API treats portal fixtures like stairs as movement, not just object use', async t => {
-  const sessionId = `api-stairs-move-${process.pid}-${Date.now()}`
-  t.after(() => cleanupSession(sessionId))
-
-  const { response, data } = await postDm({
-    message: "je me dirige vers l'etage",
-    clientRequestId: `client-${sessionId}`,
-    sessionId,
-    gameState: bakeryEntranceGameState(),
-    history: [],
-  })
-
-  assert.equal(response.status, 200)
-  assert.ok(data.toolsUsed.includes('resolve_player_action'))
-  assert.ok(data.engine?.events?.some(event => event.type === 'entity.moved'))
-  assert.equal(data.newGameState.currentRoomId, '9')
-  assert.notEqual(data.usage?.narrator, 'fallback')
-})
-
-test('DM API returns a useful ambiguity instead of moving through an unspecified interior door', async t => {
-  const sessionId = `api-ambiguous-door-${process.pid}-${Date.now()}`
-  t.after(() => cleanupSession(sessionId))
-
-  const { response, data } = await postDm({
-    message: 'je pousse la porte',
-    clientRequestId: `client-${sessionId}`,
-    sessionId,
-    gameState: bakeryEntranceGameState(),
-    history: [],
-  })
-
-  assert.equal(response.status, 200)
-  assert.ok(data.toolsUsed.includes('resolve_player_action'))
-  assert.equal(data.debug?.refusalCode, 'WORLD_OBJECT_AMBIGUOUS')
-  assert.equal(data.debug?.actionPlan?.blocked?.code, 'ACTION_PLAN_TARGET_AMBIGUOUS')
-  assert.ok(data.engine?.events?.some(event => event.type === 'action.blocked'))
-  assert.equal(data.newGameState.currentRoomId, '4')
-  assert.match(data.narrative, /plusieurs|cibles|laquelle|porte/i)
-})
-
-test('DM API refuses vague multi-exit exploration without triggering final encounter', async t => {
-  const sessionId = `api-vague-explore-${process.pid}-${Date.now()}`
-  t.after(() => cleanupSession(sessionId))
-
-  const { response, data } = await postDm({
-    message: "ok je change de piece alors, j'explore encore",
-    clientRequestId: `client-${sessionId}`,
-    sessionId,
-    gameState: bakeryFloorGameState(),
-    history: [],
-  })
-
-  assert.equal(response.status, 200)
-  assert.equal(data.newGameState.phase, 'exploration')
-  assert.equal(data.newGameState.currentRoomId, '8')
-  assert.ok(!data.toolsUsed.includes('start_encounter'))
-  assert.ok(!data.engine?.events?.some(event => event.type === 'combat.started'))
-  assert.match(data.narrative, /plusieurs|issues|repere/i)
-})
-
-test('DM API preserves potion-used then KO event order in narration', async t => {
-  const sessionId = `api-potion-ko-${process.pid}-${Date.now()}`
-  const previousDice = process.env.AI_DM_TEST_DICE_SEQUENCE
-  process.env.AI_DM_TEST_DICE_SEQUENCE = '1,1,20,6'
-  t.after(async () => {
-    if (previousDice === undefined) delete process.env.AI_DM_TEST_DICE_SEQUENCE
-    else process.env.AI_DM_TEST_DICE_SEQUENCE = previousDice
-    await cleanupSession(sessionId)
-  })
-
-  const { response, data } = await postDm({
-    message: 'je bois ma potion',
-    clientRequestId: `client-${sessionId}`,
-    sessionId,
-    gameState: lowHpPotionCombatGameState(),
-    history: [],
-  })
-
-  assert.equal(response.status, 200)
-  assert.ok(data.toolsUsed.includes('resolve_player_action'))
-  assert.ok(data.engine?.events?.some(event => event.type === 'item.used'))
-  assert.equal(data.newGameState.player.hp.current, 0)
-  assert.ok(data.newGameState.player.conditions.includes('unconscious'))
-  assert.match(data.narrative, /potion/i)
-  assert.match(data.narrative, /riposte|fauche|retombes|inconscient|0 PV/i)
-  assert.doesNotMatch(data.narrative, /fiole.*vide|potion.*vide|sans effet|depuis le debut/i)
-})
-
-test('DM API resolves natural stateful world actions through canonical engine events', async t => {
-  const sessionId = `api-world-${process.pid}-${Date.now()}`
-  const previousDice = process.env.AI_DM_TEST_DICE_SEQUENCE
-  process.env.AI_DM_TEST_DICE_SEQUENCE = '10,8'
-  t.after(async () => {
-    if (previousDice === undefined) delete process.env.AI_DM_TEST_DICE_SEQUENCE
-    else process.env.AI_DM_TEST_DICE_SEQUENCE = previousDice
-    await cleanupSession(sessionId)
-  })
-
-  const search = await postDm({
-    message: 'je fouille le bureau',
-    clientRequestId: `client-search-${sessionId}`,
-    sessionId,
-    gameState: officeGameState(),
-    history: [],
-  })
-  assert.equal(search.response.status, 200)
-  assert.ok(search.data.toolsUsed.includes('resolve_player_action'))
-  assert.ok(search.data.engine?.events?.some(event => event.type === 'room.object_discovered' && event.targetId === 'office_drawer'))
-  assert.equal(search.data.newGameState.world.objects.office_drawer.discovered, true)
-  assert.ok(search.data.engine?.affordances?.some(action => action.kind === 'unlock' && action.enabled === true))
-
-  const lockedOpen = await postDm({
-    message: "je l'ouvre",
-    clientRequestId: `client-open-ana-${sessionId}`,
-    sessionId,
-    gameState: search.data.newGameState,
-    history: [],
-  })
-  assert.equal(lockedOpen.response.status, 200)
-  assert.ok(lockedOpen.data.toolsUsed.includes('resolve_player_action'))
-  assert.ok(lockedOpen.data.engine?.events?.some(event =>
-    event.type === 'action.blocked' &&
-    event.metadata?.code === 'OBJECT_LOCKED'
-  ))
-
-  const force = await postDm({
-    message: "j'enfonce le tiroir",
-    clientRequestId: `client-force-${sessionId}`,
-    sessionId,
-    gameState: lockedOpen.data.newGameState,
-    history: [],
-  })
-  assert.equal(force.response.status, 200)
-  assert.ok(force.data.toolsUsed.includes('resolve_player_action'))
-  assert.ok(force.data.engine?.events?.some(event => event.type === 'object.opened' && event.targetId === 'office_drawer'))
-  assert.ok(force.data.engine?.events?.some(event => event.type === 'alarm.raised'))
-  assert.equal(force.data.newGameState.world.objects.recipe_half_office.discovered, true)
-  assert.ok(force.data.engine?.affordances?.some(action => action.kind === 'take' && action.enabled === true))
-
-  const take = await postDm({
-    message: 'je prends le fragment de recette',
-    clientRequestId: `client-take-${sessionId}`,
-    sessionId,
-    gameState: force.data.newGameState,
-    history: [],
-  })
-  assert.equal(take.response.status, 200)
-  assert.ok(take.data.toolsUsed.includes('resolve_player_action'))
-  assert.ok(take.data.engine?.events?.some(event => event.type === 'object.taken' && event.targetId === 'recipe_half_office'))
-  assert.ok(take.data.engine?.events?.some(event => event.type === 'quest.item_found'))
-  assert.equal(take.data.newGameState.world.quests.grammy_recipe.progress, 1)
-
-  const read = await postDm({
-    message: 'je le lis',
-    clientRequestId: `client-read-ana-${sessionId}`,
-    sessionId,
-    gameState: take.data.newGameState,
-    history: [],
-  })
-  assert.equal(read.response.status, 200)
-  assert.ok(read.data.toolsUsed.includes('resolve_player_action'))
-  assert.ok(read.data.engine?.events?.some(event => event.type === 'clue.read' && event.targetId === 'recipe_half_office'))
-
-  const duplicateTake = await postDm({
-    message: 'je prends la recette encore',
-    clientRequestId: `client-duplicate-${sessionId}`,
-    sessionId,
-    gameState: read.data.newGameState,
-    history: [],
-  })
-  assert.equal(duplicateTake.response.status, 200)
-  assert.ok(duplicateTake.data.engine?.events?.some(event => event.type === 'action.blocked'))
-  assert.equal(duplicateTake.data.newGameState.world.quests.grammy_recipe.progress, 1)
-})
-
-test('DM API canonical talk changes NPC disposition through world event', async t => {
-  const sessionId = `api-talk-${process.pid}-${Date.now()}`
-  t.after(() => cleanupSession(sessionId))
-
-  const { response, data } = await postDm({
-    message: 'je parle gentiment a Mac de la recette',
-    clientRequestId: `client-${sessionId}`,
-    sessionId,
-    gameState: baseGameState(),
-    history: [],
-  })
-
-  assert.equal(response.status, 200)
-  assert.ok(data.toolsUsed.includes('resolve_player_action'))
-  assert.equal(data.newGameState.world.npcs.mac.disposition, 'helpful')
-  assert.ok(data.engine?.events?.some(event => event.type === 'npc.disposition_changed' && event.targetId === 'mac'))
-  assert.equal(data.usage?.llmRoute, 'rich')
-  assert.notEqual(data.usage?.narrator, 'fallback')
-  assert.doesNotMatch(data.narrative, DEFAULT_SCENE_NARRATIVE_PATTERN)
-})
-
-test('DM API canonical ask reveals information without forcing disposition change', async t => {
-  const sessionId = `api-ask-${process.pid}-${Date.now()}`
-  t.after(() => cleanupSession(sessionId))
-
-  const { response, data } = await postDm({
-    message: 'je lui demande ou est la recette',
-    clientRequestId: `client-${sessionId}`,
-    sessionId,
-    gameState: baseGameState(),
-    history: [],
-  })
-
-  assert.equal(response.status, 200)
-  assert.ok(data.toolsUsed.includes('resolve_player_action'))
-  assert.equal(data.newGameState.world.npcs.mac.disposition, 'neutral')
-  assert.ok(data.engine?.events?.some(event => event.type === 'npc.information_revealed' && event.targetId === 'mac'))
-  assert.notEqual(data.usage?.narrator, 'fallback')
-  assert.doesNotMatch(data.narrative, DEFAULT_SCENE_NARRATIVE_PATTERN)
-})
-
-test('DM API routes implicit dryad questions to canonical ask events', async t => {
-  const sessionId = `api-implicit-dryad-ask-${process.pid}-${Date.now()}`
+test('DM API persists history and game state across turns', async t => {
+  const sessionId = `api-persist-${process.pid}-${Date.now()}`
   t.after(() => cleanupSession(sessionId))
 
   const first = await postDm({
-    message: 'salut, je suis la pour recuperer la recette de grammy',
-    clientRequestId: `client-recipe-${sessionId}`,
+    message: 'je vais en (6,13)',
     sessionId,
-    gameState: orchardGameState(),
+    gameState: baseGameState(),
     history: [],
   })
-
   assert.equal(first.response.status, 200)
-  assert.ok(first.data.toolsUsed.includes('resolve_player_action'))
-  assert.equal(first.data.turnTrace?.intent.kind, 'ask')
-  assert.equal(first.data.turnTrace?.intent.reason, 'intent-interpreter-ask')
-  assert.equal(first.data.turnTrace?.intentInterpreterOutput?.intentKind, 'ask')
-  assert.ok(first.data.engine?.events?.some(event => event.type === 'npc.information_revealed' && event.targetId === 'dryad_orchard'))
-  assert.notEqual(first.data.usage?.narrator, 'fallback')
+  assert.deepEqual(first.data.newGameState.player.position, { x: 6, y: 13 })
 
+  // Deuxième tour : pas de gameState fourni → l'API doit recharger la session.
   const second = await postDm({
-    message: 'ou sont les gobelins',
-    clientRequestId: `client-goblins-${sessionId}`,
+    message: 'je vais en (7,13)',
     sessionId,
-    gameState: first.data.newGameState,
-    history: [],
+    history: first.data.newGameState
+      ? [
+          { role: 'player', content: 'je vais en (6,13)' },
+          { role: 'dm', content: first.data.narrative },
+        ]
+      : [],
   })
-
   assert.equal(second.response.status, 200)
-  assert.ok(second.data.toolsUsed.includes('resolve_player_action'))
-  assert.equal(second.data.turnTrace?.intent.kind, 'ask')
-  assert.ok(second.data.engine?.events?.some(event => event.type === 'npc.information_revealed' && event.targetId === 'dryad_orchard'))
-  assert.equal(second.data.engine?.events?.some(event => event.type === 'combat.started'), false)
+  assert.deepEqual(second.data.newGameState.player.position, { x: 7, y: 13 })
 })
 
-test('DM API does not start an encounter for a bare goblin location question', async t => {
-  const sessionId = `api-goblin-location-question-${process.pid}-${Date.now()}`
+test('DM API enforces a single primary game action per player message', async t => {
+  const sessionId = `api-single-${process.pid}-${Date.now()}`
   t.after(() => cleanupSession(sessionId))
 
+  // Le mock ne produit qu'une action ; on vérifie surtout que la réponse reste
+  // cohérente (une action majeure max) et expose toujours une narration.
   const { response, data } = await postDm({
-    message: 'ou sont les gobelins',
-    clientRequestId: `client-${sessionId}`,
+    message: 'je vais en (5,13)',
     sessionId,
-    gameState: loadingDockGameState(),
+    gameState: baseGameState(),
     history: [],
   })
 
   assert.equal(response.status, 200)
-  assert.ok(['query_state', 'ask'].includes(data.turnTrace?.intent.kind))
-  assert.ok(['intent-interpreter-query-state', 'intent-interpreter-ask', 'enemy-location-question'].includes(data.turnTrace?.intent.reason))
-  assert.equal(data.toolsUsed.includes('start_encounter'), false)
-  assert.equal(data.engine?.events?.some(event => event.type === 'combat.started'), false)
-  assert.equal(data.newGameState.phase, 'exploration')
+  const primaryTools = ['resolve_attack', 'move_token', 'roll_ability_check', 'use_healing_potion', 'roll_death_save', 'start_encounter', 'trigger_room_event']
+  const primaryUsed = data.toolsUsed.filter(tool => primaryTools.includes(tool))
+  assert.ok(primaryUsed.length <= 1)
 })

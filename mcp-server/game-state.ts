@@ -1,22 +1,13 @@
 import {
   GameState,
   MonsterState,
+  NpcState,
   Condition,
   PlayerState,
   Item,
-  EngineEvent,
-  FictionFactState,
-  WorldAlarmState,
   WorldNpcDisposition,
-  WorldNpcState,
-  WorldObjectState,
-  WorldQuestState,
-  WorldRoomState,
-  WorldState,
 } from '../lib/types'
-import { inferAdventureRoomId } from '../lib/adventure-map'
-import { createInitialWorldState } from '../lib/adventure-world'
-import { assertWorldStateValid } from '../lib/world-validation'
+import { inferAdventureRoomId, seedAdventureNpcs } from '../lib/adventure-map'
 
 // Initial player template — overridable via context files
 const DEFAULT_PLAYER: PlayerState = {
@@ -39,115 +30,7 @@ const DEFAULT_PLAYER: PlayerState = {
   ],
 }
 
-const WORLD_EVENT_LOG_LIMIT = 200
-
 let state: GameState = createInitialState()
-
-function mergeRoomState(defaultRoom: WorldRoomState | undefined, incomingRoom: WorldRoomState): WorldRoomState {
-  return {
-    ...defaultRoom,
-    ...incomingRoom,
-    tags: incomingRoom.tags ?? defaultRoom?.tags,
-    exits: incomingRoom.exits ?? defaultRoom?.exits,
-  }
-}
-
-function mergeObjectState(defaultObject: WorldObjectState | undefined, incomingObject: WorldObjectState): WorldObjectState {
-  return {
-    ...defaultObject,
-    ...incomingObject,
-    dc: { ...(defaultObject?.dc ?? {}), ...(incomingObject.dc ?? {}) },
-    aliases: incomingObject.aliases ?? defaultObject?.aliases,
-    tags: incomingObject.tags ?? defaultObject?.tags,
-    contains: incomingObject.contains ?? defaultObject?.contains,
-    portal: incomingObject.portal ?? defaultObject?.portal,
-  }
-}
-
-function mergeNpcState(defaultNpc: WorldNpcState | undefined, incomingNpc: WorldNpcState): WorldNpcState {
-  return {
-    ...defaultNpc,
-    ...incomingNpc,
-    aliases: incomingNpc.aliases ?? defaultNpc?.aliases,
-    tags: incomingNpc.tags ?? defaultNpc?.tags,
-    faction: incomingNpc.faction ?? defaultNpc?.faction,
-    goals: incomingNpc.goals ?? defaultNpc?.goals,
-    memory: { ...(defaultNpc?.memory ?? {}), ...(incomingNpc.memory ?? {}) },
-  }
-}
-
-function mergeQuestState(defaultQuest: WorldQuestState | undefined, incomingQuest: WorldQuestState): WorldQuestState {
-  return {
-    ...defaultQuest,
-    ...incomingQuest,
-    flags: { ...(defaultQuest?.flags ?? {}), ...(incomingQuest.flags ?? {}) },
-  }
-}
-
-function mergeAlarmState(defaultAlarm: WorldAlarmState | undefined, incomingAlarm: WorldAlarmState): WorldAlarmState {
-  return {
-    ...defaultAlarm,
-    ...incomingAlarm,
-    clock: incomingAlarm.clock ?? defaultAlarm?.clock,
-  }
-}
-
-function mergeFictionFactState(defaultFact: FictionFactState | undefined, incomingFact: FictionFactState): FictionFactState {
-  return {
-    ...defaultFact,
-    ...incomingFact,
-    tags: incomingFact.tags ?? defaultFact?.tags,
-    metadata: { ...(defaultFact?.metadata ?? {}), ...(incomingFact.metadata ?? {}) },
-  }
-}
-
-function ensureWorldState(): WorldState {
-  const defaults = createInitialWorldState()
-  const incoming = state.world
-
-  const rooms: Record<string, WorldRoomState> = structuredClone(defaults.rooms)
-  for (const [id, room] of Object.entries(incoming?.rooms ?? {})) {
-    rooms[id] = mergeRoomState(defaults.rooms[id], structuredClone(room))
-  }
-
-  const objects: Record<string, WorldObjectState> = structuredClone(defaults.objects)
-  for (const [id, object] of Object.entries(incoming?.objects ?? {})) {
-    objects[id] = mergeObjectState(defaults.objects[id], structuredClone(object))
-  }
-
-  const npcs: Record<string, WorldNpcState> = structuredClone(defaults.npcs)
-  for (const [id, npc] of Object.entries(incoming?.npcs ?? {})) {
-    npcs[id] = mergeNpcState(defaults.npcs[id], structuredClone(npc))
-  }
-
-  const quests: Record<string, WorldQuestState> = structuredClone(defaults.quests)
-  for (const [id, quest] of Object.entries(incoming?.quests ?? {})) {
-    quests[id] = mergeQuestState(defaults.quests[id], structuredClone(quest))
-  }
-
-  const alarms: Record<string, WorldAlarmState> = structuredClone(defaults.alarms)
-  for (const [id, alarm] of Object.entries(incoming?.alarms ?? {})) {
-    alarms[id] = mergeAlarmState(defaults.alarms[id], structuredClone(alarm))
-  }
-
-  const fictionFacts: Record<string, FictionFactState> = structuredClone(defaults.fictionFacts ?? {})
-  for (const [id, fact] of Object.entries(incoming?.fictionFacts ?? {})) {
-    fictionFacts[id] = mergeFictionFactState(defaults.fictionFacts?.[id], structuredClone(fact))
-  }
-
-  state.world = {
-    rooms,
-    objects,
-    npcs,
-    quests,
-    alarms,
-    fictionFacts,
-    flags: { ...defaults.flags, ...(incoming?.flags ?? {}) },
-    eventLog: structuredClone(incoming?.eventLog ?? []).slice(-WORLD_EVENT_LOG_LIMIT),
-  }
-  assertWorldStateValid(state.world, 'Merged world state')
-  return state.world
-}
 
 function createInitialState(): GameState {
   const initialRoomId = inferAdventureRoomId(DEFAULT_PLAYER.position)
@@ -155,6 +38,7 @@ function createInitialState(): GameState {
     phase: 'exploration',
     player: structuredClone(DEFAULT_PLAYER),
     monsters: {},
+    npcs: seedAdventureNpcs(),
     initiativeOrder: [],
     currentTurn: null,
     round: 0,
@@ -164,11 +48,6 @@ function createInitialState(): GameState {
     roomsVisited: initialRoomId ? [initialRoomId] : [],
     currentRoomId: initialRoomId,
     encountersTriggered: [],
-    world: (() => {
-      const world = createInitialWorldState()
-      assertWorldStateValid(world, 'Initial world state')
-      return world
-    })(),
   }
 }
 
@@ -203,7 +82,6 @@ function syncDyingPlayerState(): void {
 }
 
 export function getState(): GameState {
-  ensureWorldState()
   return state
 }
 
@@ -219,8 +97,10 @@ export function replaceState(nextState: GameState): GameState {
     actionUsed: structuredClone(nextState.actionUsed ?? {}),
     roomsVisited: structuredClone(nextState.roomsVisited ?? []),
     encountersTriggered: structuredClone(nextState.encountersTriggered ?? []),
+    // PNJ : on préserve l'état client s'il existe (révélations déjà faites), sinon on
+    // ré-amorce le seed du module (états historiques sans le champ npcs).
+    npcs: nextState.npcs ? structuredClone(nextState.npcs) : seedAdventureNpcs(),
   }
-  ensureWorldState()
   syncPlayerRoomFromPosition()
   syncDyingPlayerState()
   return state
@@ -241,6 +121,39 @@ export function getAllEntities(): Array<PlayerState | MonsterState> {
 export function getEntity(id: string): PlayerState | MonsterState | undefined {
   if (id === 'player') return state.player
   return state.monsters[id]
+}
+
+export function getNpc(id: string): NpcState | undefined {
+  return state.npcs?.[id]
+}
+
+// Rend visible(s) un ou plusieurs PNJ de la salle courante (par id ou par kind), et
+// peut ajuster leur disposition. Scopé à la salle du joueur (roomId null = global)
+// pour éviter de révéler un PNJ d'une autre salle. Retourne les PNJ effectivement
+// touchés.
+export function revealNpcs(params: {
+  npcId?: string
+  kind?: string
+  disposition?: WorldNpcDisposition
+}): NpcState[] {
+  if (!state.npcs) return []
+  const currentRoomId = state.currentRoomId
+  const matched: NpcState[] = []
+
+  for (const npc of Object.values(state.npcs)) {
+    const inScope = npc.roomId === null || npc.roomId === currentRoomId
+    if (!inScope) continue
+
+    const idMatch = params.npcId ? npc.id === params.npcId : false
+    const kindMatch = params.kind ? npc.kind === params.kind : false
+    if (!idMatch && !kindMatch) continue
+
+    npc.visible = true
+    if (params.disposition) npc.disposition = params.disposition
+    matched.push(npc)
+  }
+
+  return matched
 }
 
 export function updatePlayerHP(delta: number): PlayerState {
@@ -286,177 +199,13 @@ export function consumePlayerItem(predicate: (item: Item) => boolean): Item | nu
   return item ?? null
 }
 
-export function getWorldState(): WorldState {
-  return ensureWorldState()
-}
-
-export function recordWorldEvent(event: Omit<EngineEvent, 'id' | 'visibleToPlayer'> & { id?: string; visibleToPlayer?: boolean }): EngineEvent {
-  const world = ensureWorldState()
-  const recorded: EngineEvent = {
-    ...event,
-    id: event.id ?? `world-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-    visibleToPlayer: event.visibleToPlayer ?? true,
-  }
-  world.eventLog.push(recorded)
-  if (world.eventLog.length > WORLD_EVENT_LOG_LIMIT) {
-    world.eventLog = world.eventLog.slice(-WORLD_EVENT_LOG_LIMIT)
-  }
-  return recorded
-}
-
-export function getWorldObject(objectId: string): WorldObjectState | undefined {
-  return ensureWorldState().objects[objectId]
-}
-
-export function updateWorldObject(objectId: string, patch: Partial<WorldObjectState>): WorldObjectState {
-  const world = ensureWorldState()
-  const object = world.objects[objectId]
-  if (!object) throw new Error(`World object not found: ${objectId}`)
-  world.objects[objectId] = {
-    ...object,
-    ...patch,
-    dc: { ...(object.dc ?? {}), ...(patch.dc ?? {}) },
-    tags: patch.tags ?? object.tags,
-    contains: patch.contains ?? object.contains,
-  }
-  return world.objects[objectId]
-}
-
-export function discoverWorldObject(objectId: string): WorldObjectState {
-  return updateWorldObject(objectId, { visible: true, discovered: true })
-}
-
-export function openWorldObject(objectId: string): WorldObjectState {
-  return updateWorldObject(objectId, { visible: true, discovered: true, opened: true, locked: false })
-}
-
-export function takeWorldObject(objectId: string): WorldObjectState {
-  return updateWorldObject(objectId, { visible: true, discovered: true, taken: true })
-}
-
-export function updateNpcDisposition(npcId: string, disposition: WorldNpcDisposition): WorldNpcState {
-  const world = ensureWorldState()
-  const npc = world.npcs[npcId]
-  if (!npc) throw new Error(`World NPC not found: ${npcId}`)
-  world.npcs[npcId] = {
-    ...npc,
-    disposition,
-    known: true,
-  }
-  return world.npcs[npcId]
-}
-
-export function updateNpcMemory(npcId: string, memory: Record<string, string | number | boolean>): WorldNpcState {
-  const world = ensureWorldState()
-  const npc = world.npcs[npcId]
-  if (!npc) throw new Error(`World NPC not found: ${npcId}`)
-  world.npcs[npcId] = {
-    ...npc,
-    known: true,
-    memory: {
-      ...(npc.memory ?? {}),
-      ...memory,
-    },
-  }
-  return world.npcs[npcId]
-}
-
-export function advanceWorldQuest(questId: string, flagId: string, amount = 1): WorldQuestState {
-  const world = ensureWorldState()
-  const quest = world.quests[questId]
-  if (!quest) throw new Error(`World quest not found: ${questId}`)
-  quest.flags ??= {}
-  if (!quest.flags[flagId]) {
-    quest.progress = Math.min(quest.goal, quest.progress + amount)
-    quest.flags[flagId] = true
-  }
-  quest.completed = quest.progress >= quest.goal
-  return quest
-}
-
-export function completeWorldQuest(questId: string, flagId: string): WorldQuestState {
-  const world = ensureWorldState()
-  const quest = world.quests[questId]
-  if (!quest) throw new Error(`World quest not found: ${questId}`)
-  quest.flags ??= {}
-  quest.flags[flagId] = true
-  quest.progress = Math.max(quest.progress, quest.goal)
-  quest.completed = true
-  world.flags ??= {}
-  world.flags[flagId] = true
-  return quest
-}
-
-export function raiseWorldAlarm(alarmId: string, reason: string, amount = 1): WorldAlarmState {
-  const world = ensureWorldState()
-  const alarm = world.alarms[alarmId] ?? { level: 0, raised: false }
-  alarm.level = Math.max(0, alarm.level + amount)
-  alarm.raised = true
-  alarm.reason = reason
-  if (alarm.clock) {
-    alarm.clock.value = Math.max(alarm.clock.value, alarm.level)
-  }
-  world.alarms[alarmId] = alarm
-  state.sceneMemory = {
-    ...(state.sceneMemory ?? {}),
-    alertLevel: alarm.level,
-    updatedAt: new Date().toISOString(),
-  }
-  return alarm
-}
-
-export function upsertFictionFact(fact: FictionFactState): FictionFactState {
-  const world = ensureWorldState()
-  const previous = world.fictionFacts[fact.id]
-  const now = new Date().toISOString()
-  const next: FictionFactState = {
-    ...previous,
-    ...fact,
-    status: fact.status ?? previous?.status ?? 'active',
-    createdAt: fact.createdAt ?? previous?.createdAt ?? now,
-    updatedAt: fact.updatedAt ?? now,
-    tags: fact.tags ?? previous?.tags ?? [],
-    metadata: { ...(previous?.metadata ?? {}), ...(fact.metadata ?? {}) },
-  }
-  world.fictionFacts[fact.id] = next
-  return next
-}
-
-export function updateFictionFact(factId: string, patch: Partial<FictionFactState>): FictionFactState {
-  const world = ensureWorldState()
-  const fact = world.fictionFacts[factId]
-  if (!fact) throw new Error(`Fiction fact not found: ${factId}`)
-  const updated: FictionFactState = {
-    ...fact,
-    ...patch,
-    tags: patch.tags ?? fact.tags,
-    metadata: { ...(fact.metadata ?? {}), ...(patch.metadata ?? {}) },
-    updatedAt: patch.updatedAt ?? new Date().toISOString(),
-  }
-  world.fictionFacts[factId] = updated
-  return updated
-}
-
-export function setWorldFlag(flagId: string, value: boolean): void {
-  const world = ensureWorldState()
-  world.flags ??= {}
-  world.flags[flagId] = value
-}
-
-export function stabilizePlayer(reason: string): PlayerState {
+export function stabilizePlayer(): PlayerState {
   const player = state.player
   player.deathSaves = { successes: 0, failures: 0, stable: true }
   if (!player.conditions.includes('unconscious')) {
     player.conditions.push('unconscious')
   }
   player.hp.current = 0
-  recordWorldEvent({
-    type: 'character.stabilized',
-    summary: reason,
-    actorId: 'player',
-    targetId: 'player',
-    outcome: 'success',
-  })
   return player
 }
 

@@ -1,3 +1,5 @@
+import type { NpcState, WorldNpcDisposition } from './types'
+
 export interface GridCell {
   x: number
   y: number
@@ -33,6 +35,17 @@ export interface AdventureTransition {
   fromRoomId: string
   toRoomId: string
   pattern?: RegExp
+}
+
+export interface AdventureNpcSpec {
+  id: string
+  name: string
+  kind: string
+  roomId: string | null
+  cell: GridCell
+  disposition: WorldNpcDisposition
+  visibleFromStart: boolean
+  description?: string
 }
 
 export const ADVENTURE_ROOMS: AdventureRoom[] = [
@@ -88,6 +101,72 @@ export const ENCOUNTERS: Record<string, EncounterDefinition> = {
       { monsterType: 'violet_fungus', cell: { x: 13, y: 6 }, name: 'Champignon Violet' },
     ],
   },
+}
+
+// PNJ scénarisés du module, rendus par leur propre token sur la battlemap.
+// visibleFromStart=false → présents mais cachés tant qu'ils ne se sont pas révélés
+// (le DM appelle reveal_npc). Mac est dans la même zone que le joueur (salle 1) donc
+// visible d'emblée ; les dryades du verger (salle 2) restent cachées jusqu'à offrande
+// ou réussite sociale.
+export const ADVENTURE_NPCS: AdventureNpcSpec[] = [
+  {
+    id: 'mac',
+    name: 'Mac',
+    kind: 'awakened_tree',
+    roomId: '1',
+    cell: { x: 7, y: 13 },
+    disposition: 'neutral',
+    visibleFromStart: true,
+    description: 'Grand pommier animé (tréant), gardien bougon de la cour.',
+  },
+  {
+    id: 'dryad_1',
+    name: 'Dryade',
+    kind: 'dryad',
+    roomId: '2',
+    cell: { x: 3, y: 1 },
+    disposition: 'wary',
+    visibleFromStart: false,
+    description: 'Esprit malicieux du verger, caché dans les pommiers.',
+  },
+  {
+    id: 'dryad_2',
+    name: 'Dryade',
+    kind: 'dryad',
+    roomId: '2',
+    cell: { x: 8, y: 1 },
+    disposition: 'wary',
+    visibleFromStart: false,
+    description: 'Esprit malicieux du verger, caché dans les pommiers.',
+  },
+  {
+    id: 'dryad_3',
+    name: 'Dryade',
+    kind: 'dryad',
+    roomId: '2',
+    cell: { x: 13, y: 1 },
+    disposition: 'wary',
+    visibleFromStart: false,
+    description: 'Esprit malicieux du verger, caché dans les pommiers.',
+  },
+]
+
+// Construit l'état initial des PNJ pour une nouvelle partie (id -> NpcState).
+export function seedAdventureNpcs(): Record<string, NpcState> {
+  const npcs: Record<string, NpcState> = {}
+  for (const spec of ADVENTURE_NPCS) {
+    npcs[spec.id] = {
+      id: spec.id,
+      name: spec.name,
+      kind: spec.kind,
+      position: { x: spec.cell.x, y: spec.cell.y },
+      roomId: spec.roomId,
+      disposition: spec.disposition,
+      visible: spec.visibleFromStart,
+      description: spec.description,
+    }
+  }
+  return npcs
 }
 
 export const NAMED_LOCATION_CELLS: Array<{ id: string; pattern: RegExp; cell: GridCell }> = [
@@ -202,4 +281,54 @@ export function relativeAdventureRoomIdForText(
   }
 
   return null
+}
+
+// Synthèse des accroches mécaniques par salle. Injectée dans le prompt dynamique
+// (quand currentRoomId est connu) pour que le DM sache quels tools sont pertinents
+// SANS avoir à retrouver la bonne section du module markdown.
+export const ROOM_HOOKS: Record<string, string> = {
+  '1': [
+    'Mac le Tréant (pommier animé) a déjà son token visible en (7,13) : non hostile si ignoré ; hostile si on menace les plantes.',
+    'Si Mac devient hostile : spawn_monster (awakened_tree, à sa position) + enter_combat (son token PNJ laisse place au combattant).',
+    'DD 12 Persuasion ou Investigation (roll_ability_check) → il évoque les secrets des dryades du verger.',
+    'Grandes portes barrées : DD 14 Force (roll_ability_check) pour enfoncer, ou contourner par le quai de chargement (salle 7).',
+  ].join('\n'),
+  '2': [
+    "Trois dryades malicieuses, présentes mais CACHÉES (tokens invisibles) : n'apparaissent que sur offrande ou DD 13 Persuasion (roll_ability_check).",
+    'Dès qu’elles se montrent (offrande acceptée ou DD 13 réussi) : appelle reveal_npc({ kind: "dryad" }) pour afficher leurs trois tokens — peut accompagner le roll_ability_check du même message.',
+    'DD 17 Persuasion ou Investigation → elles révèlent que la recette est en deux moitiés (bureau salle 5 + appartement salle 9).',
+    'Si offensées : reveal_npc({ kind: "dryad", disposition: "offended" }) puis elles bombardent de pommes pourries jusqu’au départ du joueur (pas de vrai combat).',
+  ].join('\n'),
+  '3': [
+    'Champignon violet hostile : start_encounter("violet_fungus_heap") dès qu’on approche à ≤1 case (5 pieds).',
+  ].join('\n'),
+  '4': [
+    "Caisse verrouillée derrière le comptoir : DD 12 Perception pour la trouver, puis DD 14 Dextérité (outils) ou DD 16 Force pour l'ouvrir (roll_ability_check). Butin : 8 po, 11 pa, 21 pc.",
+    "Indices d'infestation gobeline visibles (traces, déjections).",
+  ].join('\n'),
+  '5': [
+    'Coffre caché : DD 13 Perception pour trouver, DD 15 Dextérité ou DD 17 Force pour ouvrir (75 po, 50 pa, 25 pc).',
+    'Tiroir piégé = 1re MOITIÉ DE LA RECETTE (objectif) : DD 13 Perception pour repérer, DD 16 Dextérité pour désamorcer. Si déclenché : resolve_saving_throw(con, DD 15) → empoisonné + dégâts de poison.',
+  ].join('\n'),
+  '7': [
+    'Patrouille de 2 gobelins : DD 13 Discrétion (roll_ability_check) pour passer inaperçu.',
+    'Si repéré : start_encounter("loading_dock_patrol"). Entrer discrètement ici donne la surprise sur les gobelins du sol de la boulangerie (salle 8).',
+  ].join('\n'),
+  '8': [
+    'Armoire en verre (6,7) : 2 potions de soin ordinaires, sans verrou.',
+    'Épices cachées : DD 15 Perception (roll_ability_check).',
+    '3 gobelins charpentiers dans les poutres : start_encounter("bakery_floor_goblins") si le joueur manipule les objets magiques (rouleaux, couteaux, fours). Négociation possible DD 14 CHA.',
+  ].join('\n'),
+  '9': [
+    'SALLE FINALE. Chef Grukk (hobgoblin) + 2 gobelins gardes : start_encounter("grammy_apartment_guards") à l’entrée.',
+    '2e MOITIÉ DE LA RECETTE ici. Négociation possible DD 14 CHA (Grukk veut nourriture / or / paix).',
+  ].join('\n'),
+}
+
+export function describeRoomHooks(roomId: string | null | undefined): string | null {
+  if (!roomId) return null
+  const room = getAdventureRoom(roomId)
+  const hooks = ROOM_HOOKS[roomId]
+  if (!room || !hooks) return null
+  return `Salle ${room.id} — ${room.name}\n${hooks}`
 }

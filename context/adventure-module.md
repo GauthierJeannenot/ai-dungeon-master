@@ -49,9 +49,11 @@ Légende : QDC=Quai de chargement | BSF=Sol boulangerie | TAS=Tas déchets | Ver
 | Depuis → Vers | Coordonnée d'arrivée | Condition |
 |---------------|---------------------|-----------|
 | Départ (extérieur) | (4, 13) | Position initiale — chemin d'entrée, à côté de Mac |
-| Extérieur → Entrée | (11, 13) | double porte vers l'entrée |
-| Entrée → Sol boulangerie | (11, 9) | double porte au nord de l'entrée |
-| Entrée → Appartement Grammy | (10, 10) | porte à gauche de l'entrée |
+| Extérieur → Entrée | (11, 12) | double porte vers l'entrée |
+| Extérieur → Verger | (14, 2) | Contourner le bâtiment par l'extérieur — le verger est derrière (au nord) |
+| Extérieur → Tas de déchets | (13, 6) | Composteurs à l'arrière est, accessibles par l'extérieur |
+| Entrée → Sol boulangerie | (11, 8) | double porte au nord de l'entrée |
+| Entrée → Appartement Grammy | (9, 10) | porte à gauche de l'entrée |
 | Extérieur → Quai chargement | (3, 6) | Porte latérale coulissante |
 | Quai chargement → Sol boulangerie | (6, 6) | porte latérale coulissante ouverte en grand |
 | Sol boulangerie → Boutique | (6, 8) | Porte intérieure |
@@ -95,7 +97,7 @@ trigger_room_event({ roomId: "1", eventType: "enter",
 
 ## Salle 2 — Le Verger de Pommiers
 **Zone** : x:3-15, y:1-2  
-**Point d'entrée** : (14, 3)
+**Point d'entrée** : (14, 2)
 
 ### Description
 Les pommiers plus anciens sont disposés en rangées ordonnées, mais les jeunes pousses sauvages ont envahi tout l'espace disponible. Un murmure mystérieux parcourt les feuilles, et des pommes à moitié mûres jonchent le sol. Soudain, une pomme fend l'air — suivie d'un éclat de rire cristallin.
@@ -217,7 +219,7 @@ trigger_room_event({ roomId: "7", eventType: "enter",
 
 ## Salle 8 — Sol de la Boulangerie
 **Zone** : x:6-11, y:5-8  
-**Point d'entrée** : (11, 9) et (6, 6)
+**Point d'entrée** : (11, 8) et (6, 6)
 
 ### Description
 Le sol de la boulangerie est un vaste espace aux plafonds hauts avec des poutres en bois apparentes. Six longs plans de travail occupent le centre de la salle, couverts de moules à tarte, rouleaux à pâtisserie et autres ustensiles. Certains rouleaux roulent encore paresseusement — un enchantement les maintient en mouvement perpétuel. Des couteaux émoussés hachent en l'air des pommes depuis longtemps disparues. Six immenses fours sont alignés contre le mur droit, leurs portes s'ouvrant et se refermant périodiquement comme s'ils attendaient toujours une fournée. L'ensemble est dans un désordre total — quelqu'un a manifestement essayé, et échoué, de recréer les tartes de Grammy.

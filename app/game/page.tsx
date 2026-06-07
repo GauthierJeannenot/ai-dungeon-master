@@ -5,8 +5,7 @@ import dynamic from 'next/dynamic'
 import Chat from '@/components/Chat'
 import CombatTracker from '@/components/CombatTracker'
 import { GameState, ChatMessage, DMResponse, DMRequest, ConversationTurn, DMClientMeta, type DMTurnUsage } from '@/lib/types'
-import { createInitialWorldState } from '@/lib/adventure-world'
-import { buildInitialSceneNarrative } from '@/lib/scene-surface'
+import { seedAdventureNpcs } from '@/lib/adventure-map'
 
 // Battlemap uses browser APIs — load client-only
 const Battlemap = dynamic(() => import('@/components/Battlemap'), { ssr: false })
@@ -32,6 +31,7 @@ const INITIAL_GAME_STATE: GameState = {
     ],
   },
   monsters: {},
+  npcs: seedAdventureNpcs(),
   initiativeOrder: [],
   currentTurn: null,
   round: 0,
@@ -41,7 +41,6 @@ const INITIAL_GAME_STATE: GameState = {
   roomsVisited: ['1'],
   currentRoomId: '1',
   encountersTriggered: [],
-  world: createInitialWorldState(),
 }
 
 function generateId(): string {
@@ -81,7 +80,7 @@ interface ClientBudgetSummary {
   lastLlmRoute: DMTurnUsage['llmRoute']
 }
 
-const WELCOME_MESSAGE = buildInitialSceneNarrative(INITIAL_GAME_STATE)
+const WELCOME_MESSAGE = "Le vieux sorcier Tyndareus le Vert t'a engagé pour une mission singulière : retrouver la recette secrète des célèbres tartes aux pommes de Grammy. Après des jours de route, te voici enfin devant la vieille boulangerie, abandonnée depuis longtemps et, dit-on, infestée de gobelins. L'odeur des pommes du verger flotte encore dans l'air, et la porte entrebâillée t'invite à entrer. Que fais-tu ?"
 
 function createWelcomeMessage(): ChatMessage {
   return {
