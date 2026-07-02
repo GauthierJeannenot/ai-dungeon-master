@@ -527,6 +527,9 @@ export interface DMRequest {
   clientRequestId?: string
   // Per-tab browser session used to isolate MCP game state on the server.
   sessionId?: string
+  // Module d'aventure choisi (nouvelle session). Ignoré si la session existe
+  // déjà — l'aventure de la session fait foi (mismatch → 409).
+  adventureId?: string
   gameState?: GameState
   // Historique récent gardé verbatim (derniers N messages player/dm)
   history?: ConversationTurn[]

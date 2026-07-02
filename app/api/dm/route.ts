@@ -26,6 +26,8 @@ import {
   clientIpFromHeaders,
   consumeDailyGlobalBudget,
 } from '@/lib/rate-limit'
+import { DEFAULT_ADVENTURE_ID, isKnownAdventureId } from '@/lib/adventure-map'
+import { requireAvailableAdventure } from '@/lib/adventures'
 import {
   MODEL,
   MAX_TOKENS,
@@ -186,16 +188,20 @@ function selectToolsForPhase(tools: Anthropic.Tool[], phase: GamePhase): Anthrop
 
 // ── State sync helpers ───────────────────────────────────────────────────────
 
-async function syncGameStateToMcp(gameState: GameState | undefined, sessionId: string | undefined): Promise<GameState | undefined> {
+async function syncGameStateToMcp(
+  gameState: GameState | undefined,
+  sessionId: string | undefined,
+  adventureId?: string
+): Promise<GameState | undefined> {
   if (gameState) {
     try {
-      return await callMCPTool('replace_game_state', { gameState }, sessionId) as GameState
+      return await callMCPTool('replace_game_state', { gameState }, sessionId, adventureId) as GameState
     } catch (err) {
       logEvent('warn', 'dm.state.replace_failed', { sessionId, err: err instanceof Error ? err.message : String(err) })
     }
   }
   try {
-    return await callMCPTool('get_game_state', {}, sessionId) as GameState
+    return await callMCPTool('get_game_state', {}, sessionId, adventureId) as GameState
   } catch {
     return gameState
   }
@@ -219,6 +225,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   if (!message?.trim()) {
     return NextResponse.json({ error: 'Message requis' }, { status: 400 })
+  }
+
+  // Validation cheap de l'adventureId AVANT tout débit : un id fourni mais
+  // inconnu est un 400 immédiat (l'appartenance à la session, la disponibilité
+  // et le mismatch 409 sont vérifiés plus bas, après chargement de la session).
+  if (body.adventureId && !isKnownAdventureId(body.adventureId)) {
+    return NextResponse.json({ error: `Module d'aventure inconnu : "${body.adventureId}"` }, { status: 400 })
   }
 
   // ── Anti-abus : AVANT tout débit et tout appel LLM ──────────────────────────
@@ -298,6 +311,37 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       )
     }
 
+    // ── Résolution du module d'aventure ────────────────────────────────────
+    // Session existante → l'aventure de LA SESSION fait foi (jamais de bascule
+    // en cours de partie : un id différent dans la requête est un 409).
+    // Nouvelle session → l'id du body, qui doit être un module DISPONIBLE.
+    const storedAdventureId = storedSession?.gameState?.adventureId
+    let adventureId: string
+    if (storedSession) {
+      adventureId = storedAdventureId ?? DEFAULT_ADVENTURE_ID
+      if (body.adventureId && body.adventureId !== adventureId) {
+        await refundDebit(debited, { requestId, sessionId })
+        logEvent('warn', 'dm.session.adventure_mismatch', { requestId, sessionId, requested: body.adventureId, actual: adventureId })
+        return NextResponse.json(
+          { error: 'Cette partie appartient à une autre aventure. Démarre une nouvelle partie pour en changer.' },
+          { status: 409 }
+        )
+      }
+    } else {
+      adventureId = body.adventureId ?? DEFAULT_ADVENTURE_ID
+      try {
+        // Sécurité : on ne démarre une partie que sur un module disponible.
+        requireAvailableAdventure(adventureId)
+      } catch {
+        await refundDebit(debited, { requestId, sessionId })
+        logEvent('warn', 'dm.session.adventure_unavailable', { requestId, sessionId, adventureId })
+        return NextResponse.json(
+          { error: `Module d'aventure non disponible : "${adventureId}"` },
+          { status: 403 }
+        )
+      }
+    }
+
     // État SERVEUR autoritaire (monétisation active) : le moteur MCP valide les
     // règles, donc l'état ne doit jamais venir du client — un gameState forgé
     // contournerait toutes les validations, et un summaryContext forgé serait
@@ -309,6 +353,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     let currentGameState = serverAuthoritative
       ? storedSession?.gameState
       : body.gameState ?? storedSession?.gameState
+    // Estampille l'aventure résolue sur l'état existant (états historiques sans
+    // le champ) — le moteur préserve ensuite cet id au replace_game_state.
+    if (currentGameState && !currentGameState.adventureId) {
+      currentGameState = { ...currentGameState, adventureId }
+    }
     const history = serverAuthoritative
       ? storedSession?.history ?? []
       : body.history ?? storedSession?.history ?? []
@@ -327,8 +376,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       gameState: summarizeGameState(currentGameState),
     })
 
-    // Synchronise l'état côté serveur MCP (ou récupère l'état initial).
-    const synced = await syncGameStateToMcp(currentGameState, sessionId)
+    // Synchronise l'état côté serveur MCP (ou récupère l'état initial). PREMIER
+    // appel MCP de la requête → c'est ici que le process enfant est spawné avec
+    // ADVENTURE_ID ; les appels suivants réutilisent ce process (même session).
+    const synced = await syncGameStateToMcp(currentGameState, sessionId, adventureId)
     if (!synced) {
       // Retour (pas d'exception) : le catch ne s'exécute pas — rembourser ici.
       await refundDebit(debited, { requestId, sessionId })
