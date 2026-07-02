@@ -315,7 +315,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     // Session existante → l'aventure de LA SESSION fait foi (jamais de bascule
     // en cours de partie : un id différent dans la requête est un 409).
     // Nouvelle session → l'id du body, qui doit être un module DISPONIBLE.
-    const storedAdventureId = storedSession?.gameState?.adventureId
+    // Colonne stockée en priorité, puis l'id porté par l'état (compat).
+    const storedAdventureId = storedSession?.adventureId ?? storedSession?.gameState?.adventureId
     let adventureId: string
     if (storedSession) {
       adventureId = storedAdventureId ?? DEFAULT_ADVENTURE_ID
@@ -642,6 +643,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       history: newHistory,
       summaryContext,
       ownerId: storedSession?.ownerId ?? ownerId ?? undefined,
+      adventureId: currentGameState.adventureId ?? adventureId,
     })
 
     const usage: DMTurnUsage = {

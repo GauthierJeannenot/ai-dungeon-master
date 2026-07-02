@@ -16,6 +16,9 @@ export interface StoredGameSession {
   // "user:<id>" ou "guest:<id>" — créateur de la partie. undefined pour les
   // sessions antérieures à ce champ ou créées hors monétisation.
   ownerId?: string
+  // Module d'aventure de la partie. undefined pour les sessions antérieures à
+  // ce champ → traitées comme le module par défaut (Grammy's) par la route.
+  adventureId?: string
   gameState: GameState
   history: ConversationTurn[]
   summaryContext?: string
@@ -47,6 +50,7 @@ function normalizeStoredSession(raw: unknown, requestedSessionId: string): Store
     schemaVersion: SESSION_SCHEMA_VERSION,
     sessionId: safeSessionId(record.sessionId ?? requestedSessionId),
     ownerId: typeof record.ownerId === 'string' ? record.ownerId : undefined,
+    adventureId: typeof record.adventureId === 'string' ? record.adventureId : undefined,
     gameState: record.gameState as GameState,
     history: Array.isArray(record.history) ? record.history : [],
     summaryContext: typeof record.summaryContext === 'string' ? record.summaryContext : undefined,
