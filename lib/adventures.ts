@@ -31,11 +31,15 @@ export const ADVENTURES: AdventureModule[] = [
     accent: 'amber',
   },
   {
-    id: 'coming-soon',
+    // Contenu COMPLET dans adventures/tide-crypt/ (module, carte typée, fiche
+    // perso niv.2, battlemap public/battlemaps/tide-crypt.png). Reste verrouillé
+    // tant que le moteur est câblé sur Grammy's — le plan de câblage est dans
+    // docs/multi-adventure-architecture.md ; passer available:true à l'étape 7.
+    id: 'tide-crypt',
     title: 'La Crypte des Marées',
-    tagline: 'Prochaine aventure — en préparation',
+    tagline: 'La Flamme du phare dort dans un tombeau que la mer découvre',
     description:
-      "Un phare éteint, des marées qui murmurent et une crypte engloutie qui ne se découvre qu'à la lune noire. Ce module est en cours d'écriture et arrivera bientôt.",
+      "Le phare de Kerlouan s'est éteint et les navires manquent la passe. À la lune noire, la marée dénude une chaussée de pierres qui descend vers la crypte de Morgane, première Gardienne des Marées. Ses marins morts veillent encore — rapportez la Flamme, poliment si possible.",
     level: 'Niveau 2 · D&D 5e',
     duration: '~2-3 h',
     available: false,
