@@ -48,6 +48,11 @@ tool-use (prompt statique + état + historique). Le prompt caching le ramène à
 
 ## Pistes supplémentaires (par ROI décroissant)
 
+0. **Une variante de cache par module d'aventure** (multi-modules) : le bloc
+   système statique inclut le contexte du module (`buildStaticPrompt(adventureId)`),
+   donc chaque aventure a sa propre entrée de cache Anthropic — c'est attendu et
+   sain (les préfixes diffèrent légitimement). Ne pas chercher à « fusionner »
+   les caches entre modules.
 1. **Ne pas invalider le cache pendant la boucle** : `buildDynamicPrompt`
    change à chaque itération (état muté) — c'est le 2ᵉ bloc système, donc le
    préfixe statique reste caché. RAS, mais toute future insertion de contenu

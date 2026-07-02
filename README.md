@@ -13,6 +13,30 @@ Application web de jeu de rôle D&D 5e avec un Dungeon Master IA (Claude) comme 
   crédits ; repli fichiers `.data/` sans DB
 - **Paiement** : Stripe Checkout + webhook (achat de tokens)
 
+## Modules d'aventure
+
+L'app est multi-modules : la landing propose plusieurs aventures, une partie =
+un module choisi. Le moteur MCP, les prompts, la battlemap et les textes sont
+paramétrés par `adventureId`.
+
+| Couche | Où |
+|---|---|
+| Données de carte (rooms, rencontres, PNJ, hooks, startCell, joueur) | `adventures/<id>/map.ts` + registre `lib/adventure-map.ts` (importable par le moteur MCP) |
+| Contexte narratif (markdown) | `adventures/<id>/*.md`, chargé par `lib/context-loader.ts` (repli sur le module par défaut pour les règles génériques) |
+| Définition app (landing, welcome, battlemap, placeholders) | `lib/adventures.ts` (`AdventureDefinition`) |
+| Battlemap pixel art | `public/battlemaps/<id>.png` (Grammy's : `public/battlemap.png`) |
+| Moteur | un process MCP par session, spawné avec `ADVENTURE_ID` (`mcp-server/adventure.ts`) |
+| Persistance | colonne `game_sessions.adventure_id` ; l'aventure de la session fait foi (bascule interdite → 409) |
+
+### Ajouter un module d'aventure
+
+1. `adventures/<id>/adventure-module.md` (format « ## Salle N » + « Point d'entrée »), `player-character.md`, et `map.ts` (exporter un `AdventureMapData` : rooms, entryCells, encounters — **types de monstres existants du moteur uniquement**, npcs, aliases, transitions, roomHooks, startCell, initialPlayer). Règles propres facultatives (`player-rules.md`, `dm-rules.md`) sinon repli automatique.
+2. Battlemap 17×15 : dupliquer `scripts/generate-battlemap.cjs` → `public/battlemaps/<id>.png`.
+3. Enregistrer la carte dans `lib/adventure-map.ts` (`ADVENTURE_MAPS`) et la définition dans `lib/adventures.ts` (`ADVENTURES`, `available: true`, `playPath: '/game?adventure=<id>'`).
+4. Les tests `tests/adventure-modules.test.cjs` couvrent automatiquement le nouveau module (invariants de cohérence). `npm test` doit rester vert.
+
+Détail complet du câblage : [docs/multi-adventure-architecture.md](docs/multi-adventure-architecture.md).
+
 ## Base de données (production)
 
 Définir `DATABASE_URL` bascule TOUTE la persistance sur Postgres :
@@ -158,14 +182,18 @@ Le playtest agrège appels LLM, cout estime, routes `none/short/rich/blocked`, s
 > d'optimisation (dont l'évaluation de headroom-ai) :
 > [docs/cost-optimization.md](docs/cost-optimization.md).
 
-### 5. Fichiers de contexte (optionnel)
+### 5. Modules d'aventure
 
-Les quatre fichiers dans `/context/` sont pré-remplis avec une aventure complète :
+Chaque module vit dans son dossier `adventures/<id>/` :
 
-- `context/player-character.md` — Fiche, stats, équipement et historique du joueur
-- `context/player-rules.md` — Règles et capacités côté joueur
-- `context/dm-rules.md` — Tables de monstres, règles de combat
-- `context/adventure-module.md` — Carte des salles, monstres, trésors, triggers
+- `adventures/<id>/adventure-module.md` — Carte des salles, monstres, trésors, triggers
+- `adventures/<id>/player-character.md` — Fiche, stats, équipement du joueur
+- `adventures/<id>/player-rules.md` — Règles côté joueur *(optionnel : repli sur celles du module par défaut)*
+- `adventures/<id>/dm-rules.md` — Tables de monstres, règles de combat *(optionnel : repli sur le module par défaut)*
+- `adventures/<id>/map.ts` — Données typées (salles, rencontres, PNJ, hooks, `startCell`, joueur initial)
+
+Deux modules livrés : `grammys-country-apple-pie` (par défaut) et `tide-crypt`.
+Voir [« Ajouter un module d'aventure »](#ajouter-un-module-daventure) plus bas.
 
 ## Lancement
 
