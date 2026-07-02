@@ -6,6 +6,10 @@ import type { GameState, MonsterState, PlayerState, WorldNpcDisposition } from '
 interface BattlemapProps {
   gameState: GameState
   cellSize?: number
+  // Battlemap et dimensions de grille du module actif (défauts = Grammy's).
+  image?: string
+  cols?: number
+  rows?: number
 }
 
 interface TooltipState {
@@ -43,7 +47,13 @@ function hpPercent(current: number, max: number): number {
   return Math.min(100, Math.max(0, (current / max) * 100))
 }
 
-export default function Battlemap({ gameState, cellSize = 48 }: BattlemapProps) {
+export default function Battlemap({
+  gameState,
+  cellSize = 48,
+  image = '/battlemap.png',
+  cols = 17,
+  rows = 15,
+}: BattlemapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [tooltip, setTooltip] = useState<TooltipState | null>(null)
   const [prevPositions, setPrevPositions] = useState<Record<string, { x: number; y: number }>>({})
@@ -96,11 +106,9 @@ export default function Battlemap({ gameState, cellSize = 48 }: BattlemapProps) 
   const aliveMonsters = Object.values(gameState.monsters).filter(m => m.isAlive)
   const npcTokens = deriveNpcTokens(gameState)
 
-  // Taille fixe de la carte : 17 cols × 15 rows (calée sur battlemap.png ~880×800px)
-  const MAP_COLS = 17
-  const MAP_ROWS = 15
-  const gridCols = Math.max(MAP_COLS, ...aliveMonsters.map(m => m.position.x + 2), ...npcTokens.map(npc => npc.position.x + 2), gameState.player.position.x + 2)
-  const gridRows = Math.max(MAP_ROWS, ...aliveMonsters.map(m => m.position.y + 2), ...npcTokens.map(npc => npc.position.y + 2), gameState.player.position.y + 2)
+  // Taille de la carte : dimensions du module actif (défaut 17×15).
+  const gridCols = Math.max(cols, ...aliveMonsters.map(m => m.position.x + 2), ...npcTokens.map(npc => npc.position.x + 2), gameState.player.position.x + 2)
+  const gridRows = Math.max(rows, ...aliveMonsters.map(m => m.position.y + 2), ...npcTokens.map(npc => npc.position.y + 2), gameState.player.position.y + 2)
 
   return (
     <div
@@ -123,7 +131,7 @@ export default function Battlemap({ gameState, cellSize = 48 }: BattlemapProps) 
         <div
           className="absolute inset-0"
           style={{
-            backgroundImage: 'url(/battlemap.png)',
+            backgroundImage: `url(${image})`,
             backgroundSize: '100% 100%',   // étire l'image pour couvrir toute la grille
             backgroundRepeat: 'no-repeat',
             backgroundColor: '#3a2d1a',    // fallback si image absente

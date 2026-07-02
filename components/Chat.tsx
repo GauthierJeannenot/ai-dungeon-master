@@ -11,6 +11,9 @@ interface ChatProps {
   inputValue: string
   onInputChange: (v: string) => void
   onClientEvent?: (event: string, payload: Record<string, unknown>) => void
+  // Placeholders du champ de saisie par salle (clé 'default' = repli), fournis
+  // par le module d'aventure actif.
+  placeholders?: Record<string, string[]>
 }
 
 interface BrowserSpeechRecognitionAlternative {
@@ -98,28 +101,27 @@ const PLACEHOLDERS = {
   ],
 }
 
-function selectPlaceholder(gameState: GameState, messageCount: number): string {
-  if (gameState.player.hp.current <= 0) {
-    return PLACEHOLDERS.dying[messageCount % PLACEHOLDERS.dying.length]
-  }
+function pick(list: string[], index: number): string {
+  return list[index % list.length]
+}
 
-  if (gameState.phase === 'combat') {
-    return PLACEHOLDERS.combat[messageCount % PLACEHOLDERS.combat.length]
-  }
+function selectPlaceholder(
+  gameState: GameState,
+  messageCount: number,
+  adventurePlaceholders?: Record<string, string[]>
+): string {
+  // États génériques (combat, agonie, dialogue) : indépendants du module.
+  if (gameState.player.hp.current <= 0) return pick(PLACEHOLDERS.dying, messageCount)
+  if (gameState.phase === 'combat') return pick(PLACEHOLDERS.combat, messageCount)
+  if (gameState.phase === 'dialogue') return pick(PLACEHOLDERS.dialogue, messageCount)
 
-  if (gameState.phase === 'dialogue') {
-    return PLACEHOLDERS.dialogue[messageCount % PLACEHOLDERS.dialogue.length]
-  }
+  // Exploration : placeholders du module actif (par salle, puis 'default'),
+  // avec repli sur les invites d'exploration génériques.
+  const roomId = gameState.currentRoomId
+  const fromAdventure = (roomId && adventurePlaceholders?.[roomId]) || adventurePlaceholders?.default
+  if (fromAdventure && fromAdventure.length > 0) return pick(fromAdventure, messageCount)
 
-  if (gameState.currentRoomId === '9' || gameState.currentRoomId === '8' || gameState.currentRoomId === '7') {
-    return PLACEHOLDERS.bakeryFloor[messageCount % PLACEHOLDERS.bakeryFloor.length]
-  }
-
-  if (!gameState.currentRoomId || gameState.currentRoomId === '1') {
-    return PLACEHOLDERS.bakeryEntrance[messageCount % PLACEHOLDERS.bakeryEntrance.length]
-  }
-
-  return PLACEHOLDERS.exploration[messageCount % PLACEHOLDERS.exploration.length]
+  return pick(PLACEHOLDERS.exploration, messageCount)
 }
 
 function getSpeechRecognitionConstructor(): BrowserSpeechRecognitionConstructor | null {
@@ -338,6 +340,7 @@ export default function Chat({
   inputValue,
   onInputChange,
   onClientEvent,
+  placeholders,
 }: ChatProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -361,7 +364,7 @@ export default function Chat({
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([])
   const [selectedVoiceURI, setSelectedVoiceURI] = useState<string | undefined>(undefined)
 
-  const placeholder = selectPlaceholder(gameState, messages.length)
+  const placeholder = selectPlaceholder(gameState, messages.length, placeholders)
 
   const logVoiceEvent = useCallback((event: string, payload: Record<string, unknown>) => {
     onClientEvent?.(event, {

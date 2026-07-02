@@ -93,9 +93,7 @@ export const ADVENTURES: AdventureDefinition[] = [
     level: 'Niveau 1 · D&D 5e',
     duration: '~1-2 h',
     available: true,
-    // playPath générique jusqu'à l'étape 7 (la page de jeu ne lit pas encore
-    // l'adventure param) ; passera à /game?adventure=<id> en étape 7.
-    playPath: '/game',
+    playPath: '/game?adventure=grammys-country-apple-pie',
     accent: 'amber',
     contextDir: 'adventures/grammys-country-apple-pie',
     battlemapImage: '/battlemap.png',
@@ -112,9 +110,7 @@ export const ADVENTURES: AdventureDefinition[] = [
       "Le phare de Kerlouan s'est éteint et les navires manquent la passe. À la lune noire, la marée dénude une chaussée de pierres qui descend vers la crypte de Morgane, première Gardienne des Marées. Ses marins morts veillent encore — rapportez la Flamme, poliment si possible.",
     level: 'Niveau 2 · D&D 5e',
     duration: '~2-3 h',
-    // Reste verrouillé jusqu'à l'étape 7 (page de jeu multi-modules) — le
-    // contenu et le registre existent, seul le câblage frontend manque.
-    available: false,
+    available: true,
     playPath: '/game?adventure=tide-crypt',
     accent: 'purple',
     contextDir: 'adventures/tide-crypt',

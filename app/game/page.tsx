@@ -1,59 +1,40 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useMemo, Suspense } from 'react'
 import dynamic from 'next/dynamic'
+import { useSearchParams, useRouter } from 'next/navigation'
 import Chat from '@/components/Chat'
 import CombatTracker from '@/components/CombatTracker'
 import Link from 'next/link'
 import { GameState, ChatMessage, DMResponse, DMRequest, ConversationTurn, DMClientMeta, type DMQuota, type DMTurnUsage } from '@/lib/types'
-import { seedAdventureNpcs } from '@/lib/adventure-map'
+import { getAdventure, DEFAULT_ADVENTURE_ID, type AdventureDefinition } from '@/lib/adventures'
+import { buildInitialGameState } from '@/lib/initial-game-state'
 
 // Battlemap uses browser APIs — load client-only
 const Battlemap = dynamic(() => import('@/components/Battlemap'), { ssr: false })
-
-const INITIAL_GAME_STATE: GameState = {
-  phase: 'exploration',
-  player: {
-    id: 'player',
-    name: 'Héros',
-    class: 'Guerrier',
-    level: 1,
-    hp: { current: 20, max: 20 },
-    ac: 16,
-    stats: { str: 16, dex: 12, con: 14, int: 10, wis: 12, cha: 10 },
-    proficiencyBonus: 2,
-    position: { x: 4, y: 13 },  // Chemin d'entrée — à côté de Mac le Tréant (bas-gauche)
-    conditions: [],
-    speed: 30,
-    inventory: [
-      { id: 'longsword', name: 'Épée longue', type: 'weapon', damage: '1d8+3' },
-      { id: 'shield', name: 'Bouclier', type: 'armor', acBonus: 2 },
-      { id: 'potion1', name: 'Potion de soin', type: 'potion', description: '2d4+2 HP' },
-    ],
-  },
-  monsters: {},
-  npcs: seedAdventureNpcs(),
-  initiativeOrder: [],
-  currentTurn: null,
-  round: 0,
-  movementUsed: {},
-  actionUsed: {},
-  combatLog: [],
-  roomsVisited: ['1'],
-  currentRoomId: '1',
-  encountersTriggered: [],
-}
 
 function generateId(): string {
   return `msg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
 }
 
-const SESSION_KEYS = {
-  sessionId: 'ai-dm-session-id',
-  gameState: 'ai-dm-game-state',
-  messages: 'ai-dm-messages',
-  summaryContext: 'ai-dm-summary-context',
-  budget: 'ai-dm-budget-summary',
+// Clés sessionStorage préfixées par module : changer d'aventure dans le même
+// onglet isole les états (une partie Grammy's et une partie Crypte coexistent).
+interface SessionKeys {
+  sessionId: string
+  gameState: string
+  messages: string
+  summaryContext: string
+  budget: string
+}
+function makeSessionKeys(adventureId: string): SessionKeys {
+  const prefix = `ai-dm:${adventureId}:`
+  return {
+    sessionId: `${prefix}session-id`,
+    gameState: `${prefix}game-state`,
+    messages: `${prefix}messages`,
+    summaryContext: `${prefix}summary-context`,
+    budget: `${prefix}budget-summary`,
+  }
 }
 const CLIENT_DEBUG_LOG_KEY = 'ai-dm-client-debug-log-v1'
 const CLIENT_DEBUG_BROWSER_ID_KEY = 'ai-dm-client-debug-browser-id'
@@ -81,13 +62,11 @@ interface ClientBudgetSummary {
   lastLlmRoute: DMTurnUsage['llmRoute']
 }
 
-const WELCOME_MESSAGE = "Le vieux sorcier Tyndareus le Vert t'a engagé pour une mission singulière : retrouver la recette secrète des célèbres tartes aux pommes de Grammy. Après des jours de route, te voici enfin devant la vieille boulangerie, abandonnée depuis longtemps et, dit-on, infestée de gobelins. L'odeur des pommes du verger flotte encore dans l'air, et la porte entrebâillée t'invite à entrer. Que fais-tu ?"
-
-function createWelcomeMessage(): ChatMessage {
+function createWelcomeMessage(welcome: string): ChatMessage {
   return {
     id: generateId(),
     role: 'dm',
-    content: WELCOME_MESSAGE,
+    content: welcome,
     timestamp: Date.now(),
   }
 }
@@ -155,13 +134,13 @@ function createClientRequestId(): string {
   return `client-${Date.now()}-${Math.random().toString(36).slice(2)}`
 }
 
-function getOrCreateSessionId(): string {
+function getOrCreateSessionId(keys: SessionKeys): string {
   try {
-    const existing = sessionStorage.getItem(SESSION_KEYS.sessionId)
+    const existing = sessionStorage.getItem(keys.sessionId)
     if (existing) return existing
 
     const next = createSessionId()
-    sessionStorage.setItem(SESSION_KEYS.sessionId, next)
+    sessionStorage.setItem(keys.sessionId, next)
     return next
   } catch {
     return createSessionId()
@@ -364,8 +343,13 @@ function phaseLabel(phase: GameState['phase']): { label: string; color: string }
   }
 }
 
-export default function GamePage() {
-  const [gameState, setGameState] = useState<GameState>(INITIAL_GAME_STATE)
+function GameView({ adventure }: { adventure: AdventureDefinition }) {
+  // Clés sessionStorage et état initial DÉRIVÉS du module actif. Stables par
+  // adventure.id ; un changement de module (nouvelle URL) reconstruit tout.
+  const keys = useMemo(() => makeSessionKeys(adventure.id), [adventure.id])
+  const initialGameState = useMemo(() => buildInitialGameState(adventure.id), [adventure.id])
+
+  const [gameState, setGameState] = useState<GameState>(initialGameState)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [inputValue, setInputValue] = useState('')
@@ -396,19 +380,19 @@ export default function GamePage() {
   // Restore the per-tab session after hydration. sessionStorage keeps refreshes coherent
   // while still isolating separate browser tabs from one another.
   useEffect(() => {
-    const restoredSessionId = getOrCreateSessionId()
-    const restoredGameState = readSessionJson<GameState>(SESSION_KEYS.gameState)
-    const restoredMessages = readSessionJson<ChatMessage[]>(SESSION_KEYS.messages)
-    const restoredBudget = readSessionJson<ClientBudgetSummary>(SESSION_KEYS.budget)
+    const restoredSessionId = getOrCreateSessionId(keys)
+    const restoredGameState = readSessionJson<GameState>(keys.gameState)
+    const restoredMessages = readSessionJson<ChatMessage[]>(keys.messages)
+    const restoredBudget = readSessionJson<ClientBudgetSummary>(keys.budget)
 
     setSessionId(restoredSessionId)
     if (restoredGameState) setGameState(restoredGameState)
-    setMessages(restoredMessages?.length ? restoredMessages : [createWelcomeMessage()])
+    setMessages(restoredMessages?.length ? restoredMessages : [createWelcomeMessage(adventure.welcomeMessage)])
     if (restoredBudget) setBudgetSummary(restoredBudget)
     appendClientDebugLog(restoredSessionId, 'client.session.loaded', {
       restoredGameState: Boolean(restoredGameState),
       restoredMessages: restoredMessages?.length ?? 0,
-      gameState: summarizeClientGameState(restoredGameState ?? INITIAL_GAME_STATE),
+      gameState: summarizeClientGameState(restoredGameState ?? initialGameState),
       budget: restoredBudget ?? emptyBudgetSummary(),
     })
     syncClientDebugLog(restoredSessionId).catch(err => {
@@ -416,7 +400,7 @@ export default function GamePage() {
     })
 
     try {
-      setSummaryContext(sessionStorage.getItem(SESSION_KEYS.summaryContext) ?? undefined)
+      setSummaryContext(sessionStorage.getItem(keys.summaryContext) ?? undefined)
     } catch { /* storage unavailable */ }
 
     setHasLoadedSession(true)
@@ -425,15 +409,15 @@ export default function GamePage() {
   useEffect(() => {
     if (!hasLoadedSession) return
 
-    writeSessionJson(SESSION_KEYS.gameState, gameState)
-    writeSessionJson(SESSION_KEYS.messages, messages)
-    writeSessionJson(SESSION_KEYS.budget, budgetSummary)
+    writeSessionJson(keys.gameState, gameState)
+    writeSessionJson(keys.messages, messages)
+    writeSessionJson(keys.budget, budgetSummary)
 
     try {
       if (summaryContext) {
-        sessionStorage.setItem(SESSION_KEYS.summaryContext, summaryContext)
+        sessionStorage.setItem(keys.summaryContext, summaryContext)
       } else {
-        sessionStorage.removeItem(SESSION_KEYS.summaryContext)
+        sessionStorage.removeItem(keys.summaryContext)
       }
     } catch { /* storage unavailable */ }
   }, [budgetSummary, gameState, hasLoadedSession, messages, summaryContext])
@@ -441,7 +425,7 @@ export default function GamePage() {
   const logClientEvent = useCallback((event: string, payload: Record<string, unknown>) => {
     if (!hasLoadedSession) return
 
-    const activeSessionId = sessionId ?? getOrCreateSessionId()
+    const activeSessionId = sessionId ?? getOrCreateSessionId(keys)
     if (!sessionId) setSessionId(activeSessionId)
 
     appendClientDebugLog(activeSessionId, event, payload)
@@ -456,7 +440,7 @@ export default function GamePage() {
     setIsLoading(true)
     setInputValue('')
 
-    const activeSessionId = sessionId ?? getOrCreateSessionId()
+    const activeSessionId = sessionId ?? getOrCreateSessionId(keys)
     if (!sessionId) setSessionId(activeSessionId)
     const clientRequestId = createClientRequestId()
 
@@ -483,6 +467,7 @@ export default function GamePage() {
         message: text,
         clientRequestId,
         sessionId: activeSessionId,
+        adventureId: adventure.id,
         gameState,
         history,
         summaryContext,
@@ -640,16 +625,16 @@ export default function GamePage() {
     const nextSessionId = createSessionId()
 
     try {
-      sessionStorage.setItem(SESSION_KEYS.sessionId, nextSessionId)
-      sessionStorage.removeItem(SESSION_KEYS.gameState)
-      sessionStorage.removeItem(SESSION_KEYS.messages)
-      sessionStorage.removeItem(SESSION_KEYS.summaryContext)
-      sessionStorage.removeItem(SESSION_KEYS.budget)
+      sessionStorage.setItem(keys.sessionId, nextSessionId)
+      sessionStorage.removeItem(keys.gameState)
+      sessionStorage.removeItem(keys.messages)
+      sessionStorage.removeItem(keys.summaryContext)
+      sessionStorage.removeItem(keys.budget)
     } catch { /* storage unavailable */ }
 
     setSessionId(nextSessionId)
-    setGameState(INITIAL_GAME_STATE)
-    setMessages([createWelcomeMessage()])
+    setGameState(initialGameState)
+    setMessages([createWelcomeMessage(adventure.welcomeMessage)])
     setSummaryContext(undefined)
     setBudgetSummary(emptyBudgetSummary())
     setError(null)
@@ -735,8 +720,14 @@ export default function GamePage() {
       <div className="flex flex-col lg:flex-row flex-1 overflow-hidden">
         {/* Left: Battlemap (65%) */}
         <div className="flex-[45] lg:flex-[65] min-w-0 min-h-0 p-2 overflow-hidden">
-          <Battlemap gameState={gameState} cellSize={52} />
-          {/* Carte : Grammy's Bakery (~880×800px) — grille 17×15 cases à 52px */}
+          <Battlemap
+            gameState={gameState}
+            cellSize={52}
+            image={adventure.battlemapImage}
+            cols={adventure.grid.cols}
+            rows={adventure.grid.rows}
+          />
+          {/* Battlemap et grille fournies par le module d'aventure actif */}
         </div>
 
         {/* Right: Chat + CombatTracker (35%) */}
@@ -790,10 +781,38 @@ export default function GamePage() {
               inputValue={inputValue}
               onInputChange={setInputValue}
               onClientEvent={logClientEvent}
+              placeholders={adventure.chatPlaceholders}
             />
           </div>
         </div>
       </div>
     </div>
+  )
+}
+
+// Résout le module depuis ?adventure=<id>. Module inconnu ou verrouillé →
+// retour à l'accueil (on ne joue que du disponible). useSearchParams impose un
+// Suspense boundary côté Next.
+function GamePageResolver() {
+  const params = useSearchParams()
+  const router = useRouter()
+  const requested = params.get('adventure') ?? DEFAULT_ADVENTURE_ID
+  const adventure = getAdventure(requested)
+  const playable = adventure?.available ? adventure : null
+
+  useEffect(() => {
+    if (!playable) router.replace('/')
+  }, [playable, router])
+
+  if (!playable) return null
+  // key : un changement de module remonte un GameView neuf (états/refs isolés).
+  return <GameView key={playable.id} adventure={playable} />
+}
+
+export default function GamePage() {
+  return (
+    <Suspense fallback={<div className="h-screen bg-stone-950" />}>
+      <GamePageResolver />
+    </Suspense>
   )
 }
