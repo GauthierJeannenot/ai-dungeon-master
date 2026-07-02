@@ -113,7 +113,7 @@ function pruneOldestClient(): void {
   clients.delete(sessionId)
 }
 
-async function createMCPClient(sessionId: string): Promise<Client> {
+async function createMCPClient(sessionId: string, adventureId?: string): Promise<Client> {
   const startedAt = Date.now()
   const mcpServerPath = path.join(
     process.cwd(),
@@ -132,14 +132,19 @@ async function createMCPClient(sessionId: string): Promise<Client> {
     )
   }
 
-  logEvent('info', 'mcp.client.create.start', { sessionId, mcpServerPath })
+  logEvent('info', 'mcp.client.create.start', { sessionId, mcpServerPath, adventureId })
+
+  // Le module d'aventure du process enfant est fixé ici, au spawn (un process =
+  // une session = une aventure). Le process parent n'est jamais muté.
+  const childEnv = Object.fromEntries(
+    Object.entries(process.env).filter(([, v]) => v !== undefined)
+  ) as Record<string, string>
+  if (adventureId) childEnv.ADVENTURE_ID = adventureId
 
   const transport = new StdioClientTransport({
     command: 'node',
     args: [mcpServerPath],
-    env: Object.fromEntries(
-      Object.entries(process.env).filter(([, v]) => v !== undefined)
-    ) as Record<string, string>,
+    env: childEnv,
   })
 
   const newClient = new Client({ name: 'dm-api-client', version: '1.0.0' })
@@ -170,7 +175,10 @@ async function createMCPClient(sessionId: string): Promise<Client> {
   return newClient
 }
 
-export async function getMCPClient(sessionId?: string): Promise<Client> {
+// adventureId : utilisé UNIQUEMENT au premier spawn de la session (fixe le
+// module du process). Les appels suivants réutilisent le client caché et
+// l'ignorent — une session ne change jamais d'aventure.
+export async function getMCPClient(sessionId?: string, adventureId?: string): Promise<Client> {
   cleanupIdleClients()
 
   const key = normalizeSessionId(sessionId)
@@ -200,7 +208,7 @@ export async function getMCPClient(sessionId?: string): Promise<Client> {
   }
 
   // Première connexion de session — on stocke la promesse comme verrou.
-  entry.connectingPromise = createMCPClient(key)
+  entry.connectingPromise = createMCPClient(key, adventureId)
     .then(c => {
       entry.client = c
       entry.connectingPromise = null
@@ -240,7 +248,8 @@ export async function closeMCPClient(sessionId?: string): Promise<void> {
 export async function callMCPTool(
   toolName: string,
   args: Record<string, unknown>,
-  sessionId?: string
+  sessionId?: string,
+  adventureId?: string
 ): Promise<unknown> {
   const startedAt = Date.now()
   const normalizedSessionId = normalizeSessionId(sessionId)
@@ -251,7 +260,7 @@ export async function callMCPTool(
   })
 
   try {
-    const mcpClient = await getMCPClient(sessionId)
+    const mcpClient = await getMCPClient(sessionId, adventureId)
     const result = await mcpClient.callTool({ name: toolName, arguments: args })
 
     // Extract text content from MCP result
@@ -300,13 +309,13 @@ export async function callMCPTool(
   }
 }
 
-export async function listMCPTools(sessionId?: string): Promise<Array<{ name: string; description: string; inputSchema: unknown }>> {
+export async function listMCPTools(sessionId?: string, adventureId?: string): Promise<Array<{ name: string; description: string; inputSchema: unknown }>> {
   const startedAt = Date.now()
   const normalizedSessionId = normalizeSessionId(sessionId)
   logEvent('debug', 'mcp.tools.list.start', { sessionId: normalizedSessionId })
 
   try {
-    const mcpClient = await getMCPClient(sessionId)
+    const mcpClient = await getMCPClient(sessionId, adventureId)
     const result = await mcpClient.listTools()
     logEvent('debug', 'mcp.tools.list.result', {
       sessionId: normalizedSessionId,

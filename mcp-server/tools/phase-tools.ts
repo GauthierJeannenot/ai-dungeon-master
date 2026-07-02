@@ -5,6 +5,7 @@ import * as gs from '../game-state'
 import * as rules from '../rules'
 import { MonsterState } from '../../lib/types'
 import { EncounterMonsterSpec, encounterIds, getEncounter } from '../../lib/adventure-map'
+import { ACTIVE_ADVENTURE_ID } from '../adventure'
 
 // Monster stat blocks — Monster Manual 2025 (XMM)
 // Source: CR list verified from MM 2025 appendix
@@ -349,7 +350,7 @@ export function registerPhaseTools(server: McpServer): void {
     'start_encounter',
     'Atomically moves the player if needed, spawns monsters, and enters combat with the real spawned monster IDs. Prefer this over separate spawn_monster + enter_combat for room encounters.',
     {
-      encounterId: z.enum(encounterIds() as [string, ...string[]]).optional().describe('Preset encounter id from the adventure, e.g. bakery_floor_goblins.'),
+      encounterId: z.enum(encounterIds(ACTIVE_ADVENTURE_ID) as [string, ...string[]]).optional().describe('Preset encounter id from the adventure, e.g. bakery_floor_goblins.'),
       playerCell: z.object({ x: z.number().int().min(0), y: z.number().int().min(0) }).optional().describe('Optional player destination before combat starts.'),
       monsters: z.array(z.object({
         monsterType: z.string().describe('Monster type key'),
@@ -362,7 +363,7 @@ export function registerPhaseTools(server: McpServer): void {
     async ({ encounterId, playerCell, monsters, reason }) => {
       const stateBefore = structuredClone(gs.getState())
       try {
-        const preset = encounterId ? getEncounter(encounterId) : null
+        const preset = encounterId ? getEncounter(encounterId, ACTIVE_ADVENTURE_ID) : null
         if (encounterId && !preset) {
           throw new rules.RuleViolation('UNKNOWN_ENCOUNTER', `Unknown encounter: ${encounterId}`, { encounterId })
         }

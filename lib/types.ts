@@ -223,6 +223,10 @@ export interface NpcState {
 }
 
 export interface GameState {
+  // Module d'aventure de la partie. Fixé à la création (défaut : module par
+  // défaut) et préservé au round-trip replace_game_state. Le moteur MCP le
+  // reçoit aussi via ADVENTURE_ID au spawn du process (mcp-server/adventure.ts).
+  adventureId?: string
   phase: GamePhase
   player: PlayerState
   monsters: Record<string, MonsterState>   // serializable (no Map)
