@@ -3,8 +3,7 @@ const fs = require('node:fs')
 const os = require('node:os')
 const path = require('node:path')
 const test = require('node:test')
-const Module = require('node:module')
-const ts = require('typescript')
+const { installTsRequireWithAliases } = require('./helpers/ts-require.cjs')
 
 const sessionStoreDir = path.join(os.tmpdir(), `ai-dm-api-test-${process.pid}`)
 
@@ -19,39 +18,6 @@ process.env.LLM_MODE = 'mock'
 // la monetisation (le debit/quota est couvert par tests/credits-store.test.cjs).
 process.env.MONETIZATION_ENABLED = 'false'
 delete process.env.DATABASE_URL // force le backend fichier
-
-function installTsRequireWithAliases() {
-  const previousTs = Module._extensions['.ts']
-  const previousResolve = Module._resolveFilename
-
-  Module._resolveFilename = function resolveFilename(request, parent, isMain, options) {
-    if (request.startsWith('@/')) {
-      const mapped = path.join(process.cwd(), request.slice(2))
-      return previousResolve.call(this, mapped, parent, isMain, options)
-    }
-
-    return previousResolve.call(this, request, parent, isMain, options)
-  }
-
-  Module._extensions['.ts'] = function loadTs(mod, filename) {
-    const source = fs.readFileSync(filename, 'utf8')
-    const output = ts.transpileModule(source, {
-      compilerOptions: {
-        esModuleInterop: true,
-        module: ts.ModuleKind.CommonJS,
-        moduleResolution: ts.ModuleResolutionKind.NodeJs,
-        target: ts.ScriptTarget.ES2022,
-      },
-    }).outputText
-    mod._compile(output, filename)
-  }
-
-  return () => {
-    Module._resolveFilename = previousResolve
-    if (previousTs) Module._extensions['.ts'] = previousTs
-    else delete Module._extensions['.ts']
-  }
-}
 
 const restoreTsRequire = installTsRequireWithAliases()
 const { POST } = require(path.join(process.cwd(), 'app/api/dm/route.ts'))

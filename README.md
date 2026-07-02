@@ -204,7 +204,7 @@ Le serveur MCP valide les règles critiques avant de muter l'état : tour couran
 
 ---
 
-## Déploiement (free tier)
+## Déploiement — Railway
 
 > ⚠️ **Vercel / Netlify non compatibles** — le serveur MCP tourne comme processus enfant persistant (stdio), incompatible avec les fonctions serverless.
 
@@ -213,60 +213,38 @@ Le serveur MCP valide les règles critiques avant de muter l'état : tour couran
 ```
 GitHub repo
     │
-    ├── Push sur main
+    ├── Push sur master
     │       │
-    │       ├── GitHub Actions CI → type-check + build
+    │       ├── GitHub Actions CI → type-check + tests + build
     │       │
-    │       └── Auto-deploy → Render Blueprint
+    │       └── Auto-deploy → Railway (service Node + Postgres)
     │
     └── Serveur persistant Node.js
             ├── Next.js (app + API routes)
-            └── MCP server (processus enfant, spawné par l'API)
+            ├── MCP server (processus enfant, spawné par l'API)
+            └── Postgres (auth, sessions de jeu, crédits)
 ```
 
----
+### Mise en place
 
-### Option A — Render (gratuit permanent)
+1. [railway.app](https://railway.app) → New Project → **Deploy from GitHub repo** (le `Dockerfile` est détecté, sinon build Nixpacks : `npm ci && npm run build` / `npm start`).
+2. Ajouter un service **PostgreSQL** au projet, puis référencer sa variable dans le service web : `DATABASE_URL=${{Postgres.DATABASE_URL}}`.
+3. Renseigner les variables du service web :
 
-**Avantages** : free tier sans limite de temps (750h/mois)  
-**Inconvénient** : mise en veille après 15 min d'inactivité (cold start ~30 sec)
-
-Chemin recommande pour une prod de test rapide: le fichier `render.yaml` est pret pour Render Blueprint, avec build Node 20, healthcheck, auto-deploy apres CI verte, `NARRATION_MODE=quality`, logs debug et sessions temporaires.
-
-#### 1. Créer le service
-
-1. Ouvre [render.com](https://render.com) → New → **Blueprint**
-2. Connecte ton repo GitHub
-3. Render détecte automatiquement `render.yaml` → configuration appliquée
-
-#### 2. Variables d'environnement
-
-Dans le dashboard Render → ton service → **Environment** :
 ```
-ANTHROPIC_API_KEY = sk-ant-ta-vraie-cle
+ANTHROPIC_API_KEY   = sk-ant-...          # clé réelle
+DATABASE_URL        = ${{Postgres.DATABASE_URL}}
+AUTH_SECRET         = <npx auth secret>
+AUTH_URL            = https://<votre-domaine-railway>
+AUTH_GOOGLE_ID / AUTH_GOOGLE_SECRET       # OAuth Google
+AUTH_GITHUB_ID / AUTH_GITHUB_SECRET       # OAuth GitHub
+STRIPE_SECRET_KEY / STRIPE_WEBHOOK_SECRET # paiements (optionnel au début)
+LLM_MODE            = live
+NARRATION_MODE      = quality
 ```
 
-Voir [docs/render-deploy.md](docs/render-deploy.md) pour les logs, limites du free tier et commandes de debug.
-
-#### 3. Auto-deploy
-
-Activé par défaut (`autoDeployTrigger: checksPass` dans `render.yaml`). Chaque push sur `master` redéploie après CI verte côté Render.
-
-Un workflow GitHub Actions `Deploy to Render` existe aussi comme bouton manuel dans l'onglet Actions. Pour qu'il déclenche réellement Render, crée un Deploy Hook dans Render et ajoute son URL dans le secret GitHub `RENDER_DEPLOY_HOOK_URL`. Il ne tourne pas après CI afin d'éviter un double déploiement avec le Blueprint Render.
-
----
-
-### Option B — Koyeb (free tier permanent, sans mise en veille)
-
-**Avantages** : 2 instances gratuites permanentes, pas de mise en veille  
-**Coût** : gratuit
-
-1. Ouvre [koyeb.com](https://koyeb.com) → Create App → **GitHub**
-2. Sélectionne ton repo
-3. Build command : `npm ci && npm run build`
-4. Start command : `npm start`
-5. Port : `3000`
-6. Variables : `ANTHROPIC_API_KEY`, `NODE_ENV=production`
+4. Premier déploiement : le schéma Postgres s'applique automatiquement au premier accès (ou `railway run npm run db:migrate`).
+5. Sécurité par défaut en production : `/api/debug/logs` exige un Bearer token (`APP_DEBUG_LOG_TOKEN`), les logs ne sont pas persistés sur disque, le rate-limit et le plafond journalier sont actifs (`DM_RATE_LIMIT_PER_MINUTE`, `DM_DAILY_GLOBAL_MESSAGE_LIMIT`).
 
 ---
 
@@ -323,11 +301,11 @@ Les logs sont conserves a trois niveaux :
 - buffer memoire rapide, utile pendant que le process tourne
 - fichier JSONL local (`.data/logs/server.jsonl` en local, ou le chemin `APP_LOG_PERSIST_DIR` configure par l'hebergeur)
 
-Sans aucune configuration hebergeur/GitHub supplementaire, le navigateur garde aussi une boite noire de playtest dans `localStorage` et la republie au serveur via `/api/debug/client-logs`. Les entrees recentes restent dans le navigateur meme apres une sync reussie, afin qu'un simple refresh puisse les republier si Render ou une autre plateforme a perdu le buffer serveur. Apres un redeploiement, il suffit de rafraichir ou de rejouer depuis le meme navigateur pour revoir les dernieres actions sous l'evenement `client.blackbox.entry` dans `/api/debug/logs`.
+Sans aucune configuration hebergeur/GitHub supplementaire, le navigateur garde aussi une boite noire de playtest dans `localStorage` et la republie au serveur via `/api/debug/client-logs`. Les entrees recentes restent dans le navigateur meme apres une sync reussie, afin qu'un simple refresh puisse les republier si l'hebergeur a perdu le buffer serveur. Apres un redeploiement, il suffit de rafraichir ou de rejouer depuis le meme navigateur pour revoir les dernieres actions sous l'evenement `client.blackbox.entry` dans `/api/debug/logs`.
 
-Sur Render free, `render.yaml` force `APP_LOG_PERSIST_DIR=/tmp/ai-dm/logs`. Ce stockage reste ephemere; la boite noire navigateur aide a republier les derniers tours apres refresh/redeploy.
+En production, la persistance fichier des logs est coupee par defaut (stdout est capture par Railway) ; la boite noire navigateur aide a republier les derniers tours apres refresh/redeploy.
 
-Lecture via hebergeur : utilisez l'onglet Logs du service Render.
+Lecture via hebergeur : utilisez l'onglet Logs (Observability) du service Railway.
 
 Lecture via endpoint HTTP protege :
 

@@ -13,6 +13,9 @@ export const SESSION_SCHEMA_VERSION = 1
 export interface StoredGameSession {
   schemaVersion: 1
   sessionId: string
+  // "user:<id>" ou "guest:<id>" — créateur de la partie. undefined pour les
+  // sessions antérieures à ce champ ou créées hors monétisation.
+  ownerId?: string
   gameState: GameState
   history: ConversationTurn[]
   summaryContext?: string
@@ -43,6 +46,7 @@ function normalizeStoredSession(raw: unknown, requestedSessionId: string): Store
   return {
     schemaVersion: SESSION_SCHEMA_VERSION,
     sessionId: safeSessionId(record.sessionId ?? requestedSessionId),
+    ownerId: typeof record.ownerId === 'string' ? record.ownerId : undefined,
     gameState: record.gameState as GameState,
     history: Array.isArray(record.history) ? record.history : [],
     summaryContext: typeof record.summaryContext === 'string' ? record.summaryContext : undefined,

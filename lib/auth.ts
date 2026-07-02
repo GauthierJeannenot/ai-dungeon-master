@@ -29,7 +29,7 @@ declare module 'next-auth' {
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  // Render/Railway terminent le TLS en amont — on fait confiance à l'hôte proxy.
+  // Railway termine le TLS en amont — on fait confiance à l'hôte proxy.
   trustHost: true,
   ...(isDatabaseEnabled()
     ? {

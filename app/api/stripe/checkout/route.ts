@@ -37,7 +37,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Pack de tokens inconnu.' }, { status: 400 })
   }
 
-  const origin = req.headers.get('origin') ?? process.env.APP_BASE_URL ?? req.nextUrl.origin
+  // APP_BASE_URL d'abord : le header `origin` vient du client et ne doit pas
+  // dicter les URLs de redirection en production.
+  const origin = process.env.APP_BASE_URL?.trim()
+    || req.headers.get('origin')
+    || req.nextUrl.origin
 
   try {
     const checkout = await getStripe().checkout.sessions.create({

@@ -11,7 +11,13 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 const VALID_LEVELS = new Set<LogLevel>(['debug', 'info', 'warn', 'error'])
-const PUBLIC_READ_ENABLED = process.env.APP_DEBUG_LOG_PUBLIC_READ !== 'false'
+// Lecture publique des logs : outil de dev local UNIQUEMENT. En production,
+// l'endpoint exige toujours un Bearer token (APP_DEBUG_LOG_TOKEN) — les logs
+// contiennent messages joueurs, sessionIds et userIds, ils ne doivent jamais
+// être exposés. APP_DEBUG_LOG_PUBLIC_READ n'a d'effet qu'en non-production.
+const PUBLIC_READ_ENABLED =
+  process.env.NODE_ENV !== 'production' &&
+  process.env.APP_DEBUG_LOG_PUBLIC_READ !== 'false'
 const JSON_UTF8_HEADERS = { 'Content-Type': 'application/json; charset=utf-8' }
 
 function jsonResponse(body: unknown, init?: ResponseInit): NextResponse {

@@ -11,35 +11,15 @@
 // n'a pas changé. Pour réattribuer un solde à un compte migré, mettre à jour
 // user_credits.user_id à la main après le premier login.
 
-const fs = require('node:fs')
 const path = require('node:path')
-const Module = require('node:module')
-const ts = require('typescript')
 
 if (!process.env.DATABASE_URL) {
   console.error('DATABASE_URL manquante.')
   process.exit(1)
 }
 
-const previousResolve = Module._resolveFilename
-Module._resolveFilename = function resolveFilename(request, parent, isMain, options) {
-  if (request.startsWith('@/')) {
-    return previousResolve.call(this, path.join(process.cwd(), request.slice(2)), parent, isMain, options)
-  }
-  return previousResolve.call(this, request, parent, isMain, options)
-}
-Module._extensions['.ts'] = function loadTs(mod, filename) {
-  const source = fs.readFileSync(filename, 'utf8')
-  const output = ts.transpileModule(source, {
-    compilerOptions: {
-      esModuleInterop: true,
-      module: ts.ModuleKind.CommonJS,
-      moduleResolution: ts.ModuleResolutionKind.NodeJs,
-      target: ts.ScriptTarget.ES2022,
-    },
-  }).outputText
-  mod._compile(output, filename)
-}
+const { installTsRequireWithAliases } = require('../tests/helpers/ts-require.cjs')
+installTsRequireWithAliases()
 
 async function main() {
   // Force la lecture FICHIER côté source malgré DATABASE_URL : on lit les

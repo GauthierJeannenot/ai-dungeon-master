@@ -63,15 +63,24 @@ CREATE TABLE IF NOT EXISTS sessions (
 
 CREATE UNIQUE INDEX IF NOT EXISTS sessions_token_idx ON sessions ("sessionToken");
 
--- Sessions de jeu (remplace .data/sessions/*.json)
+-- Sessions de jeu (remplace .data/sessions/*.json). owner_id lie la partie à
+-- son propriétaire ("user:<id>" ou "guest:<id>") — NULL pour les sessions
+-- créées avant cette colonne ou hors monétisation.
 CREATE TABLE IF NOT EXISTS game_sessions (
   session_id TEXT PRIMARY KEY,
   schema_version INTEGER NOT NULL DEFAULT 1,
+  owner_id TEXT,
   game_state JSONB NOT NULL,
   history JSONB NOT NULL DEFAULT '[]',
   summary_context TEXT,
   turn_traces JSONB,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Disjoncteur de dépense : messages DM toutes IP confondues, par jour UTC.
+CREATE TABLE IF NOT EXISTS daily_usage (
+  day TEXT PRIMARY KEY,
+  messages INTEGER NOT NULL DEFAULT 0
 );
 
 -- Portefeuille de tokens (remplace .data/credits/user-*.json).
@@ -114,7 +123,7 @@ function parsePositiveInt(value: string | undefined, fallback: number): number {
 }
 
 // DATABASE_SSL=require pour les Postgres managés exposés en TLS avec certificat
-// non vérifiable (Render externe, Heroku…). Railway/Render interne : laisser vide.
+// non vérifiable. Railway interne : laisser vide.
 function sslConfig(): { rejectUnauthorized: boolean } | undefined {
   const mode = (process.env.DATABASE_SSL ?? '').toLowerCase()
   if (mode === 'require' || mode === 'true' || mode === '1') {
@@ -147,10 +156,31 @@ export function __setDbPoolForTests(testPool: Pool): void {
   schemaReady = null
 }
 
+// Migrations additives pour les bases créées avant ces colonnes (CREATE TABLE
+// IF NOT EXISTS ne modifie pas une table existante). Tolérées en échec : sur
+// une base fraîche la colonne existe déjà via le CREATE.
+const ADDITIVE_MIGRATIONS_SQL = [
+  'ALTER TABLE game_sessions ADD COLUMN IF NOT EXISTS owner_id TEXT',
+]
+
+async function applyAdditiveMigrations(): Promise<void> {
+  for (const sql of ADDITIVE_MIGRATIONS_SQL) {
+    try {
+      await getPool().query(sql)
+    } catch (err) {
+      logEvent('warn', 'db.schema.additive_migration_failed', {
+        sql,
+        err: err instanceof Error ? err.message : String(err),
+      })
+    }
+  }
+}
+
 export async function ensureSchema(): Promise<void> {
   if (!schemaReady) {
     schemaReady = getPool()
       .query(DB_SCHEMA_SQL)
+      .then(applyAdditiveMigrations)
       .then(() => {
         logEvent('info', 'db.schema.ready', {})
       })

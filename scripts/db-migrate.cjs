@@ -6,10 +6,7 @@
 // Le schéma est aussi appliqué paresseusement au premier accès de l'app ;
 // ce script sert à migrer explicitement (CI/CD, premier déploiement).
 
-const fs = require('node:fs')
 const path = require('node:path')
-const Module = require('node:module')
-const ts = require('typescript')
 
 if (!process.env.DATABASE_URL) {
   console.error('DATABASE_URL manquante. Exemple :')
@@ -18,25 +15,8 @@ if (!process.env.DATABASE_URL) {
 }
 
 // Hook require pour charger les modules TS de lib/ (même mécanique que tests/).
-const previousResolve = Module._resolveFilename
-Module._resolveFilename = function resolveFilename(request, parent, isMain, options) {
-  if (request.startsWith('@/')) {
-    return previousResolve.call(this, path.join(process.cwd(), request.slice(2)), parent, isMain, options)
-  }
-  return previousResolve.call(this, request, parent, isMain, options)
-}
-Module._extensions['.ts'] = function loadTs(mod, filename) {
-  const source = fs.readFileSync(filename, 'utf8')
-  const output = ts.transpileModule(source, {
-    compilerOptions: {
-      esModuleInterop: true,
-      module: ts.ModuleKind.CommonJS,
-      moduleResolution: ts.ModuleResolutionKind.NodeJs,
-      target: ts.ScriptTarget.ES2022,
-    },
-  }).outputText
-  mod._compile(output, filename)
-}
+const { installTsRequireWithAliases } = require('../tests/helpers/ts-require.cjs')
+installTsRequireWithAliases()
 
 async function main() {
   const { ensureSchema, getPool } = require(path.join(process.cwd(), 'lib/db.ts'))
