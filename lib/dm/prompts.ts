@@ -13,9 +13,9 @@ import { parsePositiveInt } from './llm'
 const LLM_PROMPT_CACHE_ENABLED = process.env.LLM_PROMPT_CACHE_ENABLED !== 'false'
 const COMBAT_LOG_TAIL = parsePositiveInt(process.env.LLM_COMBAT_LOG_TAIL, 6)
 
-export function buildStaticPrompt(): string {
-  const ctx = loadContextFiles()
-  const moduleIndex = loadAdventureModuleParsed().index
+export function buildStaticPrompt(adventureId?: string): string {
+  const ctx = loadContextFiles(adventureId)
+  const moduleIndex = loadAdventureModuleParsed(adventureId).index
 
   return `Tu es un Dungeon Master expert de D&D 5e, narrateur immersif et arbitre de règles rigoureux.
 Tu combines une narration cinématographique et épique avec une application stricte des règles mécaniques.
@@ -164,16 +164,17 @@ export function serializeGameState(gameState: GameState): string {
 }
 
 export function buildDynamicPrompt(gameState: GameState, summaryContext?: string, directive?: string): string {
+  const adventureId = gameState.adventureId
   const summaryBlock = summaryContext?.trim()
     ? `---\n## RÉSUMÉ DES ÉVÉNEMENTS PRÉCÉDENTS\n${summaryContext.trim()}\n\n`
     : ''
   const roomDetail = gameState.currentRoomId
-    ? loadAdventureModuleParsed().rooms[gameState.currentRoomId]
+    ? loadAdventureModuleParsed(adventureId).rooms[gameState.currentRoomId]
     : undefined
   const roomDetailBlock = roomDetail
     ? `---\n## SALLE ACTUELLE — DÉTAIL DU MODULE\n${roomDetail}\n\n`
     : ''
-  const roomHooks = describeRoomHooks(gameState.currentRoomId)
+  const roomHooks = describeRoomHooks(gameState.currentRoomId, adventureId)
   const roomBlock = roomHooks
     ? `---\n## SALLE ACTUELLE — ACCROCHES MÉCANIQUES DISPONIBLES\n${roomHooks}\nDès que l'action du joueur correspond à l'une de ces accroches, appelle le tool indiqué (ne narre pas l'issue à la place).\n\n`
     : ''
@@ -192,7 +193,7 @@ ${serializeGameState(gameState)}
 export function buildSystemBlocks(gameState: GameState, summaryContext?: string, directive?: string): Anthropic.TextBlockParam[] {
   const staticBlock: Anthropic.TextBlockParam = {
     type: 'text',
-    text: buildStaticPrompt(),
+    text: buildStaticPrompt(gameState.adventureId),
   }
   if (LLM_PROMPT_CACHE_ENABLED) {
     staticBlock.cache_control = { type: 'ephemeral' }

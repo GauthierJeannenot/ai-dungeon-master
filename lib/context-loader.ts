@@ -1,5 +1,6 @@
 import fs from 'fs'
 import path from 'path'
+import { DEFAULT_ADVENTURE_ID } from './adventure-map'
 
 interface ContextFiles {
   playerCharacter: string   // Fiche de personnage : stats, inventaire, background
@@ -8,36 +9,44 @@ interface ContextFiles {
   adventureModule: string
 }
 
-let cached: ContextFiles | null = null
+// Caches par module : un singleton mélangerait les prompts de deux aventures.
+const cachedFiles = new Map<string, ContextFiles>()
 
-export function loadContextFiles(): ContextFiles {
-  if (cached) return cached
-
-  const contextDir = path.join(process.cwd(), 'context')
-
-  function readOrDefault(filename: string, fallback: string): string {
-    const filePath = path.join(contextDir, filename)
-    try {
-      return fs.readFileSync(filePath, 'utf-8')
-    } catch {
-      return fallback
-    }
-  }
-
-  cached = {
-    playerCharacter: readOrDefault('player-character.md', DEFAULT_PLAYER_CHARACTER),
-    playerRules: readOrDefault('player-rules.md', DEFAULT_PLAYER_RULES),
-    dmRules: readOrDefault('dm-rules.md', DEFAULT_DM_RULES),
-    adventureModule: readOrDefault('adventure-module.md', DEFAULT_ADVENTURE_MODULE),
-  }
-
-  return cached
+function adventureDir(adventureId: string): string {
+  return path.join(process.cwd(), 'adventures', adventureId)
 }
 
-// Invalidate cache (useful for hot-reload in dev)
+// Chaîne de repli : dossier du module → dossier du module par défaut (Grammy's,
+// pour les fichiers de règles génériques que la crypte ne redéfinit pas) →
+// constante en dur. tide-crypt n'a que adventure-module.md + player-character.md ;
+// player-rules.md et dm-rules.md retombent sur les règles D&D de Grammy's.
+function readWithFallback(adventureId: string, filename: string, fallback: string): string {
+  for (const dir of [adventureDir(adventureId), adventureDir(DEFAULT_ADVENTURE_ID)]) {
+    try {
+      return fs.readFileSync(path.join(dir, filename), 'utf-8')
+    } catch { /* fichier absent : essayer le repli suivant */ }
+  }
+  return fallback
+}
+
+export function loadContextFiles(adventureId: string = DEFAULT_ADVENTURE_ID): ContextFiles {
+  const existing = cachedFiles.get(adventureId)
+  if (existing) return existing
+
+  const files: ContextFiles = {
+    playerCharacter: readWithFallback(adventureId, 'player-character.md', DEFAULT_PLAYER_CHARACTER),
+    playerRules: readWithFallback(adventureId, 'player-rules.md', DEFAULT_PLAYER_RULES),
+    dmRules: readWithFallback(adventureId, 'dm-rules.md', DEFAULT_DM_RULES),
+    adventureModule: readWithFallback(adventureId, 'adventure-module.md', DEFAULT_ADVENTURE_MODULE),
+  }
+  cachedFiles.set(adventureId, files)
+  return files
+}
+
+// Invalidate caches (useful for hot-reload in dev)
 export function invalidateContextCache(): void {
-  cached = null
-  cachedParsedModule = null
+  cachedFiles.clear()
+  cachedParsedModule.clear()
 }
 
 export interface ParsedAdventureModule {
@@ -45,7 +54,7 @@ export interface ParsedAdventureModule {
   rooms: Record<string, string>  // roomId -> section "## Salle N ..." complète, injectée dynamiquement selon la position.
 }
 
-let cachedParsedModule: ParsedAdventureModule | null = null
+const cachedParsedModule = new Map<string, ParsedAdventureModule>()
 
 // Découpe le module d'aventure en un index permanent et des sections par salle.
 // Objectif contexte : n'envoyer au LLM que le détail de la salle courante (via le
@@ -92,10 +101,12 @@ export function parseAdventureModule(moduleText: string): ParsedAdventureModule 
   return { index, rooms }
 }
 
-export function loadAdventureModuleParsed(): ParsedAdventureModule {
-  if (cachedParsedModule) return cachedParsedModule
-  cachedParsedModule = parseAdventureModule(loadContextFiles().adventureModule)
-  return cachedParsedModule
+export function loadAdventureModuleParsed(adventureId: string = DEFAULT_ADVENTURE_ID): ParsedAdventureModule {
+  const existing = cachedParsedModule.get(adventureId)
+  if (existing) return existing
+  const parsed = parseAdventureModule(loadContextFiles(adventureId).adventureModule)
+  cachedParsedModule.set(adventureId, parsed)
+  return parsed
 }
 
 const DEFAULT_PLAYER_CHARACTER = `

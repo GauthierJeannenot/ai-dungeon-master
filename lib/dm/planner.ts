@@ -69,7 +69,7 @@ export async function planPlayerAction(
   if (gameState.phase === 'combat' && gameState.currentTurn && gameState.currentTurn !== 'player') {
     return null
   }
-  const roomHooks = describeRoomHooks(gameState.currentRoomId)
+  const roomHooks = describeRoomHooks(gameState.currentRoomId, gameState.adventureId)
   const toolList = tools.map(tool => `- ${tool.name}: ${tool.description ?? ''}`).join('\n')
   const phaseLine = gameState.phase === 'combat' ? 'COMBAT (tour du joueur)' : 'EXPLORATION'
   const summaryBlock = summaryContext?.trim()

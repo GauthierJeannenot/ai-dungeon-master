@@ -554,7 +554,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           system: [
             {
               type: 'text',
-              text: buildStaticPrompt() + '\n\nRéponds maintenant UNIQUEMENT avec la narration en prose, sans appeler de tools.',
+              text: buildStaticPrompt(currentGameState.adventureId) + '\n\nRéponds maintenant UNIQUEMENT avec la narration en prose, sans appeler de tools.',
             },
             { type: 'text', text: buildDynamicPrompt(currentGameState, summaryContext) },
           ],
