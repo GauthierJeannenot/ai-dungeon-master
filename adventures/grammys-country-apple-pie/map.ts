@@ -16,6 +16,18 @@ export const GRAMMYS_ID = 'grammys-country-apple-pie'
 export const GRAMMYS_START_CELL: GridCell = { x: 4, y: 13 }
 
 export const GRAMMYS_MAP: AdventureMapData = {
+  startCell: GRAMMYS_START_CELL,
+  // Héros niveau 1 (identique au gabarit par défaut du moteur — comportement
+  // Grammy's inchangé).
+  initialPlayer: {
+    level: 1,
+    hp: { current: 20, max: 20 },
+    inventory: [
+      { id: 'longsword', name: 'Épée longue', type: 'weapon', damage: '1d8+3', description: 'Épée longue +3 STR' },
+      { id: 'shield', name: 'Bouclier', type: 'armor', acBonus: 2, description: 'Bouclier standard' },
+      { id: 'potion1', name: 'Potion de soin', type: 'potion', description: 'Restaure 2d4+2 HP' },
+    ],
+  },
   rooms: [
     { id: '1', name: 'Entrée extérieure', zone: { minX: 3, maxX: 16, minY: 13, maxY: 14 } },
     { id: '2', name: 'Verger de pommiers', zone: { minX: 3, maxX: 15, minY: 1, maxY: 2 } },
@@ -27,15 +39,17 @@ export const GRAMMYS_MAP: AdventureMapData = {
     { id: '9', name: 'Appartement de Grammy', zone: { minX: 7, maxX: 9, minY: 8, maxY: 11 } },
   ],
 
+  // Alignés sur les lignes « Point d'entrée » du module markdown (source de
+  // vérité que le DM lit pour les déplacements).
   entryCells: {
     '1': { x: 4, y: 13 },
     '2': { x: 14, y: 2 },
     '3': { x: 13, y: 6 },
     '4': { x: 11, y: 12 },
-    '5': { x: 6, y: 11 },
+    '5': { x: 6, y: 8 },
     '7': { x: 3, y: 6 },
     '8': { x: 11, y: 8 },
-    '9': { x: 9, y: 10 },
+    '9': { x: 8, y: 9 },
   },
 
   encounters: {

@@ -1,4 +1,4 @@
-import type { NpcState, WorldNpcDisposition } from './types'
+import type { NpcState, WorldNpcDisposition, PlayerState } from './types'
 import { GRAMMYS_MAP, GRAMMYS_ID } from '../adventures/grammys-country-apple-pie/map'
 import { TIDE_CRYPT_MAP, TIDE_CRYPT_ID } from '../adventures/tide-crypt/map'
 
@@ -53,6 +53,10 @@ export interface AdventureNpcSpec {
 // Toutes les données de carte d'un module. Chaque module en exporte une instance
 // (adventures/<id>/map.ts) ; le registre ci-dessous les agrège par adventureId.
 export interface AdventureMapData {
+  // État initial du joueur pour ce module (fusionné sur le gabarit par défaut du
+  // moteur à la création d'une partie — voir mcp-server/game-state.ts, étape 3).
+  startCell: GridCell
+  initialPlayer: Pick<PlayerState, 'level' | 'hp' | 'inventory'>
   rooms: AdventureRoom[]
   entryCells: Record<string, GridCell>
   encounters: Record<string, EncounterDefinition>
