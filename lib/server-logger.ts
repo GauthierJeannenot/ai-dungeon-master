@@ -39,7 +39,13 @@ const OBJECT_KEY_LIMIT = parsePositiveInt(process.env.APP_LOG_OBJECT_KEY_LIMIT, 
 const INCLUDE_TEXT = process.env.APP_LOG_INCLUDE_TEXT !== 'false'
 const BUFFER_ENABLED = process.env.APP_LOG_BUFFER_ENABLED !== 'false'
 const BUFFER_LIMIT = parseBoundedInt(process.env.APP_LOG_BUFFER_LIMIT, 1000, 0, 5000)
-const PERSIST_ENABLED = process.env.APP_LOG_PERSIST_ENABLED !== 'false'
+// Persistance JSONL : utile en dev local, coupée par défaut en production —
+// l'hébergeur (Railway) capture stdout/stderr, et un fichier de 20 Mo relu de
+// façon synchrone sur le chemin de requête est un risque de DoS CPU.
+// Opt-in explicite en prod via APP_LOG_PERSIST_ENABLED=true.
+const PERSIST_ENABLED = process.env.NODE_ENV === 'production'
+  ? process.env.APP_LOG_PERSIST_ENABLED === 'true'
+  : process.env.APP_LOG_PERSIST_ENABLED !== 'false'
 const PERSIST_MAX_BYTES = parseBoundedInt(process.env.APP_LOG_PERSIST_MAX_BYTES, 20_000_000, 100_000, 100_000_000)
 
 const SECRET_KEY_PATTERN = /api[_-]?key|authorization|bearer|cookie|password|secret|access[_-]?token|refresh[_-]?token|id[_-]?token/i

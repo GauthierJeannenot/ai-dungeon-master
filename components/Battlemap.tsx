@@ -116,7 +116,10 @@ export default function Battlemap({ gameState, cellSize = 48 }: BattlemapProps) 
           height: gridRows * cellSize,
         }}
       >
-        {/* Image de la battlemap — étirée pour couvrir exactement la grille */}
+        {/* Image de la battlemap — pixel art généré (17×15 cases exactes, voir
+            scripts/generate-battlemap.cjs). backgroundSize 100% garde chaque case
+            image alignée sur chaque case de la grille ; imageRendering pixelated
+            préserve les pixels nets à l'agrandissement. */}
         <div
           className="absolute inset-0"
           style={{
@@ -124,6 +127,7 @@ export default function Battlemap({ gameState, cellSize = 48 }: BattlemapProps) 
             backgroundSize: '100% 100%',   // étire l'image pour couvrir toute la grille
             backgroundRepeat: 'no-repeat',
             backgroundColor: '#3a2d1a',    // fallback si image absente
+            imageRendering: 'pixelated',
           }}
         />
 

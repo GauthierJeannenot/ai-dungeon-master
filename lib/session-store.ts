@@ -2,12 +2,20 @@ import fs from 'fs/promises'
 import path from 'path'
 import { ConversationTurn, GameState, TurnTrace } from './types'
 import { logEvent, summarizeGameState } from './server-logger'
+import { isDatabaseEnabled } from './db'
+import * as dbSessions from './session-store-db'
+
+// Deux backends derrière la même API : Postgres (table game_sessions) quand
+// DATABASE_URL est définie, sinon fichiers JSON sous .data/sessions/.
 
 export const SESSION_SCHEMA_VERSION = 1
 
 export interface StoredGameSession {
   schemaVersion: 1
   sessionId: string
+  // "user:<id>" ou "guest:<id>" — créateur de la partie. undefined pour les
+  // sessions antérieures à ce champ ou créées hors monétisation.
+  ownerId?: string
   gameState: GameState
   history: ConversationTurn[]
   summaryContext?: string
@@ -38,6 +46,7 @@ function normalizeStoredSession(raw: unknown, requestedSessionId: string): Store
   return {
     schemaVersion: SESSION_SCHEMA_VERSION,
     sessionId: safeSessionId(record.sessionId ?? requestedSessionId),
+    ownerId: typeof record.ownerId === 'string' ? record.ownerId : undefined,
     gameState: record.gameState as GameState,
     history: Array.isArray(record.history) ? record.history : [],
     summaryContext: typeof record.summaryContext === 'string' ? record.summaryContext : undefined,
@@ -50,6 +59,10 @@ export async function loadSession(sessionId: string | undefined): Promise<Stored
   if (!sessionId?.trim()) {
     logEvent('debug', 'session.load.skipped', { reason: 'missing-session-id' })
     return null
+  }
+
+  if (isDatabaseEnabled()) {
+    return dbSessions.loadSession(sessionId)
   }
 
   try {
@@ -82,6 +95,10 @@ export async function saveSession(
   if (!sessionId?.trim()) {
     logEvent('debug', 'session.save.skipped', { reason: 'missing-session-id' })
     return
+  }
+
+  if (isDatabaseEnabled()) {
+    return dbSessions.saveSession(sessionId, data)
   }
 
   const dir = getSessionDir()
@@ -117,10 +134,36 @@ export async function saveSession(
   })
 }
 
+// Lecture brute du backend fichier (script d'import vers Postgres).
+export async function listFileSessions(): Promise<StoredGameSession[]> {
+  let files: string[]
+  try {
+    files = await fs.readdir(getSessionDir())
+  } catch {
+    return []
+  }
+  const sessions: StoredGameSession[] = []
+  for (const file of files) {
+    if (!file.endsWith('.json')) continue
+    try {
+      const raw = await fs.readFile(path.join(getSessionDir(), file), 'utf-8')
+      const session = normalizeStoredSession(JSON.parse(raw), file.replace(/\.json$/, ''))
+      if (session.gameState) sessions.push(session)
+    } catch (err) {
+      logEvent('warn', 'session.list.parse_error', { file, err })
+    }
+  }
+  return sessions
+}
+
 export async function deleteSession(sessionId: string | undefined): Promise<void> {
   if (!sessionId?.trim()) {
     logEvent('debug', 'session.delete.skipped', { reason: 'missing-session-id' })
     return
+  }
+
+  if (isDatabaseEnabled()) {
+    return dbSessions.deleteSession(sessionId)
   }
 
   try {

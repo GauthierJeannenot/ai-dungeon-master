@@ -1,12 +1,64 @@
 # AI Dungeon Master
 
-Application web de jeu de rôle D&D 5e avec un Dungeon Master IA (Claude) comme narrateur et arbitre de règles. Interface battlemap interactive avec chat latéral. Un serveur MCP TypeScript gère tous les calculs mécaniques.
+Application web de jeu de rôle D&D 5e avec un Dungeon Master IA (Claude) comme narrateur et arbitre de règles. Landing page avec choix de modules d'aventure, interface battlemap interactive avec chat latéral. Un serveur MCP TypeScript gère tous les calculs mécaniques.
 
 ## Stack
 
 - **Frontend** : Next.js 16, TypeScript, Tailwind CSS
-- **IA** : Anthropic SDK avec `claude-haiku-4-5`
+- **IA** : Anthropic SDK — Haiku 4.5 (classifieur d'intention) + Sonnet (narration)
 - **MCP** : `@modelcontextprotocol/sdk` — game engine déterministe
+- **Auth** : NextAuth v5 (OAuth 2.0 Google/GitHub) — sessions Postgres via
+  `@auth/pg-adapter`, ou JWT sans base
+- **Persistance** : Postgres (`DATABASE_URL`) pour auth, sessions de jeu et
+  crédits ; repli fichiers `.data/` sans DB
+- **Paiement** : Stripe Checkout + webhook (achat de tokens)
+
+## Base de données (production)
+
+Définir `DATABASE_URL` bascule TOUTE la persistance sur Postgres :
+
+| Donnée | Sans DATABASE_URL | Avec DATABASE_URL |
+|---|---|---|
+| Auth (users, comptes OAuth, sessions) | JWT (cookie signé, rien côté serveur) | Tables Auth.js (`users`, `accounts`, `sessions`) |
+| Sessions de jeu | `.data/sessions/*.json` | Table `game_sessions` (JSONB) |
+| Crédits & quota invité | `.data/credits/*.json` | Tables `user_credits`, `stripe_events`, `guest_usage` (SQL atomique, multi-instance safe) |
+
+```bash
+npm run db:migrate   # applique le schéma (idempotent — aussi fait au 1er accès)
+npm run db:import    # importe les données .data/ existantes vers Postgres
+```
+
+⚠️ En mode Postgres, l'identifiant utilisateur devient `users.id` (au lieu de
+`provider:accountId` en mode JWT) : les soldes acquis en mode JWT ne suivent
+pas automatiquement — voir l'en-tête de `scripts/db-import-file-stores.cjs`.
+`DATABASE_SSL=require` pour un Postgres managé exposé en TLS.
+
+## Monétisation
+
+- **Un token = un message envoyé au DM.** Le débit se fait côté serveur AVANT
+  l'appel LLM, avec remboursement automatique en cas d'erreur serveur.
+- **Visiteur anonyme** : `GUEST_MESSAGE_LIMIT` messages gratuits (5 par défaut)
+  sur *Grammy's Country Apple Pie*, suivis via un cookie invité httpOnly +
+  compteur serveur (`.data/credits/`).
+- **Utilisateur connecté** : solde de tokens (`SIGNUP_BONUS_TOKENS` offerts au
+  premier login) rechargeable via Stripe. Les packs sont définis dans
+  [lib/token-packages.ts](lib/token-packages.ts) ; le crédit est effectué par
+  le webhook `checkout.session.completed` (idempotent par event id).
+- Configuration Stripe : voir les commentaires `TO DO remplir les informations
+  bancaires pour le paiement` dans [.env.example](.env.example) et
+  [lib/stripe.ts](lib/stripe.ts).
+- `MONETIZATION_ENABLED=false` coupe le débit/quota (tests, dev hors runtime Next).
+
+## Battlemap
+
+`public/battlemap.png` est générée en pixel art, exactement alignée sur la
+grille de jeu (17×15 cases) et les zones de `lib/adventure-map.ts` :
+
+```bash
+node scripts/generate-battlemap.cjs
+```
+
+À relancer si les zones de salles changent.
 
 ## Prérequis
 
@@ -29,11 +81,28 @@ npm install
 ANTHROPIC_API_KEY=sk-ant-...
 ```
 
-### 2. Battlemap (optionnel)
+### 2. Authentification & paiements
 
-Placez votre image dans `/public/battlemap.png`. En l'absence du fichier, un fond sombre est affiché.
+```env
+AUTH_SECRET=...            # npx auth secret
+AUTH_GOOGLE_ID=...         # Google Cloud Console → OAuth credentials
+AUTH_GOOGLE_SECRET=...
+AUTH_GITHUB_ID=...         # GitHub → Settings → Developer settings → OAuth Apps
+AUTH_GITHUB_SECRET=...
+STRIPE_SECRET_KEY=...      # TO DO remplir les informations bancaires pour le paiement (dashboard Stripe)
+STRIPE_WEBHOOK_SECRET=...  # webhook checkout.session.completed → /api/stripe/webhook
+```
 
-### 3. Cout LLM et tests sans appels payants
+Sans clés Stripe, l'app fonctionne : les boutons d'achat affichent « paiements
+non configurés » et le reste (auth, quota invité, jeu) est opérationnel.
+
+### 3. Battlemap (générée)
+
+`/public/battlemap.png` est produite par `node scripts/generate-battlemap.cjs`
+(pixel art aligné sur la grille 17×15). Vous pouvez la remplacer par toute
+image respectant ce ratio ; en l'absence du fichier, un fond sombre est affiché.
+
+### 4. Cout LLM et tests sans appels payants
 
 Par defaut, l'application utilise le LLM en live. Pour tester les regles, les deplacements et la boucle de combat sans cout Anthropic :
 
@@ -83,7 +152,13 @@ node scripts/playtest.cjs --mode live --narration-mode quality --allow-paid --re
 
 Le playtest agrège appels LLM, cout estime, routes `none/short/rich/blocked`, source narrative, tools, violations de seuils, part de narrateur LLM et formulations robotiques interdites (`[Mock]`, coordonnees visibles, phrases generiques type "decor se replace"). Les seuils sont configurables via `PLAYTEST_MAX_COST_USD`, `PLAYTEST_MIN_LLM_NARRATOR_RATIO`, `PLAYTEST_MIN_DIRECTOR_LOCAL_RATIO`, `PLAYTEST_MAX_AVERAGE_LLM_CALLS` et `PLAYTEST_MAX_SIMPLE_TURN_LLM_CALLS`.
 
-### 4. Fichiers de contexte (optionnel)
+> ⚠️ L'estimateur de coût facture désormais chaque appel au tarif de SON modèle
+> (Haiku 1/5, Sonnet 3/15 $/MTok…) au lieu de tout facturer au tarif Haiku —
+> recalibrez `PLAYTEST_MAX_COST_USD` en conséquence. Analyse complète et pistes
+> d'optimisation (dont l'évaluation de headroom-ai) :
+> [docs/cost-optimization.md](docs/cost-optimization.md).
+
+### 5. Fichiers de contexte (optionnel)
 
 Les quatre fichiers dans `/context/` sont pré-remplis avec une aventure complète :
 
@@ -129,7 +204,7 @@ Le serveur MCP valide les règles critiques avant de muter l'état : tour couran
 
 ---
 
-## Déploiement (free tier)
+## Déploiement — Railway
 
 > ⚠️ **Vercel / Netlify non compatibles** — le serveur MCP tourne comme processus enfant persistant (stdio), incompatible avec les fonctions serverless.
 
@@ -138,60 +213,38 @@ Le serveur MCP valide les règles critiques avant de muter l'état : tour couran
 ```
 GitHub repo
     │
-    ├── Push sur main
+    ├── Push sur master
     │       │
-    │       ├── GitHub Actions CI → type-check + build
+    │       ├── GitHub Actions CI → type-check + tests + build
     │       │
-    │       └── Auto-deploy → Render Blueprint
+    │       └── Auto-deploy → Railway (service Node + Postgres)
     │
     └── Serveur persistant Node.js
             ├── Next.js (app + API routes)
-            └── MCP server (processus enfant, spawné par l'API)
+            ├── MCP server (processus enfant, spawné par l'API)
+            └── Postgres (auth, sessions de jeu, crédits)
 ```
 
----
+### Mise en place
 
-### Option A — Render (gratuit permanent)
+1. [railway.app](https://railway.app) → New Project → **Deploy from GitHub repo** (le `Dockerfile` est détecté, sinon build Nixpacks : `npm ci && npm run build` / `npm start`).
+2. Ajouter un service **PostgreSQL** au projet, puis référencer sa variable dans le service web : `DATABASE_URL=${{Postgres.DATABASE_URL}}`.
+3. Renseigner les variables du service web :
 
-**Avantages** : free tier sans limite de temps (750h/mois)  
-**Inconvénient** : mise en veille après 15 min d'inactivité (cold start ~30 sec)
-
-Chemin recommande pour une prod de test rapide: le fichier `render.yaml` est pret pour Render Blueprint, avec build Node 20, healthcheck, auto-deploy apres CI verte, `NARRATION_MODE=quality`, logs debug et sessions temporaires.
-
-#### 1. Créer le service
-
-1. Ouvre [render.com](https://render.com) → New → **Blueprint**
-2. Connecte ton repo GitHub
-3. Render détecte automatiquement `render.yaml` → configuration appliquée
-
-#### 2. Variables d'environnement
-
-Dans le dashboard Render → ton service → **Environment** :
 ```
-ANTHROPIC_API_KEY = sk-ant-ta-vraie-cle
+ANTHROPIC_API_KEY   = sk-ant-...          # clé réelle
+DATABASE_URL        = ${{Postgres.DATABASE_URL}}
+AUTH_SECRET         = <npx auth secret>
+AUTH_URL            = https://<votre-domaine-railway>
+AUTH_GOOGLE_ID / AUTH_GOOGLE_SECRET       # OAuth Google
+AUTH_GITHUB_ID / AUTH_GITHUB_SECRET       # OAuth GitHub
+STRIPE_SECRET_KEY / STRIPE_WEBHOOK_SECRET # paiements (optionnel au début)
+LLM_MODE            = live
+NARRATION_MODE      = quality
 ```
 
-Voir [docs/render-deploy.md](docs/render-deploy.md) pour les logs, limites du free tier et commandes de debug.
-
-#### 3. Auto-deploy
-
-Activé par défaut (`autoDeployTrigger: checksPass` dans `render.yaml`). Chaque push sur `master` redéploie après CI verte côté Render.
-
-Un workflow GitHub Actions `Deploy to Render` existe aussi comme bouton manuel dans l'onglet Actions. Pour qu'il déclenche réellement Render, crée un Deploy Hook dans Render et ajoute son URL dans le secret GitHub `RENDER_DEPLOY_HOOK_URL`. Il ne tourne pas après CI afin d'éviter un double déploiement avec le Blueprint Render.
-
----
-
-### Option B — Koyeb (free tier permanent, sans mise en veille)
-
-**Avantages** : 2 instances gratuites permanentes, pas de mise en veille  
-**Coût** : gratuit
-
-1. Ouvre [koyeb.com](https://koyeb.com) → Create App → **GitHub**
-2. Sélectionne ton repo
-3. Build command : `npm ci && npm run build`
-4. Start command : `npm start`
-5. Port : `3000`
-6. Variables : `ANTHROPIC_API_KEY`, `NODE_ENV=production`
+4. Premier déploiement : le schéma Postgres s'applique automatiquement au premier accès (ou `railway run npm run db:migrate`).
+5. Sécurité par défaut en production : `/api/debug/logs` exige un Bearer token (`APP_DEBUG_LOG_TOKEN`), les logs ne sont pas persistés sur disque, le rate-limit et le plafond journalier sont actifs (`DM_RATE_LIMIT_PER_MINUTE`, `DM_DAILY_GLOBAL_MESSAGE_LIMIT`).
 
 ---
 
@@ -218,7 +271,7 @@ Chaque onglet de navigateur possède son propre `sessionId`. L'état de jeu, l'h
 GAME_SESSION_STORE_DIR=/chemin/vers/sessions
 ```
 
-Cette persistance fichier permet de reprendre une partie apres redemarrage du processus Node tant que le stockage local est conserve. Sur un deploiement multi-instance ou avec disque ephemere, migrez cette interface vers Redis, Postgres ou un stockage equivalent.
+Cette persistance fichier permet de reprendre une partie apres redemarrage du processus Node tant que le stockage local est conserve. **Sur un deploiement multi-instance ou avec disque ephemere, definissez `DATABASE_URL`** : les sessions de jeu (ainsi que l'auth et les credits) basculent alors sur Postgres — voir la section « Base de données » plus haut.
 
 ### Logs de production
 
@@ -248,11 +301,11 @@ Les logs sont conserves a trois niveaux :
 - buffer memoire rapide, utile pendant que le process tourne
 - fichier JSONL local (`.data/logs/server.jsonl` en local, ou le chemin `APP_LOG_PERSIST_DIR` configure par l'hebergeur)
 
-Sans aucune configuration hebergeur/GitHub supplementaire, le navigateur garde aussi une boite noire de playtest dans `localStorage` et la republie au serveur via `/api/debug/client-logs`. Les entrees recentes restent dans le navigateur meme apres une sync reussie, afin qu'un simple refresh puisse les republier si Render ou une autre plateforme a perdu le buffer serveur. Apres un redeploiement, il suffit de rafraichir ou de rejouer depuis le meme navigateur pour revoir les dernieres actions sous l'evenement `client.blackbox.entry` dans `/api/debug/logs`.
+Sans aucune configuration hebergeur/GitHub supplementaire, le navigateur garde aussi une boite noire de playtest dans `localStorage` et la republie au serveur via `/api/debug/client-logs`. Les entrees recentes restent dans le navigateur meme apres une sync reussie, afin qu'un simple refresh puisse les republier si l'hebergeur a perdu le buffer serveur. Apres un redeploiement, il suffit de rafraichir ou de rejouer depuis le meme navigateur pour revoir les dernieres actions sous l'evenement `client.blackbox.entry` dans `/api/debug/logs`.
 
-Sur Render free, `render.yaml` force `APP_LOG_PERSIST_DIR=/tmp/ai-dm/logs`. Ce stockage reste ephemere; la boite noire navigateur aide a republier les derniers tours apres refresh/redeploy.
+En production, la persistance fichier des logs est coupee par defaut (stdout est capture par Railway) ; la boite noire navigateur aide a republier les derniers tours apres refresh/redeploy.
 
-Lecture via hebergeur : utilisez l'onglet Logs du service Render.
+Lecture via hebergeur : utilisez l'onglet Logs (Observability) du service Railway.
 
 Lecture via endpoint HTTP protege :
 
