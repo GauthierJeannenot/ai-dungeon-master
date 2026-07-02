@@ -50,6 +50,10 @@ process.env.APP_LOG_BUFFER_ENABLED = process.env.APP_LOG_BUFFER_ENABLED || 'fals
 process.env.APP_LOG_LEVEL = process.env.APP_LOG_LEVEL || 'error'
 process.env.APP_LOG_PERSIST_ENABLED = process.env.APP_LOG_PERSIST_ENABLED || 'false'
 process.env.GAME_SESSION_STORE_DIR = process.env.GAME_SESSION_STORE_DIR || sessionStoreDir
+// Harnais de mécaniques/coût hors runtime Next : pas de cookies() ni de
+// next-auth chargeable → on coupe la monétisation (le débit/quota est couvert
+// par tests/credits-store et abuse-guards).
+process.env.MONETIZATION_ENABLED = process.env.MONETIZATION_ENABLED || 'false'
 process.env.LLM_MODE = mode
 process.env.NARRATION_MODE = narrationMode
 process.env.AI_DM_TEST_DICE_SEQUENCE = process.env.AI_DM_TEST_DICE_SEQUENCE ||

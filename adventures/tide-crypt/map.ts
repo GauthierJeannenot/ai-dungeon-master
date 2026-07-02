@@ -1,5 +1,6 @@
 import type {
   AdventureRoom,
+  AdventureMapData,
   EncounterDefinition,
   AdventureNpcSpec,
   AdventureTransition,
@@ -221,4 +222,20 @@ export function describeTideCryptRoomHooks(roomId: string | null | undefined): s
   const hooks = TIDE_CRYPT_ROOM_HOOKS[roomId]
   if (!room || !hooks) return null
   return `Salle ${room.id} — ${room.name}\n${hooks}`
+}
+
+// Agrégat consommé par le registre lib/adventure-map.ts (getAdventureMap).
+// La crypte n'a pas d'alias de contexte dédiés → roomContextAliases vide (le
+// moteur retombe alors sur roomNavigationAliases).
+export const TIDE_CRYPT_MAP: AdventureMapData = {
+  rooms: TIDE_CRYPT_ROOMS,
+  entryCells: TIDE_CRYPT_ENTRY_CELLS,
+  encounters: TIDE_CRYPT_ENCOUNTERS,
+  npcs: TIDE_CRYPT_NPCS,
+  namedLocationCells: TIDE_CRYPT_NAMED_LOCATION_CELLS,
+  roomNavigationAliases: TIDE_CRYPT_ROOM_NAVIGATION_ALIASES,
+  roomContextAliases: [],
+  doorTransitions: TIDE_CRYPT_DOOR_TRANSITIONS,
+  forwardTransitions: TIDE_CRYPT_FORWARD_TRANSITIONS,
+  roomHooks: TIDE_CRYPT_ROOM_HOOKS,
 }

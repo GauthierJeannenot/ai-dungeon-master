@@ -14,6 +14,6 @@
     "declarationMap": true,
     "sourceMap": true
   },
-  "include": ["../mcp-server/**/*", "../lib/types.ts", "../lib/adventure-map.ts"],
+  "include": ["../mcp-server/**/*", "../lib/types.ts", "../lib/adventure-map.ts", "../adventures/**/*.ts"],
   "exclude": ["../node_modules", "../app", "../components", "./dist", "../mcp-server/dist"]
 }
