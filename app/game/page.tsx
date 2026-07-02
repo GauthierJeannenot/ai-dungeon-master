@@ -4,7 +4,8 @@ import { useState, useCallback, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import Chat from '@/components/Chat'
 import CombatTracker from '@/components/CombatTracker'
-import { GameState, ChatMessage, DMResponse, DMRequest, ConversationTurn, DMClientMeta, type DMTurnUsage } from '@/lib/types'
+import Link from 'next/link'
+import { GameState, ChatMessage, DMResponse, DMRequest, ConversationTurn, DMClientMeta, type DMQuota, type DMTurnUsage } from '@/lib/types'
 import { seedAdventureNpcs } from '@/lib/adventure-map'
 
 // Battlemap uses browser APIs — load client-only
@@ -343,6 +344,18 @@ async function syncClientDebugLog(sessionId: string): Promise<void> {
   writeClientDebugLog(readClientDebugLog())
 }
 
+// Libellé compact du quota dans la barre du haut : solde de tokens (connecté)
+// ou messages d'essai restants (anonyme).
+function quotaLabel(quota: DMQuota | null): { label: string; warning: boolean } | null {
+  if (!quota) return null
+  if (quota.kind === 'user') {
+    const balance = quota.balance ?? 0
+    return { label: `${balance} token${balance > 1 ? 's' : ''}`, warning: balance <= 3 }
+  }
+  const remaining = quota.remaining ?? 0
+  return { label: `essai ${remaining}/${quota.limit ?? remaining}`, warning: remaining <= 1 }
+}
+
 function phaseLabel(phase: GameState['phase']): { label: string; color: string } {
   switch (phase) {
     case 'combat': return { label: 'COMBAT', color: 'text-red-400' }
@@ -362,6 +375,23 @@ export default function GamePage() {
   // Résumé compressé des échanges anciens — stocké ici, renvoyé à chaque requête
   const [summaryContext, setSummaryContext] = useState<string | undefined>(undefined)
   const [budgetSummary, setBudgetSummary] = useState<ClientBudgetSummary>(emptyBudgetSummary)
+  const [quota, setQuota] = useState<DMQuota | null>(null)
+
+  // Charge l'état du compte (solde de tokens ou quota invité). Crée aussi le
+  // cookie invité et crédite le bonus de bienvenue au premier passage.
+  useEffect(() => {
+    fetch('/api/me')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (!data) return
+        if (data.authenticated) {
+          setQuota({ kind: 'user', balance: data.balance })
+        } else if (data.guest) {
+          setQuota({ kind: 'guest', remaining: data.guest.remaining, limit: data.guest.limit })
+        }
+      })
+      .catch(() => { /* affichage quota indisponible, le serveur reste l'arbitre */ })
+  }, [])
 
   // Restore the per-tab session after hydration. sessionStorage keeps refreshes coherent
   // while still isolating separate browser tabs from one another.
@@ -479,6 +509,8 @@ export default function GamePage() {
 
       if (!res.ok) {
         const data = await res.json()
+        // 402 = quota épuisé : le serveur renvoie l'état exact du compteur.
+        if (res.status === 402 && data.quota) setQuota(data.quota)
         throw new Error(data.error ?? `HTTP ${res.status}`)
       }
 
@@ -543,6 +575,10 @@ export default function GamePage() {
 
       if (data.usage) {
         setBudgetSummary(prev => addTurnUsage(prev, data.usage))
+      }
+
+      if (data.quota) {
+        setQuota(data.quota)
       }
 
       const newMessages: ChatMessage[] = []
@@ -640,6 +676,10 @@ export default function GamePage() {
   }, [gameState, isLoading, messages.length, sessionId])
 
   const { label: phaseText, color: phaseColor } = phaseLabel(gameState.phase)
+  const quotaInfo = quotaLabel(quota)
+  const quotaExhausted = quota
+    ? (quota.kind === 'user' ? (quota.balance ?? 0) <= 0 : (quota.remaining ?? 0) <= 0)
+    : false
   const alertLevel = gameState.sceneMemory?.alertLevel ?? 0
   const alertColor = alertLevel >= 4 ? 'text-red-300' : alertLevel >= 2 ? 'text-amber-300' : 'text-stone-300'
 
@@ -647,7 +687,9 @@ export default function GamePage() {
     <div className="flex flex-col h-screen bg-stone-950 text-stone-100 overflow-hidden">
       {/* Top bar */}
       <header className="flex-shrink-0 min-h-10 bg-stone-900 border-b border-amber-900/40 flex flex-wrap items-center px-3 sm:px-4 py-1 gap-2 sm:gap-4">
-        <span className="font-bold text-amber-500 tracking-wider text-xs sm:text-sm">⚔ AI DUNGEON MASTER</span>
+        <Link href="/" className="font-bold text-amber-500 hover:text-amber-400 tracking-wider text-xs sm:text-sm transition-colors" title="Retour à l'accueil">
+          ⚔ AI DUNGEON MASTER
+        </Link>
         <div className="hidden sm:block h-4 w-px bg-stone-700" />
         <span className={`text-xs font-mono font-bold ${phaseColor}`}>{phaseText}</span>
         <div className="hidden sm:block h-4 w-px bg-stone-700" />
@@ -660,6 +702,19 @@ export default function GamePage() {
           </span>/{gameState.player.hp.max}
         </span>
         <span className="text-[11px] sm:text-xs text-stone-500">CA: {gameState.player.ac}</span>
+        {quotaInfo && (
+          <Link
+            href="/"
+            title={quota?.kind === 'user' ? 'Tokens restants — acheter un pack' : "Messages d'essai restants — se connecter"}
+            className={`text-[11px] sm:text-xs font-mono border px-2 py-0.5 rounded transition-colors ${
+              quotaInfo.warning
+                ? 'text-red-300 border-red-800/60 bg-red-950/40 hover:bg-red-900/40'
+                : 'text-amber-300 border-amber-900/40 bg-stone-800 hover:bg-stone-700'
+            }`}
+          >
+            {quotaInfo.label}
+          </Link>
+        )}
         <button
           type="button"
           onClick={resetGame}
@@ -711,6 +766,16 @@ export default function GamePage() {
               <span className="min-w-0 text-right sm:col-auto">route {budgetSummary.lastLlmRoute}</span>
             </div>
           </div>
+          {quotaExhausted && (
+            <div className="flex-shrink-0 border border-red-800/60 bg-red-950/40 px-3 py-2 text-xs text-red-200">
+              {quota?.kind === 'user'
+                ? 'Solde de tokens épuisé — achetez un pack pour continuer l\'aventure.'
+                : "Messages d'essai gratuits épuisés — connectez-vous pour continuer à jouer."}{' '}
+              <Link href="/" className="underline text-amber-300 hover:text-amber-200">
+                {quota?.kind === 'user' ? 'Acheter des tokens' : 'Se connecter'}
+              </Link>
+            </div>
+          )}
           {gameState.phase === 'combat' && (
             <div className="flex-shrink-0">
               <CombatTracker gameState={gameState} />

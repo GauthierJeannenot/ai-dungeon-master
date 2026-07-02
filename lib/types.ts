@@ -532,6 +532,16 @@ export interface DMRequest {
   clientMeta?: DMClientMeta
 }
 
+// État de consommation renvoyé au client après chaque message.
+//   - user  : balance = tokens restants sur le compte
+//   - guest : remaining/limit = messages gratuits restants (anonyme)
+export interface DMQuota {
+  kind: 'user' | 'guest'
+  balance?: number
+  remaining?: number
+  limit?: number
+}
+
 export interface DMResponse {
   narrative: string
   newGameState: GameState
@@ -540,6 +550,7 @@ export interface DMResponse {
   debug?: DMDebugTurnView
   turnTrace?: TurnTrace
   usage?: DMTurnUsage
+  quota?: DMQuota
   // Nouveau résumé retourné si une compression a eu lieu pendant cette requête
   summaryContext?: string
   error?: string

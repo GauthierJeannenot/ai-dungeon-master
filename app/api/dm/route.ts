@@ -15,11 +15,25 @@ import {
 import {
   DMRequest,
   DMResponse,
+  DMQuota,
   GameState,
   GamePhase,
   ConversationTurn,
   DMTurnUsage,
 } from '@/lib/types'
+import {
+  consumeUserCredit,
+  consumeGuestMessage,
+  refundUserCredit,
+  refundGuestMessage,
+  GUEST_MESSAGE_LIMIT,
+} from '@/lib/credits-store'
+
+// Monétisation active par défaut. MONETIZATION_ENABLED=false ne sert qu'aux
+// tests/dev hors runtime Next : le harnais Node ne fournit ni le contexte
+// cookies() ni le chargement ESM de next-auth — d'où l'import paresseux de
+// lib/entitlements plus bas, jamais exécuté quand la monétisation est coupée.
+const MONETIZATION_ENABLED = process.env.MONETIZATION_ENABLED !== 'false'
 
 // Route longue à cause de la boucle agentique tool-use.
 export const maxDuration = 60
@@ -859,6 +873,41 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Message requis' }, { status: 400 })
   }
 
+  // ── Monétisation : débit AVANT le travail LLM, remboursement si erreur ──────
+  // Connecté → 1 token de son solde. Anonyme → 1 des GUEST_MESSAGE_LIMIT
+  // messages gratuits (suivis côté serveur par cookie invité httpOnly).
+  let quota: DMQuota | undefined
+  let debited: { kind: 'user'; userId: string } | { kind: 'guest'; guestId: string } | null = null
+
+  if (MONETIZATION_ENABLED) {
+    // Import paresseux : lib/entitlements tire next-auth + next/headers, qui
+    // n'existent que dans le runtime Next (voir MONETIZATION_ENABLED ci-dessus).
+    const { resolveEntitlement } = await import('@/lib/entitlements')
+    const entitlement = await resolveEntitlement()
+
+    if (entitlement.kind === 'user') {
+      const debit = await consumeUserCredit(entitlement.userId)
+      if (!debit.ok) {
+        return NextResponse.json({
+          error: 'Solde de tokens épuisé. Achetez un pack pour continuer l\'aventure.',
+          quota: { kind: 'user', balance: 0 } satisfies DMQuota,
+        }, { status: 402 })
+      }
+      debited = { kind: 'user', userId: entitlement.userId }
+      quota = { kind: 'user', balance: debit.balance }
+    } else {
+      const debit = await consumeGuestMessage(entitlement.guestId)
+      if (!debit.ok) {
+        return NextResponse.json({
+          error: `Les ${GUEST_MESSAGE_LIMIT} messages d'essai gratuits sont épuisés. Connectez-vous pour continuer à jouer.`,
+          quota: { kind: 'guest', remaining: 0, limit: GUEST_MESSAGE_LIMIT } satisfies DMQuota,
+        }, { status: 402 })
+      }
+      debited = { kind: 'guest', guestId: entitlement.guestId }
+      quota = { kind: 'guest', remaining: debit.remaining, limit: GUEST_MESSAGE_LIMIT }
+    }
+  }
+
   const releaseLock = await acquireSessionLock(sessionId)
   const usageLog: AnthropicUsageLogEntry[] = []
 
@@ -1160,11 +1209,26 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       newGameState: currentGameState,
       toolsUsed: [...new Set(toolsUsed)],
       usage,
+      quota,
       ...(processedHistory.compressed && summaryContext ? { summaryContext } : {}),
     }
 
     return NextResponse.json(dmResponse)
   } catch (err) {
+    // Erreur serveur : le joueur ne paie pas — on rembourse le débit initial.
+    try {
+      if (debited?.kind === 'user') {
+        await refundUserCredit(debited.userId)
+      } else if (debited?.kind === 'guest') {
+        await refundGuestMessage(debited.guestId)
+      }
+    } catch (refundErr) {
+      logEvent('error', 'dm.request.refund_failed', {
+        requestId,
+        sessionId,
+        err: refundErr instanceof Error ? refundErr.message : String(refundErr),
+      })
+    }
     logEvent('error', 'dm.request.error', {
       requestId,
       sessionId,

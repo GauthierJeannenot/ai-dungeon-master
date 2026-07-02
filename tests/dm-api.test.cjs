@@ -15,6 +15,10 @@ process.env.APP_LOG_LEVEL = 'error'
 process.env.APP_LOG_PERSIST_ENABLED = 'false'
 process.env.GAME_SESSION_STORE_DIR = sessionStoreDir
 process.env.LLM_MODE = 'mock'
+// Hors runtime Next : pas de cookies() ni de next-auth chargeable — on coupe
+// la monetisation (le debit/quota est couvert par tests/credits-store.test.cjs).
+process.env.MONETIZATION_ENABLED = 'false'
+delete process.env.DATABASE_URL // force le backend fichier
 
 function installTsRequireWithAliases() {
   const previousTs = Module._extensions['.ts']

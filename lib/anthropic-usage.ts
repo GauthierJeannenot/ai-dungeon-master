@@ -40,12 +40,30 @@ export interface AnthropicUsageLogEntry extends AnthropicUsageLogContext {
   metadata?: Record<string, unknown>
 }
 
-const HAIKU_4_5_PRICE_PER_MTOK_USD = {
-  input: 1,
-  output: 5,
-  cacheWrite5m: 1.25,
-  cacheWrite1h: 2,
-  cacheRead: 0.1,
+interface ModelPricePerMTokUsd {
+  input: number
+  output: number
+  cacheWrite5m: number
+  cacheWrite1h: number
+  cacheRead: number
+}
+
+// Tarifs par MTok (USD). Cache : écriture 5m = 1,25× input, 1h = 2× input,
+// lecture = 0,1× input. Détection par sous-chaîne du model id — le pipeline
+// mélange Haiku (planner/compression) et Sonnet (narration), qui coûte 3× plus
+// cher en input et en output : facturer tout au tarif Haiku sous-estimait le
+// coût réel d'un facteur ~3-5.
+const MODEL_PRICES_PER_MTOK_USD: Array<{ match: RegExp; prices: ModelPricePerMTokUsd }> = [
+  { match: /haiku/, prices: { input: 1, output: 5, cacheWrite5m: 1.25, cacheWrite1h: 2, cacheRead: 0.1 } },
+  { match: /sonnet/, prices: { input: 3, output: 15, cacheWrite5m: 3.75, cacheWrite1h: 6, cacheRead: 0.3 } },
+  { match: /opus/, prices: { input: 5, output: 25, cacheWrite5m: 6.25, cacheWrite1h: 10, cacheRead: 0.5 } },
+]
+
+// Modèle inconnu : tarif Sonnet (défaut du DM) plutôt que le moins cher.
+const DEFAULT_PRICES = MODEL_PRICES_PER_MTOK_USD[1].prices
+
+function pricesForModel(model: string): ModelPricePerMTokUsd {
+  return MODEL_PRICES_PER_MTOK_USD.find(entry => entry.match.test(model))?.prices ?? DEFAULT_PRICES
 }
 
 function tokenCount(value: number | null | undefined): number {
@@ -56,7 +74,8 @@ function roundUsd(value: number): number {
   return Number(value.toFixed(8))
 }
 
-function estimateHaiku45CostUsd(usage: AnthropicUsage): number {
+function estimateModelCostUsd(model: string, usage: AnthropicUsage): number {
+  const prices = pricesForModel(model)
   const inputTokens = tokenCount(usage.input_tokens)
   const outputTokens = tokenCount(usage.output_tokens)
   const cacheReadInputTokens = tokenCount(usage.cache_read_input_tokens)
@@ -70,11 +89,11 @@ function estimateHaiku45CostUsd(usage: AnthropicUsage): number {
   )
 
   const cost =
-    (inputTokens * HAIKU_4_5_PRICE_PER_MTOK_USD.input) +
-    (outputTokens * HAIKU_4_5_PRICE_PER_MTOK_USD.output) +
-    ((cacheCreation5mInputTokens + unclassifiedCacheCreationTokens) * HAIKU_4_5_PRICE_PER_MTOK_USD.cacheWrite5m) +
-    (cacheCreation1hInputTokens * HAIKU_4_5_PRICE_PER_MTOK_USD.cacheWrite1h) +
-    (cacheReadInputTokens * HAIKU_4_5_PRICE_PER_MTOK_USD.cacheRead)
+    (inputTokens * prices.input) +
+    (outputTokens * prices.output) +
+    ((cacheCreation5mInputTokens + unclassifiedCacheCreationTokens) * prices.cacheWrite5m) +
+    (cacheCreation1hInputTokens * prices.cacheWrite1h) +
+    (cacheReadInputTokens * prices.cacheRead)
 
   return roundUsd(cost / 1_000_000)
 }
@@ -121,7 +140,7 @@ export function logAnthropicUsage({
     cacheCreation1hInputTokens,
     cacheReadInputTokens,
     totalInputTokens: inputTokens + cacheCreationInputTokens + cacheReadInputTokens,
-    estimatedCostUsd: estimateHaiku45CostUsd(usage),
+    estimatedCostUsd: estimateModelCostUsd(model, usage),
     stopReason,
     serviceTier: usage.service_tier,
     inferenceGeo: usage.inference_geo,

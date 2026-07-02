@@ -1,12 +1,64 @@
 # AI Dungeon Master
 
-Application web de jeu de rôle D&D 5e avec un Dungeon Master IA (Claude) comme narrateur et arbitre de règles. Interface battlemap interactive avec chat latéral. Un serveur MCP TypeScript gère tous les calculs mécaniques.
+Application web de jeu de rôle D&D 5e avec un Dungeon Master IA (Claude) comme narrateur et arbitre de règles. Landing page avec choix de modules d'aventure, interface battlemap interactive avec chat latéral. Un serveur MCP TypeScript gère tous les calculs mécaniques.
 
 ## Stack
 
 - **Frontend** : Next.js 16, TypeScript, Tailwind CSS
-- **IA** : Anthropic SDK avec `claude-haiku-4-5`
+- **IA** : Anthropic SDK — Haiku 4.5 (classifieur d'intention) + Sonnet (narration)
 - **MCP** : `@modelcontextprotocol/sdk` — game engine déterministe
+- **Auth** : NextAuth v5 (OAuth 2.0 Google/GitHub) — sessions Postgres via
+  `@auth/pg-adapter`, ou JWT sans base
+- **Persistance** : Postgres (`DATABASE_URL`) pour auth, sessions de jeu et
+  crédits ; repli fichiers `.data/` sans DB
+- **Paiement** : Stripe Checkout + webhook (achat de tokens)
+
+## Base de données (production)
+
+Définir `DATABASE_URL` bascule TOUTE la persistance sur Postgres :
+
+| Donnée | Sans DATABASE_URL | Avec DATABASE_URL |
+|---|---|---|
+| Auth (users, comptes OAuth, sessions) | JWT (cookie signé, rien côté serveur) | Tables Auth.js (`users`, `accounts`, `sessions`) |
+| Sessions de jeu | `.data/sessions/*.json` | Table `game_sessions` (JSONB) |
+| Crédits & quota invité | `.data/credits/*.json` | Tables `user_credits`, `stripe_events`, `guest_usage` (SQL atomique, multi-instance safe) |
+
+```bash
+npm run db:migrate   # applique le schéma (idempotent — aussi fait au 1er accès)
+npm run db:import    # importe les données .data/ existantes vers Postgres
+```
+
+⚠️ En mode Postgres, l'identifiant utilisateur devient `users.id` (au lieu de
+`provider:accountId` en mode JWT) : les soldes acquis en mode JWT ne suivent
+pas automatiquement — voir l'en-tête de `scripts/db-import-file-stores.cjs`.
+`DATABASE_SSL=require` pour un Postgres managé exposé en TLS.
+
+## Monétisation
+
+- **Un token = un message envoyé au DM.** Le débit se fait côté serveur AVANT
+  l'appel LLM, avec remboursement automatique en cas d'erreur serveur.
+- **Visiteur anonyme** : `GUEST_MESSAGE_LIMIT` messages gratuits (5 par défaut)
+  sur *Grammy's Country Apple Pie*, suivis via un cookie invité httpOnly +
+  compteur serveur (`.data/credits/`).
+- **Utilisateur connecté** : solde de tokens (`SIGNUP_BONUS_TOKENS` offerts au
+  premier login) rechargeable via Stripe. Les packs sont définis dans
+  [lib/token-packages.ts](lib/token-packages.ts) ; le crédit est effectué par
+  le webhook `checkout.session.completed` (idempotent par event id).
+- Configuration Stripe : voir les commentaires `TO DO remplir les informations
+  bancaires pour le paiement` dans [.env.example](.env.example) et
+  [lib/stripe.ts](lib/stripe.ts).
+- `MONETIZATION_ENABLED=false` coupe le débit/quota (tests, dev hors runtime Next).
+
+## Battlemap
+
+`public/battlemap.png` est générée en pixel art, exactement alignée sur la
+grille de jeu (17×15 cases) et les zones de `lib/adventure-map.ts` :
+
+```bash
+node scripts/generate-battlemap.cjs
+```
+
+À relancer si les zones de salles changent.
 
 ## Prérequis
 
@@ -29,11 +81,28 @@ npm install
 ANTHROPIC_API_KEY=sk-ant-...
 ```
 
-### 2. Battlemap (optionnel)
+### 2. Authentification & paiements
 
-Placez votre image dans `/public/battlemap.png`. En l'absence du fichier, un fond sombre est affiché.
+```env
+AUTH_SECRET=...            # npx auth secret
+AUTH_GOOGLE_ID=...         # Google Cloud Console → OAuth credentials
+AUTH_GOOGLE_SECRET=...
+AUTH_GITHUB_ID=...         # GitHub → Settings → Developer settings → OAuth Apps
+AUTH_GITHUB_SECRET=...
+STRIPE_SECRET_KEY=...      # TO DO remplir les informations bancaires pour le paiement (dashboard Stripe)
+STRIPE_WEBHOOK_SECRET=...  # webhook checkout.session.completed → /api/stripe/webhook
+```
 
-### 3. Cout LLM et tests sans appels payants
+Sans clés Stripe, l'app fonctionne : les boutons d'achat affichent « paiements
+non configurés » et le reste (auth, quota invité, jeu) est opérationnel.
+
+### 3. Battlemap (générée)
+
+`/public/battlemap.png` est produite par `node scripts/generate-battlemap.cjs`
+(pixel art aligné sur la grille 17×15). Vous pouvez la remplacer par toute
+image respectant ce ratio ; en l'absence du fichier, un fond sombre est affiché.
+
+### 4. Cout LLM et tests sans appels payants
 
 Par defaut, l'application utilise le LLM en live. Pour tester les regles, les deplacements et la boucle de combat sans cout Anthropic :
 
@@ -83,7 +152,13 @@ node scripts/playtest.cjs --mode live --narration-mode quality --allow-paid --re
 
 Le playtest agrège appels LLM, cout estime, routes `none/short/rich/blocked`, source narrative, tools, violations de seuils, part de narrateur LLM et formulations robotiques interdites (`[Mock]`, coordonnees visibles, phrases generiques type "decor se replace"). Les seuils sont configurables via `PLAYTEST_MAX_COST_USD`, `PLAYTEST_MIN_LLM_NARRATOR_RATIO`, `PLAYTEST_MIN_DIRECTOR_LOCAL_RATIO`, `PLAYTEST_MAX_AVERAGE_LLM_CALLS` et `PLAYTEST_MAX_SIMPLE_TURN_LLM_CALLS`.
 
-### 4. Fichiers de contexte (optionnel)
+> ⚠️ L'estimateur de coût facture désormais chaque appel au tarif de SON modèle
+> (Haiku 1/5, Sonnet 3/15 $/MTok…) au lieu de tout facturer au tarif Haiku —
+> recalibrez `PLAYTEST_MAX_COST_USD` en conséquence. Analyse complète et pistes
+> d'optimisation (dont l'évaluation de headroom-ai) :
+> [docs/cost-optimization.md](docs/cost-optimization.md).
+
+### 5. Fichiers de contexte (optionnel)
 
 Les quatre fichiers dans `/context/` sont pré-remplis avec une aventure complète :
 
@@ -218,7 +293,7 @@ Chaque onglet de navigateur possède son propre `sessionId`. L'état de jeu, l'h
 GAME_SESSION_STORE_DIR=/chemin/vers/sessions
 ```
 
-Cette persistance fichier permet de reprendre une partie apres redemarrage du processus Node tant que le stockage local est conserve. Sur un deploiement multi-instance ou avec disque ephemere, migrez cette interface vers Redis, Postgres ou un stockage equivalent.
+Cette persistance fichier permet de reprendre une partie apres redemarrage du processus Node tant que le stockage local est conserve. **Sur un deploiement multi-instance ou avec disque ephemere, definissez `DATABASE_URL`** : les sessions de jeu (ainsi que l'auth et les credits) basculent alors sur Postgres — voir la section « Base de données » plus haut.
 
 ### Logs de production
 
