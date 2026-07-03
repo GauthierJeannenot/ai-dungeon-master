@@ -151,7 +151,7 @@ export default async function LandingPage() {
           <p className="text-sm text-stone-500 mb-6">
             Un token = un message envoyé au Dungeon Master. Les nouveaux comptes reçoivent
             des tokens de bienvenue ; les visiteurs anonymes disposent de {GUEST_MESSAGE_LIMIT} messages
-            d&apos;essai sur Grammy&apos;s Country Apple Pie.
+            d&apos;essai, quel que soit le module.
           </p>
           <BuyTokensPanel
             authenticated={Boolean(session?.userId)}

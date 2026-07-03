@@ -18,7 +18,7 @@ function generateId(): string {
 }
 
 // Clés sessionStorage préfixées par module : changer d'aventure dans le même
-// onglet isole les états (une partie Grammy's et une partie Crypte coexistent).
+// onglet isole les états (deux parties de modules différents coexistent).
 interface SessionKeys {
   sessionId: string
   gameState: string
@@ -831,6 +831,7 @@ function GameView({ adventure, resumeSessionId }: { adventure: AdventureDefiniti
               onInputChange={setInputValue}
               onClientEvent={logClientEvent}
               placeholders={adventure.chatPlaceholders}
+              roomStatusHints={adventure.roomStatusHints}
             />
           </div>
         </div>
