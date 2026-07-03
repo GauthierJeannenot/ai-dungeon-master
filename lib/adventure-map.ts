@@ -69,6 +69,7 @@ export interface AdventureMapData {
   roomHooks: Record<string, string>
 }
 
+<<<<<<< Updated upstream
 // ── Registre des cartes de module ────────────────────────────────────────────
 // Couche « données », importable à la fois par l'app Next et par le serveur MCP
 // (mcp-server compile lib/adventure-map.ts + adventures/**). La couche « module
@@ -95,6 +96,55 @@ export function isKnownAdventureId(adventureId: string | null | undefined): bool
 // ── Accesseurs paramétrés par adventureId (défaut = module par défaut) ────────
 // Les signatures gardent l'adventureId en DERNIER argument optionnel : tous les
 // call-sites historiques (un seul argument) restent valides.
+=======
+// PNJ scénarisés du module, rendus par leur propre token sur la battlemap.
+// visibleFromStart=false → présents mais cachés tant qu'ils ne se sont pas révélés
+// (le DM appelle reveal_npc). Mac est dans la même zone que le joueur (salle 1) donc
+// visible d'emblée ; les dryades du verger (salle 2) restent cachées jusqu'à offrande
+// ou réussite sociale.
+export const ADVENTURE_NPCS: AdventureNpcSpec[] = [
+  {
+    id: 'mac',
+    name: 'Mac',
+    kind: 'awakened_tree',
+    roomId: '1',
+    cell: { x: 3, y: 13 },
+    disposition: 'neutral',
+    visibleFromStart: true,
+    description: 'Grand pommier animé (tréant), gardien bougon de la cour.',
+  },
+  {
+    id: 'dryad_1',
+    name: 'Dryade',
+    kind: 'dryad',
+    roomId: '2',
+    cell: { x: 3, y: 1 },
+    disposition: 'wary',
+    visibleFromStart: false,
+    description: 'Esprit malicieux du verger, caché dans les pommiers.',
+  },
+  {
+    id: 'dryad_2',
+    name: 'Dryade',
+    kind: 'dryad',
+    roomId: '2',
+    cell: { x: 8, y: 1 },
+    disposition: 'wary',
+    visibleFromStart: false,
+    description: 'Esprit malicieux du verger, caché dans les pommiers.',
+  },
+  {
+    id: 'dryad_3',
+    name: 'Dryade',
+    kind: 'dryad',
+    roomId: '2',
+    cell: { x: 13, y: 1 },
+    disposition: 'wary',
+    visibleFromStart: false,
+    description: 'Esprit malicieux du verger, caché dans les pommiers.',
+  },
+]
+>>>>>>> Stashed changes
 
 // Construit l'état initial des PNJ pour une nouvelle partie (id -> NpcState).
 export function seedAdventureNpcs(adventureId?: string): Record<string, NpcState> {

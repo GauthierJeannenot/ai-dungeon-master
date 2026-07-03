@@ -132,7 +132,11 @@ export default function Battlemap({
         <div
           className="absolute inset-0"
           style={{
+<<<<<<< Updated upstream
             backgroundImage: `url(${image})`,
+=======
+            backgroundImage: 'url(/battlemaps/grammys_bakery.png)',
+>>>>>>> Stashed changes
             backgroundSize: '100% 100%',   // étire l'image pour couvrir toute la grille
             backgroundRepeat: 'no-repeat',
             backgroundColor: '#3a2d1a',    // fallback si image absente
