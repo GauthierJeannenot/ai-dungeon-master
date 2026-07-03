@@ -1,14 +1,16 @@
 import { getAdventureMap, DEFAULT_ADVENTURE_ID, type AdventureMapData } from './adventure-map'
+import { GRAMMYS_CONTENT } from '../adventures/grammys-country-apple-pie/definition'
+import { TIDE_CRYPT_CONTENT } from '../adventures/tide-crypt/definition'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Registre des modules d'aventure. Deux niveaux :
-//   - AdventureModule : métadonnées de la landing (titre, pitch, disponibilité).
-//   - AdventureDefinition : le module COMPLET côté app (landing + contexte,
-//     battlemap, état initial, welcome, placeholders, carte moteur).
+// Registre des modules d'aventure — pur AGRÉGATEUR.
 //
-// La couche « carte/moteur » (rooms, encounters, npcs…) vit dans
-// lib/adventure-map.ts + adventures/<id>/map.ts et est aussi importable par le
-// serveur MCP. Ce fichier-ci n'est utilisé que côté app/frontend.
+// Le contenu propre à chaque module (meta landing, welcome, placeholders,
+// indices de statut, vocabulaire des prompts) vit dans adventures/<id>/
+// definition.ts. La couche « carte/moteur » (rooms, encounters, npcs…) vit dans
+// lib/adventure-map.ts + adventures/<id>/map.ts (aussi importable par le serveur
+// MCP). Ce fichier ne fait que fusionner les deux avec l'« exploitation »
+// (disponibilité + chemin de jeu) et exposer les accesseurs côté app.
 //
 // Pour ajouter un module : voir la checklist du README (« Ajouter un module »).
 // ─────────────────────────────────────────────────────────────────────────────
@@ -17,24 +19,37 @@ export { DEFAULT_ADVENTURE_ID }
 
 export type AdventureAccent = 'amber' | 'emerald' | 'purple'
 
-export interface AdventureModule {
+// Vocabulaire du module injecté dans les prompts DM (prompts.ts + planner.ts) à
+// la place de valeurs en dur : garde les prompts d'un module exempts du
+// vocabulaire d'un autre. Voir docs/adventure-content-consolidation.md.
+export interface AdventurePromptGuidance {
+  /** Exemple d'intention de déplacement propre au module (« je vais au verger »). */
+  movementExample: string
+  /** Lieux nommés du module, en une liste lisible (« verger, tas de déchets, … »). */
+  namedPlaces: string
+  /** PNJ visible dès le départ, exemple pour la règle des tokens (« Mac dès le départ »). */
+  visibleNpcExample: string
+  /** PNJ non hostiles que run_monster_turns ignore (« Mac le Tréant, la dryade… »). */
+  nonHostileNpcs: string
+  /** 4-6 exemples « message → décision » pour le classifieur, dont un reveal_npc du module. */
+  plannerExamples: string[]
+  /** Exemple de marqueur reveal_npc du module (« reveal_npc:dryad » / « reveal_npc:ghost »). */
+  revealNpcKindExample: string
+}
+
+// Contenu APP d'un module (adventures/<id>/definition.ts). Ne contient que du
+// contenu propre au module — ni la carte moteur, ni l'exploitation (available,
+// playPath), ajoutées par le registre ci-dessous.
+export interface AdventureContent {
   id: string
   title: string
   tagline: string
   description: string
   level: string
   duration: string
-  available: boolean
-  /** Chemin de la page de jeu pour ce module. */
-  playPath?: string
   /** Accent visuel de la carte sur la landing. */
   accent: AdventureAccent
-}
-
-export interface AdventureDefinition extends AdventureModule {
-  /** Dossier des fichiers de contexte markdown (adventures/<id>). */
-  contextDir: string
-  /** Image de battlemap servie (public/…). */
+  /** Image de battlemap servie (public/battlemaps/<id>.png). */
   battlemapImage: string
   /** Dimensions de la grille (17×15 pour les deux modules actuels). */
   grid: { cols: number; rows: number }
@@ -42,85 +57,41 @@ export interface AdventureDefinition extends AdventureModule {
   welcomeMessage: string
   /** Placeholders du champ de saisie par salle (clé 'default' = repli). */
   chatPlaceholders?: Record<string, string[]>
+  /** Indices de statut par salle (ligne au-dessus du champ, hors combat). */
+  roomStatusHints?: Record<string, string>
+  /** Vocabulaire injecté dans les prompts DM. */
+  promptGuidance: AdventurePromptGuidance
+}
+
+// Module COMPLET côté app : contenu + exploitation + carte moteur.
+export interface AdventureDefinition extends AdventureContent {
+  available: boolean
+  /** Chemin de la page de jeu pour ce module. */
+  playPath?: string
+  /** Dossier des fichiers de contexte markdown (adventures/<id>). */
+  contextDir: string
   /** Carte moteur du module (rooms, encounters, npcs, hooks, startCell…). */
   map: AdventureMapData
 }
 
-const GRAMMYS_WELCOME =
-  "Le vieux sorcier Tyndareus le Vert t'a engagé pour une mission singulière : retrouver la recette secrète des célèbres tartes aux pommes de Grammy. Après des jours de route, te voici enfin devant la vieille boulangerie, abandonnée depuis longtemps et, dit-on, infestée de gobelins. L'odeur des pommes du verger flotte encore dans l'air, et la porte entrebâillée t'invite à entrer. Que fais-tu ?"
-
-const TIDE_CRYPT_WELCOME =
-  "Le phare de Kerlouan s'est éteint il y a trois nuits, et déjà les navires manquent la passe. Maël, le vieux gardien, t'attend sur la grève, une lanterne sourde à la main. La lune noire a tiré la mer si loin qu'une chaussée de pierres, d'ordinaire noyée, s'enfonce à découvert vers un escalier sombre. « La Flamme dort là-dessous, gamin », murmure-t-il. « Va la chercher. Poliment, si tu tiens à remonter. » Que fais-tu ?"
-
-// Placeholders du chat par salle (repris de components/Chat.tsx pour Grammy's).
-const GRAMMYS_PLACEHOLDERS: Record<string, string[]> = {
-  default: [
-    "Fouiller les comptoirs, écouter derrière une porte, suivre l'odeur de cannelle...",
-    'Avancer prudemment, tenter un plan bancal, faire confiance au nez...',
-  ],
-  '1': [
-    "Amadouer l'arbre, forcer la porte, accuser une pomme d'espionnage...",
-    "Inspecter l'écorce, toquer à la porte, flairer le piège à tarte...",
-  ],
-  '8': [
-    'Négocier avec Grukk, lever le bouclier, demander qui tient la recette...',
-    'Observer les gobelins, chercher une sortie, parler plus fort que le danger...',
-  ],
+// Disponibilité par module — « exploitation », pas du contenu : un module peut
+// être présent dans le registre mais verrouillé (placeholder landing).
+const AVAILABILITY: Record<string, boolean> = {
+  'grammys-country-apple-pie': true,
+  'tide-crypt': true,
 }
 
-const TIDE_CRYPT_PLACEHOLDERS: Record<string, string[]> = {
-  default: [
-    'Sonder la laisse de mer, guetter la marée, écouter la crypte respirer...',
-    "Avancer sur la chaussée, prier les morts, chercher l'indice qui apaise...",
-  ],
-  '1': [
-    'Interroger Maël, fouiller le varech, jauger la chaussée découverte...',
-    'Demander le rythme des cloches, ramasser un débris, flairer le sel...',
-  ],
-  '8': [
-    'Offrir le médaillon, nommer Morgane, demander la Flamme sans la voler...',
-    "Saluer le Gardien, chercher l'Écho, tendre une main plutôt qu'une lame...",
-  ],
+function toDefinition(content: AdventureContent): AdventureDefinition {
+  return {
+    ...content,
+    available: AVAILABILITY[content.id] ?? false,
+    playPath: `/game?adventure=${content.id}`,
+    contextDir: `adventures/${content.id}`,
+    map: getAdventureMap(content.id),
+  }
 }
 
-export const ADVENTURES: AdventureDefinition[] = [
-  {
-    id: 'grammys-country-apple-pie',
-    title: "Grammy's Country Apple Pie",
-    tagline: 'La recette perdue de la meilleure tarte du royaume',
-    description:
-      "La boulangerie de Grammy est abandonnée — et infestée de gobelins. Le sorcier Tyndareus le Vert t'engage pour retrouver la recette secrète de ses légendaires tartes aux pommes. Verger enchanté, dryades susceptibles, tréant bougon et Chef Grukk t'attendent.",
-    level: 'Niveau 1 · D&D 5e',
-    duration: '~1-2 h',
-    available: true,
-    playPath: '/game?adventure=grammys-country-apple-pie',
-    accent: 'amber',
-    contextDir: 'adventures/grammys-country-apple-pie',
-    battlemapImage: '/battlemap.png',
-    grid: { cols: 17, rows: 15 },
-    welcomeMessage: GRAMMYS_WELCOME,
-    chatPlaceholders: GRAMMYS_PLACEHOLDERS,
-    map: getAdventureMap('grammys-country-apple-pie'),
-  },
-  {
-    id: 'tide-crypt',
-    title: 'La Crypte des Marées',
-    tagline: 'La Flamme du phare dort dans un tombeau que la mer découvre',
-    description:
-      "Le phare de Kerlouan s'est éteint et les navires manquent la passe. À la lune noire, la marée dénude une chaussée de pierres qui descend vers la crypte de Morgane, première Gardienne des Marées. Ses marins morts veillent encore — rapportez la Flamme, poliment si possible.",
-    level: 'Niveau 2 · D&D 5e',
-    duration: '~2-3 h',
-    available: true,
-    playPath: '/game?adventure=tide-crypt',
-    accent: 'purple',
-    contextDir: 'adventures/tide-crypt',
-    battlemapImage: '/battlemaps/tide-crypt.png',
-    grid: { cols: 17, rows: 15 },
-    welcomeMessage: TIDE_CRYPT_WELCOME,
-    chatPlaceholders: TIDE_CRYPT_PLACEHOLDERS,
-    map: getAdventureMap('tide-crypt'),
-  },
-]
+export const ADVENTURES: AdventureDefinition[] = [GRAMMYS_CONTENT, TIDE_CRYPT_CONTENT].map(toDefinition)
 
 export function getAdventure(id: string | null | undefined): AdventureDefinition | null {
   if (!id) return null

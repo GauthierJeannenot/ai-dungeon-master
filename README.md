@@ -23,17 +23,18 @@ paramétrés par `adventureId`.
 |---|---|
 | Données de carte (rooms, rencontres, PNJ, hooks, startCell, joueur) | `adventures/<id>/map.ts` + registre `lib/adventure-map.ts` (importable par le moteur MCP) |
 | Contexte narratif (markdown) | `adventures/<id>/*.md`, chargé par `lib/context-loader.ts` (repli sur le module par défaut pour les règles génériques) |
-| Définition app (landing, welcome, battlemap, placeholders) | `lib/adventures.ts` (`AdventureDefinition`) |
-| Battlemap pixel art | `public/battlemaps/<id>.png` (Grammy's : `public/battlemap.png`) |
+| Contenu app (landing, welcome, battlemap, placeholders, prompts) | `adventures/<id>/definition.ts` (`AdventureContent`), agrégé par `lib/adventures.ts` |
+| Battlemap pixel art | `public/battlemaps/<id>.png` |
 | Moteur | un process MCP par session, spawné avec `ADVENTURE_ID` (`mcp-server/adventure.ts`) |
 | Persistance | colonne `game_sessions.adventure_id` ; l'aventure de la session fait foi (bascule interdite → 409) |
 
 ### Ajouter un module d'aventure
 
 1. `adventures/<id>/adventure-module.md` (format « ## Salle N » + « Point d'entrée »), `player-character.md`, et `map.ts` (exporter un `AdventureMapData` : rooms, entryCells, encounters — **types de monstres existants du moteur uniquement**, npcs, aliases, transitions, roomHooks, startCell, initialPlayer). Règles propres facultatives (`player-rules.md`, `dm-rules.md`) sinon repli automatique.
-2. Battlemap 17×15 : dupliquer `scripts/generate-battlemap.cjs` → `public/battlemaps/<id>.png`.
-3. Enregistrer la carte dans `lib/adventure-map.ts` (`ADVENTURE_MAPS`) et la définition dans `lib/adventures.ts` (`ADVENTURES`, `available: true`, `playPath: '/game?adventure=<id>'`).
-4. Les tests `tests/adventure-modules.test.cjs` couvrent automatiquement le nouveau module (invariants de cohérence). `npm test` doit rester vert.
+2. `adventures/<id>/definition.ts` : exporter un `AdventureContent` (meta landing, `welcomeMessage`, `chatPlaceholders`, `roomStatusHints`, et surtout `promptGuidance` — le vocabulaire du module injecté dans les prompts DM ; **aucun terme d'un autre module**).
+3. Battlemap 17×15 : dupliquer `scripts/generate-battlemap-grammys-country-apple-pie.cjs` → `scripts/generate-battlemap-<id>.cjs`, sortie `public/battlemaps/<id>.png`.
+4. Enregistrer la carte dans `lib/adventure-map.ts` (`ADVENTURE_MAPS`), importer la définition dans `lib/adventures.ts` et l'ajouter à `AVAILABILITY`.
+5. Les tests `tests/adventure-modules.test.cjs` (cohérence) et `tests/no-module-leaks.test.cjs` (aucune fuite de vocabulaire inter-module) couvrent automatiquement le nouveau module. `npm test` doit rester vert.
 
 Détail complet du câblage : [docs/multi-adventure-architecture.md](docs/multi-adventure-architecture.md).
 
@@ -82,14 +83,16 @@ cookie invité.
 
 ## Battlemap
 
-`public/battlemap.png` est générée en pixel art, exactement alignée sur la
-grille de jeu (17×15 cases) et les zones de `lib/adventure-map.ts` :
+Chaque module a sa battlemap `public/battlemaps/<id>.png`, générée en pixel art,
+exactement alignée sur la grille de jeu (17×15 cases) et les zones de
+`adventures/<id>/map.ts` :
 
 ```bash
-node scripts/generate-battlemap.cjs
+node scripts/generate-battlemap-grammys-country-apple-pie.cjs
+node scripts/generate-battlemap-tide-crypt.cjs
 ```
 
-À relancer si les zones de salles changent.
+À relancer si les zones de salles du module changent.
 
 ## Prérequis
 
@@ -129,9 +132,10 @@ non configurés » et le reste (auth, quota invité, jeu) est opérationnel.
 
 ### 3. Battlemap (générée)
 
-`/public/battlemap.png` est produite par `node scripts/generate-battlemap.cjs`
-(pixel art aligné sur la grille 17×15). Vous pouvez la remplacer par toute
-image respectant ce ratio ; en l'absence du fichier, un fond sombre est affiché.
+Les battlemaps `public/battlemaps/<id>.png` sont produites par
+`node scripts/generate-battlemap-<id>.cjs` (pixel art aligné sur la grille
+17×15). Vous pouvez les remplacer par toute image respectant ce ratio ; en
+l'absence du fichier, un fond sombre est affiché.
 
 ### 4. Cout LLM et tests sans appels payants
 

@@ -6,8 +6,9 @@ import type { GameState, MonsterState, PlayerState, WorldNpcDisposition } from '
 interface BattlemapProps {
   gameState: GameState
   cellSize?: number
-  // Battlemap et dimensions de grille du module actif (défauts = Grammy's).
-  image?: string
+  // Battlemap du module actif (toujours fournie par la page de jeu depuis la
+  // définition du module) ; dimensions de grille par défaut 17×15.
+  image: string
   cols?: number
   rows?: number
 }
@@ -50,7 +51,7 @@ function hpPercent(current: number, max: number): number {
 export default function Battlemap({
   gameState,
   cellSize = 48,
-  image = '/battlemap.png',
+  image,
   cols = 17,
   rows = 15,
 }: BattlemapProps) {

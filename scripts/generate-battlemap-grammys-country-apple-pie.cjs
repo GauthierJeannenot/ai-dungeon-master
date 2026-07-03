@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 'use strict'
 
-// Génère public/battlemap.png : carte pixel art EXACTEMENT alignée sur la
-// grille de jeu (17 colonnes × 15 lignes, CELL_PX pixels par case).
+// Génère public/battlemaps/grammys-country-apple-pie.png : carte pixel art
+// EXACTEMENT alignée sur la grille de jeu (17 colonnes × 15 lignes, CELL_PX
+// pixels par case).
 //
-// La disposition des salles reproduit lib/adventure-map.ts (ADVENTURE_ROOMS) —
-// si les zones changent là-bas, relancer :  node scripts/generate-battlemap.cjs
+// La disposition des salles reproduit adventures/grammys-country-apple-pie/map.ts —
+// si les zones changent là-bas, relancer :
+//   node scripts/generate-battlemap-grammys-country-apple-pie.cjs
 //
 // Aucune dépendance : PNG écrit à la main (zlib natif + CRC32).
 
@@ -439,6 +441,8 @@ const png = Buffer.concat([
   chunk('IEND', Buffer.alloc(0)),
 ])
 
-const outPath = path.join(__dirname, '..', 'public', 'battlemap.png')
+const outDir = path.join(__dirname, '..', 'public', 'battlemaps')
+fs.mkdirSync(outDir, { recursive: true })
+const outPath = path.join(outDir, 'grammys-country-apple-pie.png')
 fs.writeFileSync(outPath, png)
-console.log(`battlemap.png générée : ${WIDTH}×${HEIGHT}px (${COLS}×${ROWS} cases de ${CELL_PX}px) → ${outPath}`)
+console.log(`grammys-country-apple-pie.png générée : ${WIDTH}×${HEIGHT}px (${COLS}×${ROWS} cases de ${CELL_PX}px) → ${outPath}`)
