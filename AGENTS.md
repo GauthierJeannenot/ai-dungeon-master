@@ -52,7 +52,9 @@ décrite dans README.md, docs/intent-pipeline.md ou .env.example :
   `resolve_player_action`) non implémenté.
 - docs/multi-adventure-architecture.md et
   docs/adventure-content-consolidation.md sont TERMINÉS (référence de
-  conception, pas du travail à faire).
+  conception, pas du travail à faire). docs/postgres-only-migration.md est en
+  revanche un chantier À FAIRE (suppression du backend fichiers au profit de
+  Postgres seul) — le suivre étape par étape quand il est lancé.
 
 ## Invariants transverses (ne pas casser)
 
