@@ -2,6 +2,7 @@ import type Anthropic from '@anthropic-ai/sdk'
 import { callMCPTool } from '@/lib/mcp-client'
 import { logEvent } from '@/lib/server-logger'
 import { describeRoomHooks } from '@/lib/adventure-map'
+import { getAdventureDefinition } from '@/lib/adventures'
 import type { GameState } from '@/lib/types'
 import { PLANNER_MODEL, createLlmMessage, type LlmCallContext } from './llm'
 
@@ -20,8 +21,9 @@ function isObjectRecord(value: unknown): value is Record<string, unknown> {
 }
 
 // Le champ `tool` est contraint à un enum des tools réellement exposés cette phase :
-// Haiku ne peut plus halluciner un nom de tool inexistant.
-function buildDecideActionTool(toolNames: string[]): Anthropic.Tool {
+// Haiku ne peut plus halluciner un nom de tool inexistant. L'exemple de marqueur
+// reveal_npc vient du module actif (pas de vocabulaire d'un autre module).
+function buildDecideActionTool(toolNames: string[], revealNpcExample: string): Anthropic.Tool {
   const toolProp: Record<string, unknown> = {
     type: 'string',
     description: "Nom exact du tool MCP à appeler (omets si requiresMechanic=false).",
@@ -38,13 +40,48 @@ function buildDecideActionTool(toolNames: string[]): Anthropic.Tool {
         ability: { type: 'string', enum: ['str', 'dex', 'con', 'int', 'wis', 'cha'], description: 'Caractéristique pour un roll_ability_check / resolve_saving_throw.' },
         dc: { type: 'number', description: "Degré de Difficulté si connu (DD de l'accroche de salle)." },
         target: { type: 'string', description: "Cible ou objet visé (id de monstre, nom d'objet…)." },
-        sceneMarkers: { type: 'array', items: { type: 'string' }, description: 'Marqueurs de scène à poser en plus (ex: "reveal_npc:dryad", "trigger_room_event:enter").' },
+        sceneMarkers: { type: 'array', items: { type: 'string' }, description: `Marqueurs de scène à poser en plus (ex: "${revealNpcExample}", "trigger_room_event:enter").` },
         confidence: { type: 'string', enum: ['low', 'medium', 'high'], description: 'Confiance dans la classification.' },
         reason: { type: 'string', description: 'Justification courte (1 phrase).' },
       },
       required: ['requiresMechanic', 'confidence', 'reason'],
     },
   }
+}
+
+// Construit le prompt système du classifieur. Extrait pour être testable et
+// pour vérifier qu'un module n'hérite pas du vocabulaire d'un autre (les
+// exemples et le marqueur reveal_npc viennent de la définition du module actif).
+export function buildPlannerSystem(
+  gameState: GameState,
+  tools: Anthropic.Tool[],
+  summaryContext: string | undefined,
+): string {
+  const guidance = getAdventureDefinition(gameState.adventureId).promptGuidance
+  const roomHooks = describeRoomHooks(gameState.currentRoomId, gameState.adventureId)
+  const toolList = tools.map(tool => `- ${tool.name}: ${tool.description ?? ''}`).join('\n')
+  const phaseLine = gameState.phase === 'combat' ? 'COMBAT (tour du joueur)' : 'EXPLORATION'
+  const summaryBlock = summaryContext?.trim()
+    ? `\nRésumé de la partie (contexte) :\n${summaryContext.trim()}\n`
+    : ''
+  return `Tu es un classifieur d'intention pour un Maître du Jeu D&D 5e. Tu NE narres jamais. Ton unique rôle : analyser le message du joueur et décider s'il exige une résolution mécanique (un tool), laquelle, puis appeler decide_action.
+
+Phase: ${phaseLine}
+${roomHooks ? `\nAccroches mécaniques de la salle actuelle:\n${roomHooks}\n` : ''}${summaryBlock}
+Tools mécaniques disponibles (le champ \`tool\` doit être EXACTEMENT l'un de ces noms) :
+${toolList}
+
+Règles de décision:
+- requiresMechanic=true dès que l'issue est INCERTAINE et dépend d'un jet ou d'une règle : fouiller, observer/chercher un caché, crocheter, forcer, se faufiler, grimper, persuader, intimider, marchander, enquêter, attaquer, subir un piège/sauvegarde, boire une potion, déclencher/approcher une rencontre. Choisis alors le tool exact (\`tool\`).
+- Pour un jet de caractéristique, renseigne \`ability\` et \`dc\` (reprends le DD de l'accroche si présent).
+- requiresMechanic=false UNIQUEMENT pour la pure couleur sans enjeu : dialogue anodin, contemplation, question, déplacement déjà couvert par move_token mais sans incertitude.
+- \`sceneMarkers\` : ajoute les marqueurs utiles EN PLUS de l'action (ex "${guidance.revealNpcKindExample}" quand des PNJ cachés se montrent suite à une offrande/jet réussi, "trigger_room_event:enter" à l'entrée d'une salle décrite).
+- \`confidence\` : high = intention et tool sans ambiguïté ; medium = probable mais le message reste vague ; low = tu n'es pas sûr qu'une mécanique s'applique.
+- Sers-toi du contexte récent et du résumé pour lever les ambiguïtés (un "je leur parle" devient une persuasion si la scène l'exige).
+- Dans le doute sur l'incertitude, préfère requiresMechanic=true.
+
+Exemples (message → décision) :
+${guidance.plannerExamples.join('\n')}`
 }
 
 export interface PlannerDecision {
@@ -69,35 +106,8 @@ export async function planPlayerAction(
   if (gameState.phase === 'combat' && gameState.currentTurn && gameState.currentTurn !== 'player') {
     return null
   }
-  const roomHooks = describeRoomHooks(gameState.currentRoomId, gameState.adventureId)
-  const toolList = tools.map(tool => `- ${tool.name}: ${tool.description ?? ''}`).join('\n')
-  const phaseLine = gameState.phase === 'combat' ? 'COMBAT (tour du joueur)' : 'EXPLORATION'
-  const summaryBlock = summaryContext?.trim()
-    ? `\nRésumé de la partie (contexte) :\n${summaryContext.trim()}\n`
-    : ''
-  const system = `Tu es un classifieur d'intention pour un Maître du Jeu D&D 5e. Tu NE narres jamais. Ton unique rôle : analyser le message du joueur et décider s'il exige une résolution mécanique (un tool), laquelle, puis appeler decide_action.
-
-Phase: ${phaseLine}
-${roomHooks ? `\nAccroches mécaniques de la salle actuelle:\n${roomHooks}\n` : ''}${summaryBlock}
-Tools mécaniques disponibles (le champ \`tool\` doit être EXACTEMENT l'un de ces noms) :
-${toolList}
-
-Règles de décision:
-- requiresMechanic=true dès que l'issue est INCERTAINE et dépend d'un jet ou d'une règle : fouiller, observer/chercher un caché, crocheter, forcer, se faufiler, grimper, persuader, intimider, marchander, enquêter, attaquer, subir un piège/sauvegarde, boire une potion, déclencher/approcher une rencontre. Choisis alors le tool exact (\`tool\`).
-- Pour un jet de caractéristique, renseigne \`ability\` et \`dc\` (reprends le DD de l'accroche si présent).
-- requiresMechanic=false UNIQUEMENT pour la pure couleur sans enjeu : dialogue anodin, contemplation, question, déplacement déjà couvert par move_token mais sans incertitude.
-- \`sceneMarkers\` : ajoute les marqueurs utiles EN PLUS de l'action (ex "reveal_npc:dryad" quand des PNJ cachés se montrent suite à une offrande/jet réussi, "trigger_room_event:enter" à l'entrée d'une salle décrite).
-- \`confidence\` : high = intention et tool sans ambiguïté ; medium = probable mais le message reste vague ; low = tu n'es pas sûr qu'une mécanique s'applique.
-- Sers-toi du contexte récent et du résumé pour lever les ambiguïtés (un "je leur parle" devient une persuasion si la scène l'exige).
-- Dans le doute sur l'incertitude, préfère requiresMechanic=true.
-
-Exemples (message → décision) :
-- "je fouille la bibliothèque" → requiresMechanic=true, tool=roll_ability_check, ability=wis, dc≈13, confidence=high.
-- "je crochète la serrure du coffre" → requiresMechanic=true, tool=roll_ability_check, ability=dex, dc≈15, confidence=high.
-- "je dépose une offrande au pied des arbres" → requiresMechanic=true, tool=roll_ability_check, ability=cha, sceneMarkers=["reveal_npc:dryad"], confidence=medium.
-- "j'attaque le gobelin" → requiresMechanic=true, tool=resolve_player_attack, target="gobelin", confidence=high.
-- "j'entre dans la salle suivante" → requiresMechanic=true, tool=move_token, sceneMarkers=["trigger_room_event:enter"], confidence=high.
-- "je lève les yeux vers le plafond / qui es-tu ?" → requiresMechanic=false, confidence=high.`
+  const guidance = getAdventureDefinition(gameState.adventureId).promptGuidance
+  const system = buildPlannerSystem(gameState, tools, summaryContext)
   const recentText = recentMessages
     .slice(-4)
     .map(m => `${m.role === 'user' ? 'Joueur' : 'MJ'}: ${typeof m.content === 'string' ? m.content : '[action]'}`)
@@ -111,7 +121,7 @@ Exemples (message → décision) :
       max_tokens: 400,
       system,
       messages: [{ role: 'user', content: userContent }],
-      tools: [buildDecideActionTool(tools.map(tool => tool.name))],
+      tools: [buildDecideActionTool(tools.map(tool => tool.name), guidance.revealNpcKindExample)],
       tool_choice: { type: 'tool', name: 'decide_action' },
     },
     { ...context, operation: 'dm.plan', model: PLANNER_MODEL },

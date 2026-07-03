@@ -28,13 +28,17 @@ test('loads each module own adventure text and player sheet', () => {
   assert.match(tide.playerCharacter, /Niveau.*2/i)
 })
 
-test('tide-crypt falls back to Grammy generic rules for missing files', () => {
+test('tide-crypt falls back to Grammy player rules but keeps its own dm rules', () => {
   const grammy = loader.loadContextFiles('grammys-country-apple-pie')
   const tide = loader.loadContextFiles('tide-crypt')
-  // player-rules.md / dm-rules.md n'existent pas côté tide-crypt → repli Grammy's.
+  // player-rules.md n'existe pas côté tide-crypt → repli sur les règles joueur
+  // génériques de Grammy's (mécaniques D&D communes, sans vocabulaire de module).
   assert.equal(tide.playerRules, grammy.playerRules)
-  assert.equal(tide.dmRules, grammy.dmRules)
-  // ... mais le module et la fiche perso sont bien distincts.
+  // dm-rules.md, adventure-module.md et player-character.md sont PROPRES à
+  // tide-crypt (son dm-rules.md évite d'hériter du bestiaire Grammy — Mac,
+  // dryades, verger — qui fuyait auparavant dans le prompt de la crypte).
+  assert.notEqual(tide.dmRules, grammy.dmRules)
+  assert.doesNotMatch(tide.dmRules, /Mac le|dryade|verger|Grukk/i)
   assert.notEqual(tide.adventureModule, grammy.adventureModule)
   assert.notEqual(tide.playerCharacter, grammy.playerCharacter)
 })

@@ -1,6 +1,7 @@
 import type Anthropic from '@anthropic-ai/sdk'
 import { loadContextFiles, loadAdventureModuleParsed } from '@/lib/context-loader'
 import { describeRoomHooks } from '@/lib/adventure-map'
+import { getAdventureDefinition } from '@/lib/adventures'
 import type { GameState, ConversationTurn } from '@/lib/types'
 import { parsePositiveInt } from './llm'
 
@@ -16,6 +17,9 @@ const COMBAT_LOG_TAIL = parsePositiveInt(process.env.LLM_COMBAT_LOG_TAIL, 6)
 export function buildStaticPrompt(adventureId?: string): string {
   const ctx = loadContextFiles(adventureId)
   const moduleIndex = loadAdventureModuleParsed(adventureId).index
+  // Vocabulaire propre au module actif (lieux, PNJ) injecté dans les règles
+  // ci-dessous : un module ne reçoit jamais les exemples d'un autre.
+  const g = getAdventureDefinition(adventureId).promptGuidance
 
   return `Tu es un Dungeon Master expert de D&D 5e, narrateur immersif et arbitre de règles rigoureux.
 Tu combines une narration cinématographique et épique avec une application stricte des règles mécaniques.
@@ -47,13 +51,13 @@ ${moduleIndex}
    - Fouiller, observer attentivement, chercher un passage/objet caché, crocheter, forcer une porte, se faufiler, grimper, persuader, intimider, marchander, enquêter, repérer un piège → \`roll_ability_check\` (avec le DD indiqué par le module si présent).
    - Entrer dans une salle décrite par le module → \`trigger_room_event({ roomId, eventType: "enter" })\` pour activer son contenu et la marquer visitée (peut accompagner le \`move_token\` du même message).
    - Provoquer / approcher une rencontre prévue par le module → \`start_encounter\` (sinon \`spawn_monster\` + \`enter_combat\`).
-   - Un PNJ caché qui se montre au joueur (offrande acceptée, jet social réussi, embuscade qui se déclenche) → \`reveal_npc\` (par \`kind\` pour révéler tout un groupe, ou par \`npcId\`) pour afficher son token. Les PNJ existent et ont un token même hors combat (ex. Mac dès le départ) ; ne narre l'apparition qu'APRÈS l'appel.
+   - Un PNJ caché qui se montre au joueur (offrande acceptée, jet social réussi, embuscade qui se déclenche) → \`reveal_npc\` (par \`kind\` pour révéler tout un groupe, ou par \`npcId\`) pour afficher son token. Les PNJ existent et ont un token même hors combat (ex. ${g.visibleNpcExample}) ; ne narre l'apparition qu'APRÈS l'appel.
    - Subir un piège ou un effet à sauvegarde → \`resolve_saving_throw\`. Boire une potion → \`use_healing_potion\`. Attaquer → \`resolve_attack\` / \`resolve_player_attack\`.
    - **INTERDIT** : décrire l'issue (réussite, échec, dégâts, découverte, réaction d'un PNJ à un jet social, créature qui surgit) AVANT l'appel du tool. C'est le résultat du tool qui dicte ta narration, jamais l'inverse.
    - Seules les actions SANS incertitude mécanique (parler sans enjeu, contempler le décor, improviser une ruse de pure couleur) se narrent directement, sans tool.
 
-3. **⚠️ Déplacement — RÈGLE ABSOLUE** : Dès que le joueur exprime une intention de déplacement (« je vais au verger », « entre dans la boutique », « avance vers la porte », « va en (x,y) », « retourne à l'entrée »…), tu DOIS appeler \`move_token\` AVANT toute narration.
-   - **Lieu nommé** : si le joueur nomme un lieu connu du module (verger, tas de déchets, entrée/façade, bureau, quai de chargement, sol de la boulangerie, appartement…), va chercher le **Point d'entrée** de cette salle dans le MODULE D'AVENTURE (table « Points d'entrée et de déplacement », ou la ligne « Point d'entrée » de la salle) et appelle \`move_token({ tokenId: "player", toCell: { x, y } })\` vers ces coordonnées exactes.
+3. **⚠️ Déplacement — RÈGLE ABSOLUE** : Dès que le joueur exprime une intention de déplacement (« ${g.movementExample} », « entre dans la boutique », « avance vers la porte », « va en (x,y) », « retourne à l'entrée »…), tu DOIS appeler \`move_token\` AVANT toute narration.
+   - **Lieu nommé** : si le joueur nomme un lieu connu du module (${g.namedPlaces}…), va chercher le **Point d'entrée** de cette salle dans le MODULE D'AVENTURE (table « Points d'entrée et de déplacement », ou la ligne « Point d'entrée » de la salle) et appelle \`move_token({ tokenId: "player", toCell: { x, y } })\` vers ces coordonnées exactes.
    - **Coordonnées explicites** : si le joueur donne un (x,y), utilise-le directement.
    - **INTERDIT** : ne décris JAMAIS une arrivée, un trajet ou un changement de lieu sans avoir appelé \`move_token\` d'abord. Narrer un déplacement sans le tool call est une erreur — le pion ne bougerait pas à l'écran.
    - Un déplacement compte comme l'unique action de jeu majeure du message (voir règle 4).
@@ -72,7 +76,7 @@ ${moduleIndex}
    - **Sinon, des monstres vivants restent** → clos le tour du joueur (\`next_turn\` s'il a agi, \`pass_turn\` s'il ne fait rien) → puis \`run_monster_turns\` UNE fois.
    - Lis le résultat de \`run_monster_turns\` : s'il renvoie \`combatShouldEnd: true\` (joueur mort ou plus de monstres) → \`end_combat\`. Sinon le tour revient au joueur.
    - Termine par UNE narration qui couvre l'action du joueur ET tous les tours des monstres (\`resolvedTurns\`), puis ARRÊTE-TOI.
-   - \`run_monster_turns\` n'achève jamais un joueur déjà à terre et ignore automatiquement les créatures non hostiles (Mac le Tréant, la dryade…) ; mets dans \`holdIds\` tout monstre qui ne doit pas agir ce tour (charmé, en pourparlers).
+   - \`run_monster_turns\` n'achève jamais un joueur déjà à terre et ignore automatiquement les créatures non hostiles (${g.nonHostileNpcs}…) ; mets dans \`holdIds\` tout monstre qui ne doit pas agir ce tour (charmé, en pourparlers).
 
 6. **HP des monstres** : Ne révèle jamais les HP exacts. Utilise des descriptions qualitatives :
    - > 75% HP : "paraît vigoureux", "combat avec assurance"
@@ -130,8 +134,8 @@ export function serializeGameState(gameState: GameState): string {
   if (Object.keys(aliveMonsters).length > 0) {
     compact.monsters = aliveMonsters
   }
-  // PNJ visibles de la salle courante (Mac dès le début, dryades une fois révélées).
-  // Les PNJ cachés (visible:false) restent hors du contexte LLM.
+  // PNJ visibles de la salle courante (présents dès le départ ou révélés en cours
+  // de partie). Les PNJ cachés (visible:false) restent hors du contexte LLM.
   if (gameState.npcs) {
     const visibleNpcs = Object.values(gameState.npcs)
       .filter(npc => npc.visible && (npc.roomId === null || npc.roomId === gameState.currentRoomId))
