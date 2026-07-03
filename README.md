@@ -146,46 +146,46 @@ LLM_MODE=mock
 ALLOW_PAID_LLM=false
 ```
 
-Modes disponibles :
+Modes et réglages effectivement lus par le code :
 
 | Variable | Effet |
 |----------|-------|
-| `LLM_MODE=live` | Appels Anthropic normaux |
+| `LLM_MODE=live` | Appels Anthropic normaux (défaut) |
 | `LLM_MODE=mock` | Reponses deterministes locales, sans appel payant |
-| `LLM_MODE=record` | Appels live + sauvegarde des reponses dans `.data/llm-cassettes/` |
-| `LLM_MODE=replay` | Rejoue les cassettes, sans appel payant |
-| `NARRATION_MODE=quality` | Mode par defaut: le moteur resout les faits, puis le LLM ecrit la reponse visible |
-| `NARRATION_MODE=budget` | Mode economie: garde les narrations locales quand elles sont considerees sures |
-| `LLM_REPLAY_FALLBACK_TO_MOCK=true` | En replay, bascule sur le mock si une cassette manque |
-| `LLM_MAX_CALLS_PER_REQUEST=10` | Coupe une requete trop bavarde |
-| `LLM_MAX_CALLS_PER_SESSION=0` | Budget live par session (`0` = illimite) |
+| `ALLOW_PAID_LLM=false` | Refuse tout appel payant (ceinture de sécurité en mode `live`) |
+| `LLM_PLANNER_ENABLED=false` | Désactive la pré-passe d'intention (classifieur Haiku) |
+| `LLM_MAX_CALLS_PER_REQUEST=10` | Coupe une requete trop bavarde (itérations de la boucle tool-use) |
+| `LLM_MAX_TOKENS=1024` | Plafond de sortie par appel API |
 | `LLM_PROMPT_CACHE_ENABLED=true` | Active les breakpoints de prompt caching Anthropic |
-| `LLM_PROMPT_CACHE_TTL=5m` | TTL du cache prompt (`5m` par defaut, `1h` possible pour longs playtests) |
-| `LLM_SHORT_NARRATION_MAX_TOKENS=220` | Sortie courte pour les narrations mecaniques ou contraintes |
-| `LLM_RICH_NARRATION_MAX_TOKENS=420` | Sortie plus large pour scenes sociales/ouvertes |
-| `LLM_MODULE_CONTEXT_MAX_CHARS=6500` | Limite le contexte du module envoye au LLM |
-| `LLM_FINAL_NARRATION_MAX_TOKENS=180` | Plafond de sortie pour les narrations finales breves |
+| `LLM_COMBAT_LOG_TAIL=6` | Nombre d'entrées de journal de combat envoyées au LLM |
+| `LLM_HISTORY_COMPRESS_THRESHOLD_CHARS` / `LLM_HISTORY_KEEP_RECENT` | Seuil et fenêtre de compression d'historique |
+| `DM_MODEL` / `DM_PLANNER_MODEL` / `DM_COMPRESS_MODEL` | Modèles narration / classifieur / résumé |
+| `DM_EFFORT=medium` | Effort de réflexion du DM (modèles compatibles uniquement) |
+
+> ⚠️ `LLM_MODE` ne connaît QUE `mock` et `live`. Les anciens modes `record`/
+> `replay` (cassettes) ont été supprimés, ainsi que `NARRATION_MODE`, le
+> « director local » et les variables `LLM_*_NARRATION_MAX_TOKENS`,
+> `LLM_MODULE_CONTEXT_MAX_CHARS`, `LLM_PROMPT_CACHE_TTL`,
+> `LLM_MAX_CALLS_PER_SESSION`, `LLM_REPLAY_FALLBACK_TO_MOCK` : elles ne sont
+> plus lues par personne.
 
 En mode live, la route DM reduit aussi le cout sans passer en mock :
 
 - actions evidentes de combat/deplacement par coordonnees/passage de tour resolues cote moteur avant Anthropic
 - tools MCP filtres selon la phase et l'intention au lieu d'envoyer tous les schemas a chaque appel
-- director local pour produire des beats/fallbacks; en `NARRATION_MODE=quality`, Claude reprend la voix finale visible apres les mutations moteur
+- classifieur d'intention Haiku en pré-passe qui exécute lui-même les marqueurs de scène sûrs (reveal_npc, trigger_room_event) et injecte une directive mécanique au DM
 - memoire de scene compacte dans `gameState.sceneMemory` pour porter les consequences sans repayer tout l'historique
 - prompt caching sur les blocs systeme statiques et les schemas tools selectionnes
-- mini budget visible en jeu: cout partie/tour, appels LLM, cache lu/ecrit, source narrative et route LLM
-- narration finale avec prompt court specialise et reponses visees a 1-2 phrases
-- correction serveur directe des narrations qui contredisent l'etat moteur, sans retry LLM supplementaire
+- mini budget visible en jeu: cout partie/tour, appels LLM, cache lu/ecrit et route LLM
 
-Playtest cout/qualite :
+Playtest cout/qualite (mock par défaut ; `--mode live` exige `--allow-paid` et facture Anthropic) :
 
 ```bash
 npm run playtest:mock
-node scripts/playtest.cjs --mode replay --narration-mode quality --report .data/playtest-reports/replay.json
-node scripts/playtest.cjs --mode live --narration-mode quality --allow-paid --report .data/playtest-reports/live.json
+node scripts/playtest.cjs --mode live --allow-paid --report .data/playtest-reports/live.json
 ```
 
-Le playtest agrège appels LLM, cout estime, routes `none/short/rich/blocked`, source narrative, tools, violations de seuils, part de narrateur LLM et formulations robotiques interdites (`[Mock]`, coordonnees visibles, phrases generiques type "decor se replace"). Les seuils sont configurables via `PLAYTEST_MAX_COST_USD`, `PLAYTEST_MIN_LLM_NARRATOR_RATIO`, `PLAYTEST_MIN_DIRECTOR_LOCAL_RATIO`, `PLAYTEST_MAX_AVERAGE_LLM_CALLS` et `PLAYTEST_MAX_SIMPLE_TURN_LLM_CALLS`.
+Le playtest agrège appels LLM, cout estime, routes `none/short/rich/blocked`, tools, violations de seuils et formulations robotiques interdites (`[Mock]`, coordonnees visibles, phrases generiques type "decor se replace"). Les seuils sont configurables via `PLAYTEST_MAX_COST_USD`, `PLAYTEST_MIN_LLM_NARRATOR_RATIO`, `PLAYTEST_MAX_AVERAGE_LLM_CALLS` et `PLAYTEST_MAX_SIMPLE_TURN_LLM_CALLS`.
 
 > ⚠️ L'estimateur de coût facture désormais chaque appel au tarif de SON modèle
 > (Haiku 1/5, Sonnet 3/15 $/MTok…) au lieu de tout facturer au tarif Haiku —
@@ -279,7 +279,6 @@ AUTH_GOOGLE_ID / AUTH_GOOGLE_SECRET       # OAuth Google
 AUTH_GITHUB_ID / AUTH_GITHUB_SECRET       # OAuth GitHub
 STRIPE_SECRET_KEY / STRIPE_WEBHOOK_SECRET # paiements (optionnel au début)
 LLM_MODE            = live
-NARRATION_MODE      = quality
 ```
 
 4. Premier déploiement : le schéma Postgres s'applique automatiquement au premier accès (ou `railway run npm run db:migrate`).
@@ -365,16 +364,15 @@ L'endpoint `GET /api/debug/logs` retourne les logs persistants si le fichier JSO
 
 Les logs incluent notamment `requestId`, `sessionId`, appels Anthropic, usage tokens/cout estime, appels MCP, erreurs de regles, resume compact du `GameState`, persistance session et durees. Les valeurs ressemblant a des secrets/tokens sont masquees automatiquement.
 
-Chaque tour DM produit aussi un `TurnTrace` canonique sous l'evenement `dm.turn.trace`. Il regroupe l'input brut, l'intent, l'actionPlan, la resolution de cible, les appels d'outils executes ou bloques, les `EngineEvent`, le diff monde, les reactions ennemies derivees, les facts narratifs detectes, les contradictions restantes et la narration finale. Pour ne lire que ces traces :
+> ℹ️ L'endpoint accepte un paramètre `?traces=true` qui filtre les événements
+> `dm.turn.trace`, mais **aucun code ne produit ce type de trace** aujourd'hui
+> (le pipeline `TurnTrace`/`EngineEvent` décrit dans docs/intent-pipeline.md
+> n'est pas implémenté) : la réponse est donc vide. À ignorer tant que ce
+> pipeline n'existe pas.
 
-```bash
-curl "https://votre-app.example.com/api/debug/logs?traces=true&limit=100"
-curl "https://votre-app.example.com/api/debug/logs?traces=true&sessionId=ma-session&limit=100"
-```
-
-Pour transformer des logs ou traces exportees en regression locale :
+Pour transformer des logs exportes en regression locale :
 
 ```bash
 node scripts/replay-session-log.cjs --input logs.json --output tests/fixtures/ma-session-regression.json
-node scripts/replay-session-log.cjs --input logs.jsonl --playtest --mode mock --narration-mode quality
+node scripts/replay-session-log.cjs --input logs.jsonl --playtest --mode mock
 ```

@@ -43,7 +43,7 @@ export const GRAMMYS_CONTENT: AdventureContent = {
   level: 'Niveau 1 · D&D 5e',
   duration: '~1-2 h',
   accent: 'amber',
-  battlemapImage: '/battlemaps/grammys-country-apple-pie.png',
+  battlemapImage: '/battlemaps/grammys_bakery.png',
   grid: { cols: 17, rows: 15 },
   welcomeMessage: WELCOME,
   chatPlaceholders: PLACEHOLDERS,
