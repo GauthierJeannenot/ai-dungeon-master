@@ -8,21 +8,8 @@ import {
   WorldNpcDisposition,
 } from '../lib/types'
 import { inferAdventureRoomId, seedAdventureNpcs, getAdventureMap } from '../lib/adventure-map'
+import { BASE_PLAYER } from '../lib/player-template'
 import { ACTIVE_ADVENTURE_ID } from './adventure'
-
-// Gabarit de joueur commun (nom, classe, stats, CA, maîtrise, vitesse). Le
-// niveau, les PV, la position et l'inventaire viennent du module actif.
-const BASE_PLAYER: Omit<PlayerState, 'level' | 'hp' | 'position' | 'inventory'> = {
-  id: 'player',
-  name: 'Héros',
-  class: 'Guerrier',
-  deathSaves: { successes: 0, failures: 0 },
-  ac: 16,
-  stats: { str: 16, dex: 12, con: 14, int: 10, wis: 12, cha: 10 },
-  proficiencyBonus: 2,
-  conditions: [],
-  speed: 30,
-}
 
 // Construit le joueur initial du module actif (gabarit + startCell + deltas).
 function buildInitialPlayer(): PlayerState {
