@@ -71,6 +71,18 @@ function createWelcomeMessage(welcome: string): ChatMessage {
   }
 }
 
+// Reconstruit les bulles de chat depuis l'historique serveur (reprise de partie
+// sur un nouvel appareil : le sessionStorage local est vide).
+function historyToChatMessages(history: ConversationTurn[] | undefined): ChatMessage[] {
+  if (!Array.isArray(history)) return []
+  return history.map((turn, index) => ({
+    id: `hist-${index}-${Math.random().toString(36).slice(2, 7)}`,
+    role: turn.role,
+    content: turn.content,
+    timestamp: Date.now() + index,
+  }))
+}
+
 function emptyBudgetSummary(): ClientBudgetSummary {
   return {
     turns: 0,
@@ -343,7 +355,7 @@ function phaseLabel(phase: GameState['phase']): { label: string; color: string }
   }
 }
 
-function GameView({ adventure }: { adventure: AdventureDefinition }) {
+function GameView({ adventure, resumeSessionId }: { adventure: AdventureDefinition; resumeSessionId?: string | null }) {
   // Clés sessionStorage et état initial DÉRIVÉS du module actif. Stables par
   // adventure.id ; un changement de module (nouvelle URL) reconstruit tout.
   const keys = useMemo(() => makeSessionKeys(adventure.id), [adventure.id])
@@ -377,33 +389,70 @@ function GameView({ adventure }: { adventure: AdventureDefinition }) {
       .catch(() => { /* affichage quota indisponible, le serveur reste l'arbitre */ })
   }, [])
 
-  // Restore the per-tab session after hydration. sessionStorage keeps refreshes coherent
-  // while still isolating separate browser tabs from one another.
+  // Restore the per-tab session after hydration. sessionStorage keeps refreshes
+  // coherent while still isolating separate browser tabs from one another.
+  // Cas particulier « reprise » (?session=<id>) : si le sessionStorage local est
+  // vide (nouvel appareil), on hydrate depuis le serveur.
   useEffect(() => {
-    const restoredSessionId = getOrCreateSessionId(keys)
-    const restoredGameState = readSessionJson<GameState>(keys.gameState)
-    const restoredMessages = readSessionJson<ChatMessage[]>(keys.messages)
-    const restoredBudget = readSessionJson<ClientBudgetSummary>(keys.budget)
+    let cancelled = false
 
-    setSessionId(restoredSessionId)
-    if (restoredGameState) setGameState(restoredGameState)
-    setMessages(restoredMessages?.length ? restoredMessages : [createWelcomeMessage(adventure.welcomeMessage)])
-    if (restoredBudget) setBudgetSummary(restoredBudget)
-    appendClientDebugLog(restoredSessionId, 'client.session.loaded', {
-      restoredGameState: Boolean(restoredGameState),
-      restoredMessages: restoredMessages?.length ?? 0,
-      gameState: summarizeClientGameState(restoredGameState ?? initialGameState),
-      budget: restoredBudget ?? emptyBudgetSummary(),
-    })
-    syncClientDebugLog(restoredSessionId).catch(err => {
-      console.error('Failed to sync client debug log:', err)
-    })
+    async function initSession() {
+      const localState = readSessionJson<GameState>(keys.gameState)
+      const localMessages = readSessionJson<ChatMessage[]>(keys.messages)
+      const localBudget = readSessionJson<ClientBudgetSummary>(keys.budget)
 
-    try {
-      setSummaryContext(sessionStorage.getItem(keys.summaryContext) ?? undefined)
-    } catch { /* storage unavailable */ }
+      // Reprise demandée ET aucun état local pour ce module → hydratation serveur.
+      if (resumeSessionId && !(localState && localMessages?.length)) {
+        try {
+          const res = await fetch(`/api/sessions/${encodeURIComponent(resumeSessionId)}`)
+          if (res.ok) {
+            const data = await res.json()
+            if (cancelled) return
+            try { sessionStorage.setItem(keys.sessionId, resumeSessionId) } catch { /* storage unavailable */ }
+            const rebuilt = historyToChatMessages(data.history)
+            setSessionId(resumeSessionId)
+            setGameState(data.gameState ?? initialGameState)
+            setMessages(rebuilt.length ? rebuilt : [createWelcomeMessage(adventure.welcomeMessage)])
+            setSummaryContext(data.summaryContext ?? undefined)
+            setBudgetSummary(emptyBudgetSummary())
+            setHasLoadedSession(true)
+            return
+          }
+          // 403/404 → on retombe sur une nouvelle partie (code ci-dessous).
+        } catch { /* réseau indisponible : nouvelle partie */ }
+      }
 
-    setHasLoadedSession(true)
+      // Reprise sur le même navigateur : forcer le sessionId demandé.
+      if (resumeSessionId) {
+        try { sessionStorage.setItem(keys.sessionId, resumeSessionId) } catch { /* storage unavailable */ }
+      }
+
+      const restoredSessionId = getOrCreateSessionId(keys)
+      if (cancelled) return
+
+      setSessionId(restoredSessionId)
+      if (localState) setGameState(localState)
+      setMessages(localMessages?.length ? localMessages : [createWelcomeMessage(adventure.welcomeMessage)])
+      if (localBudget) setBudgetSummary(localBudget)
+      appendClientDebugLog(restoredSessionId, 'client.session.loaded', {
+        restoredGameState: Boolean(localState),
+        restoredMessages: localMessages?.length ?? 0,
+        gameState: summarizeClientGameState(localState ?? initialGameState),
+        budget: localBudget ?? emptyBudgetSummary(),
+      })
+      syncClientDebugLog(restoredSessionId).catch(err => {
+        console.error('Failed to sync client debug log:', err)
+      })
+
+      try {
+        setSummaryContext(sessionStorage.getItem(keys.summaryContext) ?? undefined)
+      } catch { /* storage unavailable */ }
+
+      setHasLoadedSession(true)
+    }
+
+    initSession()
+    return () => { cancelled = true }
   }, [])
 
   useEffect(() => {
@@ -797,6 +846,7 @@ function GamePageResolver() {
   const params = useSearchParams()
   const router = useRouter()
   const requested = params.get('adventure') ?? DEFAULT_ADVENTURE_ID
+  const resumeSessionId = params.get('session')
   const adventure = getAdventure(requested)
   const playable = adventure?.available ? adventure : null
 
@@ -806,7 +856,7 @@ function GamePageResolver() {
 
   if (!playable) return null
   // key : un changement de module remonte un GameView neuf (états/refs isolés).
-  return <GameView key={playable.id} adventure={playable} />
+  return <GameView key={playable.id} adventure={playable} resumeSessionId={resumeSessionId} />
 }
 
 export default function GamePage() {

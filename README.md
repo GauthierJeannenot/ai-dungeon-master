@@ -73,6 +73,13 @@ pas automatiquement — voir l'en-tête de `scripts/db-import-file-stores.cjs`.
   [lib/stripe.ts](lib/stripe.ts).
 - `MONETIZATION_ENABLED=false` coupe le débit/quota (tests, dev hors runtime Next).
 
+**Mes parties** : la landing liste les parties en cours du joueur (`GET /api/sessions`,
+scoped par propriétaire) avec reprise multi-appareils. « Reprendre » ouvre
+`/game?adventure=<id>&session=<sid>` ; sur un appareil neuf (sessionStorage vide),
+la page réhydrate l'état et l'historique depuis `GET /api/sessions/<sid>`
+(vérifié en appartenance). Connecté = parties du compte ; invité = parties du
+cookie invité.
+
 ## Battlemap
 
 `public/battlemap.png` est générée en pixel art, exactement alignée sur la

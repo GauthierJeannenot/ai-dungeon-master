@@ -1,7 +1,7 @@
 import { dbQuery } from './db'
 import { logEvent, summarizeGameState } from './server-logger'
 import type { GameState, TurnTrace, ConversationTurn } from './types'
-import { SESSION_SCHEMA_VERSION, type StoredGameSession } from './session-store'
+import { SESSION_SCHEMA_VERSION, summarizeStoredSession, type StoredGameSession, type StoredSessionSummary } from './session-store'
 
 // Backend Postgres des sessions de jeu (table game_sessions). L'état, l'historique
 // et les traces sont stockés en JSONB — mêmes données que les fichiers
@@ -110,4 +110,34 @@ export async function deleteSession(sessionId: string): Promise<void> {
   } else {
     logEvent('debug', 'session.delete.miss', { sessionId: safeId, backend: 'db' })
   }
+}
+
+// Résumés des parties d'un propriétaire, les plus récentes d'abord. On remonte
+// game_state + history (bornés à 200 tours par MAX_STORED_HISTORY_TURNS) et on
+// résume en JS — SQL portable (pas de fonctions JSONB, compatible pg-mem) et
+// cohérent avec le backend fichier.
+export async function listSessionsByOwner(ownerId: string, limit: number): Promise<StoredSessionSummary[]> {
+  const result = await dbQuery<{
+    session_id: string
+    adventure_id: string | null
+    updated_at: Date
+    game_state: GameState
+    history: ConversationTurn[]
+  }>(
+    `SELECT session_id, adventure_id, updated_at, game_state, history
+     FROM game_sessions
+     WHERE owner_id = $1
+     ORDER BY updated_at DESC
+     LIMIT $2`,
+    [ownerId, limit]
+  )
+  return result.rows.map(row =>
+    summarizeStoredSession(
+      row.session_id,
+      row.adventure_id ?? undefined,
+      new Date(row.updated_at).toISOString(),
+      row.game_state,
+      Array.isArray(row.history) ? row.history : []
+    )
+  )
 }

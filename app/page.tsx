@@ -8,6 +8,7 @@ import { TOKEN_PACKAGES } from '@/lib/token-packages'
 import { isStripeConfigured } from '@/lib/stripe'
 import AuthControls from '@/components/landing/AuthControls'
 import BuyTokensPanel from '@/components/landing/BuyTokensPanel'
+import MyGamesPanel from '@/components/landing/MyGamesPanel'
 
 // Landing page — choix du module d'aventure, connexion OAuth et achat de tokens.
 // Server Component : l'état (session, solde, quota invité) est lu côté serveur.
@@ -92,6 +93,9 @@ export default async function LandingPage() {
             )}
           </div>
         </section>
+
+        {/* Mes parties en cours (masqué s'il n'y en a aucune) */}
+        <MyGamesPanel />
 
         {/* Modules d'aventure */}
         <section className="pb-14">
