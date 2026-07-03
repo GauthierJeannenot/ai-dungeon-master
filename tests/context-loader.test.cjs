@@ -3,6 +3,7 @@
 // redéfinit pas (tide-crypt n'a ni player-rules.md ni dm-rules.md).
 
 const assert = require('node:assert/strict')
+const fs = require('node:fs')
 const path = require('node:path')
 const test = require('node:test')
 const { installTsRequireWithAliases } = require('./helpers/ts-require.cjs')
@@ -43,11 +44,22 @@ test('tide-crypt falls back to Grammy player rules but keeps its own dm rules', 
   assert.notEqual(tide.playerCharacter, grammy.playerCharacter)
 })
 
-test('unknown module defaults to Grammy content', () => {
+test('unknown module defaults to the default module content (fail-safe)', () => {
   const grammy = loader.loadContextFiles('grammys-country-apple-pie')
+  // Id inconnu du registre → repli fail-safe sur le module par défaut pour TOUS
+  // les fichiers (perModule ou non), puisqu'aucun contenu propre n'existe.
   const unknown = loader.loadContextFiles('does-not-exist')
-  // Dossier absent → repli sur le module par défaut pour tous les fichiers.
   assert.equal(unknown.adventureModule, grammy.adventureModule)
+  assert.equal(unknown.playerCharacter, grammy.playerCharacter)
+})
+
+test('the default module ships all four context files (fallback guard)', () => {
+  // Le repli n'a plus de constante en dur : il s'appuie entièrement sur les
+  // fichiers du module par défaut. Ils doivent tous exister sur le disque.
+  const dir = path.join(process.cwd(), 'adventures', 'grammys-country-apple-pie')
+  for (const file of ['player-character.md', 'player-rules.md', 'dm-rules.md', 'adventure-module.md']) {
+    assert.ok(fs.existsSync(path.join(dir, file)), `fichier de repli manquant : ${file}`)
+  }
 })
 
 test('parsed module is cached per adventure and split into rooms', () => {
