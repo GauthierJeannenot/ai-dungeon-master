@@ -115,6 +115,8 @@ test('db: game session save/load/delete round-trip', async () => {
     ],
     summaryContext: 'résumé de test',
     turnTraces: [],
+    ownerId: 'user:42',
+    adventureId: 'tide-crypt',
   })
 
   const loaded = await sessionStore.loadSession('db-session-1')
@@ -123,6 +125,8 @@ test('db: game session save/load/delete round-trip', async () => {
   assert.equal(loaded.history.length, 2)
   assert.equal(loaded.summaryContext, 'résumé de test')
   assert.equal(loaded.gameState.player.name, 'Héros')
+  assert.equal(loaded.ownerId, 'user:42')
+  assert.equal(loaded.adventureId, 'tide-crypt')
 
   // Upsert : la sauvegarde suivante écrase la précédente.
   await sessionStore.saveSession('db-session-1', {
@@ -137,6 +141,43 @@ test('db: game session save/load/delete round-trip', async () => {
 
   await sessionStore.deleteSession('db-session-1')
   assert.equal(await sessionStore.loadSession('db-session-1'), null)
+})
+
+test('db: lists sessions by owner, most recent first, with summaries', async () => {
+  const baseState = (roomId) => ({
+    adventureId: 'tide-crypt',
+    phase: 'exploration',
+    player: { id: 'player', name: 'Héros', hp: { current: 18, max: 28 } },
+    monsters: {}, combatLog: [], roomsVisited: [roomId], currentRoomId: roomId,
+  })
+
+  await sessionStore.saveSession('own-a', {
+    gameState: baseState('1'),
+    history: [{ role: 'player', content: 'a' }, { role: 'dm', content: 'b' }, { role: 'player', content: 'c' }],
+    ownerId: 'user:owner-1', adventureId: 'tide-crypt', turnTraces: [],
+  })
+  await sessionStore.saveSession('own-b', {
+    gameState: baseState('4'),
+    history: [{ role: 'player', content: 'x' }, { role: 'dm', content: 'y' }],
+    ownerId: 'user:owner-1', adventureId: 'grammys-country-apple-pie', turnTraces: [],
+  })
+  await sessionStore.saveSession('own-other', {
+    gameState: baseState('1'),
+    history: [], ownerId: 'user:someone-else', adventureId: 'tide-crypt', turnTraces: [],
+  })
+
+  const mine = await sessionStore.listSessionsByOwner('user:owner-1')
+  assert.equal(mine.length, 2)
+  assert.ok(mine.every(s => s.sessionId === 'own-a' || s.sessionId === 'own-b'))
+  const a = mine.find(s => s.sessionId === 'own-a')
+  assert.equal(a.turnCount, 2)        // deux messages joueur
+  assert.equal(a.phase, 'exploration')
+  assert.equal(a.playerHp.max, 28)
+  assert.equal(a.adventureId, 'tide-crypt')
+
+  const other = await sessionStore.listSessionsByOwner('user:someone-else')
+  assert.equal(other.length, 1)
+  assert.equal(other[0].sessionId, 'own-other')
 })
 
 test('db: sanitizes hostile session ids like the file backend', async () => {

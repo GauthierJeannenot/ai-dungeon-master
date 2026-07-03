@@ -4,7 +4,8 @@ import { rollDice, getAbilityModifier, d20WithModifier } from '../dice'
 import * as gs from '../game-state'
 import * as rules from '../rules'
 import { MonsterState } from '../../lib/types'
-import { EncounterMonsterSpec, ENCOUNTERS, getEncounter } from '../../lib/adventure-map'
+import { EncounterMonsterSpec, encounterIds, getEncounter } from '../../lib/adventure-map'
+import { ACTIVE_ADVENTURE_ID } from '../adventure'
 
 // Monster stat blocks — Monster Manual 2025 (XMM)
 // Source: CR list verified from MM 2025 appendix
@@ -349,7 +350,7 @@ export function registerPhaseTools(server: McpServer): void {
     'start_encounter',
     'Atomically moves the player if needed, spawns monsters, and enters combat with the real spawned monster IDs. Prefer this over separate spawn_monster + enter_combat for room encounters.',
     {
-      encounterId: z.enum(Object.keys(ENCOUNTERS) as [string, ...string[]]).optional().describe('Preset encounter id from the adventure, e.g. bakery_floor_goblins.'),
+      encounterId: z.enum(encounterIds(ACTIVE_ADVENTURE_ID) as [string, ...string[]]).optional().describe('Preset encounter id from the adventure, e.g. bakery_floor_goblins.'),
       playerCell: z.object({ x: z.number().int().min(0), y: z.number().int().min(0) }).optional().describe('Optional player destination before combat starts.'),
       monsters: z.array(z.object({
         monsterType: z.string().describe('Monster type key'),
@@ -362,7 +363,7 @@ export function registerPhaseTools(server: McpServer): void {
     async ({ encounterId, playerCell, monsters, reason }) => {
       const stateBefore = structuredClone(gs.getState())
       try {
-        const preset = encounterId ? getEncounter(encounterId) : null
+        const preset = encounterId ? getEncounter(encounterId, ACTIVE_ADVENTURE_ID) : null
         if (encounterId && !preset) {
           throw new rules.RuleViolation('UNKNOWN_ENCOUNTER', `Unknown encounter: ${encounterId}`, { encounterId })
         }
@@ -587,7 +588,7 @@ export function registerPhaseTools(server: McpServer): void {
     'spawn_monster',
     'Spawns a monster on the grid. Uses built-in stat blocks for known types.',
     {
-      monsterType: z.string().describe('Monster type key: goblin, goblin_minion, goblin_boss, hobgoblin, hobgoblin_captain, skeleton, zombie, violet_fungus, wolf, bandit, dryad, awakened_tree'),
+      monsterType: z.string().describe(`Monster type key (built-in stat block): ${Object.keys(MONSTER_TEMPLATES).join(', ')}`),
       cell: z.object({ x: z.number().int().min(0), y: z.number().int().min(0) }).describe('Grid position to spawn at'),
       name: z.string().optional().describe('Custom name override (e.g. "Gobelin Chef")'),
       hpOverride: z.number().int().positive().optional().describe('Override max HP'),

@@ -7,38 +7,33 @@ import {
   Item,
   WorldNpcDisposition,
 } from '../lib/types'
-import { inferAdventureRoomId, seedAdventureNpcs } from '../lib/adventure-map'
+import { inferAdventureRoomId, seedAdventureNpcs, getAdventureMap } from '../lib/adventure-map'
+import { BASE_PLAYER } from '../lib/player-template'
+import { ACTIVE_ADVENTURE_ID } from './adventure'
 
-// Initial player template — overridable via context files
-const DEFAULT_PLAYER: PlayerState = {
-  id: 'player',
-  name: 'Héros',
-  class: 'Guerrier',
-  level: 1,
-  hp: { current: 20, max: 20 },
-  deathSaves: { successes: 0, failures: 0 },
-  ac: 16,
-  stats: { str: 16, dex: 12, con: 14, int: 10, wis: 12, cha: 10 },
-  proficiencyBonus: 2,
-  position: { x: 4, y: 13 },
-  conditions: [],
-  speed: 30,
-  inventory: [
-    { id: 'longsword', name: 'Épée longue', type: 'weapon', damage: '1d8+3', description: 'Épée longue +3 STR' },
-    { id: 'shield', name: 'Bouclier', type: 'armor', acBonus: 2, description: 'Bouclier standard' },
-    { id: 'potion1', name: 'Potion de soin', type: 'potion', description: 'Restaure 2d4+2 HP' },
-  ],
+// Construit le joueur initial du module actif (gabarit + startCell + deltas).
+function buildInitialPlayer(): PlayerState {
+  const map = getAdventureMap(ACTIVE_ADVENTURE_ID)
+  return {
+    ...BASE_PLAYER,
+    level: map.initialPlayer.level,
+    hp: structuredClone(map.initialPlayer.hp),
+    position: { ...map.startCell },
+    inventory: structuredClone(map.initialPlayer.inventory),
+  }
 }
 
 let state: GameState = createInitialState()
 
 function createInitialState(): GameState {
-  const initialRoomId = inferAdventureRoomId(DEFAULT_PLAYER.position)
+  const player = buildInitialPlayer()
+  const initialRoomId = inferAdventureRoomId(player.position, ACTIVE_ADVENTURE_ID)
   return {
+    adventureId: ACTIVE_ADVENTURE_ID,
     phase: 'exploration',
-    player: structuredClone(DEFAULT_PLAYER),
+    player,
     monsters: {},
-    npcs: seedAdventureNpcs(),
+    npcs: seedAdventureNpcs(ACTIVE_ADVENTURE_ID),
     initiativeOrder: [],
     currentTurn: null,
     round: 0,
@@ -52,7 +47,7 @@ function createInitialState(): GameState {
 }
 
 function syncPlayerRoomFromPosition(): void {
-  const roomId = inferAdventureRoomId(state.player.position)
+  const roomId = inferAdventureRoomId(state.player.position, state.adventureId)
   state.currentRoomId = roomId
   if (roomId && !state.roomsVisited.includes(roomId)) {
     state.roomsVisited.push(roomId)
@@ -91,15 +86,20 @@ export function resetState(): GameState {
 }
 
 export function replaceState(nextState: GameState): GameState {
+  // L'aventure de l'état entrant fait foi si présente ; sinon celle du process
+  // (états historiques sans le champ). Un process = une avention : on ne bascule
+  // jamais d'aventure ici, on ne fait que compléter un état qui n'en portait pas.
+  const adventureId = nextState.adventureId ?? ACTIVE_ADVENTURE_ID
   state = {
     ...structuredClone(nextState),
+    adventureId,
     movementUsed: structuredClone(nextState.movementUsed ?? {}),
     actionUsed: structuredClone(nextState.actionUsed ?? {}),
     roomsVisited: structuredClone(nextState.roomsVisited ?? []),
     encountersTriggered: structuredClone(nextState.encountersTriggered ?? []),
     // PNJ : on préserve l'état client s'il existe (révélations déjà faites), sinon on
     // ré-amorce le seed du module (états historiques sans le champ npcs).
-    npcs: nextState.npcs ? structuredClone(nextState.npcs) : seedAdventureNpcs(),
+    npcs: nextState.npcs ? structuredClone(nextState.npcs) : seedAdventureNpcs(adventureId),
   }
   syncPlayerRoomFromPosition()
   syncDyingPlayerState()

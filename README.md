@@ -13,6 +13,31 @@ Application web de jeu de rôle D&D 5e avec un Dungeon Master IA (Claude) comme 
   crédits ; repli fichiers `.data/` sans DB
 - **Paiement** : Stripe Checkout + webhook (achat de tokens)
 
+## Modules d'aventure
+
+L'app est multi-modules : la landing propose plusieurs aventures, une partie =
+un module choisi. Le moteur MCP, les prompts, la battlemap et les textes sont
+paramétrés par `adventureId`.
+
+| Couche | Où |
+|---|---|
+| Données de carte (rooms, rencontres, PNJ, hooks, startCell, joueur) | `adventures/<id>/map.ts` + registre `lib/adventure-map.ts` (importable par le moteur MCP) |
+| Contexte narratif (markdown) | `adventures/<id>/*.md`, chargé par `lib/context-loader.ts` (repli sur le module par défaut pour les règles génériques) |
+| Contenu app (landing, welcome, battlemap, placeholders, prompts) | `adventures/<id>/definition.ts` (`AdventureContent`), agrégé par `lib/adventures.ts` |
+| Battlemap pixel art | `public/battlemaps/<id>.png` |
+| Moteur | un process MCP par session, spawné avec `ADVENTURE_ID` (`mcp-server/adventure.ts`) |
+| Persistance | colonne `game_sessions.adventure_id` ; l'aventure de la session fait foi (bascule interdite → 409) |
+
+### Ajouter un module d'aventure
+
+1. `adventures/<id>/adventure-module.md` (format « ## Salle N » + « Point d'entrée »), `player-character.md`, et `map.ts` (exporter un `AdventureMapData` : rooms, entryCells, encounters — **types de monstres existants du moteur uniquement**, npcs, aliases, transitions, roomHooks, startCell, initialPlayer). Règles propres facultatives (`player-rules.md`, `dm-rules.md`) sinon repli automatique.
+2. `adventures/<id>/definition.ts` : exporter un `AdventureContent` (meta landing, `welcomeMessage`, `chatPlaceholders`, `roomStatusHints`, et surtout `promptGuidance` — le vocabulaire du module injecté dans les prompts DM ; **aucun terme d'un autre module**).
+3. Battlemap 17×15 : dupliquer `scripts/generate-battlemap-grammys-country-apple-pie.cjs` → `scripts/generate-battlemap-<id>.cjs`, sortie `public/battlemaps/<id>.png`.
+4. Enregistrer la carte dans `lib/adventure-map.ts` (`ADVENTURE_MAPS`), importer la définition dans `lib/adventures.ts` et l'ajouter à `AVAILABILITY`.
+5. Les tests `tests/adventure-modules.test.cjs` (cohérence) et `tests/no-module-leaks.test.cjs` (aucune fuite de vocabulaire inter-module) couvrent automatiquement le nouveau module. `npm test` doit rester vert.
+
+Détail complet du câblage : [docs/multi-adventure-architecture.md](docs/multi-adventure-architecture.md).
+
 ## Base de données (production)
 
 Définir `DATABASE_URL` bascule TOUTE la persistance sur Postgres :
@@ -49,16 +74,25 @@ pas automatiquement — voir l'en-tête de `scripts/db-import-file-stores.cjs`.
   [lib/stripe.ts](lib/stripe.ts).
 - `MONETIZATION_ENABLED=false` coupe le débit/quota (tests, dev hors runtime Next).
 
+**Mes parties** : la landing liste les parties en cours du joueur (`GET /api/sessions`,
+scoped par propriétaire) avec reprise multi-appareils. « Reprendre » ouvre
+`/game?adventure=<id>&session=<sid>` ; sur un appareil neuf (sessionStorage vide),
+la page réhydrate l'état et l'historique depuis `GET /api/sessions/<sid>`
+(vérifié en appartenance). Connecté = parties du compte ; invité = parties du
+cookie invité.
+
 ## Battlemap
 
-`public/battlemap.png` est générée en pixel art, exactement alignée sur la
-grille de jeu (17×15 cases) et les zones de `lib/adventure-map.ts` :
+Chaque module a sa battlemap `public/battlemaps/<id>.png`, générée en pixel art,
+exactement alignée sur la grille de jeu (17×15 cases) et les zones de
+`adventures/<id>/map.ts` :
 
 ```bash
-node scripts/generate-battlemap.cjs
+node scripts/generate-battlemap-grammys-country-apple-pie.cjs
+node scripts/generate-battlemap-tide-crypt.cjs
 ```
 
-À relancer si les zones de salles changent.
+À relancer si les zones de salles du module changent.
 
 ## Prérequis
 
@@ -98,9 +132,10 @@ non configurés » et le reste (auth, quota invité, jeu) est opérationnel.
 
 ### 3. Battlemap (générée)
 
-`/public/battlemap.png` est produite par `node scripts/generate-battlemap.cjs`
-(pixel art aligné sur la grille 17×15). Vous pouvez la remplacer par toute
-image respectant ce ratio ; en l'absence du fichier, un fond sombre est affiché.
+Les battlemaps `public/battlemaps/<id>.png` sont produites par
+`node scripts/generate-battlemap-<id>.cjs` (pixel art aligné sur la grille
+17×15). Vous pouvez les remplacer par toute image respectant ce ratio ; en
+l'absence du fichier, un fond sombre est affiché.
 
 ### 4. Cout LLM et tests sans appels payants
 
@@ -158,14 +193,18 @@ Le playtest agrège appels LLM, cout estime, routes `none/short/rich/blocked`, s
 > d'optimisation (dont l'évaluation de headroom-ai) :
 > [docs/cost-optimization.md](docs/cost-optimization.md).
 
-### 5. Fichiers de contexte (optionnel)
+### 5. Modules d'aventure
 
-Les quatre fichiers dans `/context/` sont pré-remplis avec une aventure complète :
+Chaque module vit dans son dossier `adventures/<id>/` :
 
-- `context/player-character.md` — Fiche, stats, équipement et historique du joueur
-- `context/player-rules.md` — Règles et capacités côté joueur
-- `context/dm-rules.md` — Tables de monstres, règles de combat
-- `context/adventure-module.md` — Carte des salles, monstres, trésors, triggers
+- `adventures/<id>/adventure-module.md` — Carte des salles, monstres, trésors, triggers
+- `adventures/<id>/player-character.md` — Fiche, stats, équipement du joueur
+- `adventures/<id>/player-rules.md` — Règles côté joueur *(optionnel : repli sur celles du module par défaut)*
+- `adventures/<id>/dm-rules.md` — Tables de monstres, règles de combat *(optionnel : repli sur le module par défaut)*
+- `adventures/<id>/map.ts` — Données typées (salles, rencontres, PNJ, hooks, `startCell`, joueur initial)
+
+Deux modules livrés : `grammys-country-apple-pie` (par défaut) et `tide-crypt`.
+Voir [« Ajouter un module d'aventure »](#ajouter-un-module-daventure) plus bas.
 
 ## Lancement
 

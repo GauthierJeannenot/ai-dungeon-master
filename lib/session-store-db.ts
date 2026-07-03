@@ -1,7 +1,7 @@
 import { dbQuery } from './db'
 import { logEvent, summarizeGameState } from './server-logger'
 import type { GameState, TurnTrace, ConversationTurn } from './types'
-import { SESSION_SCHEMA_VERSION, type StoredGameSession } from './session-store'
+import { SESSION_SCHEMA_VERSION, summarizeStoredSession, type StoredGameSession, type StoredSessionSummary } from './session-store'
 
 // Backend Postgres des sessions de jeu (table game_sessions). L'état, l'historique
 // et les traces sont stockés en JSONB — mêmes données que les fichiers
@@ -11,6 +11,7 @@ interface GameSessionRow {
   session_id: string
   schema_version: number
   owner_id: string | null
+  adventure_id: string | null
   game_state: GameState
   history: ConversationTurn[]
   summary_context: string | null
@@ -38,6 +39,7 @@ export async function loadSession(sessionId: string): Promise<StoredGameSession 
     schemaVersion: SESSION_SCHEMA_VERSION,
     sessionId: row.session_id,
     ownerId: row.owner_id ?? undefined,
+    adventureId: row.adventure_id ?? undefined,
     gameState: row.game_state,
     history: Array.isArray(row.history) ? row.history : [],
     summaryContext: row.summary_context ?? undefined,
@@ -64,11 +66,12 @@ export async function saveSession(
   const safeId = safeSessionId(sessionId)
   await dbQuery(
     `INSERT INTO game_sessions
-       (session_id, schema_version, owner_id, game_state, history, summary_context, turn_traces, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, now())
+       (session_id, schema_version, owner_id, adventure_id, game_state, history, summary_context, turn_traces, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now())
      ON CONFLICT (session_id) DO UPDATE SET
        schema_version = EXCLUDED.schema_version,
        owner_id = COALESCE(EXCLUDED.owner_id, game_sessions.owner_id),
+       adventure_id = COALESCE(EXCLUDED.adventure_id, game_sessions.adventure_id),
        game_state = EXCLUDED.game_state,
        history = EXCLUDED.history,
        summary_context = EXCLUDED.summary_context,
@@ -78,6 +81,7 @@ export async function saveSession(
       safeId,
       SESSION_SCHEMA_VERSION,
       data.ownerId ?? null,
+      data.adventureId ?? null,
       JSON.stringify(data.gameState),
       JSON.stringify(data.history ?? []),
       data.summaryContext ?? null,
@@ -106,4 +110,34 @@ export async function deleteSession(sessionId: string): Promise<void> {
   } else {
     logEvent('debug', 'session.delete.miss', { sessionId: safeId, backend: 'db' })
   }
+}
+
+// Résumés des parties d'un propriétaire, les plus récentes d'abord. On remonte
+// game_state + history (bornés à 200 tours par MAX_STORED_HISTORY_TURNS) et on
+// résume en JS — SQL portable (pas de fonctions JSONB, compatible pg-mem) et
+// cohérent avec le backend fichier.
+export async function listSessionsByOwner(ownerId: string, limit: number): Promise<StoredSessionSummary[]> {
+  const result = await dbQuery<{
+    session_id: string
+    adventure_id: string | null
+    updated_at: Date
+    game_state: GameState
+    history: ConversationTurn[]
+  }>(
+    `SELECT session_id, adventure_id, updated_at, game_state, history
+     FROM game_sessions
+     WHERE owner_id = $1
+     ORDER BY updated_at DESC
+     LIMIT $2`,
+    [ownerId, limit]
+  )
+  return result.rows.map(row =>
+    summarizeStoredSession(
+      row.session_id,
+      row.adventure_id ?? undefined,
+      new Date(row.updated_at).toISOString(),
+      row.game_state,
+      Array.isArray(row.history) ? row.history : []
+    )
+  )
 }

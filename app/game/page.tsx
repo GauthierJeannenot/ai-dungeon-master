@@ -1,59 +1,40 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useMemo, Suspense } from 'react'
 import dynamic from 'next/dynamic'
+import { useSearchParams, useRouter } from 'next/navigation'
 import Chat from '@/components/Chat'
 import CombatTracker from '@/components/CombatTracker'
 import Link from 'next/link'
 import { GameState, ChatMessage, DMResponse, DMRequest, ConversationTurn, DMClientMeta, type DMQuota, type DMTurnUsage } from '@/lib/types'
-import { seedAdventureNpcs } from '@/lib/adventure-map'
+import { getAdventure, DEFAULT_ADVENTURE_ID, type AdventureDefinition } from '@/lib/adventures'
+import { buildInitialGameState } from '@/lib/initial-game-state'
 
 // Battlemap uses browser APIs — load client-only
 const Battlemap = dynamic(() => import('@/components/Battlemap'), { ssr: false })
-
-const INITIAL_GAME_STATE: GameState = {
-  phase: 'exploration',
-  player: {
-    id: 'player',
-    name: 'Héros',
-    class: 'Guerrier',
-    level: 1,
-    hp: { current: 20, max: 20 },
-    ac: 16,
-    stats: { str: 16, dex: 12, con: 14, int: 10, wis: 12, cha: 10 },
-    proficiencyBonus: 2,
-    position: { x: 4, y: 13 },  // Chemin d'entrée — à côté de Mac le Tréant (bas-gauche)
-    conditions: [],
-    speed: 30,
-    inventory: [
-      { id: 'longsword', name: 'Épée longue', type: 'weapon', damage: '1d8+3' },
-      { id: 'shield', name: 'Bouclier', type: 'armor', acBonus: 2 },
-      { id: 'potion1', name: 'Potion de soin', type: 'potion', description: '2d4+2 HP' },
-    ],
-  },
-  monsters: {},
-  npcs: seedAdventureNpcs(),
-  initiativeOrder: [],
-  currentTurn: null,
-  round: 0,
-  movementUsed: {},
-  actionUsed: {},
-  combatLog: [],
-  roomsVisited: ['1'],
-  currentRoomId: '1',
-  encountersTriggered: [],
-}
 
 function generateId(): string {
   return `msg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
 }
 
-const SESSION_KEYS = {
-  sessionId: 'ai-dm-session-id',
-  gameState: 'ai-dm-game-state',
-  messages: 'ai-dm-messages',
-  summaryContext: 'ai-dm-summary-context',
-  budget: 'ai-dm-budget-summary',
+// Clés sessionStorage préfixées par module : changer d'aventure dans le même
+// onglet isole les états (deux parties de modules différents coexistent).
+interface SessionKeys {
+  sessionId: string
+  gameState: string
+  messages: string
+  summaryContext: string
+  budget: string
+}
+function makeSessionKeys(adventureId: string): SessionKeys {
+  const prefix = `ai-dm:${adventureId}:`
+  return {
+    sessionId: `${prefix}session-id`,
+    gameState: `${prefix}game-state`,
+    messages: `${prefix}messages`,
+    summaryContext: `${prefix}summary-context`,
+    budget: `${prefix}budget-summary`,
+  }
 }
 const CLIENT_DEBUG_LOG_KEY = 'ai-dm-client-debug-log-v1'
 const CLIENT_DEBUG_BROWSER_ID_KEY = 'ai-dm-client-debug-browser-id'
@@ -81,15 +62,25 @@ interface ClientBudgetSummary {
   lastLlmRoute: DMTurnUsage['llmRoute']
 }
 
-const WELCOME_MESSAGE = "Le vieux sorcier Tyndareus le Vert t'a engagé pour une mission singulière : retrouver la recette secrète des célèbres tartes aux pommes de Grammy. Après des jours de route, te voici enfin devant la vieille boulangerie, abandonnée depuis longtemps et, dit-on, infestée de gobelins. L'odeur des pommes du verger flotte encore dans l'air, et la porte entrebâillée t'invite à entrer. Que fais-tu ?"
-
-function createWelcomeMessage(): ChatMessage {
+function createWelcomeMessage(welcome: string): ChatMessage {
   return {
     id: generateId(),
     role: 'dm',
-    content: WELCOME_MESSAGE,
+    content: welcome,
     timestamp: Date.now(),
   }
+}
+
+// Reconstruit les bulles de chat depuis l'historique serveur (reprise de partie
+// sur un nouvel appareil : le sessionStorage local est vide).
+function historyToChatMessages(history: ConversationTurn[] | undefined): ChatMessage[] {
+  if (!Array.isArray(history)) return []
+  return history.map((turn, index) => ({
+    id: `hist-${index}-${Math.random().toString(36).slice(2, 7)}`,
+    role: turn.role,
+    content: turn.content,
+    timestamp: Date.now() + index,
+  }))
 }
 
 function emptyBudgetSummary(): ClientBudgetSummary {
@@ -155,13 +146,13 @@ function createClientRequestId(): string {
   return `client-${Date.now()}-${Math.random().toString(36).slice(2)}`
 }
 
-function getOrCreateSessionId(): string {
+function getOrCreateSessionId(keys: SessionKeys): string {
   try {
-    const existing = sessionStorage.getItem(SESSION_KEYS.sessionId)
+    const existing = sessionStorage.getItem(keys.sessionId)
     if (existing) return existing
 
     const next = createSessionId()
-    sessionStorage.setItem(SESSION_KEYS.sessionId, next)
+    sessionStorage.setItem(keys.sessionId, next)
     return next
   } catch {
     return createSessionId()
@@ -364,8 +355,13 @@ function phaseLabel(phase: GameState['phase']): { label: string; color: string }
   }
 }
 
-export default function GamePage() {
-  const [gameState, setGameState] = useState<GameState>(INITIAL_GAME_STATE)
+function GameView({ adventure, resumeSessionId }: { adventure: AdventureDefinition; resumeSessionId?: string | null }) {
+  // Clés sessionStorage et état initial DÉRIVÉS du module actif. Stables par
+  // adventure.id ; un changement de module (nouvelle URL) reconstruit tout.
+  const keys = useMemo(() => makeSessionKeys(adventure.id), [adventure.id])
+  const initialGameState = useMemo(() => buildInitialGameState(adventure.id), [adventure.id])
+
+  const [gameState, setGameState] = useState<GameState>(initialGameState)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [inputValue, setInputValue] = useState('')
@@ -393,47 +389,84 @@ export default function GamePage() {
       .catch(() => { /* affichage quota indisponible, le serveur reste l'arbitre */ })
   }, [])
 
-  // Restore the per-tab session after hydration. sessionStorage keeps refreshes coherent
-  // while still isolating separate browser tabs from one another.
+  // Restore the per-tab session after hydration. sessionStorage keeps refreshes
+  // coherent while still isolating separate browser tabs from one another.
+  // Cas particulier « reprise » (?session=<id>) : si le sessionStorage local est
+  // vide (nouvel appareil), on hydrate depuis le serveur.
   useEffect(() => {
-    const restoredSessionId = getOrCreateSessionId()
-    const restoredGameState = readSessionJson<GameState>(SESSION_KEYS.gameState)
-    const restoredMessages = readSessionJson<ChatMessage[]>(SESSION_KEYS.messages)
-    const restoredBudget = readSessionJson<ClientBudgetSummary>(SESSION_KEYS.budget)
+    let cancelled = false
 
-    setSessionId(restoredSessionId)
-    if (restoredGameState) setGameState(restoredGameState)
-    setMessages(restoredMessages?.length ? restoredMessages : [createWelcomeMessage()])
-    if (restoredBudget) setBudgetSummary(restoredBudget)
-    appendClientDebugLog(restoredSessionId, 'client.session.loaded', {
-      restoredGameState: Boolean(restoredGameState),
-      restoredMessages: restoredMessages?.length ?? 0,
-      gameState: summarizeClientGameState(restoredGameState ?? INITIAL_GAME_STATE),
-      budget: restoredBudget ?? emptyBudgetSummary(),
-    })
-    syncClientDebugLog(restoredSessionId).catch(err => {
-      console.error('Failed to sync client debug log:', err)
-    })
+    async function initSession() {
+      const localState = readSessionJson<GameState>(keys.gameState)
+      const localMessages = readSessionJson<ChatMessage[]>(keys.messages)
+      const localBudget = readSessionJson<ClientBudgetSummary>(keys.budget)
 
-    try {
-      setSummaryContext(sessionStorage.getItem(SESSION_KEYS.summaryContext) ?? undefined)
-    } catch { /* storage unavailable */ }
+      // Reprise demandée ET aucun état local pour ce module → hydratation serveur.
+      if (resumeSessionId && !(localState && localMessages?.length)) {
+        try {
+          const res = await fetch(`/api/sessions/${encodeURIComponent(resumeSessionId)}`)
+          if (res.ok) {
+            const data = await res.json()
+            if (cancelled) return
+            try { sessionStorage.setItem(keys.sessionId, resumeSessionId) } catch { /* storage unavailable */ }
+            const rebuilt = historyToChatMessages(data.history)
+            setSessionId(resumeSessionId)
+            setGameState(data.gameState ?? initialGameState)
+            setMessages(rebuilt.length ? rebuilt : [createWelcomeMessage(adventure.welcomeMessage)])
+            setSummaryContext(data.summaryContext ?? undefined)
+            setBudgetSummary(emptyBudgetSummary())
+            setHasLoadedSession(true)
+            return
+          }
+          // 403/404 → on retombe sur une nouvelle partie (code ci-dessous).
+        } catch { /* réseau indisponible : nouvelle partie */ }
+      }
 
-    setHasLoadedSession(true)
+      // Reprise sur le même navigateur : forcer le sessionId demandé.
+      if (resumeSessionId) {
+        try { sessionStorage.setItem(keys.sessionId, resumeSessionId) } catch { /* storage unavailable */ }
+      }
+
+      const restoredSessionId = getOrCreateSessionId(keys)
+      if (cancelled) return
+
+      setSessionId(restoredSessionId)
+      if (localState) setGameState(localState)
+      setMessages(localMessages?.length ? localMessages : [createWelcomeMessage(adventure.welcomeMessage)])
+      if (localBudget) setBudgetSummary(localBudget)
+      appendClientDebugLog(restoredSessionId, 'client.session.loaded', {
+        restoredGameState: Boolean(localState),
+        restoredMessages: localMessages?.length ?? 0,
+        gameState: summarizeClientGameState(localState ?? initialGameState),
+        budget: localBudget ?? emptyBudgetSummary(),
+      })
+      syncClientDebugLog(restoredSessionId).catch(err => {
+        console.error('Failed to sync client debug log:', err)
+      })
+
+      try {
+        setSummaryContext(sessionStorage.getItem(keys.summaryContext) ?? undefined)
+      } catch { /* storage unavailable */ }
+
+      setHasLoadedSession(true)
+    }
+
+    initSession()
+    return () => { cancelled = true }
   }, [])
 
   useEffect(() => {
     if (!hasLoadedSession) return
 
-    writeSessionJson(SESSION_KEYS.gameState, gameState)
-    writeSessionJson(SESSION_KEYS.messages, messages)
-    writeSessionJson(SESSION_KEYS.budget, budgetSummary)
+    writeSessionJson(keys.gameState, gameState)
+    writeSessionJson(keys.messages, messages)
+    writeSessionJson(keys.budget, budgetSummary)
 
     try {
       if (summaryContext) {
-        sessionStorage.setItem(SESSION_KEYS.summaryContext, summaryContext)
+        sessionStorage.setItem(keys.summaryContext, summaryContext)
       } else {
-        sessionStorage.removeItem(SESSION_KEYS.summaryContext)
+        sessionStorage.removeItem(keys.summaryContext)
       }
     } catch { /* storage unavailable */ }
   }, [budgetSummary, gameState, hasLoadedSession, messages, summaryContext])
@@ -441,7 +474,7 @@ export default function GamePage() {
   const logClientEvent = useCallback((event: string, payload: Record<string, unknown>) => {
     if (!hasLoadedSession) return
 
-    const activeSessionId = sessionId ?? getOrCreateSessionId()
+    const activeSessionId = sessionId ?? getOrCreateSessionId(keys)
     if (!sessionId) setSessionId(activeSessionId)
 
     appendClientDebugLog(activeSessionId, event, payload)
@@ -456,7 +489,7 @@ export default function GamePage() {
     setIsLoading(true)
     setInputValue('')
 
-    const activeSessionId = sessionId ?? getOrCreateSessionId()
+    const activeSessionId = sessionId ?? getOrCreateSessionId(keys)
     if (!sessionId) setSessionId(activeSessionId)
     const clientRequestId = createClientRequestId()
 
@@ -483,6 +516,7 @@ export default function GamePage() {
         message: text,
         clientRequestId,
         sessionId: activeSessionId,
+        adventureId: adventure.id,
         gameState,
         history,
         summaryContext,
@@ -640,16 +674,16 @@ export default function GamePage() {
     const nextSessionId = createSessionId()
 
     try {
-      sessionStorage.setItem(SESSION_KEYS.sessionId, nextSessionId)
-      sessionStorage.removeItem(SESSION_KEYS.gameState)
-      sessionStorage.removeItem(SESSION_KEYS.messages)
-      sessionStorage.removeItem(SESSION_KEYS.summaryContext)
-      sessionStorage.removeItem(SESSION_KEYS.budget)
+      sessionStorage.setItem(keys.sessionId, nextSessionId)
+      sessionStorage.removeItem(keys.gameState)
+      sessionStorage.removeItem(keys.messages)
+      sessionStorage.removeItem(keys.summaryContext)
+      sessionStorage.removeItem(keys.budget)
     } catch { /* storage unavailable */ }
 
     setSessionId(nextSessionId)
-    setGameState(INITIAL_GAME_STATE)
-    setMessages([createWelcomeMessage()])
+    setGameState(initialGameState)
+    setMessages([createWelcomeMessage(adventure.welcomeMessage)])
     setSummaryContext(undefined)
     setBudgetSummary(emptyBudgetSummary())
     setError(null)
@@ -735,8 +769,14 @@ export default function GamePage() {
       <div className="flex flex-col lg:flex-row flex-1 overflow-hidden">
         {/* Left: Battlemap (65%) */}
         <div className="flex-[45] lg:flex-[65] min-w-0 min-h-0 p-2 overflow-hidden">
-          <Battlemap gameState={gameState} cellSize={52} />
-          {/* Carte : Grammy's Bakery (~880×800px) — grille 17×15 cases à 52px */}
+          <Battlemap
+            gameState={gameState}
+            cellSize={52}
+            image={adventure.battlemapImage}
+            cols={adventure.grid.cols}
+            rows={adventure.grid.rows}
+          />
+          {/* Battlemap et grille fournies par le module d'aventure actif */}
         </div>
 
         {/* Right: Chat + CombatTracker (35%) */}
@@ -790,10 +830,40 @@ export default function GamePage() {
               inputValue={inputValue}
               onInputChange={setInputValue}
               onClientEvent={logClientEvent}
+              placeholders={adventure.chatPlaceholders}
+              roomStatusHints={adventure.roomStatusHints}
             />
           </div>
         </div>
       </div>
     </div>
+  )
+}
+
+// Résout le module depuis ?adventure=<id>. Module inconnu ou verrouillé →
+// retour à l'accueil (on ne joue que du disponible). useSearchParams impose un
+// Suspense boundary côté Next.
+function GamePageResolver() {
+  const params = useSearchParams()
+  const router = useRouter()
+  const requested = params.get('adventure') ?? DEFAULT_ADVENTURE_ID
+  const resumeSessionId = params.get('session')
+  const adventure = getAdventure(requested)
+  const playable = adventure?.available ? adventure : null
+
+  useEffect(() => {
+    if (!playable) router.replace('/')
+  }, [playable, router])
+
+  if (!playable) return null
+  // key : un changement de module remonte un GameView neuf (états/refs isolés).
+  return <GameView key={playable.id} adventure={playable} resumeSessionId={resumeSessionId} />
+}
+
+export default function GamePage() {
+  return (
+    <Suspense fallback={<div className="h-screen bg-stone-950" />}>
+      <GamePageResolver />
+    </Suspense>
   )
 }

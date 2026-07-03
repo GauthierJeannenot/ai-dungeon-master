@@ -1,11 +1,10 @@
-# Directives — Architecture multi-modules d'aventure
+# Architecture multi-modules d'aventure
 
-> **Document d'exécution.** Il décrit le refactor qui permettra de jouer
-> plusieurs modules d'aventure (Grammy's + La Crypte des Marées + suivants).
-> Le contenu du second module existe déjà et est validé par des tests
-> (`adventures/tide-crypt/`, `tests/tide-crypt-module.test.cjs`) : il sert de
-> banc d'essai de l'abstraction. Suivre les étapes DANS L'ORDRE — chacune
-> laisse le jeu Grammy's fonctionnel et les tests verts.
+> ✅ **REFACTOR TERMINÉ** (étapes 1→7 livrées). Le jeu est multi-modules :
+> Grammy's et La Crypte des Marées sont jouables depuis la landing. Ce document
+> reste comme référence de conception ; pour **ajouter un module**, suivre la
+> checklist courte du README (« Ajouter un module d'aventure »). Le détail
+> étape par étape ci-dessous documente comment le câblage a été fait.
 
 ## Objectif
 

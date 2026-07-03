@@ -16,11 +16,44 @@ export interface StoredGameSession {
   // "user:<id>" ou "guest:<id>" — créateur de la partie. undefined pour les
   // sessions antérieures à ce champ ou créées hors monétisation.
   ownerId?: string
+  // Module d'aventure de la partie. undefined pour les sessions antérieures à
+  // ce champ → traitées comme le module par défaut (Grammy's) par la route.
+  adventureId?: string
   gameState: GameState
   history: ConversationTurn[]
   summaryContext?: string
   turnTraces?: TurnTrace[]
   updatedAt: string
+}
+
+// Résumé léger d'une partie pour l'écran « Mes parties » (sans l'état complet).
+export interface StoredSessionSummary {
+  sessionId: string
+  adventureId?: string
+  updatedAt: string
+  phase: string
+  playerHp: { current: number; max: number }
+  currentRoomId: string | null
+  // Nombre de messages joueur (≈ nombre de tours joués).
+  turnCount: number
+}
+
+export function summarizeStoredSession(
+  sessionId: string,
+  adventureId: string | undefined,
+  updatedAt: string,
+  gameState: GameState,
+  history: ConversationTurn[]
+): StoredSessionSummary {
+  return {
+    sessionId,
+    adventureId: adventureId ?? gameState?.adventureId,
+    updatedAt,
+    phase: gameState?.phase ?? 'exploration',
+    playerHp: gameState?.player?.hp ?? { current: 0, max: 0 },
+    currentRoomId: gameState?.currentRoomId ?? null,
+    turnCount: history.filter(turn => turn.role === 'player').length,
+  }
 }
 
 const DEFAULT_SESSION_DIR = path.join(process.cwd(), '.data', 'sessions')
@@ -47,6 +80,7 @@ function normalizeStoredSession(raw: unknown, requestedSessionId: string): Store
     schemaVersion: SESSION_SCHEMA_VERSION,
     sessionId: safeSessionId(record.sessionId ?? requestedSessionId),
     ownerId: typeof record.ownerId === 'string' ? record.ownerId : undefined,
+    adventureId: typeof record.adventureId === 'string' ? record.adventureId : undefined,
     gameState: record.gameState as GameState,
     history: Array.isArray(record.history) ? record.history : [],
     summaryContext: typeof record.summaryContext === 'string' ? record.summaryContext : undefined,
@@ -132,6 +166,26 @@ export async function saveSession(
     turnTraceCount: payload.turnTraces?.length ?? 0,
     gameState: summarizeGameState(payload.gameState),
   })
+}
+
+// Résumés des parties d'un propriétaire ("user:<id>" / "guest:<id>"), les plus
+// récentes d'abord. Alimente l'écran « Mes parties » (reprise multi-appareils).
+export async function listSessionsByOwner(
+  ownerId: string,
+  limit = 50
+): Promise<StoredSessionSummary[]> {
+  if (isDatabaseEnabled()) {
+    return dbSessions.listSessionsByOwner(ownerId, limit)
+  }
+
+  const sessions = await listFileSessions()
+  return sessions
+    .filter(session => session.ownerId === ownerId)
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+    .slice(0, limit)
+    .map(session =>
+      summarizeStoredSession(session.sessionId, session.adventureId, session.updatedAt, session.gameState, session.history)
+    )
 }
 
 // Lecture brute du backend fichier (script d'import vers Postgres).

@@ -1,5 +1,6 @@
 import type {
   AdventureRoom,
+  AdventureMapData,
   EncounterDefinition,
   AdventureNpcSpec,
   AdventureTransition,
@@ -221,4 +222,32 @@ export function describeTideCryptRoomHooks(roomId: string | null | undefined): s
   const hooks = TIDE_CRYPT_ROOM_HOOKS[roomId]
   if (!room || !hooks) return null
   return `Salle ${room.id} — ${room.name}\n${hooks}`
+}
+
+// Agrégat consommé par le registre lib/adventure-map.ts (getAdventureMap).
+// La crypte n'a pas d'alias de contexte dédiés → roomContextAliases vide (le
+// moteur retombe alors sur roomNavigationAliases).
+export const TIDE_CRYPT_MAP: AdventureMapData = {
+  startCell: TIDE_CRYPT_START_CELL,
+  // Héros niveau 2 (suite de Grammy's) : 28 PV, deux potions.
+  initialPlayer: {
+    level: 2,
+    hp: { current: 28, max: 28 },
+    inventory: [
+      { id: 'longsword', name: 'Épée longue', type: 'weapon', damage: '1d8+3', description: 'Épée longue +3 STR' },
+      { id: 'shield', name: 'Bouclier', type: 'armor', acBonus: 2, description: 'Bouclier standard' },
+      { id: 'potion1', name: 'Potion de soin', type: 'potion', description: 'Restaure 2d4+2 HP' },
+      { id: 'potion2', name: 'Potion de soin', type: 'potion', description: 'Restaure 2d4+2 HP' },
+    ],
+  },
+  rooms: TIDE_CRYPT_ROOMS,
+  entryCells: TIDE_CRYPT_ENTRY_CELLS,
+  encounters: TIDE_CRYPT_ENCOUNTERS,
+  npcs: TIDE_CRYPT_NPCS,
+  namedLocationCells: TIDE_CRYPT_NAMED_LOCATION_CELLS,
+  roomNavigationAliases: TIDE_CRYPT_ROOM_NAVIGATION_ALIASES,
+  roomContextAliases: [],
+  doorTransitions: TIDE_CRYPT_DOOR_TRANSITIONS,
+  forwardTransitions: TIDE_CRYPT_FORWARD_TRANSITIONS,
+  roomHooks: TIDE_CRYPT_ROOM_HOOKS,
 }

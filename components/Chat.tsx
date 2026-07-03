@@ -11,6 +11,11 @@ interface ChatProps {
   inputValue: string
   onInputChange: (v: string) => void
   onClientEvent?: (event: string, payload: Record<string, unknown>) => void
+  // Placeholders du champ de saisie par salle (clé 'default' = repli), fournis
+  // par le module d'aventure actif.
+  placeholders?: Record<string, string[]>
+  // Indices de statut par salle (hors combat), fournis par le module actif.
+  roomStatusHints?: Record<string, string>
 }
 
 interface BrowserSpeechRecognitionAlternative {
@@ -71,6 +76,9 @@ const MAX_RECOGNITION_AUTO_RESTARTS = 20
 const MAX_RECOGNITION_SESSION_MS = 120_000
 const RECOGNITION_RESTART_DELAY_MS = 160
 
+// Placeholders GÉNÉRIQUES, indépendants du module (états combat/agonie/dialogue,
+// et repli d'exploration). Les invites propres à un module (par salle) viennent
+// de sa définition (chatPlaceholders) — voir selectPlaceholder.
 const PLACEHOLDERS = {
   combat: [
     'Frapper le plus proche, reculer vers la porte, tenter une intimidation...',
@@ -82,44 +90,35 @@ const PLACEHOLDERS = {
   ],
   dialogue: [
     'Mentir avec aplomb, proposer un marché, demander le détail qui fâche...',
-    'Sourire trop fort, négocier la recette, accuser une odeur suspecte...',
-  ],
-  bakeryEntrance: [
-    "Amadouer l'arbre, forcer la porte, accuser une pomme d'espionnage...",
-    "Inspecter l'écorce, toquer à la porte, flairer le piège à tarte...",
-  ],
-  bakeryFloor: [
-    'Négocier avec Grukk, lever le bouclier, demander qui tient la recette...',
-    'Observer les gobelins, chercher une sortie, parler plus fort que le danger...',
+    'Sourire trop fort, négocier un passage, débusquer le mensonge...',
   ],
   exploration: [
-    "Fouiller les comptoirs, écouter derrière une porte, suivre l'odeur de cannelle...",
-    'Avancer prudemment, tenter un plan bancal, faire confiance au nez...',
+    "Fouiller les lieux, écouter derrière une porte, suivre une piste...",
+    "Avancer prudemment, tenter un plan bancal, se fier à son instinct...",
   ],
 }
 
-function selectPlaceholder(gameState: GameState, messageCount: number): string {
-  if (gameState.player.hp.current <= 0) {
-    return PLACEHOLDERS.dying[messageCount % PLACEHOLDERS.dying.length]
-  }
+function pick(list: string[], index: number): string {
+  return list[index % list.length]
+}
 
-  if (gameState.phase === 'combat') {
-    return PLACEHOLDERS.combat[messageCount % PLACEHOLDERS.combat.length]
-  }
+function selectPlaceholder(
+  gameState: GameState,
+  messageCount: number,
+  adventurePlaceholders?: Record<string, string[]>
+): string {
+  // États génériques (combat, agonie, dialogue) : indépendants du module.
+  if (gameState.player.hp.current <= 0) return pick(PLACEHOLDERS.dying, messageCount)
+  if (gameState.phase === 'combat') return pick(PLACEHOLDERS.combat, messageCount)
+  if (gameState.phase === 'dialogue') return pick(PLACEHOLDERS.dialogue, messageCount)
 
-  if (gameState.phase === 'dialogue') {
-    return PLACEHOLDERS.dialogue[messageCount % PLACEHOLDERS.dialogue.length]
-  }
+  // Exploration : placeholders du module actif (par salle, puis 'default'),
+  // avec repli sur les invites d'exploration génériques.
+  const roomId = gameState.currentRoomId
+  const fromAdventure = (roomId && adventurePlaceholders?.[roomId]) || adventurePlaceholders?.default
+  if (fromAdventure && fromAdventure.length > 0) return pick(fromAdventure, messageCount)
 
-  if (gameState.currentRoomId === '9' || gameState.currentRoomId === '8' || gameState.currentRoomId === '7') {
-    return PLACEHOLDERS.bakeryFloor[messageCount % PLACEHOLDERS.bakeryFloor.length]
-  }
-
-  if (!gameState.currentRoomId || gameState.currentRoomId === '1') {
-    return PLACEHOLDERS.bakeryEntrance[messageCount % PLACEHOLDERS.bakeryEntrance.length]
-  }
-
-  return PLACEHOLDERS.exploration[messageCount % PLACEHOLDERS.exploration.length]
+  return pick(PLACEHOLDERS.exploration, messageCount)
 }
 
 function getSpeechRecognitionConstructor(): BrowserSpeechRecognitionConstructor | null {
@@ -258,11 +257,11 @@ function playerMovementAllowance(gameState: GameState): number {
   return Math.floor(gameState.player.speed / 5)
 }
 
-function describePlayerTurn(gameState: GameState): string {
+function describePlayerTurn(gameState: GameState, roomStatusHints?: Record<string, string>): string {
   if (gameState.phase !== 'combat') {
-    if (gameState.currentRoomId === '8') return 'Les fours claquent: parle, fouille, provoque, ou cherche une sortie.'
-    if (gameState.currentRoomId === '9') return "Grammy n'est plus tres loin: arrache une info, negocie, ou tente un coup."
-    if (gameState.currentRoomId === '4') return "Les traces menent aux fours; une autre piste grimpe vers l'appartement."
+    // Indice de statut propre à la salle courante, fourni par le module actif.
+    const hint = gameState.currentRoomId ? roomStatusHints?.[gameState.currentRoomId] : undefined
+    if (hint) return hint
     return 'Dis ce que tu fais, ce que tu demandes, ou le risque que tu prends.'
   }
 
@@ -338,6 +337,8 @@ export default function Chat({
   inputValue,
   onInputChange,
   onClientEvent,
+  placeholders,
+  roomStatusHints,
 }: ChatProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -361,7 +362,7 @@ export default function Chat({
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([])
   const [selectedVoiceURI, setSelectedVoiceURI] = useState<string | undefined>(undefined)
 
-  const placeholder = selectPlaceholder(gameState, messages.length)
+  const placeholder = selectPlaceholder(gameState, messages.length, placeholders)
 
   const logVoiceEvent = useCallback((event: string, payload: Record<string, unknown>) => {
     onClientEvent?.(event, {
@@ -788,7 +789,7 @@ export default function Chat({
     }
   }
 
-  const playerTurnStatus = describePlayerTurn(gameState)
+  const playerTurnStatus = describePlayerTurn(gameState, roomStatusHints)
   const voiceStatus = voiceError
     ? voiceError
     : isListening

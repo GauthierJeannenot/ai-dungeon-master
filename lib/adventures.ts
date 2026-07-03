@@ -1,54 +1,117 @@
-// Registre des modules d'aventure proposés sur la landing page.
-// Un seul module est jouable pour l'instant ; les suivants sont des placeholders
-// affichés verrouillés. Pour ajouter un module : créer ses fichiers de contexte
-// (context/), sa carte (public/) et l'entrée ci-dessous avec available: true.
+import { getAdventureMap, DEFAULT_ADVENTURE_ID, type AdventureMapData } from './adventure-map'
+import { GRAMMYS_CONTENT } from '../adventures/grammys-country-apple-pie/definition'
+import { TIDE_CRYPT_CONTENT } from '../adventures/tide-crypt/definition'
 
-export interface AdventureModule {
+// ─────────────────────────────────────────────────────────────────────────────
+// Registre des modules d'aventure — pur AGRÉGATEUR.
+//
+// Le contenu propre à chaque module (meta landing, welcome, placeholders,
+// indices de statut, vocabulaire des prompts) vit dans adventures/<id>/
+// definition.ts. La couche « carte/moteur » (rooms, encounters, npcs…) vit dans
+// lib/adventure-map.ts + adventures/<id>/map.ts (aussi importable par le serveur
+// MCP). Ce fichier ne fait que fusionner les deux avec l'« exploitation »
+// (disponibilité + chemin de jeu) et exposer les accesseurs côté app.
+//
+// Pour ajouter un module : voir la checklist du README (« Ajouter un module »).
+// ─────────────────────────────────────────────────────────────────────────────
+
+export { DEFAULT_ADVENTURE_ID }
+
+export type AdventureAccent = 'amber' | 'emerald' | 'purple'
+
+// Vocabulaire du module injecté dans les prompts DM (prompts.ts + planner.ts) à
+// la place de valeurs en dur : garde les prompts d'un module exempts du
+// vocabulaire d'un autre. Voir docs/adventure-content-consolidation.md.
+export interface AdventurePromptGuidance {
+  /** Exemple d'intention de déplacement propre au module (« je vais au verger »). */
+  movementExample: string
+  /** Lieux nommés du module, en une liste lisible (« verger, tas de déchets, … »). */
+  namedPlaces: string
+  /** PNJ visible dès le départ, exemple pour la règle des tokens (« Mac dès le départ »). */
+  visibleNpcExample: string
+  /** PNJ non hostiles que run_monster_turns ignore (« Mac le Tréant, la dryade… »). */
+  nonHostileNpcs: string
+  /** 4-6 exemples « message → décision » pour le classifieur, dont un reveal_npc du module. */
+  plannerExamples: string[]
+  /** Exemple de marqueur reveal_npc du module (« reveal_npc:dryad » / « reveal_npc:ghost »). */
+  revealNpcKindExample: string
+}
+
+// Contenu APP d'un module (adventures/<id>/definition.ts). Ne contient que du
+// contenu propre au module — ni la carte moteur, ni l'exploitation (available,
+// playPath), ajoutées par le registre ci-dessous.
+export interface AdventureContent {
   id: string
   title: string
   tagline: string
   description: string
   level: string
   duration: string
+  /** Accent visuel de la carte sur la landing. */
+  accent: AdventureAccent
+  /** Image de battlemap servie (public/battlemaps/<id>.png). */
+  battlemapImage: string
+  /** Dimensions de la grille (17×15 pour les deux modules actuels). */
+  grid: { cols: number; rows: number }
+  /** Message d'ouverture du DM affiché avant le premier message du joueur. */
+  welcomeMessage: string
+  /** Placeholders du champ de saisie par salle (clé 'default' = repli). */
+  chatPlaceholders?: Record<string, string[]>
+  /** Indices de statut par salle (ligne au-dessus du champ, hors combat). */
+  roomStatusHints?: Record<string, string>
+  /** Vocabulaire injecté dans les prompts DM. */
+  promptGuidance: AdventurePromptGuidance
+}
+
+// Module COMPLET côté app : contenu + exploitation + carte moteur.
+export interface AdventureDefinition extends AdventureContent {
   available: boolean
   /** Chemin de la page de jeu pour ce module. */
   playPath?: string
-  /** Accent visuel de la carte sur la landing. */
-  accent: 'amber' | 'emerald' | 'purple'
+  /** Dossier des fichiers de contexte markdown (adventures/<id>). */
+  contextDir: string
+  /** Carte moteur du module (rooms, encounters, npcs, hooks, startCell…). */
+  map: AdventureMapData
 }
 
-export const ADVENTURES: AdventureModule[] = [
-  {
-    id: 'grammys-country-apple-pie',
-    title: "Grammy's Country Apple Pie",
-    tagline: 'La recette perdue de la meilleure tarte du royaume',
-    description:
-      "La boulangerie de Grammy est abandonnée — et infestée de gobelins. Le sorcier Tyndareus le Vert t'engage pour retrouver la recette secrète de ses légendaires tartes aux pommes. Verger enchanté, dryades susceptibles, tréant bougon et Chef Grukk t'attendent.",
-    level: 'Niveau 1 · D&D 5e',
-    duration: '~1-2 h',
-    available: true,
-    playPath: '/game',
-    accent: 'amber',
-  },
-  {
-    // Contenu COMPLET dans adventures/tide-crypt/ (module, carte typée, fiche
-    // perso niv.2, battlemap public/battlemaps/tide-crypt.png). Reste verrouillé
-    // tant que le moteur est câblé sur Grammy's — le plan de câblage est dans
-    // docs/multi-adventure-architecture.md ; passer available:true à l'étape 7.
-    id: 'tide-crypt',
-    title: 'La Crypte des Marées',
-    tagline: 'La Flamme du phare dort dans un tombeau que la mer découvre',
-    description:
-      "Le phare de Kerlouan s'est éteint et les navires manquent la passe. À la lune noire, la marée dénude une chaussée de pierres qui descend vers la crypte de Morgane, première Gardienne des Marées. Ses marins morts veillent encore — rapportez la Flamme, poliment si possible.",
-    level: 'Niveau 2 · D&D 5e',
-    duration: '~2-3 h',
-    available: false,
-    accent: 'purple',
-  },
-]
+// Disponibilité par module — « exploitation », pas du contenu : un module peut
+// être présent dans le registre mais verrouillé (placeholder landing).
+const AVAILABILITY: Record<string, boolean> = {
+  'grammys-country-apple-pie': true,
+  'tide-crypt': true,
+}
 
-export function getAdventure(id: string): AdventureModule | null {
+function toDefinition(content: AdventureContent): AdventureDefinition {
+  return {
+    ...content,
+    available: AVAILABILITY[content.id] ?? false,
+    playPath: `/game?adventure=${content.id}`,
+    contextDir: `adventures/${content.id}`,
+    map: getAdventureMap(content.id),
+  }
+}
+
+export const ADVENTURES: AdventureDefinition[] = [GRAMMYS_CONTENT, TIDE_CRYPT_CONTENT].map(toDefinition)
+
+export function getAdventure(id: string | null | undefined): AdventureDefinition | null {
+  if (!id) return null
   return ADVENTURES.find(adventure => adventure.id === id) ?? null
 }
 
-export const DEFAULT_ADVENTURE_ID = 'grammys-country-apple-pie'
+// Résout un module JOUABLE : lève si l'id est inconnu ou verrouillé. Utilisé par
+// la route DM et la page de jeu (sécurité : on ne démarre que du disponible).
+export function requireAvailableAdventure(id: string | null | undefined): AdventureDefinition {
+  const adventure = getAdventure(id ?? DEFAULT_ADVENTURE_ID)
+  if (!adventure) {
+    throw new Error(`Module d'aventure inconnu : "${id}"`)
+  }
+  if (!adventure.available) {
+    throw new Error(`Module d'aventure non disponible : "${id}"`)
+  }
+  return adventure
+}
+
+// Définition complète du module, défaut si id inconnu (fail-safe lecture seule).
+export function getAdventureDefinition(id: string | null | undefined): AdventureDefinition {
+  return getAdventure(id) ?? getAdventure(DEFAULT_ADVENTURE_ID)!
+}

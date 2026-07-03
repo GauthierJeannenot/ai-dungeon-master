@@ -8,6 +8,7 @@ import { TOKEN_PACKAGES } from '@/lib/token-packages'
 import { isStripeConfigured } from '@/lib/stripe'
 import AuthControls from '@/components/landing/AuthControls'
 import BuyTokensPanel from '@/components/landing/BuyTokensPanel'
+import MyGamesPanel from '@/components/landing/MyGamesPanel'
 
 // Landing page — choix du module d'aventure, connexion OAuth et achat de tokens.
 // Server Component : l'état (session, solde, quota invité) est lu côté serveur.
@@ -93,6 +94,9 @@ export default async function LandingPage() {
           </div>
         </section>
 
+        {/* Mes parties en cours (masqué s'il n'y en a aucune) */}
+        <MyGamesPanel />
+
         {/* Modules d'aventure */}
         <section className="pb-14">
           <h2 className="text-xl font-bold text-stone-200 mb-1">Modules d&apos;aventure</h2>
@@ -147,7 +151,7 @@ export default async function LandingPage() {
           <p className="text-sm text-stone-500 mb-6">
             Un token = un message envoyé au Dungeon Master. Les nouveaux comptes reçoivent
             des tokens de bienvenue ; les visiteurs anonymes disposent de {GUEST_MESSAGE_LIMIT} messages
-            d&apos;essai sur Grammy&apos;s Country Apple Pie.
+            d&apos;essai, quel que soit le module.
           </p>
           <BuyTokensPanel
             authenticated={Boolean(session?.userId)}
