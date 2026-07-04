@@ -80,20 +80,11 @@ export interface CombatLogEntry {
 
 export type GamePhase = 'exploration' | 'combat' | 'dialogue'
 
-export interface SceneMemory {
-  madeNoise?: boolean
-  insultedMac?: boolean
-  foundRecipeHalfCount?: number
-  sparedGoblin?: boolean
-  tension?: number
-  alertLevel?: number
-  macDisposition?: 'neutral' | 'helpful' | 'offended'
-  goblinMorale?: 'steady' | 'shaken' | 'broken'
-  patrolPressure?: 'quiet' | 'stirring' | 'hunting'
-  lastDirectorBeats?: string[]
-  lastWorldSignals?: string[]
-  updatedAt?: string
-}
+// Mémoire de scène libre, propre au module (clés non typées : le contenu
+// appartient à adventures/<id>/, le code partagé ne fait que la transporter et
+// la round-tripper — pas de vocabulaire de module dans lib/). Le champ reste
+// déclaré sur GameState pour survivre à replace_game_state (états legacy JSONB).
+export type SceneMemory = Record<string, unknown>
 
 export interface WorldRoomState {
   id: string

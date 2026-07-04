@@ -104,20 +104,10 @@ const CombatLogEntrySchema = z.object({
   timestamp: z.number(),
 })
 
-const SceneMemorySchema = z.object({
-  madeNoise: z.boolean().optional(),
-  insultedMac: z.boolean().optional(),
-  foundRecipeHalfCount: z.number().int().min(0).max(2).optional(),
-  sparedGoblin: z.boolean().optional(),
-  tension: z.number().int().min(0).max(6).optional(),
-  alertLevel: z.number().int().min(0).max(5).optional(),
-  macDisposition: z.enum(['neutral', 'helpful', 'offended']).optional(),
-  goblinMorale: z.enum(['steady', 'shaken', 'broken']).optional(),
-  patrolPressure: z.enum(['quiet', 'stirring', 'hunting']).optional(),
-  lastDirectorBeats: z.array(z.string()).optional(),
-  lastWorldSignals: z.array(z.string()).optional(),
-  updatedAt: z.string().optional(),
-})
+// Mémoire de scène libre : clés propres au module, non typées ici (le moteur ne
+// fait que la round-tripper). z.record garantit la survie des états legacy sans
+// coder de vocabulaire de module dans le moteur.
+const SceneMemorySchema = z.record(z.string(), z.unknown())
 
 const GameStateSchema = z.object({
   phase: z.enum(['exploration', 'combat', 'dialogue']),

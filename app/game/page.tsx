@@ -214,14 +214,9 @@ function summarizeClientGameState(state: GameState): Record<string, unknown> {
     room: state.currentRoomId,
     roomsVisitedCount: state.roomsVisited.length,
     combatLogCount: state.combatLog.length,
-    sceneMemory: state.sceneMemory ? {
-      tension: state.sceneMemory.tension,
-      alertLevel: state.sceneMemory.alertLevel,
-      macDisposition: state.sceneMemory.macDisposition,
-      goblinMorale: state.sceneMemory.goblinMorale,
-      patrolPressure: state.sceneMemory.patrolPressure,
-      lastDirectorBeats: state.sceneMemory.lastDirectorBeats,
-    } : null,
+    // sceneMemory est un Record libre propre au module : passthrough sans
+    // référencer de clé de module (le débug affiche ce que le module y a mis).
+    sceneMemory: state.sceneMemory ?? null,
   }
 }
 
@@ -714,7 +709,7 @@ function GameView({ adventure, resumeSessionId }: { adventure: AdventureDefiniti
   const quotaExhausted = quota
     ? (quota.kind === 'user' ? (quota.balance ?? 0) <= 0 : (quota.remaining ?? 0) <= 0)
     : false
-  const alertLevel = gameState.sceneMemory?.alertLevel ?? 0
+  const alertLevel = Number(gameState.sceneMemory?.alertLevel ?? 0)
   const alertColor = alertLevel >= 4 ? 'text-red-300' : alertLevel >= 2 ? 'text-amber-300' : 'text-stone-300'
 
   return (
