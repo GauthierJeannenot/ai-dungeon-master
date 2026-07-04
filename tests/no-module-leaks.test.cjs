@@ -17,7 +17,7 @@ const SCAN_DIRS = ['lib', 'components', 'app']
 const EXTENSIONS = new Set(['.ts', '.tsx'])
 
 // Slugs d'identifiant de module : légitimes partout (imports, registre, clés).
-const MODULE_SLUGS = [/grammys-country-apple-pie/g, /tide-crypt/g]
+const MODULE_SLUGS = [/grammys-country-apple-pie/g, /tide-crypt/g, /fey-shadow-fair/g]
 
 // Vocabulaire narratif/bestiaire qui ne doit pas fuir. Bornes de mots pour éviter
 // les faux positifs (« started » contient « tarte », etc.).
@@ -32,6 +32,14 @@ const LEAK_TERMS = [
   // Identifiants de clés de SceneMemory propres à Grammy's : ne doivent plus
   // apparaître dans le code partagé (SceneMemory est désormais un Record libre).
   /insultedmac|macdisposition|goblinmorale|foundrecipehalf|sparedgoblin/i,
+  // Vocabulaire « La Foire du Voleur d'Ombres » (fey-shadow-fair).
+  /\bbois[- ]ricanant\b/i,
+  /\bvoleur d'ombres\b/i,
+  /\bmadame bougie\b/i,
+  /\bprince des farces\b/i,
+  /\bbonneteau\b/i,
+  /\bfarfadets?\b/i,
+  /\bchiens?[- ]clins?\b/i,
 ]
 
 function stripCommentsAndSlugs(source) {

@@ -53,9 +53,9 @@ décrite dans README.md, docs/intent-pipeline.md ou .env.example :
 - docs/multi-adventure-architecture.md,
   docs/adventure-content-consolidation.md et docs/postgres-only-migration.md
   sont TERMINÉS (référence de conception, pas du travail à faire).
-- docs/multi-map-adventures.md est une CIBLE EN COURS (aventures à plusieurs
-  maps) : sa section « État d'avancement » fait foi. Pour implémenter, suivre
-  ce document et le mettre à jour dans le même commit que toute avancée.
+- docs/multi-map-adventures.md est IMPLÉMENTÉ (référence de conception des
+  aventures multi-maps ; premier module : adventures/fey-shadow-fair/). Le
+  maintenir à jour dans le même commit que toute évolution du multi-map.
 
 ## Invariants transverses (ne pas casser)
 

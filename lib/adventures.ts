@@ -1,6 +1,7 @@
 import { getAdventureMap, DEFAULT_ADVENTURE_ID, type AdventureMapData } from './adventure-map'
 import { GRAMMYS_CONTENT } from '../adventures/grammys-country-apple-pie/definition'
 import { TIDE_CRYPT_CONTENT } from '../adventures/tide-crypt/definition'
+import { FEY_SHADOW_FAIR_CONTENT } from '../adventures/fey-shadow-fair/definition'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Registre des modules d'aventure — pur AGRÉGATEUR.
@@ -93,6 +94,7 @@ export interface AdventureDefinition extends AdventureContent {
 const AVAILABILITY: Record<string, boolean> = {
   'grammys-country-apple-pie': true,
   'tide-crypt': true,
+  'fey-shadow-fair': true,
 }
 
 // Modules payants (accès à acheter, une fois, par compte connecté) et leur prix
@@ -118,7 +120,7 @@ function toDefinition(content: AdventureContent): AdventureDefinition {
   }
 }
 
-export const ADVENTURES: AdventureDefinition[] = [GRAMMYS_CONTENT, TIDE_CRYPT_CONTENT].map(toDefinition)
+export const ADVENTURES: AdventureDefinition[] = [GRAMMYS_CONTENT, TIDE_CRYPT_CONTENT, FEY_SHADOW_FAIR_CONTENT].map(toDefinition)
 
 export function getAdventure(id: string | null | undefined): AdventureDefinition | null {
   if (!id) return null

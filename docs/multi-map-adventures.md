@@ -1,9 +1,11 @@
-# Aventures multi-maps — conception CIBLE
+# Aventures multi-maps — conception (IMPLÉMENTÉE)
 
-> **Statut : CIBLE, non implémentée.** Ce document est le contrat d'implémentation.
-> Cocher la section « État d'avancement » au fur et à mesure ; si une décision
-> change en cours de route, METTRE À JOUR ce document dans le même commit
-> (docs/ a déjà divergé du code une fois — ne pas recommencer).
+> **Statut : IMPLÉMENTÉ (les 4 phases).** Ce document reste la référence de
+> conception ; si une décision change, METTRE À JOUR ce document dans le même
+> commit (docs/ a déjà divergé du code une fois — ne pas recommencer).
+> Premier module multi-maps : `adventures/fey-shadow-fair/` (« La Foire du
+> Voleur d'Ombres », 2 cartes). Tests : tests/mcp-multimap.test.cjs +
+> boucles registre de tests/adventure-modules.test.cjs.
 
 ## Objectif
 
@@ -291,7 +293,13 @@ Chaque phase laisse le repo vert (typecheck + tests + playtest inchangé).
 
 ## État d'avancement
 
-- [ ] Phase 1 — Modèle de données
-- [ ] Phase 2 — Moteur (`travel_to_map`, bornes dynamiques, fixture)
-- [ ] Phase 3 — App/UI/Prompts
-- [ ] Phase 4 — Contenu multi-map réel
+- [x] Phase 1 — Modèle de données (maps/quêtes/transitions, GameState.currentMapId + mapOutcomes, round-trip replaceState)
+- [x] Phase 2 — Moteur (`travel_to_map`, bornes dynamiques par map, garde ENCOUNTER_WRONG_MAP)
+- [x] Phase 3 — App/UI/Prompts (battlemapImages par map, blocs dynamiques quête/mapOutcomes, parseur `# Carte`)
+- [x] Phase 4 — Contenu multi-map réel : `adventures/fey-shadow-fair/` (2 cartes, quête à objectifs requis/optionnels, compagnon, 2 battlemaps générées, 6 monstres fey SRD ajoutés au bestiaire commun, tests moteur dédiés)
+
+Écarts assumés par rapport à la cible initiale : la « fixture de test » de la
+phase 2 est remplacée par le module réel (fey-shadow-fair) ; l'union
+`MapOutcome.completion` est en anglais (`partial`/`total`) comme le reste des
+types ; l'intro de carte (`# Carte`) est injectée dans le bloc DYNAMIQUE (pas
+statique) pour garder le cache Anthropic stable par aventure.

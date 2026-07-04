@@ -270,13 +270,19 @@ for (const adventure of ADVENTURES) {
     }
   })
 
-  test(`[${label}] battlemap asset exists with the exact grid dimensions`, () => {
-    const assetPath = path.join(process.cwd(), 'public', adventure.battlemapImage.replace(/^\//, ''))
-    const png = fs.readFileSync(assetPath)
-    const width = png.readUInt32BE(16)
-    const height = png.readUInt32BE(20)
-    assert.equal(width % adventure.grid.cols, 0, 'largeur non multiple du nombre de colonnes')
-    assert.equal(height % adventure.grid.rows, 0, 'hauteur non multiple du nombre de rangées')
-    assert.equal(width / adventure.grid.cols, height / adventure.grid.rows, 'cases non carrées')
+  test(`[${label}] battlemap assets exist with the exact grid dimensions (per map)`, () => {
+    for (const spec of map.maps) {
+      // Image de la map : battlemapImages[mapId] (multi-map), repli sur
+      // battlemapImage (modules 1-map historiques).
+      const image = (adventure.battlemapImages ?? {})[spec.id] ?? adventure.battlemapImage
+      assert.ok(image, `map ${spec.id}: aucune image de battlemap déclarée`)
+      const assetPath = path.join(process.cwd(), 'public', image.replace(/^\//, ''))
+      const png = fs.readFileSync(assetPath)
+      const width = png.readUInt32BE(16)
+      const height = png.readUInt32BE(20)
+      assert.equal(width % spec.grid.cols, 0, `map ${spec.id}: largeur non multiple du nombre de colonnes`)
+      assert.equal(height % spec.grid.rows, 0, `map ${spec.id}: hauteur non multiple du nombre de rangées`)
+      assert.equal(width / spec.grid.cols, height / spec.grid.rows, `map ${spec.id}: cases non carrées`)
+    }
   })
 }

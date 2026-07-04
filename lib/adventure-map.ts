@@ -1,6 +1,7 @@
 import type { GameState, NpcState, WorldNpcDisposition, PlayerState } from './types'
 import { GRAMMYS_MAP, GRAMMYS_ID } from '../adventures/grammys-country-apple-pie/map'
 import { TIDE_CRYPT_MAP, TIDE_CRYPT_ID } from '../adventures/tide-crypt/map'
+import { FEY_SHADOW_FAIR_MAP, FEY_SHADOW_FAIR_ID } from '../adventures/fey-shadow-fair/map'
 
 export interface GridCell {
   x: number
@@ -141,6 +142,7 @@ export const DEFAULT_ADVENTURE_ID = GRAMMYS_ID
 const ADVENTURE_MAPS: Record<string, AdventureMapData> = {
   [GRAMMYS_ID]: GRAMMYS_MAP,
   [TIDE_CRYPT_ID]: TIDE_CRYPT_MAP,
+  [FEY_SHADOW_FAIR_ID]: FEY_SHADOW_FAIR_MAP,
 }
 
 // Retourne la carte du module demandé, ou celle du module par défaut si l'id est
