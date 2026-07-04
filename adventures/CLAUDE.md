@@ -46,8 +46,13 @@ Ne les retoucher qu'avec `npm run playtest:mock` avant/après.
    passer un module — corriger la donnée.
 5. Bestiaire : uniquement des types existants de `MONSTER_TEMPLATES`
    (reskin par `name`/`hpOverride`), pas de nouveau template par module.
+6. Module payant (optionnel) : deux entrées dans lib/adventures.ts
+   (`REQUIRES_ENTITLEMENT` + `MODULE_PRICE_CENTS`) — guide complet :
+   docs/monetizing-a-module.md.
 
 ## Modules multi-maps (docs/multi-map-adventures.md)
+
+Guide pas-à-pas pour en créer un : docs/creating-multi-map-modules.md.
 
 - `map.ts` déclare `maps` (grille PAR map), `mapQuests` (objectifs vérifiables
   par le moteur : requis = sortie possible, tous = complétion totale) et
