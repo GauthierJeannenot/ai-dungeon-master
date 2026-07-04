@@ -16,7 +16,6 @@
     "lint": "npm run typecheck",
     "test": "npm run build:mcp && node --test tests/*.test.cjs",
     "db:migrate": "node scripts/db-migrate.cjs",
-    "db:import": "node scripts/db-import-file-stores.cjs",
     "start": "next start"
   },
   "dependencies": {

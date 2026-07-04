@@ -1,21 +1,23 @@
-import fs from 'fs/promises'
-import path from 'path'
-import { acquireSessionLock } from './session-lock'
+import { dbQuery, withTransaction } from './db'
 import { logEvent } from './server-logger'
-import { isDatabaseEnabled } from './db'
-import * as dbCredits from './credits-store-db'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Portefeuille de tokens (utilisateurs connectés) + quota invité (anonymes).
 //
-// Deux backends derrière la même API :
-//   - DATABASE_URL définie → Postgres (lib/credits-store-db.ts), mutations SQL
-//     atomiques, multi-instance safe. Backend recommandé en production.
-//   - sinon → fichiers JSON sous .data/credits/ (verrou in-process, adapté au
-//     dev sans DB et aux tests).
+// Backend unique Postgres : toutes les mutations sont des opérations SQL
+// atomiques (UPDATE conditionnel, INSERT ... ON CONFLICT), correctes en
+// multi-instance. Sans DATABASE_URL, dbQuery lève (config-check refuse déjà de
+// démarrer en prod).
 //
 // Un « token » ici = un crédit de message envoyé au DM (pas un token LLM).
+// L'idempotence Stripe vit dans la table stripe_events (pas dans UserCredits).
 // ─────────────────────────────────────────────────────────────────────────────
+
+function parsePositiveInt(value: string | undefined, fallback: number): number {
+  if (!value) return fallback
+  const parsed = Number.parseInt(value, 10)
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback
+}
 
 export const GUEST_MESSAGE_LIMIT = parsePositiveInt(process.env.GUEST_MESSAGE_LIMIT, 5)
 // Solde de bienvenue offert au premier login (0 pour désactiver).
@@ -29,10 +31,6 @@ export interface UserCredits {
   totalPurchased: number
   totalConsumed: number
   signupBonusGranted: boolean
-  // Idempotence Stripe : ids d'événements webhook déjà crédités.
-  // Backend fichier uniquement — en Postgres, l'idempotence vit dans la table
-  // stripe_events et cette liste reste vide.
-  processedEventIds: string[]
   updatedAt: string
 }
 
@@ -53,16 +51,85 @@ export interface GuestConsumeResult {
   remaining: number
 }
 
-// ── API publique : dispatch Postgres / fichiers ──────────────────────────────
+interface UserCreditsRow {
+  user_id: string
+  email: string | null
+  balance: number
+  total_purchased: number
+  total_consumed: number
+  signup_bonus_granted: boolean
+  updated_at: Date
+}
+
+interface GuestUsageRow {
+  guest_id: string
+  messages_used: number
+  updated_at: Date
+}
+
+function rowToUserCredits(row: UserCreditsRow | undefined, userId: string): UserCredits {
+  if (!row) {
+    return {
+      schemaVersion: 1,
+      userId,
+      balance: 0,
+      totalPurchased: 0,
+      totalConsumed: 0,
+      signupBonusGranted: false,
+      updatedAt: new Date(0).toISOString(),
+    }
+  }
+  return {
+    schemaVersion: 1,
+    userId: row.user_id,
+    email: row.email ?? undefined,
+    balance: row.balance,
+    totalPurchased: row.total_purchased,
+    totalConsumed: row.total_consumed,
+    signupBonusGranted: row.signup_bonus_granted,
+    updatedAt: new Date(row.updated_at).toISOString(),
+  }
+}
 
 export async function getUserCredits(userId: string): Promise<UserCredits> {
-  return isDatabaseEnabled() ? dbCredits.getUserCredits(userId) : getUserCreditsFile(userId)
+  const result = await dbQuery<UserCreditsRow>(
+    'SELECT * FROM user_credits WHERE user_id = $1',
+    [userId]
+  )
+  return rowToUserCredits(result.rows[0], userId)
 }
 
 // Crédite le bonus de bienvenue une seule fois (appelé au premier accès d'un
 // utilisateur connecté). Idempotent.
 export async function ensureSignupBonus(userId: string, email?: string): Promise<UserCredits> {
-  return isDatabaseEnabled() ? dbCredits.ensureSignupBonus(userId, email) : ensureSignupBonusFile(userId, email)
+  return withTransaction(async client => {
+    await client.query(
+      `INSERT INTO user_credits (user_id, email) VALUES ($1, $2)
+       ON CONFLICT (user_id) DO NOTHING`,
+      [userId, email ?? null]
+    )
+    const granted = await client.query(
+      `UPDATE user_credits
+       SET balance = balance + $2, signup_bonus_granted = TRUE, updated_at = now()
+       WHERE user_id = $1 AND signup_bonus_granted = FALSE`,
+      [userId, SIGNUP_BONUS_TOKENS]
+    )
+    if ((granted.rowCount ?? 0) > 0) {
+      logEvent('info', 'credits.signup_bonus.granted', { userId, amount: SIGNUP_BONUS_TOKENS })
+    }
+    if (email) {
+      await client.query(
+        `UPDATE user_credits SET email = $2, updated_at = now()
+         WHERE user_id = $1 AND (email IS NULL OR email <> $2)`,
+        [userId, email]
+      )
+    }
+    const result = await client.query<UserCreditsRow>(
+      'SELECT * FROM user_credits WHERE user_id = $1',
+      [userId]
+    )
+    return rowToUserCredits(result.rows[0], userId)
+  })
 }
 
 // Crédite des tokens achetés. Idempotent par eventId (webhook Stripe rejoué).
@@ -71,262 +138,130 @@ export async function addPurchasedCredits(
   amount: number,
   meta: { eventId: string; email?: string; source?: string }
 ): Promise<UserCredits> {
-  return isDatabaseEnabled()
-    ? dbCredits.addPurchasedCredits(userId, amount, meta)
-    : addPurchasedCreditsFile(userId, amount, meta)
-}
-
-// Consomme 1 token pour un message DM. Refuse si solde nul.
-export async function consumeUserCredit(userId: string): Promise<ConsumeResult> {
-  return isDatabaseEnabled() ? dbCredits.consumeUserCredit(userId) : consumeUserCreditFile(userId)
-}
-
-// Rembourse 1 token (échec technique APRÈS débit : le joueur ne paie pas une
-// erreur serveur).
-export async function refundUserCredit(userId: string): Promise<void> {
-  return isDatabaseEnabled() ? dbCredits.refundUserCredit(userId) : refundUserCreditFile(userId)
-}
-
-export async function getGuestUsage(guestId: string): Promise<GuestUsage> {
-  return isDatabaseEnabled() ? dbCredits.getGuestUsage(guestId) : getGuestUsageFile(guestId)
-}
-
-// Consomme 1 message du quota invité (GUEST_MESSAGE_LIMIT messages gratuits).
-export async function consumeGuestMessage(guestId: string): Promise<GuestConsumeResult> {
-  return isDatabaseEnabled() ? dbCredits.consumeGuestMessage(guestId) : consumeGuestMessageFile(guestId)
-}
-
-export async function refundGuestMessage(guestId: string): Promise<void> {
-  return isDatabaseEnabled() ? dbCredits.refundGuestMessage(guestId) : refundGuestMessageFile(guestId)
-}
-
-// ── Backend fichier (.data/credits/) ─────────────────────────────────────────
-
-const DEFAULT_CREDITS_DIR = path.join(process.cwd(), '.data', 'credits')
-
-function parsePositiveInt(value: string | undefined, fallback: number): number {
-  if (!value) return fallback
-  const parsed = Number.parseInt(value, 10)
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback
-}
-
-function getCreditsDir(): string {
-  return process.env.CREDITS_STORE_DIR || DEFAULT_CREDITS_DIR
-}
-
-function safeId(id: string): string {
-  return id.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 160)
-}
-
-function userPath(userId: string): string {
-  return path.join(getCreditsDir(), `user-${safeId(userId)}.json`)
-}
-
-function guestPath(guestId: string): string {
-  return path.join(getCreditsDir(), `guest-${safeId(guestId)}.json`)
-}
-
-async function readJson<T>(filePath: string): Promise<T | null> {
-  try {
-    const raw = await fs.readFile(filePath, 'utf-8')
-    return JSON.parse(raw) as T
-  } catch (err) {
-    if (err instanceof Error && 'code' in err && err.code === 'ENOENT') return null
-    logEvent('error', 'credits.read.error', { filePath, err })
-    return null
-  }
-}
-
-async function writeJsonAtomic(filePath: string, payload: unknown): Promise<void> {
-  await fs.mkdir(path.dirname(filePath), { recursive: true })
-  const tmpPath = `${filePath}.${process.pid}.${Date.now()}.tmp`
-  try {
-    await fs.writeFile(tmpPath, JSON.stringify(payload, null, 2), 'utf-8')
-    await fs.rename(tmpPath, filePath)
-  } catch (err) {
-    await fs.unlink(tmpPath).catch(() => undefined)
-    throw err
-  }
-}
-
-function normalizeUserCredits(raw: unknown, userId: string): UserCredits {
-  const record = raw && typeof raw === 'object' ? raw as Partial<UserCredits> : {}
-  return {
-    schemaVersion: 1,
-    userId: safeId(record.userId ?? userId),
-    email: typeof record.email === 'string' ? record.email : undefined,
-    balance: typeof record.balance === 'number' && Number.isFinite(record.balance) ? Math.max(0, Math.floor(record.balance)) : 0,
-    totalPurchased: typeof record.totalPurchased === 'number' ? record.totalPurchased : 0,
-    totalConsumed: typeof record.totalConsumed === 'number' ? record.totalConsumed : 0,
-    signupBonusGranted: Boolean(record.signupBonusGranted),
-    processedEventIds: Array.isArray(record.processedEventIds)
-      ? record.processedEventIds.filter((id): id is string => typeof id === 'string').slice(-200)
-      : [],
-    updatedAt: typeof record.updatedAt === 'string' ? record.updatedAt : new Date(0).toISOString(),
-  }
-}
-
-// Sérialise les mutations d'un même utilisateur dans ce process. Suffisant pour
-// un déploiement mono-instance ; en multi-instance, utiliser le backend Postgres.
-function creditsLock(key: string): Promise<() => void> {
-  return acquireSessionLock(`credits:${key}`)
-}
-
-async function getUserCreditsFile(userId: string): Promise<UserCredits> {
-  const existing = await readJson<UserCredits>(userPath(userId))
-  return normalizeUserCredits(existing, userId)
-}
-
-async function ensureSignupBonusFile(userId: string, email?: string): Promise<UserCredits> {
-  const release = await creditsLock(userId)
-  try {
-    const credits = normalizeUserCredits(await readJson<UserCredits>(userPath(userId)), userId)
-    if (email && credits.email !== email) credits.email = email
-    if (!credits.signupBonusGranted) {
-      credits.signupBonusGranted = true
-      credits.balance += SIGNUP_BONUS_TOKENS
-      logEvent('info', 'credits.signup_bonus.granted', { userId: credits.userId, amount: SIGNUP_BONUS_TOKENS })
+  const tokens = Math.max(0, Math.floor(amount))
+  return withTransaction(async client => {
+    // Idempotence : l'événement Stripe ne crédite qu'une fois même rejoué.
+    // SELECT puis INSERT simple : en cas de course entre deux livraisons du
+    // même événement, la PK fait échouer l'un des INSERT (transaction rollback,
+    // Stripe rejouera et tombera alors sur le doublon) — jamais de double crédit.
+    const existing = await client.query(
+      'SELECT event_id FROM stripe_events WHERE event_id = $1',
+      [meta.eventId]
+    )
+    if (existing.rows.length > 0) {
+      logEvent('info', 'credits.purchase.duplicate_event', { userId, eventId: meta.eventId })
+      const current = await client.query<UserCreditsRow>(
+        'SELECT * FROM user_credits WHERE user_id = $1',
+        [userId]
+      )
+      return rowToUserCredits(current.rows[0], userId)
     }
-    credits.updatedAt = new Date().toISOString()
-    await writeJsonAtomic(userPath(userId), credits)
-    return credits
-  } finally {
-    release()
-  }
-}
+    await client.query(
+      `INSERT INTO stripe_events (event_id, user_id, tokens, source)
+       VALUES ($1, $2, $3, $4)`,
+      [meta.eventId, userId, tokens, meta.source ?? null]
+    )
 
-async function addPurchasedCreditsFile(
-  userId: string,
-  amount: number,
-  meta: { eventId: string; email?: string; source?: string }
-): Promise<UserCredits> {
-  const release = await creditsLock(userId)
-  try {
-    const credits = normalizeUserCredits(await readJson<UserCredits>(userPath(userId)), userId)
-    if (credits.processedEventIds.includes(meta.eventId)) {
-      logEvent('info', 'credits.purchase.duplicate_event', { userId: credits.userId, eventId: meta.eventId })
-      return credits
-    }
-    credits.balance += Math.max(0, Math.floor(amount))
-    credits.totalPurchased += Math.max(0, Math.floor(amount))
-    credits.processedEventIds = [...credits.processedEventIds, meta.eventId].slice(-200)
-    if (meta.email && !credits.email) credits.email = meta.email
-    credits.updatedAt = new Date().toISOString()
-    await writeJsonAtomic(userPath(userId), credits)
+    await client.query(
+      `INSERT INTO user_credits (user_id, email) VALUES ($1, $2)
+       ON CONFLICT (user_id) DO NOTHING`,
+      [userId, meta.email ?? null]
+    )
+    const result = await client.query<UserCreditsRow>(
+      `UPDATE user_credits
+       SET balance = balance + $2, total_purchased = total_purchased + $2, updated_at = now()
+       WHERE user_id = $1
+       RETURNING *`,
+      [userId, tokens]
+    )
+    const credits = rowToUserCredits(result.rows[0], userId)
     logEvent('info', 'credits.purchase.ok', {
-      userId: credits.userId,
-      amount,
+      userId,
+      amount: tokens,
       balance: credits.balance,
       eventId: meta.eventId,
       source: meta.source,
     })
     return credits
-  } finally {
-    release()
-  }
-}
-
-async function consumeUserCreditFile(userId: string): Promise<ConsumeResult> {
-  const release = await creditsLock(userId)
-  try {
-    const credits = normalizeUserCredits(await readJson<UserCredits>(userPath(userId)), userId)
-    if (credits.balance <= 0) {
-      return { ok: false, balance: 0 }
-    }
-    credits.balance -= 1
-    credits.totalConsumed += 1
-    credits.updatedAt = new Date().toISOString()
-    await writeJsonAtomic(userPath(userId), credits)
-    return { ok: true, balance: credits.balance }
-  } finally {
-    release()
-  }
-}
-
-async function refundUserCreditFile(userId: string): Promise<void> {
-  const release = await creditsLock(userId)
-  try {
-    const credits = normalizeUserCredits(await readJson<UserCredits>(userPath(userId)), userId)
-    credits.balance += 1
-    credits.totalConsumed = Math.max(0, credits.totalConsumed - 1)
-    credits.updatedAt = new Date().toISOString()
-    await writeJsonAtomic(userPath(userId), credits)
-  } finally {
-    release()
-  }
-}
-
-async function getGuestUsageFile(guestId: string): Promise<GuestUsage> {
-  const existing = await readJson<GuestUsage>(guestPath(guestId))
-  const record = existing && typeof existing === 'object' ? existing : null
-  return {
-    schemaVersion: 1,
-    guestId: safeId(guestId),
-    messagesUsed: typeof record?.messagesUsed === 'number' && Number.isFinite(record.messagesUsed)
-      ? Math.max(0, Math.floor(record.messagesUsed))
-      : 0,
-    updatedAt: typeof record?.updatedAt === 'string' ? record.updatedAt : new Date(0).toISOString(),
-  }
-}
-
-async function consumeGuestMessageFile(guestId: string): Promise<GuestConsumeResult> {
-  const release = await creditsLock(`guest:${guestId}`)
-  try {
-    const usage = await getGuestUsageFile(guestId)
-    if (usage.messagesUsed >= GUEST_MESSAGE_LIMIT) {
-      return { ok: false, remaining: 0 }
-    }
-    usage.messagesUsed += 1
-    usage.updatedAt = new Date().toISOString()
-    await writeJsonAtomic(guestPath(guestId), usage)
-    return { ok: true, remaining: GUEST_MESSAGE_LIMIT - usage.messagesUsed }
-  } finally {
-    release()
-  }
-}
-
-async function refundGuestMessageFile(guestId: string): Promise<void> {
-  const release = await creditsLock(`guest:${guestId}`)
-  try {
-    const usage = await getGuestUsageFile(guestId)
-    usage.messagesUsed = Math.max(0, usage.messagesUsed - 1)
-    usage.updatedAt = new Date().toISOString()
-    await writeJsonAtomic(guestPath(guestId), usage)
-  } finally {
-    release()
-  }
-}
-
-// ── Lecture brute du backend fichier (script d'import vers Postgres) ─────────
-
-export async function listFileUserCredits(): Promise<UserCredits[]> {
-  return listFileRecords<UserCredits>('user-', raw => normalizeUserCredits(raw, 'unknown'))
-}
-
-export async function listFileGuestUsage(): Promise<GuestUsage[]> {
-  return listFileRecords<GuestUsage>('guest-', raw => {
-    const record = raw as Partial<GuestUsage>
-    return {
-      schemaVersion: 1,
-      guestId: typeof record.guestId === 'string' ? record.guestId : 'unknown',
-      messagesUsed: typeof record.messagesUsed === 'number' ? Math.max(0, Math.floor(record.messagesUsed)) : 0,
-      updatedAt: typeof record.updatedAt === 'string' ? record.updatedAt : new Date(0).toISOString(),
-    }
   })
 }
 
-async function listFileRecords<T>(prefix: string, normalize: (raw: unknown) => T): Promise<T[]> {
-  let files: string[]
-  try {
-    files = await fs.readdir(getCreditsDir())
-  } catch {
-    return []
+// Consomme 1 token pour un message DM. Refuse si solde nul (garde atomique).
+export async function consumeUserCredit(userId: string): Promise<ConsumeResult> {
+  const result = await dbQuery<{ balance: number }>(
+    `UPDATE user_credits
+     SET balance = balance - 1, total_consumed = total_consumed + 1, updated_at = now()
+     WHERE user_id = $1 AND balance > 0
+     RETURNING balance`,
+    [userId]
+  )
+  const row = result.rows[0]
+  return row ? { ok: true, balance: row.balance } : { ok: false, balance: 0 }
+}
+
+// Rembourse 1 token (échec technique APRÈS débit : le joueur ne paie pas une
+// erreur serveur).
+export async function refundUserCredit(userId: string): Promise<void> {
+  await withTransaction(async client => {
+    await client.query(
+      `INSERT INTO user_credits (user_id) VALUES ($1)
+       ON CONFLICT (user_id) DO NOTHING`,
+      [userId]
+    )
+    await client.query(
+      `UPDATE user_credits
+       SET balance = balance + 1,
+           total_consumed = CASE WHEN total_consumed > 0 THEN total_consumed - 1 ELSE 0 END,
+           updated_at = now()
+       WHERE user_id = $1`,
+      [userId]
+    )
+  })
+}
+
+export async function getGuestUsage(guestId: string): Promise<GuestUsage> {
+  const result = await dbQuery<GuestUsageRow>(
+    'SELECT * FROM guest_usage WHERE guest_id = $1',
+    [guestId]
+  )
+  const row = result.rows[0]
+  return {
+    schemaVersion: 1,
+    guestId,
+    messagesUsed: row?.messages_used ?? 0,
+    updatedAt: row ? new Date(row.updated_at).toISOString() : new Date(0).toISOString(),
   }
-  const records: T[] = []
-  for (const file of files) {
-    if (!file.startsWith(prefix) || !file.endsWith('.json')) continue
-    const raw = await readJson<unknown>(path.join(getCreditsDir(), file))
-    if (raw) records.push(normalize(raw))
-  }
-  return records
+}
+
+// Consomme 1 message du quota invité (GUEST_MESSAGE_LIMIT messages gratuits).
+export async function consumeGuestMessage(guestId: string): Promise<GuestConsumeResult> {
+  return withTransaction(async client => {
+    await client.query(
+      `INSERT INTO guest_usage (guest_id, messages_used) VALUES ($1, 0)
+       ON CONFLICT (guest_id) DO NOTHING`,
+      [guestId]
+    )
+    // Garde atomique : n'incrémente que sous la limite.
+    const result = await client.query<{ messages_used: number }>(
+      `UPDATE guest_usage
+       SET messages_used = messages_used + 1, updated_at = now()
+       WHERE guest_id = $1 AND messages_used < $2
+       RETURNING messages_used`,
+      [guestId, GUEST_MESSAGE_LIMIT]
+    )
+    const row = result.rows[0]
+    return row
+      ? { ok: true, remaining: Math.max(0, GUEST_MESSAGE_LIMIT - row.messages_used) }
+      : { ok: false, remaining: 0 }
+  })
+}
+
+export async function refundGuestMessage(guestId: string): Promise<void> {
+  await dbQuery(
+    `UPDATE guest_usage
+     SET messages_used = CASE WHEN messages_used > 0 THEN messages_used - 1 ELSE 0 END,
+         updated_at = now()
+     WHERE guest_id = $1`,
+    [guestId]
+  )
 }

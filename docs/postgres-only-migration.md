@@ -1,11 +1,12 @@
 # Directives — Backend unique Postgres (suppression des stores fichiers)
 
-> **Document d'exécution — chantier À FAIRE.** Il décrit la suppression du
-> double backend de persistance : Postgres (`DATABASE_URL`) devient le SEUL
-> backend pour l'auth, les sessions de jeu, les crédits et le disjoncteur
-> journalier. Le repli fichiers `.data/` et le mode auth JWT sans base
-> disparaissent. Suivre les étapes DANS L'ORDRE — chacune laisse typecheck +
-> `npm test` verts et le jeu jouable.
+> ✅ **REFACTOR TERMINÉ** (étapes 1→4 livrées). Postgres est désormais le SEUL
+> backend de persistance (auth, sessions de jeu, crédits, disjoncteur
+> journalier) ; le repli fichiers `.data/` et le mode auth JWT ont disparu. Les
+> tests et le playtest tournent sur un pool pg-mem injecté (aucun Postgres
+> réel), le dev local sur le `docker-compose.yml` fourni. Ce document reste
+> comme référence de conception — le détail ci-dessous documente comment le
+> câblage a été fait.
 
 ## Objectif
 

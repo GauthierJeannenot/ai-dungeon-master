@@ -1,25 +1,17 @@
 // Webhook Stripe : vérification de signature, crédit des tokens, idempotence.
-// Utilise stripe.webhooks.generateTestHeaderString (aucun appel réseau) et le
-// backend fichier des crédits.
+// Utilise stripe.webhooks.generateTestHeaderString (aucun appel réseau) ;
+// l'idempotence (rejeu du même event) est portée par la table stripe_events.
 
 const assert = require('node:assert/strict')
-const fs = require('node:fs')
-const os = require('node:os')
 const path = require('node:path')
 const test = require('node:test')
-const { installTsRequireWithAliases } = require('./helpers/ts-require.cjs')
+const { installPgMem } = require('./helpers/pg-mem.cjs')
 
-const creditsDir = path.join(os.tmpdir(), `ai-dm-webhook-test-${process.pid}`)
-
-process.env.APP_LOG_BUFFER_ENABLED = 'false'
-process.env.APP_LOG_LEVEL = 'error'
-process.env.APP_LOG_PERSIST_ENABLED = 'false'
-delete process.env.DATABASE_URL // backend fichier
-process.env.CREDITS_STORE_DIR = creditsDir
 process.env.STRIPE_SECRET_KEY = 'sk_test_dummy_key_for_signature_checks'
 process.env.STRIPE_WEBHOOK_SECRET = 'whsec_test_secret'
 
-const restoreTsRequire = installTsRequireWithAliases()
+// Backend unique Postgres, émulé en mémoire (pg-mem injecté).
+const pg = installPgMem()
 const { POST } = require(path.join(process.cwd(), 'app/api/stripe/webhook/route.ts'))
 const credits = require(path.join(process.cwd(), 'lib/credits-store.ts'))
 const Stripe = require('stripe')
@@ -27,8 +19,7 @@ const Stripe = require('stripe')
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
 
 test.after(() => {
-  restoreTsRequire()
-  fs.rmSync(creditsDir, { recursive: true, force: true })
+  pg.restore()
 })
 
 function checkoutCompletedEvent({ eventId, userId, tokens, paymentStatus = 'paid' }) {

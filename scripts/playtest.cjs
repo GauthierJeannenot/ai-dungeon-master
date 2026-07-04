@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 
 const fs = require('node:fs')
-const os = require('node:os')
 const path = require('node:path')
 const Module = require('node:module')
 const ts = require('typescript')
@@ -42,14 +41,13 @@ if ((mode === 'live' || mode === 'record') && !allowPaid) {
   process.exit(2)
 }
 
-const sessionStoreDir = path.join(os.tmpdir(), `ai-dm-playtest-${process.pid}`)
-
 process.env.ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || 'sk-ant-playtest-placeholder'
 process.env.ALLOW_PAID_LLM = allowPaid ? 'true' : 'false'
 process.env.APP_LOG_BUFFER_ENABLED = process.env.APP_LOG_BUFFER_ENABLED || 'false'
 process.env.APP_LOG_LEVEL = process.env.APP_LOG_LEVEL || 'error'
 process.env.APP_LOG_PERSIST_ENABLED = process.env.APP_LOG_PERSIST_ENABLED || 'false'
-process.env.GAME_SESSION_STORE_DIR = process.env.GAME_SESSION_STORE_DIR || sessionStoreDir
+// Backend unique Postgres, émulé en mémoire (pg-mem injecté dans run()).
+process.env.DATABASE_URL = process.env.DATABASE_URL || 'postgres://pg-mem/in-memory'
 // Harnais de mécaniques/coût hors runtime Next : pas de cookies() ni de
 // next-auth chargeable → on coupe la monétisation (le débit/quota est couvert
 // par tests/credits-store et abuse-guards).
@@ -949,6 +947,12 @@ async function postDm(POST, body) {
 
 async function run() {
   const restoreTsRequire = installTsRequireWithAliases()
+  // Postgres unique : on injecte pg-mem AVANT de requérir la route (qui tire
+  // session-store → lib/db). Même rituel que tests/helpers/pg-mem.cjs, en CJS
+  // direct car le playtest a son propre hook ts-require.
+  const { newDb } = require('pg-mem')
+  const db = require(path.join(process.cwd(), 'lib/db.ts'))
+  db.__setDbPoolForTests(new (newDb().adapters.createPg().Pool)())
   const { POST } = require(path.join(process.cwd(), 'app/api/dm/route.ts'))
   const { closeMCPClient } = require(path.join(process.cwd(), 'lib/mcp-client.ts'))
   const { deleteSession } = require(path.join(process.cwd(), 'lib/session-store.ts'))
@@ -1202,7 +1206,6 @@ async function run() {
     }
   } finally {
     restoreTsRequire()
-    fs.rmSync(sessionStoreDir, { recursive: true, force: true })
   }
 
   report.summary.durationMs = Date.now() - startedAt

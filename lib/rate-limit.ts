@@ -1,4 +1,4 @@
-import { dbQuery, isDatabaseEnabled } from './db'
+import { dbQuery } from './db'
 import { logEvent } from './server-logger'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -10,8 +10,7 @@ import { logEvent } from './server-logger'
 //      multi-instance chaque nœud applique sa propre fenêtre, ce qui reste une
 //      borne correcte (limite globale = limite × nb d'instances).
 //   2. Plafond global de messages par jour — disjoncteur de dépense Anthropic.
-//      Compteur Postgres atomique quand DATABASE_URL est définie (partagé entre
-//      instances), sinon compteur mémoire.
+//      Compteur Postgres atomique (table daily_usage), partagé entre instances.
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Messages par minute et par IP (0 = désactivé).
@@ -82,22 +81,20 @@ export function checkRateLimit(key: string, limitPerMinute = RATE_LIMIT_PER_MINU
   return { ok: true, retryAfterSeconds: 0 }
 }
 
-// Hook de test : réinitialise les fenêtres en mémoire.
+// Hook de test : réinitialise les fenêtres de rate-limit en mémoire.
 export function __resetRateLimitForTests(): void {
   buckets.clear()
-  memoryDailyCount = { day: '', count: 0 }
 }
 
 // ── Plafond global journalier ────────────────────────────────────────────────
-
-let memoryDailyCount: { day: string; count: number } = { day: '', count: 0 }
 
 function utcDay(): string {
   return new Date().toISOString().slice(0, 10)
 }
 
 // Consomme 1 message du budget global du jour. Refuse au-delà du plafond.
-// Même motif atomique que le quota invité : INSERT DO NOTHING + UPDATE gardé.
+// Compteur Postgres atomique (même motif que le quota invité : INSERT DO NOTHING
+// + UPDATE gardé) — partagé entre instances.
 export async function consumeDailyGlobalBudget(
   limit = DAILY_GLOBAL_MESSAGE_LIMIT
 ): Promise<boolean> {
@@ -105,33 +102,21 @@ export async function consumeDailyGlobalBudget(
 
   const day = utcDay()
 
-  if (isDatabaseEnabled()) {
-    await dbQuery(
-      `INSERT INTO daily_usage (day, messages) VALUES ($1, 0)
-       ON CONFLICT (day) DO NOTHING`,
-      [day]
-    )
-    const result = await dbQuery<{ messages: number }>(
-      `UPDATE daily_usage
-       SET messages = messages + 1
-       WHERE day = $1 AND messages < $2
-       RETURNING messages`,
-      [day, limit]
-    )
-    const ok = result.rows.length > 0
-    if (!ok) {
-      logEvent('warn', 'abuse.daily_budget.exhausted', { day, limit, backend: 'db' })
-    }
-    return ok
+  await dbQuery(
+    `INSERT INTO daily_usage (day, messages) VALUES ($1, 0)
+     ON CONFLICT (day) DO NOTHING`,
+    [day]
+  )
+  const result = await dbQuery<{ messages: number }>(
+    `UPDATE daily_usage
+     SET messages = messages + 1
+     WHERE day = $1 AND messages < $2
+     RETURNING messages`,
+    [day, limit]
+  )
+  const ok = result.rows.length > 0
+  if (!ok) {
+    logEvent('warn', 'abuse.daily_budget.exhausted', { day, limit })
   }
-
-  if (memoryDailyCount.day !== day) {
-    memoryDailyCount = { day, count: 0 }
-  }
-  if (memoryDailyCount.count >= limit) {
-    logEvent('warn', 'abuse.daily_budget.exhausted', { day, limit, backend: 'memory' })
-    return false
-  }
-  memoryDailyCount.count += 1
-  return true
+  return ok
 }

@@ -1,24 +1,20 @@
-// Protections anti-abus : rate-limit par IP (fenêtre mémoire) et plafond
-// global journalier (backend mémoire — le backend Postgres est couvert par
-// db-stores via le même motif SQL que le quota invité).
+// Protections anti-abus : rate-limit par IP (fenêtre mémoire, par instance) et
+// plafond global journalier (compteur SQL atomique sur daily_usage, ici pg-mem).
 
 const assert = require('node:assert/strict')
 const path = require('node:path')
 const test = require('node:test')
-const { installTsRequireWithAliases } = require('./helpers/ts-require.cjs')
+const { installPgMem } = require('./helpers/pg-mem.cjs')
 
-process.env.APP_LOG_BUFFER_ENABLED = 'false'
-process.env.APP_LOG_LEVEL = 'error'
-process.env.APP_LOG_PERSIST_ENABLED = 'false'
-delete process.env.DATABASE_URL // plafond journalier en mémoire
 process.env.DM_RATE_LIMIT_PER_MINUTE = '3'
 process.env.DM_DAILY_GLOBAL_MESSAGE_LIMIT = '4'
 
-const restoreTsRequire = installTsRequireWithAliases()
+// Backend unique Postgres, émulé en mémoire (pg-mem injecté).
+const pg = installPgMem()
 const rateLimit = require(path.join(process.cwd(), 'lib/rate-limit.ts'))
 
 test.after(() => {
-  restoreTsRequire()
+  pg.restore()
 })
 
 test('rate limit allows up to the per-minute cap then refuses with a retry delay', () => {
@@ -43,7 +39,7 @@ test('rate limit is disabled when the cap is 0', () => {
   }
 })
 
-test('daily global budget refuses beyond the cap (memory backend)', async () => {
+test('daily global budget refuses beyond the cap (SQL backend)', async () => {
   rateLimit.__resetRateLimitForTests()
 
   for (let i = 0; i < 4; i++) {

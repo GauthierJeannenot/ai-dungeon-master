@@ -15,15 +15,21 @@
 - `lib/player-template.ts` : gabarit héros PARTAGÉ app + moteur — modifier ici,
   jamais dupliquer.
 
-## Stores à double backend (fichier ↔ Postgres)
+## Persistance — Postgres unique
 
-`session-store.ts` et `credits-store.ts` routent vers `*-db.ts` quand
-`DATABASE_URL` est définie (`isDatabaseEnabled()`), sinon fichiers `.data/`.
-**Toute évolution de schéma se fait dans LES DEUX backends** + la migration
-additive dans `lib/db.ts` (`ADDITIVE_MIGRATIONS_SQL`, même mécanique que
-`owner_id`/`adventure_id`) + le round-trip testé dans tests/db-stores.test.cjs
-(pg-mem). Les données legacy sans le nouveau champ doivent rester lisibles
-(normalisation avec défauts, cf. `normalizeStoredSession`).
+`session-store.ts` et `credits-store.ts` sont des implémentations SQL directes
+(plus de dispatch, plus de backend fichier). `rate-limit.ts` (plafond
+journalier) et `auth.ts` (@auth/pg-adapter, stratégie « database ») aussi.
+`DATABASE_URL` est requise ; `getPool()` (lib/db.ts) lève sans elle.
+**Toute évolution de schéma** : SQL dans `DB_SCHEMA_SQL` + migration additive
+dans `ADDITIVE_MIGRATIONS_SQL` (même mécanique que `owner_id`/`adventure_id`,
+car `CREATE TABLE IF NOT EXISTS` ne modifie pas une table existante) +
+round-trip testé dans tests/db-stores.test.cjs (pg-mem). Les lignes legacy sans
+un nouveau champ doivent rester lisibles (défauts au mapping row→objet).
+
+Tests/playtest : PAS de Postgres réel — pool pg-mem injecté via
+`__setDbPoolForTests` (helper `tests/helpers/pg-mem.cjs`). Ne jamais remettre
+`isDatabaseEnabled()` ni un repli fichier.
 
 ## Monétisation & anti-abus (consommé par app/api/dm/route.ts)
 
@@ -34,9 +40,9 @@ additive dans `lib/db.ts` (`ADDITIVE_MIGRATIONS_SQL`, même mécanique que
 - `lib/entitlements.ts` tire next-auth + next/headers : ne l'importer que
   PARESSEUSEMENT et seulement si `MONETIZATION_ENABLED !== 'false'` (les
   tests/scripts Node n'ont pas le runtime Next).
-- Idempotence Stripe : le webhook crédite par event id (table
-  `stripe_events` / `processedEventIds`) — préserver cette clé lors de tout
-  changement.
+- Idempotence Stripe : le webhook crédite par event id, porté par la table
+  `stripe_events` (SELECT-puis-INSERT transactionnel) — préserver cette garde
+  lors de tout changement.
 - `session-lock.ts` sérialise les requêtes d'une même session (le moteur MCP
   est un process à état) : tout nouveau point d'entrée qui mute une session
   doit prendre le verrou.

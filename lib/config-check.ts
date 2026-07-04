@@ -51,15 +51,26 @@ export function validateServerConfig(): void {
     )
   }
 
+  // Postgres est le SEUL backend de persistance (auth, sessions, crédits,
+  // disjoncteur journalier). Sans DATABASE_URL, aucune de ces opérations ne peut
+  // aboutir → fatal en prod, erreur claire en dev pointant vers docker compose.
   const databaseUrl = process.env.DATABASE_URL?.trim()
   if (databaseUrl && !/^postgres(ql)?:\/\//.test(databaseUrl)) {
     warnings.push(`DATABASE_URL ne ressemble pas à une URL Postgres (schéma attendu postgres://) : "${databaseUrl.slice(0, 24)}..."`)
   }
-  if (isProduction && !databaseUrl) {
-    warnings.push(
-      'Pas de DATABASE_URL en production : auth en JWT, sessions/crédits sur disque local ' +
-      '(perdus à chaque redéploiement sur un système de fichiers éphémère).'
-    )
+  if (!databaseUrl) {
+    if (isProduction) {
+      fatals.push(
+        'DATABASE_URL manquante : Postgres est le seul backend de persistance ' +
+        '(auth, sessions de jeu, crédits). Aucun message DM ne peut aboutir. ' +
+        'Définir DATABASE_URL sur le Postgres du service.'
+      )
+    } else {
+      warnings.push(
+        'Pas de DATABASE_URL : la persistance (sessions, crédits, auth) est indisponible. ' +
+        'En dev : `docker compose up -d` puis DATABASE_URL=postgres://postgres:postgres@localhost:5432/ai_dm dans .env.local.'
+      )
+    }
   }
 
   for (const name of NUMERIC_ENV_VARS) {

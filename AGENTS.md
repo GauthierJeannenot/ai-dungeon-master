@@ -50,11 +50,9 @@ décrite dans README.md, docs/intent-pipeline.md ou .env.example :
   RIEN ne le produit : la route DM n'écrit jamais `turnTraces`.
   docs/intent-pipeline.md décrit un pipeline CIBLE (EngineEvent, fictionFacts,
   `resolve_player_action`) non implémenté.
-- docs/multi-adventure-architecture.md et
-  docs/adventure-content-consolidation.md sont TERMINÉS (référence de
-  conception, pas du travail à faire). docs/postgres-only-migration.md est en
-  revanche un chantier À FAIRE (suppression du backend fichiers au profit de
-  Postgres seul) — le suivre étape par étape quand il est lancé.
+- docs/multi-adventure-architecture.md,
+  docs/adventure-content-consolidation.md et docs/postgres-only-migration.md
+  sont TERMINÉS (référence de conception, pas du travail à faire).
 
 ## Invariants transverses (ne pas casser)
 
@@ -75,7 +73,9 @@ décrite dans README.md, docs/intent-pipeline.md ou .env.example :
    `adventures/<id>/` (voir adventures/CLAUDE.md).
 6. **MONETIZATION_ENABLED=false** est le mode des tests/scripts hors runtime
    Next : il évite l'import de next-auth/next/headers (import paresseux de
-   lib/entitlements). Ne pas rendre cet import eager.
+   lib/entitlements). Ne pas rendre cet import eager. À ne pas confondre avec
+   `DATABASE_URL`, qui est REQUISE : Postgres est le backend unique de
+   persistance (tests/playtest via pool pg-mem injecté, pas de repli fichier).
 
 ## Guides par dossier
 

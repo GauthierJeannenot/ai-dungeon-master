@@ -1,12 +1,10 @@
-import fs from 'fs/promises'
-import path from 'path'
+import { dbQuery } from './db'
 import { ConversationTurn, GameState, TurnTrace } from './types'
 import { logEvent, summarizeGameState } from './server-logger'
-import { isDatabaseEnabled } from './db'
-import * as dbSessions from './session-store-db'
 
-// Deux backends derrière la même API : Postgres (table game_sessions) quand
-// DATABASE_URL est définie, sinon fichiers JSON sous .data/sessions/.
+// Store des sessions de jeu — Postgres unique (table game_sessions). L'état,
+// l'historique et les traces sont stockés en JSONB, partagés entre instances.
+// Sans DATABASE_URL, dbQuery lève (config-check refuse déjà de démarrer en prod).
 
 export const SESSION_SCHEMA_VERSION = 1
 
@@ -56,37 +54,20 @@ export function summarizeStoredSession(
   }
 }
 
-const DEFAULT_SESSION_DIR = path.join(process.cwd(), '.data', 'sessions')
-
-function getSessionDir(): string {
-  return process.env.GAME_SESSION_STORE_DIR || DEFAULT_SESSION_DIR
-}
-
 function safeSessionId(sessionId: string): string {
   return sessionId.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 128)
 }
 
-function sessionPath(sessionId: string): string {
-  return path.join(getSessionDir(), `${safeSessionId(sessionId)}.json`)
-}
-
-function tempSessionPath(sessionId: string): string {
-  return `${sessionPath(sessionId)}.${process.pid}.${Date.now()}.tmp`
-}
-
-function normalizeStoredSession(raw: unknown, requestedSessionId: string): StoredGameSession {
-  const record = raw && typeof raw === 'object' ? raw as Partial<StoredGameSession> : {}
-  return {
-    schemaVersion: SESSION_SCHEMA_VERSION,
-    sessionId: safeSessionId(record.sessionId ?? requestedSessionId),
-    ownerId: typeof record.ownerId === 'string' ? record.ownerId : undefined,
-    adventureId: typeof record.adventureId === 'string' ? record.adventureId : undefined,
-    gameState: record.gameState as GameState,
-    history: Array.isArray(record.history) ? record.history : [],
-    summaryContext: typeof record.summaryContext === 'string' ? record.summaryContext : undefined,
-    turnTraces: Array.isArray(record.turnTraces) ? record.turnTraces.slice(-50) : [],
-    updatedAt: typeof record.updatedAt === 'string' ? record.updatedAt : new Date(0).toISOString(),
-  }
+interface GameSessionRow {
+  session_id: string
+  schema_version: number
+  owner_id: string | null
+  adventure_id: string | null
+  game_state: GameState
+  history: ConversationTurn[]
+  summary_context: string | null
+  turn_traces: TurnTrace[] | null
+  updated_at: Date
 }
 
 export async function loadSession(sessionId: string | undefined): Promise<StoredGameSession | null> {
@@ -95,31 +76,38 @@ export async function loadSession(sessionId: string | undefined): Promise<Stored
     return null
   }
 
-  if (isDatabaseEnabled()) {
-    return dbSessions.loadSession(sessionId)
-  }
-
-  try {
-    const raw = await fs.readFile(sessionPath(sessionId), 'utf-8')
-    const session = normalizeStoredSession(JSON.parse(raw), sessionId)
-    logEvent('debug', 'session.load.hit', {
-      sessionId: safeSessionId(sessionId),
-      schemaVersion: session.schemaVersion,
-      updatedAt: session.updatedAt,
-      historyLength: session.history.length,
-      hasSummary: Boolean(session.summaryContext),
-      turnTraceCount: session.turnTraces?.length ?? 0,
-      gameState: summarizeGameState(session.gameState),
-    })
-    return session
-  } catch (err) {
-    if (err instanceof Error && 'code' in err && err.code === 'ENOENT') {
-      logEvent('debug', 'session.load.miss', { sessionId: safeSessionId(sessionId) })
-      return null
-    }
-    logEvent('error', 'session.load.error', { sessionId: safeSessionId(sessionId), err })
+  const safeId = safeSessionId(sessionId)
+  const result = await dbQuery<GameSessionRow>(
+    'SELECT * FROM game_sessions WHERE session_id = $1',
+    [safeId]
+  )
+  const row = result.rows[0]
+  if (!row) {
+    logEvent('debug', 'session.load.miss', { sessionId: safeId })
     return null
   }
+
+  const session: StoredGameSession = {
+    schemaVersion: SESSION_SCHEMA_VERSION,
+    sessionId: row.session_id,
+    ownerId: row.owner_id ?? undefined,
+    adventureId: row.adventure_id ?? undefined,
+    gameState: row.game_state,
+    history: Array.isArray(row.history) ? row.history : [],
+    summaryContext: row.summary_context ?? undefined,
+    turnTraces: Array.isArray(row.turn_traces) ? row.turn_traces.slice(-50) : [],
+    updatedAt: new Date(row.updated_at).toISOString(),
+  }
+  logEvent('debug', 'session.load.hit', {
+    sessionId: safeId,
+    schemaVersion: session.schemaVersion,
+    updatedAt: session.updatedAt,
+    historyLength: session.history.length,
+    hasSummary: Boolean(session.summaryContext),
+    turnTraceCount: session.turnTraces?.length ?? 0,
+    gameState: summarizeGameState(session.gameState),
+  })
+  return session
 }
 
 export async function saveSession(
@@ -131,83 +119,74 @@ export async function saveSession(
     return
   }
 
-  if (isDatabaseEnabled()) {
-    return dbSessions.saveSession(sessionId, data)
-  }
-
-  const dir = getSessionDir()
-  await fs.mkdir(dir, { recursive: true })
-
   const safeId = safeSessionId(sessionId)
-  const payload: StoredGameSession = {
-    ...data,
-    schemaVersion: SESSION_SCHEMA_VERSION,
-    sessionId: safeId,
-    turnTraces: data.turnTraces?.slice(-50),
-    updatedAt: new Date().toISOString(),
-  }
-
-  const targetPath = sessionPath(sessionId)
-  const tmpPath = tempSessionPath(sessionId)
-  try {
-    await fs.writeFile(tmpPath, JSON.stringify(payload, null, 2), 'utf-8')
-    await fs.rename(tmpPath, targetPath)
-  } catch (err) {
-    await fs.unlink(tmpPath).catch(() => undefined)
-    throw err
-  }
-
+  // owner_id/adventure_id : COALESCE pour ne jamais écraser une valeur existante
+  // par un null (une sauvegarde sans owner ne doit pas orpheliner la partie).
+  await dbQuery(
+    `INSERT INTO game_sessions
+       (session_id, schema_version, owner_id, adventure_id, game_state, history, summary_context, turn_traces, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now())
+     ON CONFLICT (session_id) DO UPDATE SET
+       schema_version = EXCLUDED.schema_version,
+       owner_id = COALESCE(EXCLUDED.owner_id, game_sessions.owner_id),
+       adventure_id = COALESCE(EXCLUDED.adventure_id, game_sessions.adventure_id),
+       game_state = EXCLUDED.game_state,
+       history = EXCLUDED.history,
+       summary_context = EXCLUDED.summary_context,
+       turn_traces = EXCLUDED.turn_traces,
+       updated_at = now()`,
+    [
+      safeId,
+      SESSION_SCHEMA_VERSION,
+      data.ownerId ?? null,
+      data.adventureId ?? null,
+      JSON.stringify(data.gameState),
+      JSON.stringify(data.history ?? []),
+      data.summaryContext ?? null,
+      data.turnTraces ? JSON.stringify(data.turnTraces.slice(-50)) : null,
+    ]
+  )
   logEvent('debug', 'session.save.ok', {
     sessionId: safeId,
-    dir,
-    schemaVersion: payload.schemaVersion,
-    historyLength: payload.history.length,
-    hasSummary: Boolean(payload.summaryContext),
-    turnTraceCount: payload.turnTraces?.length ?? 0,
-    gameState: summarizeGameState(payload.gameState),
+    schemaVersion: SESSION_SCHEMA_VERSION,
+    historyLength: data.history.length,
+    hasSummary: Boolean(data.summaryContext),
+    turnTraceCount: data.turnTraces?.length ?? 0,
+    gameState: summarizeGameState(data.gameState),
   })
 }
 
 // Résumés des parties d'un propriétaire ("user:<id>" / "guest:<id>"), les plus
 // récentes d'abord. Alimente l'écran « Mes parties » (reprise multi-appareils).
+// On remonte game_state + history (bornés à 200 tours) et on résume en JS — SQL
+// portable (pas de fonctions JSONB, compatible pg-mem).
 export async function listSessionsByOwner(
   ownerId: string,
   limit = 50
 ): Promise<StoredSessionSummary[]> {
-  if (isDatabaseEnabled()) {
-    return dbSessions.listSessionsByOwner(ownerId, limit)
-  }
-
-  const sessions = await listFileSessions()
-  return sessions
-    .filter(session => session.ownerId === ownerId)
-    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-    .slice(0, limit)
-    .map(session =>
-      summarizeStoredSession(session.sessionId, session.adventureId, session.updatedAt, session.gameState, session.history)
+  const result = await dbQuery<{
+    session_id: string
+    adventure_id: string | null
+    updated_at: Date
+    game_state: GameState
+    history: ConversationTurn[]
+  }>(
+    `SELECT session_id, adventure_id, updated_at, game_state, history
+     FROM game_sessions
+     WHERE owner_id = $1
+     ORDER BY updated_at DESC
+     LIMIT $2`,
+    [ownerId, limit]
+  )
+  return result.rows.map(row =>
+    summarizeStoredSession(
+      row.session_id,
+      row.adventure_id ?? undefined,
+      new Date(row.updated_at).toISOString(),
+      row.game_state,
+      Array.isArray(row.history) ? row.history : []
     )
-}
-
-// Lecture brute du backend fichier (script d'import vers Postgres).
-export async function listFileSessions(): Promise<StoredGameSession[]> {
-  let files: string[]
-  try {
-    files = await fs.readdir(getSessionDir())
-  } catch {
-    return []
-  }
-  const sessions: StoredGameSession[] = []
-  for (const file of files) {
-    if (!file.endsWith('.json')) continue
-    try {
-      const raw = await fs.readFile(path.join(getSessionDir(), file), 'utf-8')
-      const session = normalizeStoredSession(JSON.parse(raw), file.replace(/\.json$/, ''))
-      if (session.gameState) sessions.push(session)
-    } catch (err) {
-      logEvent('warn', 'session.list.parse_error', { file, err })
-    }
-  }
-  return sessions
+  )
 }
 
 export async function deleteSession(sessionId: string | undefined): Promise<void> {
@@ -216,18 +195,11 @@ export async function deleteSession(sessionId: string | undefined): Promise<void
     return
   }
 
-  if (isDatabaseEnabled()) {
-    return dbSessions.deleteSession(sessionId)
-  }
-
-  try {
-    await fs.unlink(sessionPath(sessionId))
-    logEvent('info', 'session.delete.ok', { sessionId: safeSessionId(sessionId) })
-  } catch (err) {
-    if (!(err instanceof Error && 'code' in err && err.code === 'ENOENT')) {
-      logEvent('error', 'session.delete.error', { sessionId: safeSessionId(sessionId), err })
-      throw err
-    }
-    logEvent('debug', 'session.delete.miss', { sessionId: safeSessionId(sessionId) })
+  const safeId = safeSessionId(sessionId)
+  const result = await dbQuery('DELETE FROM game_sessions WHERE session_id = $1', [safeId])
+  if ((result.rowCount ?? 0) > 0) {
+    logEvent('info', 'session.delete.ok', { sessionId: safeId })
+  } else {
+    logEvent('debug', 'session.delete.miss', { sessionId: safeId })
   }
 }

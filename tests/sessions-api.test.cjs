@@ -1,31 +1,22 @@
-// API « Mes parties » (backend fichier, monétisation coupée → owner invité null).
-// Couvre : liste vide au départ, apparition après une partie, reprise (GET
-// single) et suppression (DELETE), avec vérification d'appartenance.
+// API « Mes parties » (backend Postgres pg-mem, monétisation coupée → owner
+// invité null). Couvre : liste vide au départ, apparition après une partie,
+// reprise (GET single) et suppression (DELETE), avec vérification d'appartenance.
 
 const assert = require('node:assert/strict')
-const fs = require('node:fs')
-const os = require('node:os')
 const path = require('node:path')
 const test = require('node:test')
-const { installTsRequireWithAliases } = require('./helpers/ts-require.cjs')
+const { installPgMem } = require('./helpers/pg-mem.cjs')
 
-const sessionStoreDir = path.join(os.tmpdir(), `ai-dm-sessions-api-${process.pid}`)
-
-process.env.APP_LOG_BUFFER_ENABLED = 'false'
-process.env.APP_LOG_LEVEL = 'error'
-process.env.APP_LOG_PERSIST_ENABLED = 'false'
-process.env.GAME_SESSION_STORE_DIR = sessionStoreDir
 process.env.MONETIZATION_ENABLED = 'false'
-delete process.env.DATABASE_URL
 
-const restoreTsRequire = installTsRequireWithAliases()
+// Backend unique Postgres, émulé en mémoire (pg-mem injecté).
+const pg = installPgMem()
 const list = require(path.join(process.cwd(), 'app/api/sessions/route.ts'))
 const single = require(path.join(process.cwd(), 'app/api/sessions/[sessionId]/route.ts'))
 const { saveSession } = require(path.join(process.cwd(), 'lib/session-store.ts'))
 
 test.after(() => {
-  restoreTsRequire()
-  fs.rmSync(sessionStoreDir, { recursive: true, force: true })
+  pg.restore()
 })
 
 function seed(sessionId, ownerId, adventureId) {
