@@ -108,7 +108,7 @@ export const GRAMMYS_MAP: AdventureMapData = {
       name: 'Mac',
       kind: 'awakened_tree',
       roomId: '1',
-      cell: { x: 3, y: 13 },
+      cell: { x: 7, y: 13 },
       disposition: 'neutral',
       visibleFromStart: true,
       description: 'Grand pommier animé (tréant), gardien bougon de la cour.',
