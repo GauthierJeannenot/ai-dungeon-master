@@ -6,6 +6,9 @@
 > Premier module multi-maps : `adventures/fey-shadow-fair/` (« La Foire du
 > Voleur d'Ombres », 2 cartes). Tests : tests/mcp-multimap.test.cjs +
 > boucles registre de tests/adventure-modules.test.cjs.
+> Pour CRÉER un nouveau module multi-maps, suivre le guide pratique
+> docs/creating-multi-map-modules.md (ce document-ci décrit le moteur, pas
+> la marche à suivre côté contenu).
 
 ## Objectif
 
