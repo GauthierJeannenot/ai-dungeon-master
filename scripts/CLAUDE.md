@@ -7,6 +7,10 @@ importé, moteur MCP réel, LLM mock par défaut). C'est LA non-régression des
 prompts : le lancer avant/après tout changement de prompt ou de contenu Grammy
 (`npm run playtest:mock`) et comparer les NOMBRES (tours/appels/ratio).
 
+Persistance : le playtest injecte un pool pg-mem dans `run()` avant de requérir
+la route (même rituel que `tests/helpers/pg-mem.cjs`, en CJS direct car il a son
+propre hook ts-require). Aucun Postgres réel ni dossier de sessions requis.
+
 ⚠️ `playtest:mock` **sort en exit 1 même sur master propre** : il teste des
 seuils aspirationnels (`PLAYTEST_MIN_LLM_NARRATOR_RATIO=0.75`) et des attentes
 du pipeline CIBLE non implémenté (engine events, affordances, intent
@@ -37,10 +41,9 @@ Pièges hérités d'une ancienne architecture (ne pas s'y fier) :
 
 ## DB
 
-- `db-migrate.cjs` : applique le schéma (idempotent, aussi fait au premier
-  accès runtime). `db-import-file-stores.cjs` : migre `.data/` vers Postgres —
-  lire son en-tête avant usage (mapping des identifiants JWT → users.id non
-  automatique).
+- `db-migrate.cjs` : applique le schéma Postgres (idempotent, aussi fait au
+  premier accès runtime). Postgres est le backend unique — il n'y a plus de
+  script d'import fichier (`db:import` supprimé avec le backend `.data/`).
 
 ## eval:intent
 

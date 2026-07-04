@@ -8,14 +8,20 @@
 
 - Fichiers `*.test.cjs` (CommonJS). Le TypeScript de lib/ se charge via
   `tests/helpers/ts-require.cjs` (`installTsRequireWithAliases()` : transpile
-  à la volée + résout l'alias `@/`). Appeler `restore()` dans `test.after()`.
-- Les variables d'env se posent EN TÊTE de fichier, AVANT tout require de
-  code applicatif (les modules lisent l'env à l'import). Standard :
-  `LLM_MODE=mock`, `MONETIZATION_ENABLED=false`, `APP_LOG_*` coupés,
-  `GAME_SESSION_STORE_DIR` vers un dossier temporaire.
+  à la volée + résout l'alias `@/`).
+- **Persistance = Postgres pg-mem, TOUJOURS.** Il n'y a plus de backend
+  fichier. Tout test qui touche stores/auth/route/webhook/quota commence par
+  `const pg = installPgMem()` (`tests/helpers/pg-mem.cjs`) AVANT tout require
+  de lib/ ou app/ — ce helper installe ts-require, injecte le pool pg-mem
+  (`__setDbPoolForTests`) et pose `DATABASE_URL`. `pg.restore()` dans
+  `test.after()`. `node --test` isole chaque fichier dans son process → base
+  pg-mem vierge par fichier. Ne jamais `delete process.env.DATABASE_URL` ni
+  ressusciter un tmpdir de sessions/crédits.
+- Les variables d'env de config lues À L'IMPORT (`GUEST_MESSAGE_LIMIT`,
+  `SIGNUP_BONUS_TOKENS`, `LLM_MODE=mock`, `MONETIZATION_ENABLED=false`,
+  `DM_*_LIMIT`…) se posent EN TÊTE, avant le require du module concerné.
 - Dés déterministes : `AI_DM_TEST_DICE_SEQUENCE` (liste de valeurs) —
   sauvegarder/restaurer la valeur précédente autour du test.
-- Postgres : pg-mem (tests/db-stores.test.cjs), pas de vraie base.
 - Le moteur MCP testé est le binaire COMPILÉ (`mcp-server/dist/`) : après une
   modif moteur, `npm run build:mcp` sinon on teste l'ancien code.
 
@@ -38,6 +44,7 @@
 
 ## Ajouter un test
 
-Copier la préface env d'un test existant du même domaine (dm-api pour la
-route, mcp-engine pour le moteur, db-stores pour la persistance). Les tests
-route appellent le handler `POST` importé directement (pas de serveur HTTP).
+Copier la préface d'un test existant du même domaine (dm-api pour la route,
+mcp-engine pour le moteur, db-stores pour la persistance) : tous utilisent
+`installPgMem()`. Les tests route appellent le handler `POST` importé
+directement (pas de serveur HTTP).

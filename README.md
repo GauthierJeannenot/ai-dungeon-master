@@ -8,9 +8,9 @@ Application web de jeu de rôle D&D 5e avec un Dungeon Master IA (Claude) comme 
 - **IA** : Anthropic SDK — Haiku 4.5 (classifieur d'intention) + Sonnet (narration)
 - **MCP** : `@modelcontextprotocol/sdk` — game engine déterministe
 - **Auth** : NextAuth v5 (OAuth 2.0 Google/GitHub) — sessions Postgres via
-  `@auth/pg-adapter`, ou JWT sans base
-- **Persistance** : Postgres (`DATABASE_URL`) pour auth, sessions de jeu et
-  crédits ; repli fichiers `.data/` sans DB
+  `@auth/pg-adapter` (stratégie « database »)
+- **Persistance** : Postgres unique (`DATABASE_URL`, requise) pour auth,
+  sessions de jeu et crédits
 - **Paiement** : Stripe Checkout + webhook (achat de tokens)
 
 ## Modules d'aventure
@@ -38,33 +38,36 @@ paramétrés par `adventureId`.
 
 Détail complet du câblage : [docs/multi-adventure-architecture.md](docs/multi-adventure-architecture.md).
 
-## Base de données (production)
+## Base de données — Postgres (requise)
 
-Définir `DATABASE_URL` bascule TOUTE la persistance sur Postgres :
+Postgres est le **seul** backend de persistance. `DATABASE_URL` est obligatoire
+(fatale en production sans elle ; en dev, la partie ne peut pas persister).
 
-| Donnée | Sans DATABASE_URL | Avec DATABASE_URL |
-|---|---|---|
-| Auth (users, comptes OAuth, sessions) | JWT (cookie signé, rien côté serveur) | Tables Auth.js (`users`, `accounts`, `sessions`) |
-| Sessions de jeu | `.data/sessions/*.json` | Table `game_sessions` (JSONB) |
-| Crédits & quota invité | `.data/credits/*.json` | Tables `user_credits`, `stripe_events`, `guest_usage` (SQL atomique, multi-instance safe) |
+| Donnée | Table(s) Postgres |
+|---|---|
+| Auth (users, comptes OAuth, sessions) | Tables Auth.js (`users`, `accounts`, `sessions`, `verification_token`) |
+| Sessions de jeu | `game_sessions` (état/historique/traces en JSONB) |
+| Crédits & quota invité | `user_credits`, `stripe_events`, `guest_usage` (SQL atomique, multi-instance safe) |
+| Disjoncteur de dépense journalier | `daily_usage` |
+
+L'identifiant du solde de tokens est `users.id`. En dev, lancez Postgres via le
+`docker-compose.yml` fourni :
 
 ```bash
-npm run db:migrate   # applique le schéma (idempotent — aussi fait au 1er accès)
-npm run db:import    # importe les données .data/ existantes vers Postgres
+docker compose up -d   # Postgres local sur localhost:5432
+npm run db:migrate     # applique le schéma (idempotent — aussi fait au 1er accès)
 ```
 
-⚠️ En mode Postgres, l'identifiant utilisateur devient `users.id` (au lieu de
-`provider:accountId` en mode JWT) : les soldes acquis en mode JWT ne suivent
-pas automatiquement — voir l'en-tête de `scripts/db-import-file-stores.cjs`.
-`DATABASE_SSL=require` pour un Postgres managé exposé en TLS.
+`DATABASE_SSL=require` pour un Postgres managé exposé en TLS. Les tests et le
+playtest n'ont PAS besoin d'un Postgres réel : ils injectent un pool `pg-mem`
+en mémoire (voir `tests/helpers/pg-mem.cjs`).
 
 ## Monétisation
 
 - **Un token = un message envoyé au DM.** Le débit se fait côté serveur AVANT
   l'appel LLM, avec remboursement automatique en cas d'erreur serveur.
-- **Visiteur anonyme** : `GUEST_MESSAGE_LIMIT` messages gratuits (5 par défaut)
-  sur *Grammy's Country Apple Pie*, suivis via un cookie invité httpOnly +
-  compteur serveur (`.data/credits/`).
+- **Visiteur anonyme** : `GUEST_MESSAGE_LIMIT` messages gratuits (5 par défaut),
+  suivis via un cookie invité httpOnly + compteur serveur (table `guest_usage`).
 - **Utilisateur connecté** : solde de tokens (`SIGNUP_BONUS_TOKENS` offerts au
   premier login) rechargeable via Stripe. Les packs sont définis dans
   [lib/token-packages.ts](lib/token-packages.ts) ; le crédit est effectué par
@@ -275,7 +278,7 @@ GitHub repo
 ### Mise en place
 
 1. [railway.app](https://railway.app) → New Project → **Deploy from GitHub repo** (le `Dockerfile` est détecté, sinon build Nixpacks : `npm ci && npm run build` / `npm start`).
-2. Ajouter un service **PostgreSQL** au projet, puis référencer sa variable dans le service web : `DATABASE_URL=${{Postgres.DATABASE_URL}}`.
+2. Ajouter un service **PostgreSQL** au projet (obligatoire — backend unique de persistance), puis référencer sa variable dans le service web : `DATABASE_URL=${{Postgres.DATABASE_URL}}`. Aucun volume disque n'est requis.
 3. Renseigner les variables du service web :
 
 ```
@@ -311,13 +314,12 @@ Aucune clé Anthropic réelle n'est nécessaire pour le CI — une clé placehol
 
 ### Note sur la persistance d'état
 
-Chaque onglet de navigateur possède son propre `sessionId`. L'état de jeu, l'historique et le résumé de session sont persistés côté serveur dans `.data/sessions/` par défaut, avec possibilité de changer l'emplacement via :
-
-```
-GAME_SESSION_STORE_DIR=/chemin/vers/sessions
-```
-
-Cette persistance fichier permet de reprendre une partie apres redemarrage du processus Node tant que le stockage local est conserve. **Sur un deploiement multi-instance ou avec disque ephemere, definissez `DATABASE_URL`** : les sessions de jeu (ainsi que l'auth et les credits) basculent alors sur Postgres — voir la section « Base de données » plus haut.
+Chaque onglet de navigateur possède son propre `sessionId`. L'état de jeu,
+l'historique et le résumé de session sont persistés côté serveur dans la table
+Postgres `game_sessions` (JSONB) — voir la section « Base de données » plus haut.
+La reprise d'une partie survit donc au redémarrage du processus et fonctionne en
+déploiement multi-instance ou sur disque éphémère (aucune donnée sur disque
+local).
 
 ### Logs de production
 

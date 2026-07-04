@@ -1,34 +1,22 @@
-// Backends Postgres (credits-store-db, session-store-db) testés contre pg-mem,
-// une émulation Postgres en mémoire compatible avec le driver pg. Vérifie le
-// SQL réel (schéma, ON CONFLICT, gardes atomiques) sans base externe.
+// Stores Postgres (credits-store, session-store) testés contre pg-mem, une
+// émulation Postgres en mémoire compatible avec le driver pg. Vérifie le SQL
+// réel (schéma, ON CONFLICT, gardes atomiques) sans base externe.
 
 const assert = require('node:assert/strict')
 const path = require('node:path')
 const test = require('node:test')
-const { installTsRequireWithAliases } = require('./helpers/ts-require.cjs')
+const { installPgMem } = require('./helpers/pg-mem.cjs')
 
-process.env.APP_LOG_BUFFER_ENABLED = 'false'
-process.env.APP_LOG_LEVEL = 'error'
-process.env.APP_LOG_PERSIST_ENABLED = 'false'
 process.env.GUEST_MESSAGE_LIMIT = '5'
 process.env.SIGNUP_BONUS_TOKENS = '10'
-// Active la branche Postgres des dispatchers ; le pool réel est injecté (pg-mem).
-process.env.DATABASE_URL = 'postgres://pg-mem/in-memory'
 
-const restoreTsRequire = installTsRequireWithAliases()
-
-const { newDb } = require('pg-mem')
-const db = require(path.join(process.cwd(), 'lib/db.ts'))
-
-const mem = newDb()
-const { Pool } = mem.adapters.createPg()
-db.__setDbPoolForTests(new Pool())
-
+const pg = installPgMem()
+const db = pg.db
 const credits = require(path.join(process.cwd(), 'lib/credits-store.ts'))
 const sessionStore = require(path.join(process.cwd(), 'lib/session-store.ts'))
 
 test.after(() => {
-  restoreTsRequire()
+  pg.restore()
 })
 
 test('db: schema bootstrap creates auth + business tables', async () => {
