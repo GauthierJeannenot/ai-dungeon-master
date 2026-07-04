@@ -12,6 +12,13 @@ import { parsePositiveInt } from './llm'
 // ─────────────────────────────────────────────────────────────────────────────
 
 const LLM_PROMPT_CACHE_ENABLED = process.env.LLM_PROMPT_CACHE_ENABLED !== 'false'
+// TTL du cache Anthropic sur le bloc statique. '1h' par défaut : en jeu de rôle
+// le joueur laisse souvent passer >5 min entre deux messages, ce qui ferait
+// expirer un cache 5m (relecture à 0,1× perdue). L'écriture 1h coûte 2× l'input
+// (vs 1,25× en 5m) mais est amortie dès ~3 lectures. Seules les valeurs '5m' et
+// '1h' sont acceptées par l'API ; toute autre valeur retombe sur '5m'.
+const LLM_PROMPT_CACHE_TTL: '5m' | '1h' =
+  process.env.LLM_PROMPT_CACHE_TTL === '5m' ? '5m' : '1h'
 const COMBAT_LOG_TAIL = parsePositiveInt(process.env.LLM_COMBAT_LOG_TAIL, 6)
 
 export function buildStaticPrompt(adventureId?: string): string {
@@ -200,7 +207,7 @@ export function buildSystemBlocks(gameState: GameState, summaryContext?: string,
     text: buildStaticPrompt(gameState.adventureId),
   }
   if (LLM_PROMPT_CACHE_ENABLED) {
-    staticBlock.cache_control = { type: 'ephemeral' }
+    staticBlock.cache_control = { type: 'ephemeral', ttl: LLM_PROMPT_CACHE_TTL }
   }
   return [
     staticBlock,
