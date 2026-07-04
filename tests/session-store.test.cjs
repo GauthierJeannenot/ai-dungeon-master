@@ -1,44 +1,18 @@
+// Store de sessions de jeu (backend unique Postgres, pg-mem injecté).
+// Le round-trip complet, la sanitisation des ids et le listing par owner sont
+// couverts par tests/db-stores.test.cjs ; ce fichier verrouille l'invariant
+// spécifique du round-trip des turnTraces (typés mais persistés).
+
 const assert = require('node:assert/strict')
-const fs = require('node:fs')
-const os = require('node:os')
 const path = require('node:path')
 const test = require('node:test')
-const Module = require('node:module')
-const ts = require('typescript')
+const { installPgMem } = require('./helpers/pg-mem.cjs')
 
-const sessionStoreDir = path.join(os.tmpdir(), `ai-dm-session-store-test-${process.pid}`)
-
-process.env.APP_LOG_BUFFER_ENABLED = 'false'
-process.env.APP_LOG_LEVEL = 'error'
-process.env.APP_LOG_PERSIST_ENABLED = 'false'
-process.env.GAME_SESSION_STORE_DIR = sessionStoreDir
-
-function installTsRequire() {
-  const previous = Module._extensions['.ts']
-  Module._extensions['.ts'] = function loadTs(mod, filename) {
-    const source = fs.readFileSync(filename, 'utf8')
-    const output = ts.transpileModule(source, {
-      compilerOptions: {
-        esModuleInterop: true,
-        module: ts.ModuleKind.CommonJS,
-        target: ts.ScriptTarget.ES2022,
-      },
-    }).outputText
-    mod._compile(output, filename)
-  }
-
-  return () => {
-    if (previous) Module._extensions['.ts'] = previous
-    else delete Module._extensions['.ts']
-  }
-}
-
-const restoreTsRequire = installTsRequire()
+const pg = installPgMem()
 const sessionStore = require(path.join(process.cwd(), 'lib/session-store.ts'))
 
 test.after(() => {
-  restoreTsRequire()
-  fs.rmSync(sessionStoreDir, { recursive: true, force: true })
+  pg.restore()
 })
 
 function gameState() {
@@ -71,7 +45,7 @@ function gameState() {
   }
 }
 
-test('session store sanitizes ids consistently and leaves no temp file after save', async () => {
+test('session store sanitizes ids and round-trips turn traces', async () => {
   await sessionStore.saveSession('unsafe/session:id', {
     gameState: gameState(),
     history: [{ role: 'player', content: 'hello' }],
@@ -104,7 +78,4 @@ test('session store sanitizes ids consistently and leaves no temp file after sav
   assert.equal(loaded.summaryContext, 'summary')
   assert.equal(loaded.turnTraces.length, 1)
   assert.equal(loaded.turnTraces[0].traceId, 'turn-test')
-
-  const files = fs.readdirSync(sessionStoreDir)
-  assert.deepEqual(files, ['unsafe_session_id.json'])
 })

@@ -1,32 +1,24 @@
 const assert = require('node:assert/strict')
-const fs = require('node:fs')
-const os = require('node:os')
 const path = require('node:path')
 const test = require('node:test')
-const { installTsRequireWithAliases } = require('./helpers/ts-require.cjs')
-
-const sessionStoreDir = path.join(os.tmpdir(), `ai-dm-api-test-${process.pid}`)
+const { installPgMem } = require('./helpers/pg-mem.cjs')
 
 process.env.ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || 'sk-ant-test-placeholder'
 process.env.ALLOW_PAID_LLM = 'false'
-process.env.APP_LOG_BUFFER_ENABLED = 'false'
-process.env.APP_LOG_LEVEL = 'error'
-process.env.APP_LOG_PERSIST_ENABLED = 'false'
-process.env.GAME_SESSION_STORE_DIR = sessionStoreDir
 process.env.LLM_MODE = 'mock'
 // Hors runtime Next : pas de cookies() ni de next-auth chargeable — on coupe
 // la monetisation (le debit/quota est couvert par tests/credits-store.test.cjs).
 process.env.MONETIZATION_ENABLED = 'false'
-delete process.env.DATABASE_URL // force le backend fichier
 
-const restoreTsRequire = installTsRequireWithAliases()
+// Backend unique Postgres, émulé en mémoire (pg-mem injecté). Doit précéder
+// tout require de lib/ ou app/ (voir helpers/pg-mem.cjs).
+const pg = installPgMem()
 const { POST } = require(path.join(process.cwd(), 'app/api/dm/route.ts'))
 const { closeMCPClient } = require(path.join(process.cwd(), 'lib/mcp-client.ts'))
 const { deleteSession } = require(path.join(process.cwd(), 'lib/session-store.ts'))
 
 test.after(() => {
-  restoreTsRequire()
-  fs.rmSync(sessionStoreDir, { recursive: true, force: true })
+  pg.restore()
 })
 
 function baseGameState(overrides = {}) {

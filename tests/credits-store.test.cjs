@@ -1,26 +1,21 @@
+// Portefeuille de tokens + quota invité (backend unique Postgres, pg-mem).
+// Vérifie les gardes atomiques SQL : bonus unique, consommation/refus/
+// remboursement, idempotence Stripe (table stripe_events) et absence de
+// surconsommation sous appels concurrents.
+
 const assert = require('node:assert/strict')
-const fs = require('node:fs')
-const os = require('node:os')
 const path = require('node:path')
 const test = require('node:test')
-const { installTsRequireWithAliases } = require('./helpers/ts-require.cjs')
+const { installPgMem } = require('./helpers/pg-mem.cjs')
 
-const creditsDir = path.join(os.tmpdir(), `ai-dm-credits-test-${process.pid}`)
-
-process.env.CREDITS_STORE_DIR = creditsDir
-delete process.env.DATABASE_URL // force le backend fichier
 process.env.GUEST_MESSAGE_LIMIT = '5'
 process.env.SIGNUP_BONUS_TOKENS = '10'
-process.env.APP_LOG_BUFFER_ENABLED = 'false'
-process.env.APP_LOG_LEVEL = 'error'
-process.env.APP_LOG_PERSIST_ENABLED = 'false'
 
-const restoreTsRequire = installTsRequireWithAliases()
+const pg = installPgMem()
 const credits = require(path.join(process.cwd(), 'lib/credits-store.ts'))
 
 test.after(() => {
-  restoreTsRequire()
-  fs.rmSync(creditsDir, { recursive: true, force: true })
+  pg.restore()
 })
 
 test('signup bonus is granted exactly once', async () => {

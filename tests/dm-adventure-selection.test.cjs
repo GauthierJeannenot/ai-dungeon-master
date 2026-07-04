@@ -2,32 +2,23 @@
 // mismatch avec une session existante (409). Harnais mock hors runtime Next.
 
 const assert = require('node:assert/strict')
-const fs = require('node:fs')
-const os = require('node:os')
 const path = require('node:path')
 const test = require('node:test')
-const { installTsRequireWithAliases } = require('./helpers/ts-require.cjs')
-
-const sessionStoreDir = path.join(os.tmpdir(), `ai-dm-adv-test-${process.pid}`)
+const { installPgMem } = require('./helpers/pg-mem.cjs')
 
 process.env.ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || 'sk-ant-test-placeholder'
 process.env.ALLOW_PAID_LLM = 'false'
-process.env.APP_LOG_BUFFER_ENABLED = 'false'
-process.env.APP_LOG_LEVEL = 'error'
-process.env.APP_LOG_PERSIST_ENABLED = 'false'
-process.env.GAME_SESSION_STORE_DIR = sessionStoreDir
 process.env.LLM_MODE = 'mock'
 process.env.MONETIZATION_ENABLED = 'false'
-delete process.env.DATABASE_URL
 
-const restoreTsRequire = installTsRequireWithAliases()
+// Backend unique Postgres, émulé en mémoire (pg-mem injecté).
+const pg = installPgMem()
 const { POST } = require(path.join(process.cwd(), 'app/api/dm/route.ts'))
 const { closeMCPClient } = require(path.join(process.cwd(), 'lib/mcp-client.ts'))
 const { saveSession, deleteSession } = require(path.join(process.cwd(), 'lib/session-store.ts'))
 
 test.after(async () => {
-  restoreTsRequire()
-  fs.rmSync(sessionStoreDir, { recursive: true, force: true })
+  pg.restore()
 })
 
 function dmRequest(body) {
