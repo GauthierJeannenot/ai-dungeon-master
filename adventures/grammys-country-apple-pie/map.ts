@@ -16,6 +16,7 @@ export const GRAMMYS_ID = 'grammys-country-apple-pie'
 export const GRAMMYS_START_CELL: GridCell = { x: 4, y: 13 }
 
 export const GRAMMYS_MAP: AdventureMapData = {
+  grid: { cols: 17, rows: 15 },
   startCell: GRAMMYS_START_CELL,
   // Héros niveau 1 (identique au gabarit par défaut du moteur — comportement
   // Grammy's inchangé).

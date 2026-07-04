@@ -23,11 +23,14 @@ test.after(() => {
   restoreTsRequire()
 })
 
-// Bornes du moteur (mcp-server/rules.ts MAP_BOUNDS).
-const BOUNDS = { minX: 0, maxX: 16, minY: 0, maxY: 14 }
+// Bornes du moteur dérivées de la grille du MODULE (mcp-server/rules.ts calcule
+// MAP_BOUNDS de la même façon : maxX = cols-1, maxY = rows-1).
+function boundsForGrid(grid) {
+  return { minX: 0, maxX: grid.cols - 1, minY: 0, maxY: grid.rows - 1 }
+}
 
-function inBounds(cell) {
-  return cell.x >= BOUNDS.minX && cell.x <= BOUNDS.maxX && cell.y >= BOUNDS.minY && cell.y <= BOUNDS.maxY
+function inBounds(cell, bounds) {
+  return cell.x >= bounds.minX && cell.x <= bounds.maxX && cell.y >= bounds.minY && cell.y <= bounds.maxY
 }
 
 function roomContains(room, cell) {
@@ -55,12 +58,18 @@ const MONSTER_TYPES = engineMonsterTypes()
 for (const adventure of ADVENTURES) {
   const label = adventure.id
   const map = adventure.map
+  const bounds = boundsForGrid(map.grid)
   const findRoom = roomId => map.rooms.find(room => room.id === roomId)
+
+  test(`[${label}] definition grid matches engine map grid (single source of truth)`, () => {
+    assert.deepEqual(adventure.grid, map.grid,
+      'definition.grid et map.grid divergent — la définition doit réexporter map.grid')
+  })
 
   test(`[${label}] rooms are within engine bounds and resolve deterministically`, () => {
     for (const room of map.rooms) {
-      assert.ok(inBounds({ x: room.zone.minX, y: room.zone.minY }), `${room.name}: coin min hors carte`)
-      assert.ok(inBounds({ x: room.zone.maxX, y: room.zone.maxY }), `${room.name}: coin max hors carte`)
+      assert.ok(inBounds({ x: room.zone.minX, y: room.zone.minY }, bounds), `${room.name}: coin min hors carte`)
+      assert.ok(inBounds({ x: room.zone.maxX, y: room.zone.maxY }, bounds), `${room.name}: coin max hors carte`)
       assert.ok(room.zone.minX <= room.zone.maxX && room.zone.minY <= room.zone.maxY, `${room.name}: zone inversée`)
     }
     // NB : on n'exige PAS l'absence de chevauchement — les salles en L sont
@@ -127,7 +136,7 @@ for (const adventure of ADVENTURES) {
         assert.ok(room, `PNJ ${npc.id}: salle inconnue ${npc.roomId}`)
         assert.ok(roomContains(room, npc.cell), `PNJ ${npc.id} hors de sa salle`)
       }
-      assert.ok(inBounds(npc.cell), `PNJ ${npc.id} hors carte`)
+      assert.ok(inBounds(npc.cell, bounds), `PNJ ${npc.id} hors carte`)
       for (const encounter of Object.values(map.encounters)) {
         for (const monster of encounter.monsters) {
           assert.ok(!(monster.cell.x === npc.cell.x && monster.cell.y === npc.cell.y),

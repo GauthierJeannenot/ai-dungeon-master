@@ -228,6 +228,7 @@ export function describeTideCryptRoomHooks(roomId: string | null | undefined): s
 // La crypte n'a pas d'alias de contexte dédiés → roomContextAliases vide (le
 // moteur retombe alors sur roomNavigationAliases).
 export const TIDE_CRYPT_MAP: AdventureMapData = {
+  grid: { cols: 17, rows: 15 },
   startCell: TIDE_CRYPT_START_CELL,
   // Héros niveau 2 (suite de Grammy's) : 28 PV, deux potions.
   initialPlayer: {

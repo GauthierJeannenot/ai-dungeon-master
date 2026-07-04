@@ -1,14 +1,21 @@
 import { PlayerState, MonsterState } from '../lib/types'
+import { getAdventureMap } from '../lib/adventure-map'
+import { ACTIVE_ADVENTURE_ID } from './adventure'
 import * as gs from './game-state'
 
 type Entity = PlayerState | MonsterState
 
 const DEFAULT_MELEE_RANGE_CELLS = 1
-const MAP_BOUNDS = {
+
+// Bornes de déplacement dérivées de la grille du MODULE ACTIF (figé au spawn).
+// Source de vérité unique : adventures/<id>/map.ts (grid). Exporté pour que
+// PositionSchema (player-tools.ts) valide contre les mêmes bornes.
+const GRID = getAdventureMap(ACTIVE_ADVENTURE_ID).grid
+export const MAP_BOUNDS = {
   minX: 0,
-  maxX: 16,
+  maxX: GRID.cols - 1,
   minY: 0,
-  maxY: 14,
+  maxY: GRID.rows - 1,
 } as const
 
 const ATTACK_RANGE_CELLS: Record<string, number> = {

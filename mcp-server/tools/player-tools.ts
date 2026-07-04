@@ -20,9 +20,11 @@ const EntityStatsSchema = z.object({
   cha: z.number().int(),
 })
 
+// Bornes dérivées de la grille du module actif (rules.MAP_BOUNDS, source de
+// vérité unique : adventures/<id>/map.ts). Ne pas re-coder 16/14 en dur.
 const PositionSchema = z.object({
-  x: z.number().int().min(0).max(16),
-  y: z.number().int().min(0).max(14),
+  x: z.number().int().min(rules.MAP_BOUNDS.minX).max(rules.MAP_BOUNDS.maxX),
+  y: z.number().int().min(rules.MAP_BOUNDS.minY).max(rules.MAP_BOUNDS.maxY),
 })
 
 const HpSchema = z.object({
