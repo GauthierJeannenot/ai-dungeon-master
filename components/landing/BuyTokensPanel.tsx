@@ -61,7 +61,7 @@ export default function BuyTokensPanel({ authenticated, paymentsEnabled, package
             <div className="text-amber-400 font-bold">{pkg.name}</div>
             <div className="text-3xl font-bold text-stone-100">
               {pkg.tokens}
-              <span className="text-sm font-normal text-stone-400"> tokens</span>
+              <span className="text-sm font-normal text-stone-400"> messages</span>
             </div>
             <div className="text-stone-300 font-mono">{formatEur(pkg.amountCents)}</div>
             <button

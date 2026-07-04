@@ -336,7 +336,7 @@ function quotaLabel(quota: DMQuota | null): { label: string; warning: boolean } 
   if (!quota) return null
   if (quota.kind === 'user') {
     const balance = quota.balance ?? 0
-    return { label: `${balance} token${balance > 1 ? 's' : ''}`, warning: balance <= 3 }
+    return { label: `${balance} message${balance > 1 ? 's' : ''}`, warning: balance <= 3 }
   }
   const remaining = quota.remaining ?? 0
   return { label: `essai ${remaining}/${quota.limit ?? remaining}`, warning: remaining <= 1 }
@@ -744,7 +744,7 @@ function GameView({ adventure, resumeSessionId }: { adventure: AdventureDefiniti
         {quotaInfo && (
           <Link
             href="/"
-            title={quota?.kind === 'user' ? 'Tokens restants — acheter un pack' : "Messages d'essai restants — se connecter"}
+            title={quota?.kind === 'user' ? 'Messages restants — acheter un pack' : "Messages d'essai restants — se connecter"}
             className={`text-[11px] sm:text-xs font-mono border px-2 py-0.5 rounded transition-colors ${
               quotaInfo.warning
                 ? 'text-red-300 border-red-800/60 bg-red-950/40 hover:bg-red-900/40'
@@ -814,10 +814,10 @@ function GameView({ adventure, resumeSessionId }: { adventure: AdventureDefiniti
           {quotaExhausted && (
             <div className="flex-shrink-0 border border-red-800/60 bg-red-950/40 px-3 py-2 text-xs text-red-200">
               {quota?.kind === 'user'
-                ? 'Solde de tokens épuisé — achetez un pack pour continuer l\'aventure.'
+                ? 'Solde de messages épuisé — achetez un pack pour continuer l\'aventure.'
                 : "Messages d'essai gratuits épuisés — connectez-vous pour continuer à jouer."}{' '}
               <Link href="/" className="underline text-amber-300 hover:text-amber-200">
-                {quota?.kind === 'user' ? 'Acheter des tokens' : 'Se connecter'}
+                {quota?.kind === 'user' ? 'Acheter des messages' : 'Se connecter'}
               </Link>
             </div>
           )}
