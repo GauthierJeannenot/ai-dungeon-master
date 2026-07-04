@@ -208,8 +208,16 @@ Voir [« Ajouter un module d'aventure »](#ajouter-un-module-daventure) plus bas
 
 ## Lancement
 
+Postgres est le backend unique de persistance (auth, sessions de jeu, crédits).
+En dev, lancez-le via le `docker-compose.yml` fourni :
+
 ```bash
+docker compose up -d   # Postgres local sur localhost:5432
+# puis dans .env.local :
+#   DATABASE_URL=postgres://postgres:postgres@localhost:5432/ai_dm
+
 npm run build:mcp   # compile le serveur MCP (une seule fois)
+npm run db:migrate  # applique le schéma (aussi fait au 1er accès)
 npm run dev         # lance Next.js + MCP server en parallèle
 ```
 

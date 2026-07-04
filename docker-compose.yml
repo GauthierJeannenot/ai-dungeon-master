@@ -1,0 +1,30 @@
+# Postgres de développement local. Backend unique de persistance (auth,
+# sessions de jeu, crédits). En prod, l'hébergeur fournit son propre Postgres
+# via DATABASE_URL — ce compose ne sert qu'au dev.
+#
+#   docker compose up -d
+#   # puis dans .env.local :
+#   DATABASE_URL=postgres://postgres:postgres@localhost:5432/ai_dm
+#
+# Le schéma s'applique tout seul au premier accès (ou `npm run db:migrate`).
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ai-dm-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ai_dm
+    ports:
+      - '5432:5432'
+    volumes:
+      - ai-dm-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d ai_dm']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  ai-dm-pgdata:
