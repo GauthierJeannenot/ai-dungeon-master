@@ -59,6 +59,19 @@ export default function Battlemap({
   const [tooltip, setTooltip] = useState<TooltipState | null>(null)
   const [prevPositions, setPrevPositions] = useState<Record<string, { x: number; y: number }>>({})
   const [animating, setAnimating] = useState<Set<string>>(new Set())
+  // Dimensions réelles du conteneur — la carte remplit tout l'espace alloué au
+  // lieu d'être figée à cols×cellSize. null tant qu'on n'a pas mesuré (1er rendu).
+  const [dims, setDims] = useState<{ w: number; h: number } | null>(null)
+
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const measure = () => setDims({ w: el.clientWidth, h: el.clientHeight })
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   // Track position changes for animation
   useEffect(() => {
@@ -111,18 +124,25 @@ export default function Battlemap({
   const gridCols = Math.max(cols, ...aliveMonsters.map(m => m.position.x + 2), ...npcTokens.map(npc => npc.position.x + 2), gameState.player.position.x + 2)
   const gridRows = Math.max(rows, ...aliveMonsters.map(m => m.position.y + 2), ...npcTokens.map(npc => npc.position.y + 2), gameState.player.position.y + 2)
 
+  // La carte remplit tout le conteneur : chaque cellule s'étire (cellW×cellH)
+  // pour couvrir l'espace mesuré. Avant la 1re mesure, repli sur cellSize fixe.
+  const cellW = dims ? dims.w / gridCols : cellSize
+  const cellH = dims ? dims.h / gridRows : cellSize
+  const mapW = dims ? dims.w : gridCols * cellSize
+  const mapH = dims ? dims.h : gridRows * cellSize
+
   return (
     <div
       ref={containerRef}
-      className="relative w-full h-full overflow-auto bg-stone-900 rounded-lg border border-amber-900/40 cursor-default"
+      className="relative w-full h-full overflow-hidden bg-stone-900 rounded-lg border border-amber-900/40 cursor-default"
       onClick={() => setTooltip(null)}
     >
-      {/* Zone scrollable — toujours aux dimensions complètes de la carte */}
+      {/* Surface de la carte — étirée aux dimensions réelles du conteneur */}
       <div
         className="relative"
         style={{
-          width: gridCols * cellSize,
-          height: gridRows * cellSize,
+          width: mapW,
+          height: mapH,
         }}
       >
         {/* Image de la battlemap — pixel art généré (17×15 cases exactes, voir
@@ -143,13 +163,13 @@ export default function Battlemap({
         {/* Grid overlay — léger, non-intrusif */}
         <svg
           className="absolute inset-0 pointer-events-none"
-          width={gridCols * cellSize}
-          height={gridRows * cellSize}
+          width={mapW}
+          height={mapH}
         >
           <defs>
-            <pattern id="grid" width={cellSize} height={cellSize} patternUnits="userSpaceOnUse">
+            <pattern id="grid" width={cellW} height={cellH} patternUnits="userSpaceOnUse">
               <path
-                d={`M ${cellSize} 0 L 0 0 0 ${cellSize}`}
+                d={`M ${cellW} 0 L 0 0 0 ${cellH}`}
                 fill="none"
                 stroke="rgba(180,140,60,0.2)"
                 strokeWidth="0.5"
@@ -164,7 +184,8 @@ export default function Battlemap({
           <TokenMonster
             key={monster.id}
             monster={monster}
-            cellSize={cellSize}
+            cellW={cellW}
+            cellH={cellH}
             isCurrentTurn={gameState.currentTurn === monster.id}
             isAnimating={animating.has(monster.id)}
             onClick={(e) => handleTokenClick(e, monster)}
@@ -176,7 +197,8 @@ export default function Battlemap({
           <TokenNpc
             key={npc.id}
             npc={npc}
-            cellSize={cellSize}
+            cellW={cellW}
+            cellH={cellH}
             isAnimating={animating.has(`npc:${npc.id}`)}
             onClick={(e) => handleTokenClick(e, npc)}
           />
@@ -185,7 +207,8 @@ export default function Battlemap({
         {/* Player token */}
         <TokenPlayer
           player={gameState.player}
-          cellSize={cellSize}
+          cellW={cellW}
+          cellH={cellH}
           isCurrentTurn={gameState.currentTurn === 'player' || gameState.phase !== 'combat'}
           isAnimating={animating.has('player')}
           onClick={(e) => handleTokenClick(e, gameState.player)}
@@ -209,9 +232,11 @@ function deriveNpcTokens(gameState: GameState): MapNpcToken[] {
 
   const currentRoomId = gameState.currentRoomId
   // PNJ devenus combattants : on évite le doublon token PNJ + token monstre.
+  // Tous les monstres comptent, morts inclus : un PNJ dont le combattant homonyme
+  // a été tué ne doit pas réapparaître (les désengagés — négociation, fuite —
+  // sont retirés de l'état par end_combat, donc leur PNJ revient bien).
   const occupiedMonsterNames = new Set(
     Object.values(gameState.monsters)
-      .filter(monster => monster.isAlive)
       .map(monster => monster.name.toLowerCase())
   )
 
@@ -255,17 +280,19 @@ function npcTokenStyle(disposition: WorldNpcDisposition): { background: string; 
 }
 
 function TokenPlayer({
-  player, cellSize, isCurrentTurn, isAnimating, onClick
+  player, cellW, cellH, isCurrentTurn, isAnimating, onClick
 }: {
   player: PlayerState
-  cellSize: number
+  cellW: number
+  cellH: number
   isCurrentTurn: boolean
   isAnimating: boolean
   onClick: (e: React.MouseEvent) => void
 }) {
-  const px = player.position.x * cellSize + cellSize / 2
-  const py = player.position.y * cellSize + cellSize / 2
-  const r = cellSize * 0.38
+  const cell = Math.min(cellW, cellH)
+  const px = player.position.x * cellW + cellW / 2
+  const py = player.position.y * cellH + cellH / 2
+  const r = cell * 0.38
 
   return (
     <div
@@ -284,7 +311,7 @@ function TokenPlayer({
         shadow-lg shadow-blue-900/60`}
         style={{ background: 'radial-gradient(circle at 35% 35%, #60a5fa, #1d4ed8)' }}
       >
-        <span style={{ fontSize: cellSize * 0.3 }}>
+        <span style={{ fontSize: cell * 0.3 }}>
           {player.name.slice(0, 2).toUpperCase()}
         </span>
         {isCurrentTurn && (
@@ -307,17 +334,19 @@ function TokenPlayer({
 }
 
 function TokenMonster({
-  monster, cellSize, isCurrentTurn, isAnimating, onClick
+  monster, cellW, cellH, isCurrentTurn, isAnimating, onClick
 }: {
   monster: MonsterState
-  cellSize: number
+  cellW: number
+  cellH: number
   isCurrentTurn: boolean
   isAnimating: boolean
   onClick: (e: React.MouseEvent) => void
 }) {
-  const px = monster.position.x * cellSize + cellSize / 2
-  const py = monster.position.y * cellSize + cellSize / 2
-  const r = cellSize * 0.38
+  const cell = Math.min(cellW, cellH)
+  const px = monster.position.x * cellW + cellW / 2
+  const py = monster.position.y * cellH + cellH / 2
+  const r = cell * 0.38
   const abbrev = monster.name.slice(0, 2).toUpperCase()
 
   return (
@@ -337,7 +366,7 @@ function TokenMonster({
         shadow-lg shadow-red-900/60`}
         style={{ background: 'radial-gradient(circle at 35% 35%, #f87171, #991b1b)' }}
       >
-        <span style={{ fontSize: cellSize * 0.28 }}>{abbrev}</span>
+        <span style={{ fontSize: cell * 0.28 }}>{abbrev}</span>
         {isCurrentTurn && (
           <div className="absolute -top-1 -right-1 w-3 h-3 bg-orange-400 rounded-full animate-pulse" />
         )}
@@ -357,7 +386,7 @@ function TokenMonster({
       {/* Name label */}
       <div
         className="absolute -bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap text-stone-200 font-medium"
-        style={{ fontSize: Math.max(9, cellSize * 0.18) }}
+        style={{ fontSize: Math.max(9, cell * 0.18) }}
       >
         {monster.name}
       </div>
@@ -366,16 +395,18 @@ function TokenMonster({
 }
 
 function TokenNpc({
-  npc, cellSize, isAnimating, onClick
+  npc, cellW, cellH, isAnimating, onClick
 }: {
   npc: MapNpcToken
-  cellSize: number
+  cellW: number
+  cellH: number
   isAnimating: boolean
   onClick: (e: React.MouseEvent) => void
 }) {
-  const px = npc.position.x * cellSize + cellSize / 2
-  const py = npc.position.y * cellSize + cellSize / 2
-  const r = cellSize * 0.34
+  const cell = Math.min(cellW, cellH)
+  const px = npc.position.x * cellW + cellW / 2
+  const py = npc.position.y * cellH + cellH / 2
+  const r = cell * 0.34
   const abbrev = npc.name.slice(0, 2).toUpperCase()
   const style = npcTokenStyle(npc.disposition)
 
@@ -394,12 +425,12 @@ function TokenNpc({
       <div className={`relative w-full h-full rounded-full flex items-center justify-center font-bold text-white select-none ring-1 ${style.ring} shadow-lg ${style.shadow}`}
         style={{ background: style.background }}
       >
-        <span style={{ fontSize: cellSize * 0.24 }}>{abbrev}</span>
+        <span style={{ fontSize: cell * 0.24 }}>{abbrev}</span>
       </div>
 
       <div
         className="absolute -bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap text-stone-200 font-medium"
-        style={{ fontSize: Math.max(9, cellSize * 0.17) }}
+        style={{ fontSize: Math.max(9, cell * 0.17) }}
       >
         {npc.name}
       </div>

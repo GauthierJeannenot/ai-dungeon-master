@@ -73,7 +73,7 @@ Le chemin de gravier serpente à travers une pelouse envahie par les mauvaises h
 
 ### Contenu
 **Mac le Tréant** (pommier animé, non hostile si ignoré) :
-- Position : (7, 13) — grand pommier à gauche du chemin d'entrée (bas-gauche de la carte)
+- Position : (3, 13) — grand pommier à gauche du chemin d'entrée (bas-gauche de la carte)
 - Ne s'implique pas si on le laisse tranquille
 - Si les plantes sont menacées → hostile (vise à neutraliser, jamais tuer)
 - DD 12 Persuasion ou Investigation → révèle que les dryades du verger connaissent des secrets
@@ -196,16 +196,15 @@ trigger_room_event({ roomId: "5", eventType: "trap",
 Une porte coulissante en bois donne accès à cette salle aux murs de pierre bruts et au sol nu. Un vieux chariot en bois abandonné prend la poussière dans un coin. On peut voir, depuis ici, l'intérieur de la boulangerie : une patrouille de deux gobelins passe devant l'ouverture, l'air de rien.
 
 ### Contenu
-**Patrouille de gobelins** (2) si approche directe :
+**Patrouille de gobelins** (2) — tokens déjà visibles sur la carte en (4, 5) et (4, 7) dès l'entrée dans la salle (PNJ scénarisés, pas encore des combattants — ne pas appeler `reveal_npc`) :
 - DD 13 Discrétion pour ne pas être repéré
 - Échec → l'un des gobelins renifle : *"Ça sent bizarre ici..."* — ils s'approchent pour inspecter
 
 **Si repéré :**
 ```
-spawn_monster({ monsterType: "goblin", cell: {x:5, y:5}, name: "Gobelin Patrouille" })
-spawn_monster({ monsterType: "goblin", cell: {x:5, y:6}, name: "Gobelin Patrouille" })
-enter_combat({ combatants: ["player", "[ids des gobelins]"] })
+start_encounter({ encounterId: "loading_dock_patrol" })
 ```
+Les combattants spawnes remplacent les tokens PNJ de la patrouille.
 
 **Avantage tactique** : entrer par ici donne le **round de surprise** sur les gobelins du sol de la boulangerie.
 

@@ -108,7 +108,7 @@ export const GRAMMYS_MAP: AdventureMapData = {
       name: 'Mac',
       kind: 'awakened_tree',
       roomId: '1',
-      cell: { x: 7, y: 13 },
+      cell: { x: 3, y: 13 },
       disposition: 'neutral',
       visibleFromStart: true,
       description: 'Grand pommier animé (tréant), gardien bougon de la cour.',
@@ -143,10 +143,35 @@ export const GRAMMYS_MAP: AdventureMapData = {
       visibleFromStart: false,
       description: 'Esprit malicieux du verger, caché dans les pommiers.',
     },
+    // Patrouille du quai : tokens visibles dès que le joueur entre en salle 7
+    // (la narration les décrit immédiatement). Mêmes noms que l'encounter
+    // loading_dock_patrol : si le combat démarre, les tokens monstres
+    // remplacent les tokens PNJ (filtre anti-doublon par nom). Cases distinctes
+    // des spawns de l'encounter — invariant adventure-modules.test.cjs.
+    {
+      id: 'goblin_patrol_1',
+      name: 'Gobelin Patrouille',
+      kind: 'goblin',
+      roomId: '7',
+      cell: { x: 4, y: 5 },
+      disposition: 'hostile',
+      visibleFromStart: true,
+      description: 'Gobelin en patrouille près de l\'ouverture vers la boulangerie.',
+    },
+    {
+      id: 'goblin_patrol_2',
+      name: 'Gobelin Patrouille',
+      kind: 'goblin',
+      roomId: '7',
+      cell: { x: 4, y: 7 },
+      disposition: 'hostile',
+      visibleFromStart: true,
+      description: 'Gobelin en patrouille près de l\'ouverture vers la boulangerie.',
+    },
   ],
 
   namedLocationCells: [
-    { id: 'mac', pattern: /\b(mac|treant|grand pommier|pommier anime|pommier eveille)\b/, cell: { x: 7, y: 13 } },
+    { id: 'mac', pattern: /\b(mac|treant|grand pommier|pommier anime|pommier eveille)\b/, cell: { x: 3, y: 13 } },
   ],
 
   roomNavigationAliases: [
@@ -192,7 +217,7 @@ export const GRAMMYS_MAP: AdventureMapData = {
   // sont pertinents SANS avoir à retrouver la bonne section du module markdown.
   roomHooks: {
     '1': [
-      'Mac le Tréant (pommier animé) a déjà son token visible en (7,13) : non hostile si ignoré ; hostile si on menace les plantes.',
+      'Mac le Tréant (pommier animé) a déjà son token visible en (3,13) : non hostile si ignoré ; hostile si on menace les plantes.',
       'Si Mac devient hostile : spawn_monster (awakened_tree, à sa position) + enter_combat (son token PNJ laisse place au combattant).',
       'DD 12 Persuasion ou Investigation (roll_ability_check) → il évoque les secrets des dryades du verger.',
       'Grandes portes barrées : DD 14 Force (roll_ability_check) pour enfoncer, ou contourner par le quai de chargement (salle 7).',
@@ -215,8 +240,9 @@ export const GRAMMYS_MAP: AdventureMapData = {
       'Tiroir piégé = 1re MOITIÉ DE LA RECETTE (objectif) : DD 13 Perception pour repérer, DD 16 Dextérité pour désamorcer. Si déclenché : resolve_saving_throw(con, DD 15) → empoisonné + dégâts de poison.',
     ].join('\n'),
     '7': [
-      'Patrouille de 2 gobelins : DD 13 Discrétion (roll_ability_check) pour passer inaperçu.',
-      'Si repéré : start_encounter("loading_dock_patrol"). Entrer discrètement ici donne la surprise sur les gobelins du sol de la boulangerie (salle 8).',
+      'Patrouille de 2 gobelins déjà visible sur la carte en (4,5) et (4,7) — tokens PNJ, pas encore des combattants : ne PAS appeler reveal_npc.',
+      'DD 13 Discrétion (roll_ability_check) pour passer inaperçu.',
+      'Si repéré : start_encounter("loading_dock_patrol") — les combattants remplacent les tokens PNJ. Entrer discrètement ici donne la surprise sur les gobelins du sol de la boulangerie (salle 8).',
     ].join('\n'),
     '8': [
       'Armoire en verre (6,7) : 2 potions de soin ordinaires, sans verrou.',
