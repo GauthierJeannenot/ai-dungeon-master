@@ -133,6 +133,8 @@ const EXPLORATION_ONLY_TOOLS = new Set([
   'enter_combat',
   'start_encounter',
   'trigger_room_event',
+  // Changement de map : refusé en combat par le moteur, autant ne pas l'exposer.
+  'travel_to_map',
 ])
 
 // Le DM ne résout qu'UNE action de jeu majeure par message joueur. Ces tools
@@ -148,6 +150,9 @@ const PRIMARY_ACTION_TOOLS = new Set([
   'use_healing_potion',
   'move_token',
   'start_encounter',
+  // Quitter une map EST l'action majeure du message (le moteur téléporte le
+  // joueur : pas de move_token préalable nécessaire).
+  'travel_to_map',
 ])
 
 // Cache de la liste de tools exposés, CLÉ PAR aventure : le schéma de certains

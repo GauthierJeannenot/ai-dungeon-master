@@ -47,10 +47,25 @@ Ne les retoucher qu'avec `npm run playtest:mock` avant/après.
 5. Bestiaire : uniquement des types existants de `MONSTER_TEMPLATES`
    (reskin par `name`/`hpOverride`), pas de nouveau template par module.
 
+## Modules multi-maps (docs/multi-map-adventures.md)
+
+- `map.ts` déclare `maps` (grille PAR map), `mapQuests` (objectifs vérifiables
+  par le moteur : requis = sortie possible, tous = complétion totale) et
+  `mapTransitions` (SENS UNIQUE, cellule/salle d'arrivée, `companions`).
+- roomId en numérotation GLOBALE continue (map 2 commence après la dernière
+  salle de la map 1) ; chaque salle porte son `mapId` (absent = première map).
+- `adventure-module.md` : sections `# Carte <mapId> — Titre` ; le préambule
+  avant la première `# Carte` reste dans le prompt statique, l'intro de chaque
+  carte est injectée dynamiquement quand elle devient courante.
+- `definition.ts` : `battlemapImages` (une image PAR mapId,
+  `public/battlemaps/<id>-<mapId>.png`), `battlemapImage` = map de départ.
+- Référence : `adventures/fey-shadow-fair/` + tests/mcp-multimap.test.cjs.
+
 ## Battlemaps
 
-- Convention : `public/battlemaps/<id>.png`, PNG réel, dimensions multiples
-  exactes de la grille (cases carrées) — vérifié par test.
+- Convention : `public/battlemaps/<id>.png` (modules 1-map) ou
+  `<id>-<mapId>.png` (multi-maps), PNG réel, dimensions multiples
+  exactes de la grille de SA map (cases carrées) — vérifié par test.
 - Exception actuelle : Grammy's utilise `grammys_bakery.png`, une image
   fournie à la main (redimensionnée 1360×1200 pour la grille 17×15). Le
   générateur `scripts/generate-battlemap-grammys-country-apple-pie.cjs`

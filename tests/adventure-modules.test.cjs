@@ -17,7 +17,7 @@ process.env.APP_LOG_PERSIST_ENABLED = 'false'
 const restoreTsRequire = installTsRequireWithAliases()
 const { ADVENTURES } = require(path.join(process.cwd(), 'lib/adventures.ts'))
 const { parseAdventureModule } = require(path.join(process.cwd(), 'lib/context-loader.ts'))
-const { inferAdventureRoomId } = require(path.join(process.cwd(), 'lib/adventure-map.ts'))
+const { inferRoomIdOnMap } = require(path.join(process.cwd(), 'lib/adventure-map.ts'))
 
 test.after(() => {
   restoreTsRequire()
@@ -58,16 +58,41 @@ const MONSTER_TYPES = engineMonsterTypes()
 for (const adventure of ADVENTURES) {
   const label = adventure.id
   const map = adventure.map
-  const bounds = boundsForGrid(map.grid)
+  const firstMapId = map.maps[0]?.id
+  // Map d'une salle : mapId explicite, sinon première map du module.
+  const roomMapId = room => room.mapId ?? firstMapId
+  const boundsForRoom = room => {
+    const spec = map.maps.find(m => m.id === roomMapId(room))
+    return spec ? boundsForGrid(spec.grid) : null
+  }
   const findRoom = roomId => map.rooms.find(room => room.id === roomId)
 
-  test(`[${label}] definition grid matches engine map grid (single source of truth)`, () => {
-    assert.deepEqual(adventure.grid, map.grid,
-      'definition.grid et map.grid divergent — la définition doit réexporter map.grid')
+  test(`[${label}] maps are declared, unique, and rooms reference them`, () => {
+    assert.ok(Array.isArray(map.maps) && map.maps.length >= 1, 'un module doit déclarer au moins une map')
+    const mapIds = new Set(map.maps.map(spec => spec.id))
+    assert.equal(mapIds.size, map.maps.length, 'mapIds dupliqués')
+    for (const spec of map.maps) {
+      assert.ok(spec.grid.cols > 0 && spec.grid.rows > 0, `map ${spec.id}: grille invalide`)
+      assert.ok(spec.name, `map ${spec.id}: nom manquant`)
+    }
+    for (const room of map.rooms) {
+      assert.ok(mapIds.has(roomMapId(room)), `salle ${room.id}: mapId inconnu ${roomMapId(room)}`)
+    }
+    // Numérotation GLOBALE : les roomId sont uniques sur tout le module,
+    // toutes maps confondues (docs/multi-map-adventures.md, décision 4).
+    const roomIds = map.rooms.map(room => room.id)
+    assert.equal(new Set(roomIds).size, roomIds.length, 'roomIds dupliqués entre maps')
   })
 
-  test(`[${label}] rooms are within engine bounds and resolve deterministically`, () => {
+  test(`[${label}] definition grid matches engine first-map grid (single source of truth)`, () => {
+    assert.deepEqual(adventure.grid, map.maps[0].grid,
+      'definition.grid et maps[0].grid divergent — la définition doit réexporter la grille moteur')
+  })
+
+  test(`[${label}] rooms are within their map bounds and resolve deterministically`, () => {
     for (const room of map.rooms) {
+      const bounds = boundsForRoom(room)
+      assert.ok(bounds, `${room.name}: map inconnue`)
       assert.ok(inBounds({ x: room.zone.minX, y: room.zone.minY }, bounds), `${room.name}: coin min hors carte`)
       assert.ok(inBounds({ x: room.zone.maxX, y: room.zone.maxY }, bounds), `${room.name}: coin max hors carte`)
       assert.ok(room.zone.minX <= room.zone.maxX && room.zone.minY <= room.zone.maxY, `${room.name}: zone inversée`)
@@ -75,16 +100,70 @@ for (const adventure of ADVENTURES) {
     // NB : on n'exige PAS l'absence de chevauchement — les salles en L sont
     // modélisées par des boîtes englobantes rectangulaires qui peuvent se
     // recouvrir (ex. Grammy's salles 5/8 partagent (6,8)). Le moteur
-    // désambiguïse par l'ordre d'itération : inferAdventureRoomId renvoie le
-    // PREMIER match. On vérifie que chaque case d'une salle résout bien vers UNE
-    // salle réelle du module (jamais null → « hors salle » inattendu).
+    // désambiguïse par l'ordre d'itération : inferRoomIdOnMap renvoie le
+    // PREMIER match DE LA MAP. On vérifie que chaque case d'une salle résout
+    // bien vers UNE salle réelle de sa map (jamais null → « hors salle »).
     for (const room of map.rooms) {
       for (let x = room.zone.minX; x <= room.zone.maxX; x++) {
         for (let y = room.zone.minY; y <= room.zone.maxY; y++) {
-          const resolved = inferAdventureRoomId({ x, y }, adventure.id)
+          const resolved = inferRoomIdOnMap({ x, y }, roomMapId(room), adventure.id)
           assert.ok(resolved !== null, `${adventure.id}: case (${x},${y}) de la salle ${room.id} ne résout vers aucune salle`)
-          assert.ok(map.rooms.some(r => r.id === resolved), `${adventure.id}: (${x},${y}) résout vers une salle inexistante ${resolved}`)
+          const resolvedRoom = findRoom(resolved)
+          assert.ok(resolvedRoom, `${adventure.id}: (${x},${y}) résout vers une salle inexistante ${resolved}`)
+          assert.equal(roomMapId(resolvedRoom), roomMapId(room),
+            `${adventure.id}: (${x},${y}) résout vers une salle d'une autre map`)
         }
+      }
+    }
+  })
+
+  test(`[${label}] map transitions and quests are coherent and engine-checkable`, () => {
+    const mapIds = new Set(map.maps.map(spec => spec.id))
+    const encounterIdSet = new Set(Object.keys(map.encounters))
+    const npcIds = new Set(map.npcs.map(npc => npc.id))
+    const roomIds = new Set(map.rooms.map(room => room.id))
+
+    for (const transition of map.mapTransitions) {
+      assert.ok(mapIds.has(transition.fromMapId), `${transition.id}: fromMapId inconnu`)
+      assert.ok(mapIds.has(transition.toMapId), `${transition.id}: toMapId inconnu`)
+      assert.notEqual(transition.fromMapId, transition.toMapId, `${transition.id}: transition vers soi-même`)
+      const arrivalRoom = findRoom(transition.arrivalRoomId)
+      assert.ok(arrivalRoom, `${transition.id}: arrivalRoomId inconnu`)
+      assert.equal(roomMapId(arrivalRoom), transition.toMapId, `${transition.id}: salle d'arrivée hors de la map de destination`)
+      assert.ok(roomContains(arrivalRoom, transition.arrivalCell), `${transition.id}: arrivalCell hors de la salle d'arrivée`)
+      for (const companion of transition.companions ?? []) {
+        assert.ok(npcIds.has(companion), `${transition.id}: compagnon inconnu ${companion}`)
+      }
+    }
+
+    for (const [mapId, quest] of Object.entries(map.mapQuests)) {
+      assert.ok(mapIds.has(mapId), `quête pour map inconnue ${mapId}`)
+      assert.equal(quest.mapId, mapId, `quête ${mapId}: mapId incohérent`)
+      for (const objective of quest.objectives) {
+        const check = objective.check
+        if (check.type === 'encounterResolved') {
+          assert.ok(encounterIdSet.has(check.encounterId), `objectif ${objective.id}: rencontre inconnue ${check.encounterId}`)
+        } else if (check.type === 'npcDisposition') {
+          assert.ok(npcIds.has(check.npcId), `objectif ${objective.id}: PNJ inconnu ${check.npcId}`)
+        } else if (check.type === 'roomVisited') {
+          assert.ok(roomIds.has(check.roomId), `objectif ${objective.id}: salle inconnue ${check.roomId}`)
+        } else if (check.type === 'itemInInventory') {
+          assert.ok(typeof check.item === 'string' && check.item.length > 0, `objectif ${objective.id}: item vide`)
+        } else {
+          assert.fail(`objectif ${objective.id}: type de condition inconnu ${check.type}`)
+        }
+      }
+    }
+
+    // Une map non-finale doit avoir une sortie ; toute map au-delà de la
+    // première doit être atteignable (sens unique = progression linéaire ou DAG).
+    if (map.maps.length > 1) {
+      const reachable = new Set([map.maps[0].id])
+      for (const transition of map.mapTransitions) {
+        if (reachable.has(transition.fromMapId)) reachable.add(transition.toMapId)
+      }
+      for (const spec of map.maps) {
+        assert.ok(reachable.has(spec.id), `map ${spec.id} inatteignable depuis la première map`)
       }
     }
   })
@@ -130,13 +209,18 @@ for (const adventure of ADVENTURES) {
   })
 
   test(`[${label}] npcs sit inside their room and do not collide with encounter spawns`, () => {
+    const mapIds = new Set(map.maps.map(spec => spec.id))
     for (const npc of map.npcs) {
+      let npcMapId = npc.mapId ?? firstMapId
       if (npc.roomId !== null) {
         const room = findRoom(npc.roomId)
         assert.ok(room, `PNJ ${npc.id}: salle inconnue ${npc.roomId}`)
         assert.ok(roomContains(room, npc.cell), `PNJ ${npc.id} hors de sa salle`)
+        npcMapId = npc.mapId ?? roomMapId(room)
       }
-      assert.ok(inBounds(npc.cell, bounds), `PNJ ${npc.id} hors carte`)
+      assert.ok(mapIds.has(npcMapId), `PNJ ${npc.id}: mapId inconnu ${npcMapId}`)
+      const npcBounds = boundsForGrid(map.maps.find(spec => spec.id === npcMapId).grid)
+      assert.ok(inBounds(npc.cell, npcBounds), `PNJ ${npc.id} hors carte`)
       for (const encounter of Object.values(map.encounters)) {
         for (const monster of encounter.monsters) {
           assert.ok(!(monster.cell.x === npc.cell.x && monster.cell.y === npc.cell.y),
@@ -186,13 +270,19 @@ for (const adventure of ADVENTURES) {
     }
   })
 
-  test(`[${label}] battlemap asset exists with the exact grid dimensions`, () => {
-    const assetPath = path.join(process.cwd(), 'public', adventure.battlemapImage.replace(/^\//, ''))
-    const png = fs.readFileSync(assetPath)
-    const width = png.readUInt32BE(16)
-    const height = png.readUInt32BE(20)
-    assert.equal(width % adventure.grid.cols, 0, 'largeur non multiple du nombre de colonnes')
-    assert.equal(height % adventure.grid.rows, 0, 'hauteur non multiple du nombre de rangées')
-    assert.equal(width / adventure.grid.cols, height / adventure.grid.rows, 'cases non carrées')
+  test(`[${label}] battlemap assets exist with the exact grid dimensions (per map)`, () => {
+    for (const spec of map.maps) {
+      // Image de la map : battlemapImages[mapId] (multi-map), repli sur
+      // battlemapImage (modules 1-map historiques).
+      const image = (adventure.battlemapImages ?? {})[spec.id] ?? adventure.battlemapImage
+      assert.ok(image, `map ${spec.id}: aucune image de battlemap déclarée`)
+      const assetPath = path.join(process.cwd(), 'public', image.replace(/^\//, ''))
+      const png = fs.readFileSync(assetPath)
+      const width = png.readUInt32BE(16)
+      const height = png.readUInt32BE(20)
+      assert.equal(width % spec.grid.cols, 0, `map ${spec.id}: largeur non multiple du nombre de colonnes`)
+      assert.equal(height % spec.grid.rows, 0, `map ${spec.id}: hauteur non multiple du nombre de rangées`)
+      assert.equal(width / spec.grid.cols, height / spec.grid.rows, `map ${spec.id}: cases non carrées`)
+    }
   })
 }

@@ -4,7 +4,7 @@ import { rollDice, getAbilityModifier, d20WithModifier } from '../dice'
 import * as gs from '../game-state'
 import * as rules from '../rules'
 import { MonsterState } from '../../lib/types'
-import { EncounterMonsterSpec, encounterIds, getEncounter } from '../../lib/adventure-map'
+import { EncounterMonsterSpec, encounterIds, getEncounter, getMapSpec, resolveRoomMapId } from '../../lib/adventure-map'
 import { ACTIVE_ADVENTURE_ID } from '../adventure'
 
 // Monster stat blocks — Monster Manual 2025 (XMM)
@@ -191,6 +191,89 @@ const MONSTER_TEMPLATES: Record<string, Omit<MonsterState, 'id' | 'name' | 'posi
     // Vulnérabilité : feu × 2
     // Fausse apparence : ressemble à un pommier ordinaire
   },
+
+  // ── FÉERIE (Feywild) — stats SRD 5.1 (dnd5eapi.co) ───────────────────────────
+
+  // Sprite — CR 1/4 · XP 50
+  sprite: {
+    type: 'sprite',
+    hp: { current: 2, max: 2 },
+    ac: 15,  // armure de cuir
+    stats: { str: 3, dex: 18, con: 10, int: 14, wis: 13, cha: 11 },
+    conditions: [],
+    xpValue: 50,
+    attackBonus: 6,
+    damageDice: '1d2',  // arc court féerique (1 dégât) — flèche empoisonnée : JS CON DD 10 ou empoisonné, géré par DM AI
+    speed: 40,  // vol 40 ft
+  },
+
+  // Satyre — CR 1/2 · XP 100
+  satyr: {
+    type: 'satyr',
+    hp: { current: 31, max: 31 },
+    ac: 14,  // armure de cuir
+    stats: { str: 12, dex: 16, con: 11, int: 12, wis: 10, cha: 14 },
+    conditions: [],
+    xpValue: 100,
+    attackBonus: 5,
+    damageDice: '1d6+3',  // épée courte (coup de tête : +3, 2d4+1)
+    speed: 40,
+    // Résistance magie : Avantage sur JS contre sorts — géré par DM AI
+  },
+
+  // Chien esquiveur (Blink Dog) — CR 1/4 · XP 50
+  blink_dog: {
+    type: 'blink_dog',
+    hp: { current: 22, max: 22 },
+    ac: 13,
+    stats: { str: 12, dex: 17, con: 12, int: 10, wis: 13, cha: 11 },
+    conditions: [],
+    xpValue: 50,
+    attackBonus: 3,
+    damageDice: '1d6+1',  // morsure — Téléportation 40 ft (recharge 4-6) gérée par DM AI
+    speed: 40,
+  },
+
+  // Feu follet (Will-o'-Wisp) — CR 2 · XP 450
+  will_o_wisp: {
+    type: 'will_o_wisp',
+    hp: { current: 22, max: 22 },
+    ac: 19,
+    stats: { str: 1, dex: 28, con: 10, int: 13, wis: 14, cha: 11 },
+    conditions: [],
+    xpValue: 450,
+    attackBonus: 4,
+    damageDice: '2d8',  // décharge (foudre) — Invisibilité et immunités gérées par DM AI
+    speed: 50,  // vol 50 ft (stationnaire)
+  },
+
+  // Arbuste éveillé (Awakened Shrub) — CR 0 · XP 10 (créature comique/allié)
+  awakened_shrub: {
+    type: 'awakened_shrub',
+    hp: { current: 10, max: 10 },
+    ac: 9,
+    stats: { str: 3, dex: 8, con: 11, int: 10, wis: 10, cha: 6 },
+    conditions: [],
+    xpValue: 10,
+    attackBonus: 1,
+    damageDice: '1d4-1',  // griffure de branches
+    speed: 20,
+    hostile: false,  // par défaut inoffensif : ne joue pas de tour offensif automatique
+    // Vulnérabilité : feu × 2 · Fausse apparence : ressemble à un buisson ordinaire
+  },
+
+  // Grenouille géante — CR 1/4 · XP 50
+  giant_frog: {
+    type: 'giant_frog',
+    hp: { current: 18, max: 18 },
+    ac: 11,
+    stats: { str: 12, dex: 13, con: 11, int: 2, wis: 10, cha: 3 },
+    conditions: [],
+    xpValue: 50,
+    attackBonus: 3,
+    damageDice: '1d6+1',  // morsure (agrippé DD 11 sur touche — géré par DM AI)
+    speed: 30,  // + nage 30 ft
+  },
 }
 
 let monsterIdCounter = 0
@@ -369,6 +452,19 @@ export function registerPhaseTools(server: McpServer): void {
         }
         if (encounterId && gs.hasEncounterTriggered(encounterId)) {
           throw new rules.RuleViolation('ENCOUNTER_ALREADY_RESOLVED', `Encounter already triggered: ${encounterId}`, { encounterId })
+        }
+        // Multi-map : une rencontre préréglée ne se déclenche que sur SA map
+        // (ses cellules n'ont de sens que sur la grille de sa salle).
+        if (preset) {
+          const presetMapId = resolveRoomMapId(preset.roomId, ACTIVE_ADVENTURE_ID)
+          const currentMapId = getMapSpec(gs.getState().currentMapId, ACTIVE_ADVENTURE_ID).id
+          if (presetMapId && presetMapId !== currentMapId) {
+            throw new rules.RuleViolation('ENCOUNTER_WRONG_MAP', `Encounter ${preset.id} belongs to another map.`, {
+              encounterId: preset.id,
+              encounterMapId: presetMapId,
+              currentMapId,
+            })
+          }
         }
 
         const encounterMonsters = monsters ?? preset?.monsters ?? []

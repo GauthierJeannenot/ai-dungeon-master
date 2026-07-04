@@ -1,6 +1,12 @@
 import type Anthropic from '@anthropic-ai/sdk'
 import { loadContextFiles, loadAdventureModuleParsed } from '@/lib/context-loader'
-import { describeRoomHooks } from '@/lib/adventure-map'
+import {
+  describeRoomHooks,
+  evaluateMapQuest,
+  getAdventureMap,
+  getMapSpec,
+  mapTransitionsFrom,
+} from '@/lib/adventure-map'
 import { getAdventureDefinition } from '@/lib/adventures'
 import type { GameState, ConversationTurn } from '@/lib/types'
 import { parsePositiveInt } from './llm'
@@ -141,10 +147,18 @@ export function serializeGameState(gameState: GameState): string {
   if (Object.keys(aliveMonsters).length > 0) {
     compact.monsters = aliveMonsters
   }
+  // Multi-map uniquement : la map courante fait partie de l'état utile au DM.
+  // Absent pour un module 1-map (préfixe de prompt byte-identique à avant).
+  const adventureMaps = getAdventureMap(gameState.adventureId).maps
+  if (adventureMaps.length > 1) {
+    compact.currentMapId = gameState.currentMapId ?? adventureMaps[0].id
+  }
   // PNJ visibles de la salle courante (présents dès le départ ou révélés en cours
-  // de partie). Les PNJ cachés (visible:false) restent hors du contexte LLM.
+  // de partie). Les PNJ cachés (visible:false) ou d'une AUTRE map restent hors
+  // du contexte LLM.
   if (gameState.npcs) {
     const visibleNpcs = Object.values(gameState.npcs)
+      .filter(npc => !npc.mapId || !gameState.currentMapId || npc.mapId === gameState.currentMapId)
       .filter(npc => npc.visible && (npc.roomId === null || npc.roomId === gameState.currentRoomId))
       .map(npc => ({
         id: npc.id,
@@ -174,11 +188,62 @@ export function serializeGameState(gameState: GameState): string {
   return JSON.stringify(compact)
 }
 
+// Contexte multi-map du bloc dynamique : intro de la carte courante (index du
+// module), quête de map (état moteur des objectifs), sorties et maps quittées.
+// Renvoie '' pour un module 1-map — le prompt reste byte-identique à avant.
+function buildMapContextBlock(gameState: GameState): string {
+  const adventureId = gameState.adventureId
+  const maps = getAdventureMap(adventureId).maps
+  if (maps.length <= 1) return ''
+
+  const currentMap = getMapSpec(gameState.currentMapId, adventureId)
+  const sections: string[] = []
+
+  const mapIntro = loadAdventureModuleParsed(adventureId).mapIntros[currentMap.id]
+  if (mapIntro) {
+    sections.push(`---\n## CARTE ACTUELLE — INDEX DU MODULE\n${mapIntro}\n`)
+  }
+
+  const quest = evaluateMapQuest(gameState, currentMap.id, adventureId)
+  const transitions = mapTransitionsFrom(currentMap.id, adventureId)
+    .filter(transition => !gameState.mapOutcomes?.[transition.toMapId])
+  if (quest.objectives.length > 0 || transitions.length > 0) {
+    const lines: string[] = [`---\n## CARTE ACTUELLE — QUÊTE ET SORTIES (état moteur)`]
+    if (quest.objectives.length > 0) {
+      lines.push(`Objectifs de « ${currentMap.name} » (la sortie n'ouvre que lorsque tous les objectifs REQUIS sont remplis — c'est le moteur qui juge, pas toi) :`)
+      for (const objective of quest.objectives) {
+        lines.push(`- [${objective.done ? 'FAIT' : 'À FAIRE'}] ${objective.label} (${objective.required ? 'requis' : 'optionnel'})`)
+      }
+    }
+    for (const transition of transitions) {
+      const toMap = getMapSpec(transition.toMapId, adventureId)
+      lines.push(`Sortie : vers « ${toMap.name} » — appelle \`travel_to_map({ toMapId: "${transition.toMapId}" })\` UNIQUEMENT quand le joueur franchit délibérément le passage. Si le moteur refuse (MAP_QUEST_INCOMPLETE), narre le chemin encore fermé à partir des objectifs manquants renvoyés — n'improvise JAMAIS le passage. Le départ est SANS RETOUR : préviens le joueur qu'il laissera derrière lui ce qu'il n'a pas réglé, et demande-lui confirmation avant l'appel.`)
+    }
+    sections.push(lines.join('\n') + '\n')
+  }
+
+  const outcomes = Object.entries(gameState.mapOutcomes ?? {})
+  if (outcomes.length > 0) {
+    const lines = [`---\n## CARTES QUITTÉES (sens unique — on n'y retourne JAMAIS)`]
+    for (const [mapId, outcome] of outcomes) {
+      const spec = getMapSpec(mapId, adventureId)
+      const labels = evaluateMapQuest(gameState, mapId, adventureId).objectives
+        .filter(objective => outcome.objectivesDone.includes(objective.id))
+        .map(objective => objective.label)
+      lines.push(`- « ${spec.name} » : quête ${outcome.completion === 'total' ? 'TOTALE' : 'PARTIELLE'}${labels.length ? ` — accompli : ${labels.join(' ; ')}` : ''}`)
+    }
+    sections.push(lines.join('\n') + '\n')
+  }
+
+  return sections.length ? sections.join('\n') + '\n' : ''
+}
+
 export function buildDynamicPrompt(gameState: GameState, summaryContext?: string, directive?: string): string {
   const adventureId = gameState.adventureId
   const summaryBlock = summaryContext?.trim()
     ? `---\n## RÉSUMÉ DES ÉVÉNEMENTS PRÉCÉDENTS\n${summaryContext.trim()}\n\n`
     : ''
+  const mapContextBlock = buildMapContextBlock(gameState)
   const roomDetail = gameState.currentRoomId
     ? loadAdventureModuleParsed(adventureId).rooms[gameState.currentRoomId]
     : undefined
@@ -194,7 +259,7 @@ export function buildDynamicPrompt(gameState: GameState, summaryContext?: string
   const directiveBlock = directive
     ? `\n\n---\n## ⚠️ ACTION MÉCANIQUE REQUISE CE TOUR (classifieur d'intention)\n${directive}\nC'est le résultat du tool qui dicte ta narration — ne décris jamais l'issue avant l'appel.`
     : ''
-  return `${summaryBlock}${roomDetailBlock}${roomBlock}---
+  return `${summaryBlock}${mapContextBlock}${roomDetailBlock}${roomBlock}---
 ## ÉTAT ACTUEL DU JEU
 \`\`\`json
 ${serializeGameState(gameState)}

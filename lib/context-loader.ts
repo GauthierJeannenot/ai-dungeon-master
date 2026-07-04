@@ -72,6 +72,11 @@ export function invalidateContextCache(): void {
 export interface ParsedAdventureModule {
   index: string                  // En-tête + carte + table des transitions + annexes : toujours dans le prompt statique.
   rooms: Record<string, string>  // roomId -> section "## Salle N ..." complète, injectée dynamiquement selon la position.
+  // Modules MULTI-MAPS (en-têtes "# Carte <mapId> — Titre") : intro de chaque
+  // carte (synopsis, table des points d'entrée, sortie), injectée DYNAMIQUEMENT
+  // quand la carte devient courante — l'index statique ne garde que le
+  // préambule global. Vide pour un module 1-map (comportement historique).
+  mapIntros: Record<string, string>
 }
 
 const cachedParsedModule = new Map<string, ParsedAdventureModule>()
@@ -81,7 +86,35 @@ const cachedParsedModule = new Map<string, ParsedAdventureModule>()
 // bloc dynamique) au lieu des ~8 salles à chaque appel, tout en gardant la carte,
 // la table des points d'entrée et les annexes (récompenses, finale, monstres,
 // notes) toujours accessibles dans l'index statique mis en cache.
+// Un module multi-maps découpe EN PLUS par "# Carte <mapId> — Titre" : chaque
+// section de carte est parsée comme un sous-module (intro + salles), et seule la
+// carte courante est envoyée au LLM.
 export function parseAdventureModule(moduleText: string): ParsedAdventureModule {
+  const mapHeaderRegex = /^# Carte\s+(\S+)[^\n]*$/gm
+  const mapMatches: { mapId: string; start: number }[] = []
+  let mapMatch: RegExpExecArray | null
+  while ((mapMatch = mapHeaderRegex.exec(moduleText)) !== null) {
+    mapMatches.push({ mapId: mapMatch[1], start: mapMatch.index })
+  }
+
+  if (mapMatches.length === 0) {
+    return { ...parseSingleMapSection(moduleText), mapIntros: {} }
+  }
+
+  const preamble = moduleText.slice(0, mapMatches[0].start).trim()
+  const rooms: Record<string, string> = {}
+  const mapIntros: Record<string, string> = {}
+  for (let i = 0; i < mapMatches.length; i++) {
+    const end = i + 1 < mapMatches.length ? mapMatches[i + 1].start : moduleText.length
+    const section = moduleText.slice(mapMatches[i].start, end)
+    const parsed = parseSingleMapSection(section)
+    mapIntros[mapMatches[i].mapId] = parsed.index
+    Object.assign(rooms, parsed.rooms)
+  }
+  return { index: preamble, rooms, mapIntros }
+}
+
+function parseSingleMapSection(moduleText: string): { index: string; rooms: Record<string, string> } {
   const roomHeaderRegex = /^## Salle\s+(\d+)\b/gm
   const roomMatches: { id: string; start: number }[] = []
   let match: RegExpExecArray | null

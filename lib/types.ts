@@ -207,10 +207,20 @@ export interface NpcState {
   name: string
   kind: string                       // 'awakened_tree', 'dryad', …
   position: { x: number; y: number }
-  roomId: string | null              // null = visible quelle que soit la salle
+  roomId: string | null              // null = visible quelle que soit la salle (de sa map)
+  // Map du module où vit le PNJ (absent = première map, états legacy). Un PNJ
+  // « compagnon » change de map via travel_to_map (transition.companions).
+  mapId?: string
   disposition: WorldNpcDisposition
   visible: boolean                   // false = présent mais pas encore révélé au joueur
   description?: string
+}
+
+// Issue d'une map quittée, enregistrée PAR LE MOTEUR au moment du travel_to_map.
+// C'est la forme compressée du contexte des choix passés (docs/multi-map-adventures.md).
+export interface MapOutcome {
+  completion: 'partial' | 'total'   // partielle = objectifs requis ; totale = tous
+  objectivesDone: string[]          // ids des MapObjective remplis au départ
 }
 
 export interface GameState {
@@ -230,6 +240,12 @@ export interface GameState {
   combatLog: CombatLogEntry[]
   roomsVisited: string[]
   currentRoomId: string | null
+  // Map courante du module (absent = première map, états legacy). Change
+  // UNIQUEMENT via travel_to_map — préservé au round-trip replace_game_state.
+  currentMapId?: string
+  // Issues des maps quittées (clé = mapId). Sens unique : une map présente ici
+  // ne peut plus être re-visitée. Préservé au round-trip replace_game_state.
+  mapOutcomes?: Record<string, MapOutcome>
   encountersTriggered?: string[]
   sceneMemory?: SceneMemory
   world?: WorldState

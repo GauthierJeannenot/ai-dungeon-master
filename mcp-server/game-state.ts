@@ -5,9 +5,10 @@ import {
   Condition,
   PlayerState,
   Item,
+  MapOutcome,
   WorldNpcDisposition,
 } from '../lib/types'
-import { inferAdventureRoomId, seedAdventureNpcs, getAdventureMap } from '../lib/adventure-map'
+import { inferRoomIdOnMap, seedAdventureNpcs, getAdventureMap, firstMapId } from '../lib/adventure-map'
 import { BASE_PLAYER } from '../lib/player-template'
 import { ACTIVE_ADVENTURE_ID } from './adventure'
 
@@ -27,7 +28,8 @@ let state: GameState = createInitialState()
 
 function createInitialState(): GameState {
   const player = buildInitialPlayer()
-  const initialRoomId = inferAdventureRoomId(player.position, ACTIVE_ADVENTURE_ID)
+  const initialMapId = firstMapId(ACTIVE_ADVENTURE_ID)
+  const initialRoomId = inferRoomIdOnMap(player.position, initialMapId, ACTIVE_ADVENTURE_ID)
   return {
     adventureId: ACTIVE_ADVENTURE_ID,
     phase: 'exploration',
@@ -42,12 +44,14 @@ function createInitialState(): GameState {
     combatLog: [],
     roomsVisited: initialRoomId ? [initialRoomId] : [],
     currentRoomId: initialRoomId,
+    currentMapId: initialMapId,
+    mapOutcomes: {},
     encountersTriggered: [],
   }
 }
 
 function syncPlayerRoomFromPosition(): void {
-  const roomId = inferAdventureRoomId(state.player.position, state.adventureId)
+  const roomId = inferRoomIdOnMap(state.player.position, state.currentMapId, state.adventureId)
   state.currentRoomId = roomId
   if (roomId && !state.roomsVisited.includes(roomId)) {
     state.roomsVisited.push(roomId)
@@ -96,6 +100,10 @@ export function replaceState(nextState: GameState): GameState {
     movementUsed: structuredClone(nextState.movementUsed ?? {}),
     actionUsed: structuredClone(nextState.actionUsed ?? {}),
     roomsVisited: structuredClone(nextState.roomsVisited ?? []),
+    // Multi-map : états historiques sans ces champs = première map, aucune
+    // map quittée. Doivent survivre au round-trip (docs/multi-map-adventures.md).
+    currentMapId: nextState.currentMapId ?? firstMapId(adventureId),
+    mapOutcomes: structuredClone(nextState.mapOutcomes ?? {}),
     encountersTriggered: structuredClone(nextState.encountersTriggered ?? []),
     // PNJ : on préserve l'état client s'il existe (révélations déjà faites), sinon on
     // ré-amorce le seed du module (états historiques sans le champ npcs).
@@ -131,6 +139,13 @@ export function getNpc(id: string): NpcState | undefined {
 // peut ajuster leur disposition. Scopé à la salle du joueur (roomId null = global)
 // pour éviter de révéler un PNJ d'une autre salle. Retourne les PNJ effectivement
 // touchés.
+// Un PNJ est « sur la map courante » si son mapId (défaut : première map,
+// états legacy) correspond au currentMapId de l'état.
+export function npcOnCurrentMap(npc: NpcState): boolean {
+  const defaultMapId = firstMapId(state.adventureId)
+  return (npc.mapId ?? defaultMapId) === (state.currentMapId ?? defaultMapId)
+}
+
 export function revealNpcs(params: {
   npcId?: string
   kind?: string
@@ -141,7 +156,7 @@ export function revealNpcs(params: {
   const matched: NpcState[] = []
 
   for (const npc of Object.values(state.npcs)) {
-    const inScope = npc.roomId === null || npc.roomId === currentRoomId
+    const inScope = npcOnCurrentMap(npc) && (npc.roomId === null || npc.roomId === currentRoomId)
     if (!inScope) continue
 
     const idMatch = params.npcId ? npc.id === params.npcId : false
@@ -414,6 +429,78 @@ export function visitRoom(roomId: string): void {
     state.roomsVisited.push(roomId)
   }
   state.currentRoomId = roomId
+}
+
+// Applique les EFFETS d'un travel_to_map (les validations — quête, combat,
+// sens unique — sont faites par le tool AVANT d'appeler ceci). Atomique du
+// point de vue de l'état : appelé une fois, toutes les mutations ensemble.
+export function applyMapTravel(params: {
+  fromMapId: string
+  toMapId: string
+  arrivalCell: { x: number; y: number }
+  arrivalRoomId: string
+  companions: string[]
+  outcome: MapOutcome
+}): { companionsMoved: string[] } {
+  // Issue de la map quittée — sens unique : sa présence dans mapOutcomes
+  // verrouille tout retour.
+  state.mapOutcomes ??= {}
+  state.mapOutcomes[params.fromMapId] = structuredClone(params.outcome)
+
+  // Les combattants de la map quittée n'ont plus de sens sur la nouvelle grille
+  // (le voyage est refusé en combat : il ne reste que des cadavres ou des
+  // créatures abandonnées derrière soi).
+  state.monsters = {}
+  state.initiativeOrder = []
+  state.currentTurn = null
+  state.round = 0
+  state.movementUsed = {}
+  state.actionUsed = {}
+
+  state.currentMapId = params.toMapId
+  state.player.position = { x: params.arrivalCell.x, y: params.arrivalCell.y }
+  visitRoom(params.arrivalRoomId)
+
+  // Compagnons : ils traversent avec le joueur, placés sur une case libre
+  // adjacente à l'arrivée. Les autres PNJ restent sur leur map d'origine.
+  const companionsMoved: string[] = []
+  const occupied = new Set<string>([`${params.arrivalCell.x},${params.arrivalCell.y}`])
+  for (const npcId of params.companions) {
+    const npc = state.npcs?.[npcId]
+    if (!npc) continue
+    const grid = getAdventureMap(state.adventureId).maps.find(m => m.id === params.toMapId)?.grid
+    const cell = findFreeCellNear(params.arrivalCell, occupied, grid)
+    npc.mapId = params.toMapId
+    npc.roomId = params.arrivalRoomId
+    npc.position = cell
+    occupied.add(`${cell.x},${cell.y}`)
+    companionsMoved.push(npcId)
+  }
+  return { companionsMoved }
+}
+
+// Première case libre autour d'un point (anneaux croissants), bornée à la
+// grille. Repli : la case d'origine décalée d'un cran vers l'intérieur.
+function findFreeCellNear(
+  origin: { x: number; y: number },
+  occupied: Set<string>,
+  grid: { cols: number; rows: number } | undefined
+): { x: number; y: number } {
+  const maxX = (grid?.cols ?? 17) - 1
+  const maxY = (grid?.rows ?? 15) - 1
+  for (let radius = 1; radius <= 3; radius++) {
+    for (let dy = -radius; dy <= radius; dy++) {
+      for (let dx = -radius; dx <= radius; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== radius) continue
+        const x = origin.x + dx
+        const y = origin.y + dy
+        if (x < 0 || y < 0 || x > maxX || y > maxY) continue
+        if (occupied.has(`${x},${y}`)) continue
+        return { x, y }
+      }
+    }
+  }
+  return { x: Math.max(0, Math.min(maxX, origin.x)), y: Math.max(0, Math.min(maxY, origin.y)) }
 }
 
 export function hasEncounterTriggered(encounterId: string): boolean {

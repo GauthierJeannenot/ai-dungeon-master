@@ -1,5 +1,5 @@
 import { PlayerState, MonsterState } from '../lib/types'
-import { getAdventureMap } from '../lib/adventure-map'
+import { gridForMap } from '../lib/adventure-map'
 import { ACTIVE_ADVENTURE_ID } from './adventure'
 import * as gs from './game-state'
 
@@ -7,16 +7,20 @@ type Entity = PlayerState | MonsterState
 
 const DEFAULT_MELEE_RANGE_CELLS = 1
 
-// Bornes de déplacement dérivées de la grille du MODULE ACTIF (figé au spawn).
-// Source de vérité unique : adventures/<id>/map.ts (grid). Exporté pour que
-// PositionSchema (player-tools.ts) valide contre les mêmes bornes.
-const GRID = getAdventureMap(ACTIVE_ADVENTURE_ID).grid
-export const MAP_BOUNDS = {
-  minX: 0,
-  maxX: GRID.cols - 1,
-  minY: 0,
-  maxY: GRID.rows - 1,
-} as const
+// Bornes de déplacement dérivées de la grille de la MAP COURANTE du module
+// actif (figé au spawn). Source de vérité unique : adventures/<id>/map.ts
+// (maps[i].grid). DYNAMIQUE depuis le multi-map : chaque map a sa grille, les
+// bornes suivent state.currentMapId — ne plus les figer dans une constante ni
+// dans un schéma zod construit à l'import.
+export function mapBounds(): { minX: number; maxX: number; minY: number; maxY: number } {
+  const grid = gridForMap(gs.getState().currentMapId, ACTIVE_ADVENTURE_ID)
+  return {
+    minX: 0,
+    maxX: grid.cols - 1,
+    minY: 0,
+    maxY: grid.rows - 1,
+  }
+}
 
 const ATTACK_RANGE_CELLS: Record<string, number> = {
   longsword: 1,
@@ -123,22 +127,23 @@ function assertInInitiative(entityId: string): void {
 }
 
 export function validateMapCell(cell: { x: number; y: number }, fieldName = 'cell'): void {
+  const bounds = mapBounds()
   const validCoordinates = Number.isFinite(cell.x) &&
     Number.isFinite(cell.y) &&
     Number.isInteger(cell.x) &&
     Number.isInteger(cell.y)
 
   const inBounds = validCoordinates &&
-    cell.x >= MAP_BOUNDS.minX &&
-    cell.x <= MAP_BOUNDS.maxX &&
-    cell.y >= MAP_BOUNDS.minY &&
-    cell.y <= MAP_BOUNDS.maxY
+    cell.x >= bounds.minX &&
+    cell.x <= bounds.maxX &&
+    cell.y >= bounds.minY &&
+    cell.y <= bounds.maxY
 
   if (!inBounds) {
     throw new RuleViolation('INVALID_GRID_CELL', `Cell (${cell.x}, ${cell.y}) is outside the battlemap bounds.`, {
       field: fieldName,
       cell,
-      bounds: MAP_BOUNDS,
+      bounds,
     })
   }
 }

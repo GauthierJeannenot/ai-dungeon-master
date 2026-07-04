@@ -366,6 +366,13 @@ function GameView({ adventure, resumeSessionId }: { adventure: AdventureDefiniti
   const [hasLoadedSession, setHasLoadedSession] = useState(false)
   // Résumé compressé des échanges anciens — stocké ici, renvoyé à chaque requête
   const [summaryContext, setSummaryContext] = useState<string | undefined>(undefined)
+  // Map courante du module : image et grille suivent gameState.currentMapId
+  // (modules multi-maps). Repli : première map (états legacy, modules 1-map).
+  const currentMapSpec = useMemo(
+    () => adventure.map.maps.find(spec => spec.id === gameState.currentMapId) ?? adventure.map.maps[0],
+    [adventure, gameState.currentMapId]
+  )
+  const currentBattlemapImage = adventure.battlemapImages?.[currentMapSpec.id] ?? adventure.battlemapImage
   const [budgetSummary, setBudgetSummary] = useState<ClientBudgetSummary>(emptyBudgetSummary)
   const [quota, setQuota] = useState<DMQuota | null>(null)
 
@@ -777,11 +784,11 @@ function GameView({ adventure, resumeSessionId }: { adventure: AdventureDefiniti
           <Battlemap
             gameState={gameState}
             cellSize={52}
-            image={adventure.battlemapImage}
-            cols={adventure.grid.cols}
-            rows={adventure.grid.rows}
+            image={currentBattlemapImage}
+            cols={currentMapSpec.grid.cols}
+            rows={currentMapSpec.grid.rows}
           />
-          {/* Battlemap et grille fournies par le module d'aventure actif */}
+          {/* Battlemap et grille de la MAP COURANTE du module actif */}
         </div>
 
         {/* Right: Chat + CombatTracker (35%) */}

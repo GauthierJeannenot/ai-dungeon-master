@@ -228,7 +228,10 @@ export function describeTideCryptRoomHooks(roomId: string | null | undefined): s
 // La crypte n'a pas d'alias de contexte dédiés → roomContextAliases vide (le
 // moteur retombe alors sur roomNavigationAliases).
 export const TIDE_CRYPT_MAP: AdventureMapData = {
-  grid: { cols: 17, rows: 15 },
+  // Aventure 1-map : toutes les salles vivent sur la map unique (mapId implicite).
+  maps: [{ id: 'shore', name: 'La grève et la crypte', grid: { cols: 17, rows: 15 } }],
+  mapQuests: {},
+  mapTransitions: [],
   startCell: TIDE_CRYPT_START_CELL,
   // Héros niveau 2 (suite de Grammy's) : 28 PV, deux potions.
   initialPlayer: {

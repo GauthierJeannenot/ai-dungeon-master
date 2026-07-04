@@ -242,6 +242,9 @@ function deriveNpcTokens(gameState: GameState): MapNpcToken[] {
 
   return Object.values(gameState.npcs)
     .filter(npc => npc.visible)
+    // Multi-map : un PNJ d'une autre map ne se dessine pas sur cette grille.
+    // Champs absents (états legacy, modules 1-map) = pas de filtre.
+    .filter(npc => !npc.mapId || !gameState.currentMapId || npc.mapId === gameState.currentMapId)
     .filter(npc => npc.roomId === null || npc.roomId === currentRoomId)
     .filter(npc => !occupiedMonsterNames.has(npc.name.toLowerCase()))
     .map(npc => ({
