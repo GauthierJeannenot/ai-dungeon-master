@@ -21,7 +21,7 @@ export interface TokenPackage {
 export const TOKEN_PACKAGES: TokenPackage[] = [
   { id: 'pack-apprenti', name: "Pack Apprenti", tokens: 50, amountCents: 299 },
   { id: 'pack-aventurier', name: 'Pack Aventurier', tokens: 200, amountCents: 899, highlight: true },
-  { id: 'pack-heros', name: 'Pack Héros', tokens: 600, amountCents: 1999 },
+  { id: 'pack-heros', name: 'Pack Héros', tokens: 600, amountCents: 2499 },
 ]
 
 export function getTokenPackage(id: string): TokenPackage | null {
