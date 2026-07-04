@@ -37,11 +37,21 @@ function parseNonNegativeInt(value: string | undefined, fallback: number): numbe
 // IP du client derrière le proxy de l'hébergeur (Railway renseigne
 // x-forwarded-for). Fallback 'unknown' : mieux vaut regrouper les requêtes sans
 // IP dans un même bucket que de les exempter.
+//
+// On prend la DERNIÈRE entrée de x-forwarded-for, pas la première : les proxys
+// AJOUTENT en fin de liste, donc le dernier hop est celui posé par le proxy de
+// confiance (Railway) devant l'app ; les entrées précédentes sont DÉCLARÉES par
+// le client et falsifiables (un client qui envoie « X-Forwarded-For: <fake> »
+// obtiendrait un bucket de rate-limit neuf à chaque requête si on lisait la 1re).
+// NB : si un jour un CDN s'ajoute devant Railway (2 hops de confiance), la
+// dernière entrée deviendrait l'IP du CDN — revoir alors ce choix (sans aller
+// jusqu'à une liste de proxys de confiance tant qu'il n'y a qu'un hop).
 export function clientIpFromHeaders(headers: Headers): string {
   const forwarded = headers.get('x-forwarded-for')
   if (forwarded) {
-    const first = forwarded.split(',')[0]?.trim()
-    if (first) return first
+    const parts = forwarded.split(',').map(part => part.trim()).filter(Boolean)
+    const last = parts.at(-1)
+    if (last) return last
   }
   return headers.get('x-real-ip')?.trim() || 'unknown'
 }

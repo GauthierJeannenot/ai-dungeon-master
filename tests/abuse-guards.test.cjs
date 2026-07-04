@@ -51,9 +51,11 @@ test('daily global budget refuses beyond the cap (SQL backend)', async () => {
   assert.equal(await rateLimit.consumeDailyGlobalBudget(0), true)
 })
 
-test('client IP extraction prefers x-forwarded-for first entry', () => {
+test('client IP extraction uses the last x-forwarded-for entry (trusted proxy hop)', () => {
+  // Le proxy de confiance ajoute son entrée en FIN de liste ; la 1re est
+  // déclarée par le client (falsifiable). On prend donc la dernière.
   const headers = new Headers({ 'x-forwarded-for': '203.0.113.7, 10.0.0.1' })
-  assert.equal(rateLimit.clientIpFromHeaders(headers), '203.0.113.7')
+  assert.equal(rateLimit.clientIpFromHeaders(headers), '10.0.0.1')
 
   assert.equal(rateLimit.clientIpFromHeaders(new Headers()), 'unknown')
 })
