@@ -1,4 +1,5 @@
 import type { AdventureContent } from '../../lib/adventures'
+import { GRAMMYS_MAP } from './map'
 
 // Contenu APP du module « Grammy's Country Apple Pie » : tout ce qui est
 // spécifique au module côté frontend/prompts (meta landing, welcome,
@@ -44,7 +45,8 @@ export const GRAMMYS_CONTENT: AdventureContent = {
   duration: '~1-2 h',
   accent: 'amber',
   battlemapImage: '/battlemaps/grammys_bakery.png',
-  grid: { cols: 17, rows: 15 },
+  // Source de vérité unique : la grille du moteur (map.ts). Pas de duplication.
+  grid: GRAMMYS_MAP.grid,
   welcomeMessage: WELCOME,
   chatPlaceholders: PLACEHOLDERS,
   roomStatusHints: ROOM_STATUS_HINTS,

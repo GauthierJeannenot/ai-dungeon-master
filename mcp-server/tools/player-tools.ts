@@ -20,9 +20,11 @@ const EntityStatsSchema = z.object({
   cha: z.number().int(),
 })
 
+// Bornes dérivées de la grille du module actif (rules.MAP_BOUNDS, source de
+// vérité unique : adventures/<id>/map.ts). Ne pas re-coder 16/14 en dur.
 const PositionSchema = z.object({
-  x: z.number().int().min(0).max(16),
-  y: z.number().int().min(0).max(14),
+  x: z.number().int().min(rules.MAP_BOUNDS.minX).max(rules.MAP_BOUNDS.maxX),
+  y: z.number().int().min(rules.MAP_BOUNDS.minY).max(rules.MAP_BOUNDS.maxY),
 })
 
 const HpSchema = z.object({
@@ -102,20 +104,10 @@ const CombatLogEntrySchema = z.object({
   timestamp: z.number(),
 })
 
-const SceneMemorySchema = z.object({
-  madeNoise: z.boolean().optional(),
-  insultedMac: z.boolean().optional(),
-  foundRecipeHalfCount: z.number().int().min(0).max(2).optional(),
-  sparedGoblin: z.boolean().optional(),
-  tension: z.number().int().min(0).max(6).optional(),
-  alertLevel: z.number().int().min(0).max(5).optional(),
-  macDisposition: z.enum(['neutral', 'helpful', 'offended']).optional(),
-  goblinMorale: z.enum(['steady', 'shaken', 'broken']).optional(),
-  patrolPressure: z.enum(['quiet', 'stirring', 'hunting']).optional(),
-  lastDirectorBeats: z.array(z.string()).optional(),
-  lastWorldSignals: z.array(z.string()).optional(),
-  updatedAt: z.string().optional(),
-})
+// Mémoire de scène libre : clés propres au module, non typées ici (le moteur ne
+// fait que la round-tripper). z.record garantit la survie des états legacy sans
+// coder de vocabulaire de module dans le moteur.
+const SceneMemorySchema = z.record(z.string(), z.unknown())
 
 const GameStateSchema = z.object({
   phase: z.enum(['exploration', 'combat', 'dialogue']),
@@ -311,6 +303,10 @@ export function registerPlayerTools(server: McpServer): void {
       try {
         rules.validateHPUpdate(entityId, delta)
 
+        // Capturer les PV AVANT mutation : entity.hp.current - delta serait faux
+        // quand les PV sont écrêtés (soin au-delà du max, dégâts sous 0).
+        const hpBefore = gs.getEntity(entityId)?.hp.current ?? 0
+
         let entity
         if (entityId === 'player') {
           entity = gs.updatePlayerHP(delta)
@@ -332,7 +328,7 @@ export function registerPlayerTools(server: McpServer): void {
             text: JSON.stringify({
               entityId,
               name: entity.name,
-              hpBefore: entity.hp.current - delta,
+              hpBefore,
               hpAfter: entity.hp.current,
               hpMax: entity.hp.max,
               died,

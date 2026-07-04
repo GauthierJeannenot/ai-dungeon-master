@@ -29,6 +29,9 @@ const LEAK_TERMS = [
   /\bgrukk\b/i,
   /\btartes?\b/i,
   /\bmac le\b/i,
+  // Identifiants de clés de SceneMemory propres à Grammy's : ne doivent plus
+  // apparaître dans le code partagé (SceneMemory est désormais un Record libre).
+  /insultedmac|macdisposition|goblinmorale|foundrecipehalf|sparedgoblin/i,
 ]
 
 function stripCommentsAndSlugs(source) {

@@ -1,4 +1,5 @@
 import type { AdventureContent } from '../../lib/adventures'
+import { TIDE_CRYPT_MAP } from './map'
 
 // Contenu APP du module « La Crypte des Marées ». Voir le commentaire de tête de
 // adventures/grammys-country-apple-pie/definition.ts pour la frontière moteur/app.
@@ -37,7 +38,8 @@ export const TIDE_CRYPT_CONTENT: AdventureContent = {
   duration: '~2-3 h',
   accent: 'purple',
   battlemapImage: '/battlemaps/tide-crypt.png',
-  grid: { cols: 17, rows: 15 },
+  // Source de vérité unique : la grille du moteur (map.ts). Pas de duplication.
+  grid: TIDE_CRYPT_MAP.grid,
   welcomeMessage: WELCOME,
   chatPlaceholders: PLACEHOLDERS,
   roomStatusHints: ROOM_STATUS_HINTS,

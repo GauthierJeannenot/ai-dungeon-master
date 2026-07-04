@@ -53,6 +53,11 @@ export interface AdventureNpcSpec {
 // Toutes les données de carte d'un module. Chaque module en exporte une instance
 // (adventures/<id>/map.ts) ; le registre ci-dessous les agrège par adventureId.
 export interface AdventureMapData {
+  // Dimensions de la grille du module (cols × rows). SOURCE DE VÉRITÉ UNIQUE :
+  // definition.ts la réexporte, et les bornes de déplacement du moteur
+  // (mcp-server/rules.ts, PositionSchema) en dérivent maxX/maxY. Ne pas
+  // dupliquer ces nombres ailleurs.
+  grid: { cols: number; rows: number }
   // État initial du joueur pour ce module (fusionné sur le gabarit par défaut du
   // moteur à la création d'une partie — voir mcp-server/game-state.ts, étape 3).
   startCell: GridCell

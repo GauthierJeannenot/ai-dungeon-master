@@ -99,6 +99,11 @@ const MAX_TOOL_ITERATIONS = parsePositiveInt(process.env.LLM_MAX_CALLS_PER_REQUE
 // est couvert par summaryContext) — évite une ligne JSONB qui enfle sans fin.
 const MAX_STORED_HISTORY_TURNS = parsePositiveInt(process.env.DM_MAX_STORED_HISTORY_TURNS, 200)
 
+// Plafond de longueur du message joueur : un message géant part chez le planner
+// (Haiku) puis le DM (Sonnet) et finit dans l'historique persisté — vecteur de
+// coût direct pour 1 seul token débité. 2000 est large pour une action de joueur.
+const DM_MAX_MESSAGE_CHARS = parsePositiveInt(process.env.DM_MAX_MESSAGE_CHARS, 2000)
+
 // Tools jamais exposés au LLM. get_game_state/replace_game_state servent à la
 // synchro interne ; get_entity_stats double la fiche/l'état déjà fournis ;
 // add_to_log est géré côté serveur. Les retirer allège la liste d'outils (donc le
@@ -145,7 +150,11 @@ const PRIMARY_ACTION_TOOLS = new Set([
   'start_encounter',
 ])
 
-let cachedMcpTools: Anthropic.Tool[] | null = null
+// Cache de la liste de tools exposés, CLÉ PAR aventure : le schéma de certains
+// tools (start_encounter → enum d'encounters) est propre au module. Un seul
+// singleton serait rempli par la première session et servirait le mauvais enum
+// aux sessions d'un autre module. Borné par le nombre de modules du registre.
+const cachedMcpToolsByAdventure = new Map<string, Anthropic.Tool[]>()
 
 function isObjectRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -157,21 +166,29 @@ function generateRequestId(): string {
 
 // ── MCP tools ────────────────────────────────────────────────────────────────
 
-async function getMcpTools(sessionId: string | undefined): Promise<Anthropic.Tool[]> {
-  if (cachedMcpTools) return cachedMcpTools
-  const raw = await listMCPTools(sessionId)
-  cachedMcpTools = raw
+async function getMcpTools(
+  sessionId: string | undefined,
+  adventureId: string
+): Promise<Anthropic.Tool[]> {
+  const cached = cachedMcpToolsByAdventure.get(adventureId)
+  if (cached) return cached
+  // Passer adventureId : si c'est le premier appel MCP qui spawne le process,
+  // il doit démarrer sur le bon module (défense en profondeur, cf. Fix 3).
+  const raw = await listMCPTools(sessionId, adventureId)
+  const tools = raw
     .filter(tool => !HIDDEN_FROM_LLM.has(tool.name))
     .map(tool => ({
       name: tool.name,
       description: tool.description,
       input_schema: tool.inputSchema as Anthropic.Tool['input_schema'],
     }))
+  cachedMcpToolsByAdventure.set(adventureId, tools)
   logEvent('info', 'dm.mcp_tools.loaded', {
     sessionId,
-    exposedToolNames: cachedMcpTools.map(tool => tool.name),
+    adventureId,
+    exposedToolNames: tools.map(tool => tool.name),
   })
-  return cachedMcpTools
+  return tools
 }
 
 // Filtre la liste exposée selon la phase. Calculé une fois par requête (sur la
@@ -197,13 +214,19 @@ async function syncGameStateToMcp(
     try {
       return await callMCPTool('replace_game_state', { gameState }, sessionId, adventureId) as GameState
     } catch (err) {
-      logEvent('warn', 'dm.state.replace_failed', { sessionId, err: err instanceof Error ? err.message : String(err) })
+      // NE JAMAIS retomber sur get_game_state ici : sur un process fraîchement
+      // spawné il renverrait l'état INITIAL du module, qui serait ensuite
+      // persisté → reset silencieux de la partie. On échoue la requête (la
+      // route rembourse + 503, la sauvegarde n'est pas touchée).
+      logEvent('error', 'dm.state.replace_failed', { sessionId, err: err instanceof Error ? err.message : String(err) })
+      return undefined
     }
   }
+  // Nouvelle session (aucun état fourni) : l'état initial du moteur est le bon.
   try {
     return await callMCPTool('get_game_state', {}, sessionId, adventureId) as GameState
   } catch {
-    return gameState
+    return undefined
   }
 }
 
@@ -225,6 +248,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   if (!message?.trim()) {
     return NextResponse.json({ error: 'Message requis' }, { status: 400 })
+  }
+
+  // Plafond de longueur AVANT rate-limit et débit : refuser un message géant ne
+  // doit rien coûter au joueur.
+  if (message.length > DM_MAX_MESSAGE_CHARS) {
+    return NextResponse.json(
+      { error: `Message trop long (${message.length} caractères, maximum ${DM_MAX_MESSAGE_CHARS}).` },
+      { status: 400 }
+    )
   }
 
   // Validation cheap de l'adventureId AVANT tout débit : un id fourni mais
@@ -402,7 +434,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const processedHistory = await processHistory(history, summaryContext, baseContext)
     summaryContext = processedHistory.summaryContext
 
-    const allMcpTools = await getMcpTools(sessionId)
+    const allMcpTools = await getMcpTools(sessionId, adventureId)
     const mcpTools = selectToolsForPhase(allMcpTools, currentGameState.phase)
     baseContext.tools = mcpTools
     logEvent('info', 'dm.mcp_tools.selected', {
@@ -555,7 +587,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         toolsUsed.push(toolUse.name)
         try {
           const input = isObjectRecord(toolUse.input) ? toolUse.input : {}
-          const result = await callMCPTool(toolUse.name, input, sessionId)
+          const result = await callMCPTool(toolUse.name, input, sessionId, adventureId)
           // On ne comptabilise l'action « primaire » qu'en exploration : une action
           // résolue en combat ne doit pas bloquer une action d'exploration menée
           // après un end_combat survenu dans le même message joueur.
@@ -570,7 +602,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           }
           // Rafraîchit l'état courant après une mutation.
           try {
-            currentGameState = await callMCPTool('get_game_state', {}, sessionId) as GameState
+            currentGameState = await callMCPTool('get_game_state', {}, sessionId, adventureId) as GameState
           } catch {
             // garde l'état précédent
           }
@@ -621,7 +653,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     // Récupère l'état final faisant autorité.
     try {
-      currentGameState = await callMCPTool('get_game_state', {}, sessionId) as GameState
+      currentGameState = await callMCPTool('get_game_state', {}, sessionId, adventureId) as GameState
     } catch {
       // garde l'état courant
     }
