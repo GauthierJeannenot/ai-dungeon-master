@@ -351,6 +351,7 @@ function phaseLabel(phase: GameState['phase']): { label: string; color: string }
 }
 
 function GameView({ adventure, resumeSessionId }: { adventure: AdventureDefinition; resumeSessionId?: string | null }) {
+  const router = useRouter()
   // Clés sessionStorage et état initial DÉRIVÉS du module actif. Stables par
   // adventure.id ; un changement de module (nouvelle URL) reconstruit tout.
   const keys = useMemo(() => makeSessionKeys(adventure.id), [adventure.id])
@@ -375,6 +376,15 @@ function GameView({ adventure, resumeSessionId }: { adventure: AdventureDefiniti
       .then(res => res.ok ? res.json() : null)
       .then(data => {
         if (!data) return
+        // Garde de confort : un module payant non débloqué renvoie vers l'accueil
+        // (le vrai verrou reste la 402 de /api/dm). L'achat/la connexion s'y font.
+        if (adventure.requiresEntitlement) {
+          const owned = Array.isArray(data.ownedModules) && data.ownedModules.includes(adventure.id)
+          if (!data.authenticated || !owned) {
+            router.replace('/')
+            return
+          }
+        }
         if (data.authenticated) {
           setQuota({ kind: 'user', balance: data.balance })
         } else if (data.guest) {
