@@ -99,6 +99,11 @@ const MAX_TOOL_ITERATIONS = parsePositiveInt(process.env.LLM_MAX_CALLS_PER_REQUE
 // est couvert par summaryContext) — évite une ligne JSONB qui enfle sans fin.
 const MAX_STORED_HISTORY_TURNS = parsePositiveInt(process.env.DM_MAX_STORED_HISTORY_TURNS, 200)
 
+// Plafond de longueur du message joueur : un message géant part chez le planner
+// (Haiku) puis le DM (Sonnet) et finit dans l'historique persisté — vecteur de
+// coût direct pour 1 seul token débité. 2000 est large pour une action de joueur.
+const DM_MAX_MESSAGE_CHARS = parsePositiveInt(process.env.DM_MAX_MESSAGE_CHARS, 2000)
+
 // Tools jamais exposés au LLM. get_game_state/replace_game_state servent à la
 // synchro interne ; get_entity_stats double la fiche/l'état déjà fournis ;
 // add_to_log est géré côté serveur. Les retirer allège la liste d'outils (donc le
@@ -243,6 +248,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   if (!message?.trim()) {
     return NextResponse.json({ error: 'Message requis' }, { status: 400 })
+  }
+
+  // Plafond de longueur AVANT rate-limit et débit : refuser un message géant ne
+  // doit rien coûter au joueur.
+  if (message.length > DM_MAX_MESSAGE_CHARS) {
+    return NextResponse.json(
+      { error: `Message trop long (${message.length} caractères, maximum ${DM_MAX_MESSAGE_CHARS}).` },
+      { status: 400 }
+    )
   }
 
   // Validation cheap de l'adventureId AVANT tout débit : un id fourni mais

@@ -115,6 +115,15 @@ test('DM API rejects an empty message with 400', async () => {
   assert.equal(typeof data.error, 'string')
 })
 
+test('DM API rejects an over-long message with 400 (no debit, no engine call)', async () => {
+  // Défaut DM_MAX_MESSAGE_CHARS = 2000 ; un message plus long est refusé AVANT
+  // rate-limit/débit/LLM. Pas de sessionId réel : rien ne doit être spawné.
+  const oversized = 'a'.repeat(2001)
+  const { response, data } = await postDm({ message: oversized, sessionId: `api-toolong-${process.pid}` })
+  assert.equal(response.status, 400)
+  assert.match(data.error, /trop long/i)
+})
+
 test('DM API resolves an exploration move via the move_token tool', async t => {
   const sessionId = `api-move-${process.pid}-${Date.now()}`
   t.after(() => cleanupSession(sessionId))
