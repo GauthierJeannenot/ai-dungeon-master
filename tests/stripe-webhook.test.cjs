@@ -14,6 +14,7 @@ process.env.STRIPE_WEBHOOK_SECRET = 'whsec_test_secret'
 const pg = installPgMem()
 const { POST } = require(path.join(process.cwd(), 'app/api/stripe/webhook/route.ts'))
 const credits = require(path.join(process.cwd(), 'lib/credits-store.ts'))
+const moduleAccess = require(path.join(process.cwd(), 'lib/module-access.ts'))
 const Stripe = require('stripe')
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
@@ -32,7 +33,24 @@ function checkoutCompletedEvent({ eventId, userId, tokens, paymentStatus = 'paid
         id: `cs_test_${eventId}`,
         object: 'checkout.session',
         payment_status: paymentStatus,
-        metadata: { userId, packageId: 'pack-apprenti', tokens: String(tokens) },
+        metadata: { userId, kind: 'tokens', packageId: 'pack-apprenti', tokens: String(tokens) },
+        customer_details: { email: 'buyer@example.com' },
+      },
+    },
+  })
+}
+
+function moduleCheckoutEvent({ eventId, userId, moduleId, paymentStatus = 'paid' }) {
+  return JSON.stringify({
+    id: eventId,
+    object: 'event',
+    type: 'checkout.session.completed',
+    data: {
+      object: {
+        id: `cs_test_${eventId}`,
+        object: 'checkout.session',
+        payment_status: paymentStatus,
+        metadata: { userId, kind: 'module', moduleId },
         customer_details: { email: 'buyer@example.com' },
       },
     },
@@ -87,6 +105,33 @@ test('webhook is idempotent when Stripe replays the same event', async () => {
 
   const after = await credits.getUserCredits('user-replay')
   assert.equal(after.balance, 50)
+})
+
+test('webhook grants module access on a signed module checkout', async () => {
+  const payload = moduleCheckoutEvent({ eventId: 'evt_mod_ok', userId: 'user-mod', moduleId: 'tide-crypt' })
+  const response = await POST(signedRequest(payload))
+  assert.equal(response.status, 200)
+
+  assert.equal(await moduleAccess.hasModuleAccess('user-mod', 'tide-crypt'), true)
+  // Un achat de module ne crédite aucun token.
+  assert.equal((await credits.getUserCredits('user-mod')).balance, 0)
+})
+
+test('module grant is idempotent when Stripe replays the same event', async () => {
+  const payload = moduleCheckoutEvent({ eventId: 'evt_mod_replay', userId: 'user-mod-replay', moduleId: 'tide-crypt' })
+
+  assert.equal((await POST(signedRequest(payload))).status, 200)
+  assert.equal((await POST(signedRequest(payload))).status, 200)
+
+  assert.deepEqual(await moduleAccess.getOwnedModules('user-mod-replay'), ['tide-crypt'])
+})
+
+test('webhook ignores an unpaid module checkout without granting access', async () => {
+  const payload = moduleCheckoutEvent({
+    eventId: 'evt_mod_unpaid', userId: 'user-mod-unpaid', moduleId: 'tide-crypt', paymentStatus: 'unpaid',
+  })
+  assert.equal((await POST(signedRequest(payload))).status, 200)
+  assert.equal(await moduleAccess.hasModuleAccess('user-mod-unpaid', 'tide-crypt'), false)
 })
 
 test('webhook ignores unpaid sessions and invalid metadata without crediting', async () => {

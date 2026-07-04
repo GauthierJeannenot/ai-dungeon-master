@@ -2,13 +2,19 @@ import Link from 'next/link'
 import { cookies } from 'next/headers'
 import { auth } from '@/lib/auth'
 import { getUserCredits, getGuestUsage, GUEST_MESSAGE_LIMIT } from '@/lib/credits-store'
+import { getOwnedModules } from '@/lib/module-access'
 import { GUEST_COOKIE_NAME } from '@/lib/entitlements'
 import { ADVENTURES } from '@/lib/adventures'
 import { TOKEN_PACKAGES } from '@/lib/token-packages'
 import { isStripeConfigured } from '@/lib/stripe'
 import AuthControls from '@/components/landing/AuthControls'
 import BuyTokensPanel from '@/components/landing/BuyTokensPanel'
+import BuyModuleButton from '@/components/landing/BuyModuleButton'
 import MyGamesPanel from '@/components/landing/MyGamesPanel'
+
+function formatEur(cents: number): string {
+  return `${(cents / 100).toFixed(2).replace('.', ',')} €`
+}
 
 // Landing page — choix du module d'aventure, connexion OAuth et achat de tokens.
 // Server Component : l'état (session, solde, quota invité) est lu côté serveur.
@@ -39,8 +45,10 @@ export default async function LandingPage() {
 
   let balance: number | undefined
   let guestRemaining = GUEST_MESSAGE_LIMIT
+  let ownedModules: string[] = []
   if (session?.userId) {
     balance = (await getUserCredits(session.userId)).balance
+    ownedModules = await getOwnedModules(session.userId)
   } else {
     const guestId = (await cookies()).get(GUEST_COOKIE_NAME)?.value
     if (guestId) {
@@ -48,6 +56,8 @@ export default async function LandingPage() {
       guestRemaining = Math.max(0, GUEST_MESSAGE_LIMIT - usage.messagesUsed)
     }
   }
+  const authenticated = Boolean(session?.userId)
+  const paymentsEnabled = isStripeConfigured()
 
   return (
     <div className="min-h-screen bg-stone-950 text-stone-100">
@@ -104,6 +114,17 @@ export default async function LandingPage() {
           <div className="grid gap-5 md:grid-cols-2">
             {ADVENTURES.map(adventure => {
               const accent = ACCENT_STYLES[adventure.accent]
+              const owned = ownedModules.includes(adventure.id)
+              // Module payant non encore débloqué : accès à acheter (connexion +
+              // paiement). Un module possédé se joue normalement.
+              const needsPurchase = adventure.available && adventure.requiresEntitlement && !owned
+              const badgeLabel = !adventure.available
+                ? 'Bientôt'
+                : needsPurchase && adventure.priceCents
+                  ? formatEur(adventure.priceCents)
+                  : owned
+                    ? 'Débloqué'
+                    : 'Disponible'
               return (
                 <article
                   key={adventure.id}
@@ -112,30 +133,42 @@ export default async function LandingPage() {
                   <div className="flex items-start justify-between gap-3">
                     <h3 className="text-lg font-bold text-stone-100">{adventure.title}</h3>
                     <span className={`flex-shrink-0 text-[10px] uppercase tracking-wider border px-2 py-0.5 rounded ${accent.badge}`}>
-                      {adventure.available ? 'Disponible' : 'Bientôt'}
+                      {badgeLabel}
                     </span>
                   </div>
                   <p className="text-amber-200/80 text-sm italic">{adventure.tagline}</p>
                   <p className="text-stone-400 text-sm leading-relaxed">{adventure.description}</p>
+                  {needsPurchase && (
+                    <p className="text-xs text-amber-300/80">
+                      🔒 Module payant — connectez-vous et débloquez l&apos;accès définitif.
+                    </p>
+                  )}
                   <div className="mt-auto pt-3 flex items-center gap-3 text-xs text-stone-500">
                     <span>{adventure.level}</span>
                     <span className="w-1 h-1 rounded-full bg-stone-700" />
                     <span>{adventure.duration}</span>
                     <span className="ml-auto">
-                      {adventure.available && adventure.playPath ? (
-                        <Link
-                          href={adventure.playPath}
-                          className="inline-block px-4 py-2 bg-amber-800 hover:bg-amber-700 text-white text-sm font-semibold rounded transition-colors"
-                        >
-                          Démarrer
-                        </Link>
-                      ) : (
+                      {!adventure.available || !adventure.playPath ? (
                         <span
                           aria-disabled="true"
                           className="inline-block px-4 py-2 bg-stone-800 text-stone-500 text-sm font-semibold rounded cursor-not-allowed select-none"
                         >
                           🔒 Verrouillé
                         </span>
+                      ) : needsPurchase && adventure.priceCents ? (
+                        <BuyModuleButton
+                          moduleId={adventure.id}
+                          priceCents={adventure.priceCents}
+                          authenticated={authenticated}
+                          paymentsEnabled={paymentsEnabled}
+                        />
+                      ) : (
+                        <Link
+                          href={adventure.playPath}
+                          className="inline-block px-4 py-2 bg-amber-800 hover:bg-amber-700 text-white text-sm font-semibold rounded transition-colors"
+                        >
+                          Démarrer
+                        </Link>
                       )}
                     </span>
                   </div>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import type Stripe from 'stripe'
 import { getStripe, isStripeConfigured } from '@/lib/stripe'
 import { addPurchasedCredits } from '@/lib/credits-store'
+import { grantModuleAccess } from '@/lib/module-access'
 import { logEvent } from '@/lib/server-logger'
 
 // Webhook Stripe : crédite les tokens après paiement confirmé.
@@ -44,9 +45,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   if (event.type === 'checkout.session.completed') {
     const checkout = event.data.object
     const userId = checkout.metadata?.userId
-    const tokens = Number.parseInt(checkout.metadata?.tokens ?? '', 10)
+    const kind = checkout.metadata?.kind
+    const moduleId = checkout.metadata?.moduleId
+    // Discrimine achat de module vs pack de tokens. `kind` est posé par le
+    // checkout ; repli sur la présence de moduleId pour les sessions historiques.
+    const isModulePurchase = kind === 'module' || Boolean(moduleId)
 
-    if (!userId || !Number.isFinite(tokens) || tokens <= 0) {
+    if (!userId || (isModulePurchase && !moduleId)) {
       logEvent('error', 'stripe.webhook.invalid_metadata', {
         eventId: event.id,
         checkoutSessionId: checkout.id,
@@ -63,6 +68,29 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         paymentStatus: checkout.payment_status,
       })
       return NextResponse.json({ received: true, ignored: 'not-paid' })
+    }
+
+    if (isModulePurchase) {
+      await grantModuleAccess(userId, moduleId as string, {
+        eventId: event.id,
+        source: `stripe:module:${moduleId}`,
+      })
+      logEvent('info', 'stripe.webhook.module_granted', {
+        eventId: event.id,
+        userId,
+        moduleId,
+      })
+      return NextResponse.json({ received: true })
+    }
+
+    const tokens = Number.parseInt(checkout.metadata?.tokens ?? '', 10)
+    if (!Number.isFinite(tokens) || tokens <= 0) {
+      logEvent('error', 'stripe.webhook.invalid_metadata', {
+        eventId: event.id,
+        checkoutSessionId: checkout.id,
+        metadata: checkout.metadata,
+      })
+      return NextResponse.json({ received: true, ignored: 'invalid-metadata' })
     }
 
     const credits = await addPurchasedCredits(userId, tokens, {

@@ -27,7 +27,7 @@ import {
   consumeDailyGlobalBudget,
 } from '@/lib/rate-limit'
 import { DEFAULT_ADVENTURE_ID, isKnownAdventureId } from '@/lib/adventure-map'
-import { requireAvailableAdventure } from '@/lib/adventures'
+import { requireAvailableAdventure, getAdventureDefinition } from '@/lib/adventures'
 import {
   MODEL,
   MAX_TOKENS,
@@ -293,6 +293,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // Propriétaire de la requête ("user:<id>" / "guest:<id>") : lie les sessions
   // de jeu à leur créateur. null hors monétisation (tests, dev sans runtime Next).
   let ownerId: string | null = null
+  // userId du compte connecté (null pour un invité ou hors monétisation) —
+  // requis pour la garde d'accès aux modules payants plus bas.
+  let userId: string | null = null
 
   if (MONETIZATION_ENABLED) {
     // Import paresseux : lib/entitlements tire next-auth + next/headers, qui
@@ -302,6 +305,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     ownerId = entitlement.kind === 'user'
       ? `user:${entitlement.userId}`
       : `guest:${entitlement.guestId}`
+    userId = entitlement.kind === 'user' ? entitlement.userId : null
 
     if (entitlement.kind === 'user') {
       const debit = await consumeUserCredit(entitlement.userId)
@@ -371,6 +375,33 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         return NextResponse.json(
           { error: `Module d'aventure non disponible : "${adventureId}"` },
           { status: 403 }
+        )
+      }
+    }
+
+    // ── Garde d'accès aux modules payants ─────────────────────────────────
+    // Un module `requiresEntitlement` (ex. Tide Crypt) exige un compte connecté
+    // AYANT acheté l'accès. Garde SERVEUR autoritaire : l'UI n'est qu'indicative.
+    // Post-débit → rembourser avant tout return (invariant #2). Sous monétisation
+    // seulement (hors runtime Next il n'y a ni compte ni achat possible).
+    if (MONETIZATION_ENABLED && getAdventureDefinition(adventureId).requiresEntitlement) {
+      // Import paresseux (comme lib/entitlements) : jamais chargé quand la
+      // monétisation est coupée. module-access ne tire que lib/db (pg).
+      const { hasModuleAccess } = await import('@/lib/module-access')
+      if (!userId) {
+        await refundDebit(debited, { requestId, sessionId })
+        logEvent('warn', 'dm.module.login_required', { requestId, sessionId, adventureId })
+        return NextResponse.json(
+          { error: 'Connexion requise pour jouer à ce module.', moduleLocked: adventureId },
+          { status: 402 }
+        )
+      }
+      if (!(await hasModuleAccess(userId, adventureId))) {
+        await refundDebit(debited, { requestId, sessionId })
+        logEvent('warn', 'dm.module.purchase_required', { requestId, sessionId, adventureId, userId })
+        return NextResponse.json(
+          { error: 'Ce module doit être acheté pour y jouer.', moduleLocked: adventureId },
+          { status: 402 }
         )
       }
     }
