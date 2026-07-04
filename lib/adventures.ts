@@ -66,6 +66,14 @@ export interface AdventureContent {
 // Module COMPLET côté app : contenu + exploitation + carte moteur.
 export interface AdventureDefinition extends AdventureContent {
   available: boolean
+  /**
+   * Module payant : accessible uniquement à un utilisateur connecté ayant acheté
+   * l'accès (achat unique, cf. lib/module-access.ts). Axe orthogonal à `available`
+   * (« publié / pas “bientôt” ») et aux tokens (facturation par message).
+   */
+  requiresEntitlement: boolean
+  /** Prix d'achat de l'accès au module, en centimes d'euro (si payant). */
+  priceCents?: number
   /** Chemin de la page de jeu pour ce module. */
   playPath?: string
   /** Dossier des fichiers de contexte markdown (adventures/<id>). */
@@ -81,10 +89,23 @@ const AVAILABILITY: Record<string, boolean> = {
   'tide-crypt': true,
 }
 
+// Modules payants (accès à acheter, une fois, par compte connecté) et leur prix
+// en centimes d'euro. Keyé par slug d'identifiant (« exploitation », pas du
+// contenu narratif) — cf. verrou tests/no-module-leaks.
+const REQUIRES_ENTITLEMENT: Record<string, boolean> = {
+  'tide-crypt': true,
+}
+const MODULE_PRICE_CENTS: Record<string, number> = {
+  'tide-crypt': 500,
+}
+
 function toDefinition(content: AdventureContent): AdventureDefinition {
+  const requiresEntitlement = REQUIRES_ENTITLEMENT[content.id] ?? false
   return {
     ...content,
     available: AVAILABILITY[content.id] ?? false,
+    requiresEntitlement,
+    priceCents: requiresEntitlement ? MODULE_PRICE_CENTS[content.id] : undefined,
     playPath: `/game?adventure=${content.id}`,
     contextDir: `adventures/${content.id}`,
     map: getAdventureMap(content.id),
@@ -114,4 +135,20 @@ export function requireAvailableAdventure(id: string | null | undefined): Advent
 // Définition complète du module, défaut si id inconnu (fail-safe lecture seule).
 export function getAdventureDefinition(id: string | null | undefined): AdventureDefinition {
   return getAdventure(id) ?? getAdventure(DEFAULT_ADVENTURE_ID)!
+}
+
+// Module payant JOUABLE ciblé par un achat : lève si l'id est inconnu, verrouillé
+// (« bientôt ») ou gratuit. Utilisé par le checkout Stripe pour valider un
+// achat d'accès module et retrouver son prix (source de vérité unique).
+export function requirePurchasableModule(
+  id: string | null | undefined
+): { id: string; title: string; priceCents: number } {
+  const adventure = getAdventure(id)
+  if (!adventure || !adventure.available) {
+    throw new Error(`Module d'aventure indisponible : "${id}"`)
+  }
+  if (!adventure.requiresEntitlement || !adventure.priceCents) {
+    throw new Error(`Module d'aventure non payant : "${id}"`)
+  }
+  return { id: adventure.id, title: adventure.title, priceCents: adventure.priceCents }
 }

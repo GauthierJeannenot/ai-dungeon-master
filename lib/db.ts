@@ -107,6 +107,19 @@ CREATE TABLE IF NOT EXISTS guest_usage (
   messages_used INTEGER NOT NULL DEFAULT 0,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Accès aux modules payants (achat unique par compte, définitif). Distinct du
+-- portefeuille de tokens : déverrouille l'ACCÈS à un module, les messages
+-- continuent de consommer des tokens. user_id est TEXT (users.id sérialisé),
+-- sans FK, cohérent avec user_credits. L'idempotence des webhooks Stripe reste
+-- portée par la table stripe_events.
+CREATE TABLE IF NOT EXISTS module_entitlements (
+  user_id TEXT NOT NULL,
+  module_id TEXT NOT NULL,
+  source TEXT,
+  granted_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, module_id)
+);
 `
 
 let pool: Pool | null = null

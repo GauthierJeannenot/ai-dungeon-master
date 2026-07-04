@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { resolveEntitlement } from '@/lib/entitlements'
+import { getOwnedModules } from '@/lib/module-access'
 import { isStripeConfigured } from '@/lib/stripe'
 import { TOKEN_PACKAGES } from '@/lib/token-packages'
 import { logEvent } from '@/lib/server-logger'
@@ -20,6 +21,7 @@ export async function GET(): Promise<NextResponse> {
           image: entitlement.image ?? null,
         },
         balance: entitlement.balance,
+        ownedModules: await getOwnedModules(entitlement.userId),
         packages: TOKEN_PACKAGES,
         paymentsEnabled: isStripeConfigured(),
       })
@@ -31,6 +33,7 @@ export async function GET(): Promise<NextResponse> {
         remaining: entitlement.remaining,
         limit: entitlement.limit,
       },
+      ownedModules: [],
       packages: TOKEN_PACKAGES,
       paymentsEnabled: isStripeConfigured(),
     })
