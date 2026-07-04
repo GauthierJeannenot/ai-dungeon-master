@@ -49,9 +49,15 @@ export interface AdventureContent {
   duration: string
   /** Accent visuel de la carte sur la landing. */
   accent: AdventureAccent
-  /** Image de battlemap servie (public/battlemaps/<id>.png). */
+  /** Image de battlemap servie (public/battlemaps/<id>.png) — map de départ. */
   battlemapImage: string
-  /** Dimensions de la grille (17×15 pour les deux modules actuels). */
+  /**
+   * Modules multi-maps : image par mapId (public/battlemaps/<id>-<mapId>.png).
+   * Absent = module 1-map (battlemapImage suffit). La map de départ peut y
+   * figurer ou non ; battlemapImage reste le repli.
+   */
+  battlemapImages?: Record<string, string>
+  /** Dimensions de la grille de la PREMIÈRE map (les suivantes : map.maps[i].grid). */
   grid: { cols: number; rows: number }
   /** Message d'ouverture du DM affiché avant le premier message du joueur. */
   welcomeMessage: string

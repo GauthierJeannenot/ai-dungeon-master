@@ -167,6 +167,13 @@ function createMockLlmMessage(params: Anthropic.MessageCreateParamsNonStreaming,
     return mockToolMessage('pass_turn', { reason: 'Le joueur attend.' })
   }
 
+  // Changement de map (modules multi-maps) : intention explicite de franchir
+  // le passage vers la carte suivante. Vocabulaire générique uniquement (le
+  // verrou no-module-leaks interdit tout nom propre de module ici).
+  if (/franchis|franchir|portail|carte suivante|map suivante|quitte (cette |la )?(carte|map|zone)/.test(text) && toolAvailable('travel_to_map', context.tools)) {
+    return mockToolMessage('travel_to_map', { reason: context.playerMessage ?? text })
+  }
+
   return mockTextMessage('La scène progresse; quelque chose dans le décor répond à ton geste.')
 }
 
