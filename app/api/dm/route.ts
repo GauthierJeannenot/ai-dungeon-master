@@ -209,13 +209,19 @@ async function syncGameStateToMcp(
     try {
       return await callMCPTool('replace_game_state', { gameState }, sessionId, adventureId) as GameState
     } catch (err) {
-      logEvent('warn', 'dm.state.replace_failed', { sessionId, err: err instanceof Error ? err.message : String(err) })
+      // NE JAMAIS retomber sur get_game_state ici : sur un process fraîchement
+      // spawné il renverrait l'état INITIAL du module, qui serait ensuite
+      // persisté → reset silencieux de la partie. On échoue la requête (la
+      // route rembourse + 503, la sauvegarde n'est pas touchée).
+      logEvent('error', 'dm.state.replace_failed', { sessionId, err: err instanceof Error ? err.message : String(err) })
+      return undefined
     }
   }
+  // Nouvelle session (aucun état fourni) : l'état initial du moteur est le bon.
   try {
     return await callMCPTool('get_game_state', {}, sessionId, adventureId) as GameState
   } catch {
-    return gameState
+    return undefined
   }
 }
 
