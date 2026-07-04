@@ -303,6 +303,10 @@ export function registerPlayerTools(server: McpServer): void {
       try {
         rules.validateHPUpdate(entityId, delta)
 
+        // Capturer les PV AVANT mutation : entity.hp.current - delta serait faux
+        // quand les PV sont écrêtés (soin au-delà du max, dégâts sous 0).
+        const hpBefore = gs.getEntity(entityId)?.hp.current ?? 0
+
         let entity
         if (entityId === 'player') {
           entity = gs.updatePlayerHP(delta)
@@ -324,7 +328,7 @@ export function registerPlayerTools(server: McpServer): void {
             text: JSON.stringify({
               entityId,
               name: entity.name,
-              hpBefore: entity.hp.current - delta,
+              hpBefore,
               hpAfter: entity.hp.current,
               hpMax: entity.hp.max,
               died,

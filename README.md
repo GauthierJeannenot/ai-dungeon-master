@@ -258,6 +258,13 @@ Le serveur MCP valide les règles critiques avant de muter l'état : tour couran
 
 > ⚠️ **Vercel / Netlify non compatibles** — le serveur MCP tourne comme processus enfant persistant (stdio), incompatible avec les fonctions serverless.
 
+> ⚠️ **Une seule instance** — le verrou de session (`lib/session-lock.ts`) et le
+> cache de processus moteur (`lib/mcp-client.ts`) vivent en mémoire de
+> l'instance. Le **scaling horizontal est interdit** sans refonte : deux
+> instances = deux moteurs MCP divergents pour une même session + un verrou qui
+> ne sérialise plus rien. Le passage à N instances exige un verrou distribué et
+> un routage sticky par session (voir `lib/CLAUDE.md`). Scaler en vertical.
+
 ### Architecture de déploiement
 
 ```

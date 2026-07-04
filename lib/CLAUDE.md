@@ -55,6 +55,17 @@ Tests/playtest : PAS de Postgres réel — pool pg-mem injecté via
 - Ne jamais réutiliser un client pour une autre aventure : session ↔ aventure
   est un invariant (409 côté route).
 
+## ⚠️ Hypothèse MONO-INSTANCE (scaling horizontal interdit)
+
+`session-lock.ts` (verrou en mémoire) et `mcp-client.ts` (cache de process
+moteur par instance) supposent UNE seule instance serveur. Deux instances
+derrière un load-balancer = deux moteurs MCP divergents pour la même session
+(l'un ignore les mutations de l'autre) et un verrou qui ne sérialise plus rien.
+Scaling horizontal interdit sans refonte : verrou distribué (Redis/Postgres
+advisory lock) + routage sticky par session vers l'instance qui détient son
+process moteur. La persistance (Postgres) est déjà partagée ; c'est l'état
+moteur en mémoire qui ne l'est pas.
+
 ## Logs
 
 `server-logger.ts` : logs JSON structurés `[ai-dm:<event>]`, secrets masqués

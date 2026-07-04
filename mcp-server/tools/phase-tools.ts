@@ -605,46 +605,6 @@ export function registerPhaseTools(server: McpServer): void {
       return {
         content: [{ type: 'text', text: JSON.stringify(createdMonster) }],
       }
-
-      const template = MONSTER_TEMPLATES[monsterType.toLowerCase()]
-      if (!template) {
-        // Unknown monster type — create a generic one
-        const genericId = `${monsterType}_${Date.now()}`
-        const generic: MonsterState = {
-          id: genericId,
-          name: name ?? monsterType,
-          type: monsterType,
-          hp: { current: hpOverride ?? 10, max: hpOverride ?? 10 },
-          ac: 12,
-          stats: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 },
-          position: cell,
-          conditions: [],
-          xpValue: 50,
-          attackBonus: 2,
-          damageDice: '1d6',
-          speed: 30,
-          isAlive: true,
-        }
-        gs.spawnMonster(generic)
-        return { content: [{ type: 'text', text: JSON.stringify(generic) }] }
-      }
-
-      const id = `${monsterType}_${Date.now()}`
-      const maxHp = hpOverride ?? template.hp.max
-      const monster: MonsterState = {
-        ...template,
-        id,
-        name: name ?? `${monsterType.charAt(0).toUpperCase()}${monsterType.slice(1)}`,
-        hp: { current: maxHp, max: maxHp },
-        position: cell,
-        isAlive: true,
-      }
-
-      gs.spawnMonster(monster)
-
-      return {
-        content: [{ type: 'text', text: JSON.stringify(monster) }],
-      }
     }
   )
 }
