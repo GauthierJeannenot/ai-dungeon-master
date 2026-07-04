@@ -311,7 +311,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       const debit = await consumeUserCredit(entitlement.userId)
       if (!debit.ok) {
         return NextResponse.json({
-          error: 'Solde de tokens épuisé. Achetez un pack pour continuer l\'aventure.',
+          error: 'Solde de messages épuisé. Achetez un pack pour continuer l\'aventure.',
           quota: { kind: 'user', balance: 0 } satisfies DMQuota,
         }, { status: 402 })
       }

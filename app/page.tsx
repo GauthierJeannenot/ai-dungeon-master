@@ -180,11 +180,11 @@ export default async function LandingPage() {
 
         {/* Tarifs */}
         <section className="pb-16">
-          <h2 className="text-xl font-bold text-stone-200 mb-1">Tokens</h2>
+          <h2 className="text-xl font-bold text-stone-200 mb-1">Messages</h2>
           <p className="text-sm text-stone-500 mb-6">
-            Un token = un message envoyé au Dungeon Master. Les nouveaux comptes reçoivent
-            des tokens de bienvenue ; les visiteurs anonymes disposent de {GUEST_MESSAGE_LIMIT} messages
-            d&apos;essai, quel que soit le module.
+            Chaque message envoyé au Dungeon Master est décompté de votre solde. Les nouveaux
+            comptes reçoivent des messages de bienvenue ; les visiteurs anonymes disposent
+            de {GUEST_MESSAGE_LIMIT} messages d&apos;essai, quel que soit le module.
           </p>
           <BuyTokensPanel
             authenticated={Boolean(session?.userId)}

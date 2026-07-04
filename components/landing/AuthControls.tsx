@@ -27,7 +27,7 @@ export default function AuthControls({ authenticated, userName, userImage, balan
         </span>
         {typeof balance === 'number' && (
           <span className="text-xs font-mono text-amber-300 bg-stone-800 border border-amber-900/40 px-2 py-1 rounded">
-            {balance} token{balance > 1 ? 's' : ''}
+            {balance} message{balance > 1 ? 's' : ''}
           </span>
         )}
         <button

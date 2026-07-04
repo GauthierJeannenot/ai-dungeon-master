@@ -21,7 +21,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const session = await auth()
   if (!session?.userId) {
     return NextResponse.json(
-      { error: 'Connexion requise pour acheter des tokens.' },
+      { error: 'Connexion requise pour acheter des messages.' },
       { status: 401 }
     )
   }
@@ -109,7 +109,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // ── Achat d'un pack de tokens ───────────────────────────────────────────────
   const pkg = getTokenPackage(body.packageId ?? '')
   if (!pkg) {
-    return NextResponse.json({ error: 'Pack de tokens inconnu.' }, { status: 400 })
+    return NextResponse.json({ error: 'Pack de messages inconnu.' }, { status: 400 })
   }
 
   try {
@@ -122,7 +122,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             currency: 'eur',
             unit_amount: pkg.amountCents,
             product_data: {
-              name: `${pkg.name} — ${pkg.tokens} tokens`,
+              name: `${pkg.name} — ${pkg.tokens} messages`,
               description: `${pkg.tokens} messages au Dungeon Master IA`,
             },
           },
