@@ -16,7 +16,10 @@ export const GRAMMYS_ID = 'grammys-country-apple-pie'
 export const GRAMMYS_START_CELL: GridCell = { x: 4, y: 13 }
 
 export const GRAMMYS_MAP: AdventureMapData = {
-  grid: { cols: 17, rows: 15 },
+  // Aventure 1-map : toutes les salles vivent sur la map unique (mapId implicite).
+  maps: [{ id: 'bakery', name: 'La boulangerie et ses abords', grid: { cols: 17, rows: 15 } }],
+  mapQuests: {},
+  mapTransitions: [],
   startCell: GRAMMYS_START_CELL,
   // Héros niveau 1 (identique au gabarit par défaut du moteur — comportement
   // Grammy's inchangé).

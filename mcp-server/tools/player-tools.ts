@@ -20,11 +20,13 @@ const EntityStatsSchema = z.object({
   cha: z.number().int(),
 })
 
-// Bornes dérivées de la grille du module actif (rules.MAP_BOUNDS, source de
-// vérité unique : adventures/<id>/map.ts). Ne pas re-coder 16/14 en dur.
+// Multi-map : les bornes dépendent de la MAP COURANTE (rules.mapBounds()),
+// elles ne peuvent plus être figées dans un schéma construit à l'import. Le
+// schéma ne garde que la forme ; la validation de borne se fait dans les
+// handlers via rules.validateMapCell (source de vérité : maps[i].grid).
 const PositionSchema = z.object({
-  x: z.number().int().min(rules.MAP_BOUNDS.minX).max(rules.MAP_BOUNDS.maxX),
-  y: z.number().int().min(rules.MAP_BOUNDS.minY).max(rules.MAP_BOUNDS.maxY),
+  x: z.number().int().min(0),
+  y: z.number().int().min(0),
 })
 
 const HpSchema = z.object({
@@ -90,6 +92,7 @@ const NpcStateSchema = z.object({
   kind: z.string(),
   position: PositionSchema,
   roomId: z.string().nullable(),
+  mapId: z.string().optional(),
   disposition: z.enum(['hostile', 'wary', 'neutral', 'helpful', 'offended']),
   visible: z.boolean(),
   description: z.string().optional(),
@@ -122,6 +125,13 @@ const GameStateSchema = z.object({
   combatLog: z.array(CombatLogEntrySchema),
   roomsVisited: z.array(z.string()),
   currentRoomId: z.string().nullable(),
+  // Multi-map : sans ces champs, zod les STRIPPERAIT du round-trip
+  // replace_game_state et la partie retomberait sur la première map.
+  currentMapId: z.string().optional(),
+  mapOutcomes: z.record(z.string(), z.object({
+    completion: z.enum(['partial', 'total']),
+    objectivesDone: z.array(z.string()),
+  })).optional(),
   encountersTriggered: z.array(z.string()).optional().default([]),
   sceneMemory: SceneMemorySchema.optional(),
   world: z.any().optional(),

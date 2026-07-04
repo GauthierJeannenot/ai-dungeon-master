@@ -45,8 +45,8 @@ export const GRAMMYS_CONTENT: AdventureContent = {
   duration: '~1-2 h',
   accent: 'amber',
   battlemapImage: '/battlemaps/grammys_bakery.png',
-  // Source de vérité unique : la grille du moteur (map.ts). Pas de duplication.
-  grid: GRAMMYS_MAP.grid,
+  // Source de vérité unique : la grille du moteur (map.ts, première map). Pas de duplication.
+  grid: GRAMMYS_MAP.maps[0].grid,
   welcomeMessage: WELCOME,
   chatPlaceholders: PLACEHOLDERS,
   roomStatusHints: ROOM_STATUS_HINTS,

@@ -4,7 +4,7 @@ import { rollDice, getAbilityModifier, d20WithModifier } from '../dice'
 import * as gs from '../game-state'
 import * as rules from '../rules'
 import { MonsterState } from '../../lib/types'
-import { EncounterMonsterSpec, encounterIds, getEncounter } from '../../lib/adventure-map'
+import { EncounterMonsterSpec, encounterIds, getEncounter, getMapSpec, resolveRoomMapId } from '../../lib/adventure-map'
 import { ACTIVE_ADVENTURE_ID } from '../adventure'
 
 // Monster stat blocks — Monster Manual 2025 (XMM)
@@ -369,6 +369,19 @@ export function registerPhaseTools(server: McpServer): void {
         }
         if (encounterId && gs.hasEncounterTriggered(encounterId)) {
           throw new rules.RuleViolation('ENCOUNTER_ALREADY_RESOLVED', `Encounter already triggered: ${encounterId}`, { encounterId })
+        }
+        // Multi-map : une rencontre préréglée ne se déclenche que sur SA map
+        // (ses cellules n'ont de sens que sur la grille de sa salle).
+        if (preset) {
+          const presetMapId = resolveRoomMapId(preset.roomId, ACTIVE_ADVENTURE_ID)
+          const currentMapId = getMapSpec(gs.getState().currentMapId, ACTIVE_ADVENTURE_ID).id
+          if (presetMapId && presetMapId !== currentMapId) {
+            throw new rules.RuleViolation('ENCOUNTER_WRONG_MAP', `Encounter ${preset.id} belongs to another map.`, {
+              encounterId: preset.id,
+              encounterMapId: presetMapId,
+              currentMapId,
+            })
+          }
         }
 
         const encounterMonsters = monsters ?? preset?.monsters ?? []
