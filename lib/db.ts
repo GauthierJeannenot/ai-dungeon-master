@@ -2,19 +2,15 @@ import { Pool, type PoolClient, type QueryResult, type QueryResultRow } from 'pg
 import { logEvent } from './server-logger'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Accès Postgres central. Activé par DATABASE_URL :
-//   - présent  → auth NextAuth, sessions de jeu et crédits vivent en Postgres
-//                (multi-instance safe, opérations atomiques SQL)
-//   - absent   → repli sur les stores fichiers historiques (.data/), utilisé
-//                en dev sans DB et par la suite de tests
+// Accès Postgres central — backend UNIQUE de persistance (auth NextAuth,
+// sessions de jeu, crédits, disjoncteur journalier). DATABASE_URL est requise :
+// getPool() lève sans elle (config-check refuse de démarrer en prod).
 //
 // Le schéma est appliqué paresseusement (CREATE TABLE IF NOT EXISTS, idempotent)
-// au premier accès, et explicitement via `npm run db:migrate`.
+// au premier accès, et explicitement via `npm run db:migrate`. Les tests et le
+// playtest injectent un pool pg-mem via __setDbPoolForTests (voir
+// tests/helpers/pg-mem.cjs) — aucun Postgres réel requis.
 // ─────────────────────────────────────────────────────────────────────────────
-
-export function isDatabaseEnabled(): boolean {
-  return Boolean(process.env.DATABASE_URL?.trim())
-}
 
 // Tables NextAuth (@auth/pg-adapter — schéma officiel Auth.js) + tables métier.
 export const DB_SCHEMA_SQL = `
@@ -63,7 +59,7 @@ CREATE TABLE IF NOT EXISTS sessions (
 
 CREATE UNIQUE INDEX IF NOT EXISTS sessions_token_idx ON sessions ("sessionToken");
 
--- Sessions de jeu (remplace .data/sessions/*.json). owner_id lie la partie à
+-- Sessions de jeu (état, historique, traces en JSONB). owner_id lie la partie à
 -- son propriétaire ("user:<id>" ou "guest:<id>") — NULL pour les sessions
 -- créées avant cette colonne ou hors monétisation.
 CREATE TABLE IF NOT EXISTS game_sessions (
@@ -84,9 +80,8 @@ CREATE TABLE IF NOT EXISTS daily_usage (
   messages INTEGER NOT NULL DEFAULT 0
 );
 
--- Portefeuille de tokens (remplace .data/credits/user-*.json).
--- user_id est TEXT : id numérique users.id en mode DB, "provider:accountId" en
--- mode JWT sans DB — pas de FK pour rester valable dans les deux modes.
+-- Portefeuille de tokens. user_id est TEXT (users.id sérialisé) sans FK :
+-- le quota invité y stocke aussi des clés "guest:<id>" côté owner ailleurs.
 CREATE TABLE IF NOT EXISTS user_credits (
   user_id TEXT PRIMARY KEY,
   email TEXT,
@@ -106,7 +101,7 @@ CREATE TABLE IF NOT EXISTS stripe_events (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Quota invité (remplace .data/credits/guest-*.json).
+-- Quota invité (messages d'essai gratuits par cookie invité).
 CREATE TABLE IF NOT EXISTS guest_usage (
   guest_id TEXT PRIMARY KEY,
   messages_used INTEGER NOT NULL DEFAULT 0,

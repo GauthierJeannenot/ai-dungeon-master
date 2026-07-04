@@ -6,11 +6,10 @@
 // émule Postgres au niveau du driver `pg` ; on l'injecte dans lib/db.ts via
 // __setDbPoolForTests, exactement comme le faisait tests/db-stores.test.cjs.
 //
-// ⚠️ ORDRE CRITIQUE : installPgMem() pose DATABASE_URL et installe le hook
-// ts-require AVANT tout require d'un module de lib/. lib/auth.ts lit
-// isDatabaseEnabled() à L'IMPORT (config NextAuth) — d'où l'obligation
-// d'appeler ce helper en PREMIER dans le fichier de test, avant de requérir
-// quoi que ce soit de lib/ ou app/.
+// ⚠️ ORDRE : installPgMem() installe le hook ts-require et injecte le pool
+// pg-mem AVANT tout require d'un module de lib/. Appeler ce helper en PREMIER
+// dans le fichier de test garantit que getPool() renvoie le pool pg-mem (et
+// jamais une vraie connexion) dès le premier accès store/auth.
 //
 // Usage :
 //   const { installPgMem } = require('./helpers/pg-mem.cjs')
@@ -22,8 +21,8 @@
 const path = require('node:path')
 const { installTsRequireWithAliases } = require('./ts-require.cjs')
 
-// URL factice : la seule chose qui compte est que DATABASE_URL soit "truthy"
-// (isDatabaseEnabled), le pool réel étant remplacé par pg-mem juste après.
+// URL factice : le pool réel est remplacé par pg-mem via __setDbPoolForTests
+// juste après. On la pose quand même pour tout code qui lit DATABASE_URL.
 const IN_MEMORY_DATABASE_URL = 'postgres://pg-mem/in-memory'
 
 function installPgMem() {
