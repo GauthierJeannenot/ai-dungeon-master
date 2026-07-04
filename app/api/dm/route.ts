@@ -145,7 +145,11 @@ const PRIMARY_ACTION_TOOLS = new Set([
   'start_encounter',
 ])
 
-let cachedMcpTools: Anthropic.Tool[] | null = null
+// Cache de la liste de tools exposés, CLÉ PAR aventure : le schéma de certains
+// tools (start_encounter → enum d'encounters) est propre au module. Un seul
+// singleton serait rempli par la première session et servirait le mauvais enum
+// aux sessions d'un autre module. Borné par le nombre de modules du registre.
+const cachedMcpToolsByAdventure = new Map<string, Anthropic.Tool[]>()
 
 function isObjectRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -157,21 +161,29 @@ function generateRequestId(): string {
 
 // ── MCP tools ────────────────────────────────────────────────────────────────
 
-async function getMcpTools(sessionId: string | undefined): Promise<Anthropic.Tool[]> {
-  if (cachedMcpTools) return cachedMcpTools
-  const raw = await listMCPTools(sessionId)
-  cachedMcpTools = raw
+async function getMcpTools(
+  sessionId: string | undefined,
+  adventureId: string
+): Promise<Anthropic.Tool[]> {
+  const cached = cachedMcpToolsByAdventure.get(adventureId)
+  if (cached) return cached
+  // Passer adventureId : si c'est le premier appel MCP qui spawne le process,
+  // il doit démarrer sur le bon module (défense en profondeur, cf. Fix 3).
+  const raw = await listMCPTools(sessionId, adventureId)
+  const tools = raw
     .filter(tool => !HIDDEN_FROM_LLM.has(tool.name))
     .map(tool => ({
       name: tool.name,
       description: tool.description,
       input_schema: tool.inputSchema as Anthropic.Tool['input_schema'],
     }))
+  cachedMcpToolsByAdventure.set(adventureId, tools)
   logEvent('info', 'dm.mcp_tools.loaded', {
     sessionId,
-    exposedToolNames: cachedMcpTools.map(tool => tool.name),
+    adventureId,
+    exposedToolNames: tools.map(tool => tool.name),
   })
-  return cachedMcpTools
+  return tools
 }
 
 // Filtre la liste exposée selon la phase. Calculé une fois par requête (sur la
@@ -402,7 +414,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const processedHistory = await processHistory(history, summaryContext, baseContext)
     summaryContext = processedHistory.summaryContext
 
-    const allMcpTools = await getMcpTools(sessionId)
+    const allMcpTools = await getMcpTools(sessionId, adventureId)
     const mcpTools = selectToolsForPhase(allMcpTools, currentGameState.phase)
     baseContext.tools = mcpTools
     logEvent('info', 'dm.mcp_tools.selected', {
@@ -555,7 +567,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         toolsUsed.push(toolUse.name)
         try {
           const input = isObjectRecord(toolUse.input) ? toolUse.input : {}
-          const result = await callMCPTool(toolUse.name, input, sessionId)
+          const result = await callMCPTool(toolUse.name, input, sessionId, adventureId)
           // On ne comptabilise l'action « primaire » qu'en exploration : une action
           // résolue en combat ne doit pas bloquer une action d'exploration menée
           // après un end_combat survenu dans le même message joueur.
@@ -570,7 +582,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           }
           // Rafraîchit l'état courant après une mutation.
           try {
-            currentGameState = await callMCPTool('get_game_state', {}, sessionId) as GameState
+            currentGameState = await callMCPTool('get_game_state', {}, sessionId, adventureId) as GameState
           } catch {
             // garde l'état précédent
           }
@@ -621,7 +633,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     // Récupère l'état final faisant autorité.
     try {
-      currentGameState = await callMCPTool('get_game_state', {}, sessionId) as GameState
+      currentGameState = await callMCPTool('get_game_state', {}, sessionId, adventureId) as GameState
     } catch {
       // garde l'état courant
     }

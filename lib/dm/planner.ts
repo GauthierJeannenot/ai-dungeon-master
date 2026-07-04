@@ -229,14 +229,18 @@ export async function executeSceneMarkers(
   meta: { requestId: string },
 ): Promise<{ executed: string[]; newState: GameState }> {
   let state = gameState
+  // adventureId estampillé sur l'état par la route avant la sync : le passer à
+  // callMCPTool garantit qu'un éventuel (re)spawn du process reste sur le bon
+  // module (une session = une aventure ; le paramètre ne sert qu'au respawn).
+  const adventureId = gameState.adventureId
   const executed: string[] = []
   for (const call of calls) {
     if (!availableToolNames.has(call.tool)) continue
     try {
-      await callMCPTool(call.tool, call.input, sessionId)
+      await callMCPTool(call.tool, call.input, sessionId, adventureId)
       executed.push(call.label)
       try {
-        state = await callMCPTool('get_game_state', {}, sessionId) as GameState
+        state = await callMCPTool('get_game_state', {}, sessionId, adventureId) as GameState
       } catch {
         // garde l'état précédent
       }
