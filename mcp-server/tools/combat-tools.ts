@@ -4,24 +4,13 @@ import { rollDice, getAbilityModifier, d20WithModifier } from '../dice'
 import * as gs from '../game-state'
 import * as rules from '../rules'
 import { EntityStats, AttackResult, SavingThrowResult, AbilityCheckResult, Condition } from '../../lib/types'
+import { getWeapon } from '../../lib/srd/weapons'
 
-// Weapon damage dice by weapon name (D&D 5e)
-const WEAPON_DAMAGE: Record<string, string> = {
-  longsword: '1d8',
-  shortsword: '1d6',
-  dagger: '1d4',
-  greataxe: '1d12',
-  greatsword: '2d6',
-  handaxe: '1d6',
-  rapier: '1d8',
-  mace: '1d6',
-  quarterstaff: '1d6',
-  unarmed: '1d4',
-}
-
+// Dé de dégâts d'une arme (source de vérité : lib/srd/weapons.ts). Repli '1d6'
+// pour un nom d'arme inconnu du registre (comportement historique conservé).
 function getWeaponDamage(weaponOrSpell: string): string {
   const key = weaponOrSpell.toLowerCase().replace(/\s+/g, '')
-  return WEAPON_DAMAGE[key] ?? '1d6'
+  return getWeapon(key)?.damageDie ?? '1d6'
 }
 
 function doubleDiceNotation(notation: string): string {
