@@ -74,6 +74,14 @@ for (const adventure of ADVENTURES) {
     for (const spec of map.maps) {
       assert.ok(spec.grid.cols > 0 && spec.grid.rows > 0, `map ${spec.id}: grille invalide`)
       assert.ok(spec.name, `map ${spec.id}: nom manquant`)
+      // cellSize est optionnel (rendu uniquement) ; s'il est présent, borne
+      // raisonnable pour éviter une valeur absurde. Voir docs/battlemap-viewport.md.
+      if (spec.cellSize !== undefined) {
+        assert.ok(
+          Number.isFinite(spec.cellSize) && spec.cellSize >= 16 && spec.cellSize <= 256,
+          `map ${spec.id}: cellSize hors bornes (16–256)`
+        )
+      }
     }
     for (const room of map.rooms) {
       assert.ok(mapIds.has(roomMapId(room)), `salle ${room.id}: mapId inconnu ${roomMapId(room)}`)

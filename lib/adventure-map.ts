@@ -16,7 +16,16 @@ export interface AdventureMapSpec {
   id: string
   name: string
   grid: { cols: number; rows: number }
+  // Taille de case MINIMALE en px — rendu uniquement, JAMAIS lue par le moteur
+  // (ses bornes de déplacement dérivent de `grid`). Si la map tient dans le
+  // conteneur, les cases s'agrandissent pour le remplir (cases carrées,
+  // letterbox) ; sinon elles restent à cette taille et la map devient
+  // scrollable. Absent = DEFAULT_CELL_SIZE. Voir docs/battlemap-viewport.md.
+  cellSize?: number
 }
+
+// Taille de case par défaut (px) quand une map ne configure pas `cellSize`.
+export const DEFAULT_CELL_SIZE = 48
 
 export interface AdventureRoom {
   id: string

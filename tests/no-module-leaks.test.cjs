@@ -23,6 +23,10 @@ const MODULE_SLUGS = [/grammys-country-apple-pie/g, /tide-crypt/g, /fey-shadow-f
 // les faux positifs (« started » contient « tarte », etc.).
 const LEAK_TERMS = [
   /\bgrammy'?s?\b/i,
+  // Chemins d'assets propres à un module : le `_`/`/` empêche `\bgrammy\b`
+  // de matcher `grammys_bakery` ou `battlemaps/grammys…` — on les vise à part.
+  /grammys_bakery/i,
+  /battlemaps\/grammys/i,
   /\bverger\b/i,
   /\bboulangeries?\b/i,
   /\bdryades?\b/i,
