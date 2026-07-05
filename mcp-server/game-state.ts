@@ -6,22 +6,25 @@ import {
   PlayerState,
   Item,
   MapOutcome,
+  WorldFact,
   WorldNpcDisposition,
 } from '../lib/types'
 import { inferRoomIdOnMap, seedAdventureNpcs, getAdventureMap, firstMapId } from '../lib/adventure-map'
-import { BASE_PLAYER } from '../lib/player-template'
+import { buildPlayerState } from '../lib/character-registry'
 import { ACTIVE_ADVENTURE_ID } from './adventure'
+import { ACTIVE_CHARACTER_ID } from './character'
 
-// Construit le joueur initial du module actif (gabarit + startCell + deltas).
+// Construit le joueur initial : personnage actif (classe, stats, kit, PV,
+// capacités, sorts) fusionné avec les deltas de l'aventure (niveau, position,
+// objets propres). Voir lib/character-registry.ts (buildPlayerState).
 function buildInitialPlayer(): PlayerState {
   const map = getAdventureMap(ACTIVE_ADVENTURE_ID)
-  return {
-    ...BASE_PLAYER,
+  return buildPlayerState({
+    characterId: ACTIVE_CHARACTER_ID,
     level: map.initialPlayer.level,
-    hp: structuredClone(map.initialPlayer.hp),
-    position: { ...map.startCell },
-    inventory: structuredClone(map.initialPlayer.inventory),
-  }
+    position: map.startCell,
+    extraInventory: map.initialPlayer.extraInventory,
+  })
 }
 
 let state: GameState = createInitialState()
@@ -32,6 +35,7 @@ function createInitialState(): GameState {
   const initialRoomId = inferRoomIdOnMap(player.position, initialMapId, ACTIVE_ADVENTURE_ID)
   return {
     adventureId: ACTIVE_ADVENTURE_ID,
+    characterId: ACTIVE_CHARACTER_ID,
     phase: 'exploration',
     player,
     monsters: {},
@@ -41,21 +45,59 @@ function createInitialState(): GameState {
     round: 0,
     movementUsed: {},
     actionUsed: {},
+    bonusActionUsed: {},
+    dashUsed: {},
     combatLog: [],
     roomsVisited: initialRoomId ? [initialRoomId] : [],
     currentRoomId: initialRoomId,
     currentMapId: initialMapId,
     mapOutcomes: {},
     encountersTriggered: [],
+    worldFacts: [],
   }
 }
 
 function syncPlayerRoomFromPosition(): void {
+  const previousRoomId = state.currentRoomId
   const roomId = inferRoomIdOnMap(state.player.position, state.currentMapId, state.adventureId)
   state.currentRoomId = roomId
   if (roomId && !state.roomsVisited.includes(roomId)) {
     state.roomsVisited.push(roomId)
   }
+  // Purge des faits de monde bornés à la salle quittée (« eau au sol »…).
+  if (previousRoomId && roomId !== previousRoomId) {
+    purgeWorldFacts(fact => fact.expires === 'room' && fact.roomId === previousRoomId)
+  }
+}
+
+// Retire les faits de monde qui satisfont le prédicat. Centralisé pour que la
+// purge (salle/carte) reste cohérente.
+function purgeWorldFacts(shouldRemove: (fact: WorldFact) => boolean): void {
+  if (!state.worldFacts?.length) return
+  state.worldFacts = state.worldFacts.filter(fact => !shouldRemove(fact))
+}
+
+const MAX_WORLD_FACTS = 8
+
+// Enregistre un fait de monde (produit par un sort utilitaire). Plafond FIFO :
+// on évince les plus anciens comme le combatLog borné.
+export function addWorldFact(fact: Omit<WorldFact, 'id'>): WorldFact {
+  state.worldFacts ??= []
+  const created: WorldFact = {
+    ...fact,
+    id: `wf-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+  }
+  state.worldFacts.push(created)
+  if (state.worldFacts.length > MAX_WORLD_FACTS) {
+    state.worldFacts = state.worldFacts.slice(-MAX_WORLD_FACTS)
+  }
+  return created
+}
+
+// Faits de monde actifs sur la carte courante (pour l'injection au prompt).
+export function getActiveWorldFacts(): WorldFact[] {
+  const currentMapId = state.currentMapId ?? firstMapId(state.adventureId)
+  return (state.worldFacts ?? []).filter(fact => fact.mapId === currentMapId)
 }
 
 function syncDyingPlayerState(): void {
@@ -97,14 +139,23 @@ export function replaceState(nextState: GameState): GameState {
   state = {
     ...structuredClone(nextState),
     adventureId,
+    // Personnage : l'état entrant fait foi ; sinon le personnage du process
+    // (états historiques sans le champ = guerrier via ACTIVE_CHARACTER_ID).
+    characterId: nextState.characterId ?? ACTIVE_CHARACTER_ID,
     movementUsed: structuredClone(nextState.movementUsed ?? {}),
     actionUsed: structuredClone(nextState.actionUsed ?? {}),
+    // Économie d'action bonus / Ruse:dash (états legacy sans ces champs = vide).
+    bonusActionUsed: structuredClone(nextState.bonusActionUsed ?? {}),
+    dashUsed: structuredClone(nextState.dashUsed ?? {}),
     roomsVisited: structuredClone(nextState.roomsVisited ?? []),
     // Multi-map : états historiques sans ces champs = première map, aucune
     // map quittée. Doivent survivre au round-trip (docs/multi-map-adventures.md).
     currentMapId: nextState.currentMapId ?? firstMapId(adventureId),
     mapOutcomes: structuredClone(nextState.mapOutcomes ?? {}),
     encountersTriggered: structuredClone(nextState.encountersTriggered ?? []),
+    // Faits de monde (sorts utilitaires) : doivent survivre au round-trip, sinon
+    // ils seraient perdus au premier tour suivant (docs/playable-characters.md).
+    worldFacts: structuredClone(nextState.worldFacts ?? []),
     // PNJ : on préserve l'état client s'il existe (révélations déjà faites), sinon on
     // ré-amorce le seed du module (états historiques sans le champ npcs).
     npcs: nextState.npcs ? structuredClone(nextState.npcs) : seedAdventureNpcs(adventureId),
@@ -320,9 +371,31 @@ export function resetActionUsed(entityId: string): void {
   delete state.actionUsed[entityId]
 }
 
+// ── Économie d'action bonus (second souffle, Ruse) ───────────────────────────
+export function hasBonusActionUsed(entityId: string): boolean {
+  return Boolean(state.bonusActionUsed?.[entityId])
+}
+
+export function markBonusActionUsed(entityId: string): void {
+  state.bonusActionUsed ??= {}
+  state.bonusActionUsed[entityId] = true
+}
+
+// ── Ruse : dash (double le budget de mouvement du tour) ──────────────────────
+export function hasDashUsed(entityId: string): boolean {
+  return Boolean(state.dashUsed?.[entityId])
+}
+
+export function markDashUsed(entityId: string): void {
+  state.dashUsed ??= {}
+  state.dashUsed[entityId] = true
+}
+
 export function resetTurnEconomy(entityId: string): void {
   resetMovement(entityId)
   resetActionUsed(entityId)
+  if (state.bonusActionUsed) delete state.bonusActionUsed[entityId]
+  if (state.dashUsed) delete state.dashUsed[entityId]
 }
 
 export function spawnMonster(monster: MonsterState): void {
@@ -357,6 +430,8 @@ export function setInitiativeOrder(order: string[]): void {
   state.round = 1
   state.movementUsed = {}
   state.actionUsed = {}
+  state.bonusActionUsed = {}
+  state.dashUsed = {}
 }
 
 export function advanceTurn(): string | null {
@@ -456,6 +531,15 @@ export function applyMapTravel(params: {
   state.round = 0
   state.movementUsed = {}
   state.actionUsed = {}
+  state.bonusActionUsed = {}
+  state.dashUsed = {}
+
+  // Repos narratif entre cartes : recharge des ressources de classe et des
+  // emplacements de sorts à leur max (décision n°6, docs/playable-characters.md).
+  rechargePlayerResources()
+
+  // Faits de monde bornés à la carte quittée (ou à une de ses salles) : purgés.
+  purgeWorldFacts(fact => fact.mapId === params.fromMapId)
 
   state.currentMapId = params.toMapId
   state.player.position = { x: params.arrivalCell.x, y: params.arrivalCell.y }
@@ -501,6 +585,37 @@ function findFreeCellNear(
     }
   }
   return { x: Math.max(0, Math.min(maxX, origin.x)), y: Math.max(0, Math.min(maxY, origin.y)) }
+}
+
+// Recharge les ressources de classe et emplacements de sorts du joueur à leur
+// max (appelé au changement de carte). Sans effet sur un guerrier legacy sans
+// ressources/emplacements.
+function rechargePlayerResources(): void {
+  const player = state.player
+  if (player.resources) {
+    for (const key of Object.keys(player.resources)) {
+      player.resources[key].current = player.resources[key].max
+    }
+  }
+  if (player.spellSlots) {
+    player.spellSlots.level1.current = player.spellSlots.level1.max
+  }
+}
+
+// Dépense un emplacement de sort de niveau 1. Retourne false si aucun dispo.
+export function consumeSpellSlot(level: 1): boolean {
+  const slots = state.player.spellSlots
+  if (level !== 1 || !slots || slots.level1.current <= 0) return false
+  slots.level1.current -= 1
+  return true
+}
+
+// Dépense une ressource de classe nommée. Retourne false si épuisée/absente.
+export function consumeResource(name: string): boolean {
+  const resource = state.player.resources?.[name]
+  if (!resource || resource.current <= 0) return false
+  resource.current -= 1
+  return true
 }
 
 export function hasEncounterTriggered(encounterId: string): boolean {

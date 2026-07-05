@@ -27,7 +27,9 @@ export const CLERIC: CharacterTemplate = {
   spellcasting: {
     ability: 'wis',
     cantrips: ['sacred-flame', 'thaumaturgy'],
-    knownSpells: ['cure-wounds', 'guiding-bolt'],
+    // Clerc préparé : connaît plus de sorts que d'emplacements. Création d'eau
+    // est bien un sort de clerc au niveau 1 (SRD).
+    knownSpells: ['cure-wounds', 'guiding-bolt', 'create-water'],
     slots: { level1: 3 },
   },
 }

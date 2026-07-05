@@ -68,7 +68,10 @@ export function occupiesSpace(entity: Entity): boolean {
 }
 
 function speedCells(entity: Entity): number {
-  return Math.floor(entity.speed / 5)
+  const base = Math.floor(entity.speed / 5)
+  // Ruse : Sprint double le budget de mouvement du tour (roublard).
+  if (gs.hasDashUsed(entity.id)) return base * 2
+  return base
 }
 
 function assertEntity(entityId: string): Entity {
@@ -260,6 +263,23 @@ export function validateActionUse(entityId: string): void {
     assertCurrentTurn(entityId)
     assertInInitiative(entityId)
     assertActionAvailable(entityId)
+  }
+}
+
+// Économie d'action BONUS (second souffle, Ruse). Hors combat : non contrainte
+// (comme l'action). En combat : tour courant + action bonus non déjà dépensée.
+export function validateBonusActionUse(entityId: string): void {
+  const entity = assertEntity(entityId)
+  assertAlive(entityId, entity)
+  if (gs.getState().phase === 'combat') {
+    assertCurrentTurn(entityId)
+    assertInInitiative(entityId)
+    if (gs.hasBonusActionUsed(entityId)) {
+      throw new RuleViolation('BONUS_ACTION_ALREADY_USED', `${entityId} has already used their bonus action this turn.`, {
+        entityId,
+        currentTurn: gs.getState().currentTurn,
+      })
+    }
   }
 }
 

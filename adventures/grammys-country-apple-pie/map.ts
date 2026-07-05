@@ -21,16 +21,10 @@ export const GRAMMYS_MAP: AdventureMapData = {
   mapQuests: {},
   mapTransitions: [],
   startCell: GRAMMYS_START_CELL,
-  // Héros niveau 1 (identique au gabarit par défaut du moteur — comportement
-  // Grammy's inchangé).
+  // Niveau 1. PV et kit viennent du personnage (guerrier N1 = 20 PV, kit épée
+  // longue + bouclier + potion) : aucun objet propre à ce module.
   initialPlayer: {
     level: 1,
-    hp: { current: 20, max: 20 },
-    inventory: [
-      { id: 'longsword', name: 'Épée longue', type: 'weapon', damage: '1d8+3', description: 'Épée longue +3 STR' },
-      { id: 'shield', name: 'Bouclier', type: 'armor', acBonus: 2, description: 'Bouclier standard' },
-      { id: 'potion1', name: 'Potion de soin', type: 'potion', description: 'Restaure 2d4+2 HP' },
-    ],
   },
   rooms: [
     { id: '1', name: 'Entrée extérieure', zone: { minX: 3, maxX: 16, minY: 13, maxY: 14 } },

@@ -1,4 +1,4 @@
-import type { GameState, NpcState, WorldNpcDisposition, PlayerState } from './types'
+import type { GameState, NpcState, WorldNpcDisposition, Item } from './types'
 import { GRAMMYS_MAP, GRAMMYS_ID } from '../adventures/grammys-country-apple-pie/map'
 import { TIDE_CRYPT_MAP, TIDE_CRYPT_ID } from '../adventures/tide-crypt/map'
 import { FEY_SHADOW_FAIR_MAP, FEY_SHADOW_FAIR_ID } from '../adventures/fey-shadow-fair/map'
@@ -115,10 +115,16 @@ export interface AdventureMapData {
   mapQuests: Record<string, MapQuest>
   // Transitions inter-maps, à SENS UNIQUE (vide pour une aventure 1-map).
   mapTransitions: MapTransition[]
-  // État initial du joueur pour ce module (fusionné sur le gabarit par défaut du
-  // moteur à la création d'une partie — voir mcp-server/game-state.ts, étape 3).
+  // État initial du joueur pour ce module. Le PERSONNAGE (characters/<id>/)
+  // apporte classe, stats, CA, kit, PV (formule) ; l'aventure ne règle que le
+  // NIVEAU (seul levier de puissance) et d'éventuels objets propres au module
+  // (extraInventory : potions offertes, objet de quête). Fusionné à la création
+  // d'une partie — voir mcp-server/game-state.ts (buildInitialPlayer).
   startCell: GridCell
-  initialPlayer: Pick<PlayerState, 'level' | 'hp' | 'inventory'>
+  initialPlayer: {
+    level: number
+    extraInventory?: Item[]
+  }
   rooms: AdventureRoom[]
   entryCells: Record<string, GridCell>
   encounters: Record<string, EncounterDefinition>

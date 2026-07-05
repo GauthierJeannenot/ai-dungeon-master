@@ -1,4 +1,4 @@
-import type { EntityStats, Item } from './types'
+import type { EntityStats, Item, PlayerState } from './types'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Registre de personnages jouables (prétirés SRD 5) — partagé app + moteur MCP.
@@ -79,4 +79,62 @@ export function listCharacters(): CharacterTemplate[] {
 // PV maximum d'un personnage à un niveau donné (formule solo, décision n°7).
 export function maxHpForLevel(template: CharacterTemplate, level: number): number {
   return template.hp.base + template.hp.perLevel * Math.max(0, level - 1)
+}
+
+// Ressources rechargeables initiales d'un personnage (d'après ses capacités).
+// Rechargées à leur max au changement de carte (applyMapTravel).
+function seedResources(features: ClassFeatureId[]): Record<string, { current: number; max: number }> | undefined {
+  const resources: Record<string, { current: number; max: number }> = {}
+  if (features.includes('second_wind')) resources.second_wind = { current: 1, max: 1 }
+  return Object.keys(resources).length > 0 ? resources : undefined
+}
+
+// Construit le PlayerState initial d'une partie : template du personnage
+// (classe, stats, CA, kit, PV, capacités, sorts) fusionné avec les deltas de
+// l'aventure (niveau, position, objets propres). SOURCE UNIQUE partagée par le
+// moteur MCP (game-state.ts) et le miroir client optimiste
+// (lib/initial-game-state.ts) — aucun drift possible entre les deux.
+export function buildPlayerState(params: {
+  characterId?: string
+  level: number
+  position: { x: number; y: number }
+  extraInventory?: Item[]
+}): PlayerState {
+  const tpl = getCharacterTemplate(params.characterId)
+  const maxHp = maxHpForLevel(tpl, params.level)
+  const player: PlayerState = {
+    id: 'player',
+    name: tpl.name,
+    class: tpl.class,
+    characterId: tpl.id,
+    level: params.level,
+    hp: { current: maxHp, max: maxHp },
+    deathSaves: { successes: 0, failures: 0 },
+    ac: tpl.ac,
+    stats: { ...tpl.stats },
+    proficiencyBonus: tpl.proficiencyBonus,
+    position: { ...params.position },
+    conditions: [],
+    inventory: [
+      ...tpl.inventory.map(item => ({ ...item })),
+      ...(params.extraInventory ?? []).map(item => ({ ...item })),
+    ],
+    speed: tpl.speed,
+    savingThrowProficiencies: [...tpl.savingThrowProficiencies],
+    skillProficiencies: [...tpl.skillProficiencies],
+    features: [...tpl.features],
+  }
+  if (tpl.expertise && tpl.expertise.length > 0) {
+    player.expertise = [...tpl.expertise]
+  }
+  const resources = seedResources(tpl.features)
+  if (resources) player.resources = resources
+  if (tpl.spellcasting) {
+    player.spellcastingAbility = tpl.spellcasting.ability
+    player.spellSlots = {
+      level1: { current: tpl.spellcasting.slots.level1, max: tpl.spellcasting.slots.level1 },
+    }
+    player.knownSpells = [...tpl.spellcasting.cantrips, ...tpl.spellcasting.knownSpells]
+  }
+  return player
 }

@@ -520,7 +520,7 @@ est publié sous licence CC-BY-4.0 : ajouter l'attribution dans le README.
 | Kit | épée longue, bouclier, cotte de mailles, hache de main ×2, potion, pack | rapière, dague ×2, arc court + flèches, cuir, outils de voleur, potion, pack | bâton, dague, grimoire, potion, pack | masse d'armes, bouclier, écailles, symbole sacré, potion, pack |
 | Capacités | second_wind | sneak_attack, cunning_action, expertise* | spellcasting | spellcasting |
 | Sorts (tours) | — | — | rayon de givre (1d8), lumière (utilitaire) | flamme sacrée (save DEX 1d8), thaumaturgie (utilitaire) |
-| Sorts (niv. 1) | — | — | projectile magique (auto 3d4+3), mains brûlantes (save DEX 3d6 ½) | soins (1d8+SAG), éclair traçant/guiding bolt (attaque 4d6) |
+| Sorts (niv. 1) | — | — | projectile magique (auto 3d4+3), mains brûlantes (save DEX 3d6 ½) | soins (1d8+SAG), éclair traçant/guiding bolt (attaque 4d6), création d'eau (utilitaire → WorldFact) |
 | Emplacements niv. 1 | — | — | 3 | 3 |
 
 (* = expertise). Le guerrier est byte-identique à l'existant : `BASE_PLAYER`

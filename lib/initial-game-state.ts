@@ -1,33 +1,36 @@
-import type { GameState, PlayerState } from './types'
+import type { GameState } from './types'
 import {
   getAdventureMap,
   seedAdventureNpcs,
   inferAdventureRoomId,
   DEFAULT_ADVENTURE_ID,
 } from './adventure-map'
-import { BASE_PLAYER } from './player-template'
+import { buildPlayerState, DEFAULT_CHARACTER_ID } from './character-registry'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// État de jeu initial OPTIMISTE (client) pour un module donné : affiché avant la
-// première réponse serveur. Le moteur MCP reste autoritaire et renvoie l'état
-// réel au premier message — ceci n'existe que pour un premier rendu correct
-// (position du joueur, PV, PNJ visibles). Miroir de mcp-server/game-state.ts
-// (même BASE_PLAYER partagé via lib/player-template.ts).
+// État de jeu initial OPTIMISTE (client) pour un module + personnage donnés :
+// affiché avant la première réponse serveur. Le moteur MCP reste autoritaire et
+// renvoie l'état réel au premier message — ceci n'existe que pour un premier
+// rendu correct (position du joueur, PV, PNJ visibles). Miroir exact de
+// mcp-server/game-state.ts (même buildPlayerState partagé, aucun drift).
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function buildInitialGameState(adventureId: string = DEFAULT_ADVENTURE_ID): GameState {
+export function buildInitialGameState(
+  adventureId: string = DEFAULT_ADVENTURE_ID,
+  characterId: string = DEFAULT_CHARACTER_ID
+): GameState {
   const map = getAdventureMap(adventureId)
   const position = { ...map.startCell }
   const roomId = inferAdventureRoomId(position, adventureId)
-  const player: PlayerState = {
-    ...BASE_PLAYER,
+  const player = buildPlayerState({
+    characterId,
     level: map.initialPlayer.level,
-    hp: { ...map.initialPlayer.hp },
     position,
-    inventory: map.initialPlayer.inventory.map(item => ({ ...item })),
-  }
+    extraInventory: map.initialPlayer.extraInventory,
+  })
   return {
     adventureId,
+    characterId,
     phase: 'exploration',
     player,
     monsters: {},
@@ -37,9 +40,12 @@ export function buildInitialGameState(adventureId: string = DEFAULT_ADVENTURE_ID
     round: 0,
     movementUsed: {},
     actionUsed: {},
+    bonusActionUsed: {},
+    dashUsed: {},
     combatLog: [],
     roomsVisited: roomId ? [roomId] : [],
     currentRoomId: roomId,
     encountersTriggered: [],
+    worldFacts: [],
   }
 }
