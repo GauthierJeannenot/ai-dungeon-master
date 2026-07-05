@@ -740,6 +740,14 @@ function GameView({ adventure, characterId, resumeSessionId }: { adventure: Adve
     <div className="flex flex-col h-screen bg-stone-950 text-stone-100 overflow-hidden">
       {/* Top bar */}
       <header className="flex-shrink-0 min-h-10 bg-stone-900 border-b border-amber-900/40 flex flex-wrap items-center px-3 sm:px-4 py-1 gap-2 sm:gap-4">
+        <Link
+          href="/"
+          title="Retour à l'accueil"
+          className="flex items-center gap-1 text-[11px] sm:text-xs text-amber-200 bg-stone-800 hover:bg-stone-700 border border-amber-900/40 px-2 py-1 rounded transition-colors"
+        >
+          <span aria-hidden="true">←</span>
+          <span className="hidden sm:inline">Accueil</span>
+        </Link>
         <Link href="/" className="font-bold text-amber-500 hover:text-amber-400 tracking-wider text-xs sm:text-sm transition-colors" title="Retour à l'accueil">
           ⚔ AI DUNGEON MASTER
         </Link>
