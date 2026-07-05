@@ -39,7 +39,7 @@ async function completeFairRequiredQuest(client) {
   await callTool(client, 'move_token', { tokenId: 'player', toCell: { x: 5, y: 10 } })
   const reveal = await callTool(client, 'reveal_npc', { npcId: 'madame_bougie', disposition: 'helpful' })
   assert.ok(!reveal.error, `reveal_npc a échoué : ${JSON.stringify(reveal)}`)
-  await callTool(client, 'move_token', { tokenId: 'player', toCell: { x: 5, y: 5 } })
+  await callTool(client, 'move_token', { tokenId: 'player', toCell: { x: 3, y: 2 } })
 }
 
 test('initial state starts on the first map with mapOutcomes empty', async () => {
@@ -87,7 +87,7 @@ test('travel applies arrival, companion transfer, monster purge and outcome (par
     assert.ok(!travel.error, `travel_to_map a échoué : ${JSON.stringify(travel)}`)
     assert.equal(travel.fromMapId, 'fair')
     assert.equal(travel.toMapId, 'wood')
-    // Quête partielle : les 2 requis sont faits, pas les 2 optionnels.
+    // Quête partielle : les 2 requis sont faits, pas les 4 optionnels.
     assert.equal(travel.outcome.completion, 'partial')
     assert.ok(travel.outcome.objectivesDone.includes('find_filou_trail'))
     assert.ok(travel.outcome.objectivesDone.includes('charm_bougie'))
@@ -95,15 +95,15 @@ test('travel applies arrival, companion transfer, monster purge and outcome (par
 
     const state = await callTool(client, 'get_game_state')
     assert.equal(state.currentMapId, 'wood')
-    assert.deepEqual(state.player.position, { x: 3, y: 10 })
-    assert.equal(state.currentRoomId, '6')
+    assert.deepEqual(state.player.position, { x: 4, y: 21 })
+    assert.equal(state.currentRoomId, '10')
     assert.deepEqual(state.monsters, {}, 'les monstres de la map quittée doivent être purgés')
     // Barnabé a traversé, adjacent à l'arrivée ; les autres PNJ restent.
     assert.equal(state.npcs.barnabe.mapId, 'wood')
-    assert.equal(state.npcs.barnabe.roomId, '6')
+    assert.equal(state.npcs.barnabe.roomId, '10')
     const dist = Math.max(
-      Math.abs(state.npcs.barnabe.position.x - 3),
-      Math.abs(state.npcs.barnabe.position.y - 10)
+      Math.abs(state.npcs.barnabe.position.x - 4),
+      Math.abs(state.npcs.barnabe.position.y - 21)
     )
     assert.ok(dist >= 1 && dist <= 3, `Barnabé mal placé : ${JSON.stringify(state.npcs.barnabe.position)}`)
     assert.equal(state.npcs.madame_bougie.mapId, 'fair')
@@ -121,6 +121,12 @@ test('travel outcome is total when optional objectives are also done', async () 
     assert.ok(!started.error, `start_encounter a échoué : ${JSON.stringify(started)}`)
     const ended = await callTool(client, 'end_combat', { force: true, reason: 'ils rendent tout' })
     assert.ok(!ended.error, `end_combat a échoué : ${JSON.stringify(ended)}`)
+    // Optionnel 3 : consoler Miroslav (salle 9 — reveal_npc est scopé à la salle courante).
+    await callTool(client, 'move_token', { tokenId: 'player', toCell: { x: 9, y: 2 } })
+    const mime = await callTool(client, 'reveal_npc', { npcId: 'miroslav', disposition: 'helpful' })
+    assert.ok(!mime.error, `reveal_npc miroslav a échoué : ${JSON.stringify(mime)}`)
+    // Optionnel 4 : goûter aux réjouissances du Verger (salle 8).
+    await callTool(client, 'move_token', { tokenId: 'player', toCell: { x: 11, y: 6 } })
 
     const travel = await callTool(client, 'travel_to_map', { toMapId: 'wood' })
     assert.ok(!travel.error, `travel_to_map a échoué : ${JSON.stringify(travel)}`)
@@ -149,18 +155,18 @@ test('transitions are one-way and encounters are gated to their map', async () =
 
 test('movement bounds follow the current map grid', async () => {
   await withEngine(async client => {
-    // Foire : 17×15 → (16,14) est valide.
-    const onFair = await callTool(client, 'move_token', { tokenId: 'player', toCell: { x: 16, y: 14 } })
-    assert.ok(!onFair.error, `move (16,14) sur la foire a échoué : ${JSON.stringify(onFair)}`)
+    // Foire : 24×16 → (23,15) est valide.
+    const onFair = await callTool(client, 'move_token', { tokenId: 'player', toCell: { x: 23, y: 15 } })
+    assert.ok(!onFair.error, `move (23,15) sur la foire a échoué : ${JSON.stringify(onFair)}`)
 
     await completeFairRequiredQuest(client)
     await callTool(client, 'travel_to_map', { toMapId: 'wood' })
 
-    // Bois : 15×13 → (16,14) est HORS bornes, (14,12) est valide.
-    const outOfBounds = await callTool(client, 'move_token', { tokenId: 'player', toCell: { x: 16, y: 14 } })
+    // Bois : 16×24 → (23,15) est HORS bornes, (15,23) est valide.
+    const outOfBounds = await callTool(client, 'move_token', { tokenId: 'player', toCell: { x: 23, y: 15 } })
     assert.equal(outOfBounds.code, 'INVALID_GRID_CELL')
-    const inBounds = await callTool(client, 'move_token', { tokenId: 'player', toCell: { x: 14, y: 12 } })
-    assert.ok(!inBounds.error, `move (14,12) dans le bois a échoué : ${JSON.stringify(inBounds)}`)
+    const inBounds = await callTool(client, 'move_token', { tokenId: 'player', toCell: { x: 15, y: 23 } })
+    assert.ok(!inBounds.error, `move (15,23) dans le bois a échoué : ${JSON.stringify(inBounds)}`)
   })
 })
 

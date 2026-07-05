@@ -88,9 +88,11 @@ export interface AdventureMapSpec {
 
 - Ne PAS toucher aux signatures existantes (`getMapSpec`, `gridForMap`…) : le
   composant lira `spec.cellSize` directement.
-- Les trois modules existants (`grammys` 17×15, `tide-crypt` 17×15,
-  `fey-shadow-fair` 17×15 + 15×13) **n'ajoutent pas** le champ : absent =
-  défaut = aucun changement visuel pour l'existant.
+- `grammys` (17×15) et `tide-crypt` (17×15) **n'ajoutent pas** le champ :
+  absent = défaut = aucun changement visuel pour l'existant. Premier
+  utilisateur réel : `fey-shadow-fair` (24×16 et 16×24, `cellSize: 64` —
+  battlemaps 1536×1024 / 1024×1536, la résolution native max des images
+  ChatGPT, viewport scrollable sur les deux cartes).
 
 ## Étape 2 — Géométrie du composant (cases carrées, deux modes)
 
