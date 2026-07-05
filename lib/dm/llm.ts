@@ -163,6 +163,25 @@ function createMockLlmMessage(params: Anthropic.MessageCreateParamsNonStreaming,
     }
   }
 
+  // Sort (personnages incantateurs) : le nom du sort est passé tel quel, le
+  // moteur (resolveSpell) le résout par inclusion. Vocabulaire GÉNÉRIQUE
+  // uniquement (pas de nom propre de module — verrou no-module-leaks). On évite
+  // le token « sort » nu (« sortie »…) : on exige « lance … » ou un nom de sort.
+  if (
+    /lance (un |le |la )?(sort|projectile|éclair|eclair|flamme|rayon|soin|lumière|lumiere)|incante|projectile magique|mains brûlantes|rayon de givre|flamme sacrée|création d'eau|creation d'eau/.test(text) &&
+    toolAvailable('cast_spell', context.tools)
+  ) {
+    return mockToolMessage('cast_spell', { spellName: context.playerMessage ?? text })
+  }
+
+  // Capacité de classe (action bonus) : second souffle, ou ruse (se cacher).
+  if (/second souffle/.test(text) && toolAvailable('use_class_feature', context.tools)) {
+    return mockToolMessage('use_class_feature', { featureId: 'second_wind' })
+  }
+  if (/(ruse|je me cache|me cacher)/.test(text) && toolAvailable('use_class_feature', context.tools)) {
+    return mockToolMessage('use_class_feature', { featureId: 'cunning_action', option: 'hide' })
+  }
+
   if (/passe|attend|attends|patient|ne fais rien/.test(text) && toolAvailable('pass_turn', context.tools)) {
     return mockToolMessage('pass_turn', { reason: 'Le joueur attend.' })
   }

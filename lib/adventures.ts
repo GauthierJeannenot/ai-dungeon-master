@@ -68,6 +68,14 @@ export interface AdventureContent {
   roomStatusHints?: Record<string, string>
   /** Vocabulaire injecté dans les prompts DM. */
   promptGuidance: AdventurePromptGuidance
+  /**
+   * Accroche narrative liant UN personnage à CETTE aventure (clé = characterId).
+   * 2-3 phrases (l'équivalent de la section « Histoire » de l'ancien
+   * player-character.md), injectées sous la fiche générique dans le prompt
+   * statique. Le vocabulaire de module vit ICI, pas dans characters/. Absent
+   * pour un personnage = la fiche générique suffit. Voir docs/playable-characters.md.
+   */
+  characterHooks?: Record<string, string>
 }
 
 // Module COMPLET côté app : contenu + exploitation + carte moteur.

@@ -1,19 +1,35 @@
 import fs from 'fs'
 import path from 'path'
 import { DEFAULT_ADVENTURE_ID, isKnownAdventureId } from './adventure-map'
+import { DEFAULT_CHARACTER_ID, isKnownCharacterId } from './character-registry'
 
 interface ContextFiles {
-  playerCharacter: string   // Fiche de personnage : stats, inventaire, background
+  playerCharacter: string   // Fiche de personnage : stats, inventaire, capacités
   playerRules: string       // Règles D&D côté joueur : actions, capacités de classe
   dmRules: string
   adventureModule: string
 }
 
-// Caches par module : un singleton mélangerait les prompts de deux aventures.
+// Cache par (module, personnage) : la fiche de personnage dépend du personnage,
+// le reste du module. Une clé composite évite de mélanger les deux.
 const cachedFiles = new Map<string, ContextFiles>()
 
 function adventureDir(adventureId: string): string {
   return path.join(process.cwd(), 'adventures', adventureId)
+}
+
+function characterDir(characterId: string): string {
+  return path.join(process.cwd(), 'characters', characterId)
+}
+
+// Fiche de personnage GÉNÉRIQUE (characters/<id>/character-sheet.md), globale à
+// toutes les aventures. Personnage connu sans fiche = erreur (jamais de repli
+// silencieux sur un autre) ; id inconnu = fail-safe sur le guerrier par défaut.
+function readCharacterSheet(characterId: string): string {
+  const resolvedId = isKnownCharacterId(characterId) ? characterId : DEFAULT_CHARACTER_ID
+  const sheet = readFileOrNull(characterDir(resolvedId), 'character-sheet.md')
+  if (sheet !== null) return sheet
+  throw new Error(`Fiche de personnage manquante : characters/${resolvedId}/character-sheet.md`)
 }
 
 function readFileOrNull(dir: string, filename: string): string | null {
@@ -49,17 +65,23 @@ function readWithFallback(adventureId: string, filename: string, opts: { perModu
   )
 }
 
-export function loadContextFiles(adventureId: string = DEFAULT_ADVENTURE_ID): ContextFiles {
-  const existing = cachedFiles.get(adventureId)
+export function loadContextFiles(
+  adventureId: string = DEFAULT_ADVENTURE_ID,
+  characterId: string = DEFAULT_CHARACTER_ID
+): ContextFiles {
+  const cacheKey = `${adventureId}::${characterId}`
+  const existing = cachedFiles.get(cacheKey)
   if (existing) return existing
 
   const files: ContextFiles = {
-    playerCharacter: readWithFallback(adventureId, 'player-character.md', { perModule: true }),
+    // Fiche = personnage GÉNÉRIQUE (globale) ; l'accroche narrative propre au
+    // couple aventure×personnage est ajoutée par prompts.ts (characterHooks).
+    playerCharacter: readCharacterSheet(characterId),
     playerRules: readWithFallback(adventureId, 'player-rules.md', { perModule: false }),
     dmRules: readWithFallback(adventureId, 'dm-rules.md', { perModule: false }),
     adventureModule: readWithFallback(adventureId, 'adventure-module.md', { perModule: true }),
   }
-  cachedFiles.set(adventureId, files)
+  cachedFiles.set(cacheKey, files)
   return files
 }
 

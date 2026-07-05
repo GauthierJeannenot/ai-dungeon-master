@@ -50,6 +50,12 @@ export const GRAMMYS_CONTENT: AdventureContent = {
   welcomeMessage: WELCOME,
   chatPlaceholders: PLACEHOLDERS,
   roomStatusHints: ROOM_STATUS_HINTS,
+  characterHooks: {
+    fighter: "Ancien soldat d'une compagnie de mercenaires dissoute, tu cherches à te racheter. Le vieux sorcier Tyndareus le Vert t'a engagé pour retrouver la recette secrète des tartes aux pommes de Grammy — de l'or, et peut-être une façon de faire le bien sans dégainer au premier souffle de conflit.",
+    rogue: "Tyndareus le Vert t'a engagé pour un travail discret : récupérer la recette secrète de Grammy dans une boulangerie infestée de gobelins. Fouiller, crocheter, se faufiler — exactement ton domaine.",
+    wizard: "Tyndareus le Vert, un confrère de l'art, t'a chargé de retrouver la recette secrète de Grammy. La rumeur parle d'un verger enchanté et de dryades : de quoi éveiller ta curiosité arcanique autant que ta prudence.",
+    cleric: "Tyndareus le Vert t'a demandé de retrouver la recette perdue de Grammy et, ce faisant, d'apaiser ce qui hante encore sa vieille boulangerie. Une œuvre de compassion autant qu'une quête.",
+  },
   promptGuidance: {
     movementExample: 'je vais au verger',
     namedPlaces: 'verger, tas de déchets, entrée/façade, bureau, quai de chargement, sol de la boulangerie, appartement',
