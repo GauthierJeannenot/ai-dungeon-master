@@ -25,12 +25,16 @@ paramétrés par `adventureId`.
 | Contexte narratif (markdown) | `adventures/<id>/*.md`, chargé par `lib/context-loader.ts` (repli sur le module par défaut pour les règles génériques) |
 | Contenu app (landing, welcome, battlemap, placeholders, prompts) | `adventures/<id>/definition.ts` (`AdventureContent`), agrégé par `lib/adventures.ts` |
 | Battlemap pixel art | `public/battlemaps/<id>.png` |
-| Moteur | un process MCP par session, spawné avec `ADVENTURE_ID` (`mcp-server/adventure.ts`) |
-| Persistance | colonne `game_sessions.adventure_id` ; l'aventure de la session fait foi (bascule interdite → 409) |
+| Moteur | un process MCP par session, spawné avec `ADVENTURE_ID` **et** `CHARACTER_ID` (`mcp-server/adventure.ts` / `character.ts`) |
+| Persistance | colonnes `game_sessions.adventure_id` et `character_id` ; l'aventure ET le personnage de la session font foi (bascule interdite → 409) |
+
+### Personnages jouables
+
+Le joueur choisit un personnage prétiré (Guerrier, Roublard, Magicien, Clerc — inspirés du SRD 5.1, CC-BY-4.0) au démarrage d'une partie, sur n'importe quelle aventure. Le catalogue est global (`characters/<id>/`) ; le moteur MCP applique les mécaniques de classe (attaques selon l'arme, sorts via `cast_spell`, capacités via `use_class_feature`, attaque sournoise, emplacements). Conception et guide « ajouter un personnage » : [docs/playable-characters.md](docs/playable-characters.md) et `characters/CLAUDE.md`.
 
 ### Ajouter un module d'aventure
 
-1. `adventures/<id>/adventure-module.md` (format « ## Salle N » + « Point d'entrée »), `player-character.md`, et `map.ts` (exporter un `AdventureMapData` : rooms, entryCells, encounters — **types de monstres existants du moteur uniquement**, npcs, aliases, transitions, roomHooks, startCell, initialPlayer). Règles propres facultatives (`player-rules.md`, `dm-rules.md`) sinon repli automatique.
+1. `adventures/<id>/adventure-module.md` (format « ## Salle N » + « Point d'entrée ») et `map.ts` (exporter un `AdventureMapData` : rooms, entryCells, encounters — **types de monstres existants du moteur uniquement**, npcs, aliases, transitions, roomHooks, startCell, `initialPlayer` = `{ level, extraInventory? }`). Règles propres facultatives (`player-rules.md`, `dm-rules.md`) sinon repli automatique. (La fiche du héros est globale : `characters/<id>/`, pas de `player-character.md`.)
 2. `adventures/<id>/definition.ts` : exporter un `AdventureContent` (meta landing, `welcomeMessage`, `chatPlaceholders`, `roomStatusHints`, et surtout `promptGuidance` — le vocabulaire du module injecté dans les prompts DM ; **aucun terme d'un autre module**).
 3. Battlemap 17×15 : dupliquer `scripts/generate-battlemap-grammys-country-apple-pie.cjs` → `scripts/generate-battlemap-<id>.cjs`, sortie `public/battlemaps/<id>.png`.
 4. Enregistrer la carte dans `lib/adventure-map.ts` (`ADVENTURE_MAPS`), importer la définition dans `lib/adventures.ts` et l'ajouter à `AVAILABILITY`.
@@ -201,12 +205,15 @@ Le playtest agrège appels LLM, cout estime, routes `none/short/rich/blocked`, t
 Chaque module vit dans son dossier `adventures/<id>/` :
 
 - `adventures/<id>/adventure-module.md` — Carte des salles, monstres, trésors, triggers
-- `adventures/<id>/player-character.md` — Fiche, stats, équipement du joueur
 - `adventures/<id>/player-rules.md` — Règles côté joueur *(optionnel : repli sur celles du module par défaut)*
 - `adventures/<id>/dm-rules.md` — Tables de monstres, règles de combat *(optionnel : repli sur le module par défaut)*
-- `adventures/<id>/map.ts` — Données typées (salles, rencontres, PNJ, hooks, `startCell`, joueur initial)
+- `adventures/<id>/map.ts` — Données typées (salles, rencontres, PNJ, hooks, `startCell`, `initialPlayer` = niveau + objets propres)
 
-Deux modules livrés : `grammys-country-apple-pie` (par défaut) et `tide-crypt`.
+La fiche du personnage n'est PLUS par module : elle vit dans le catalogue global
+`characters/<id>/character-sheet.md`. L'accroche narrative liant un personnage à
+une aventure est dans `definition.ts` (`characterHooks`).
+
+Trois modules livrés : `grammys-country-apple-pie` (par défaut), `tide-crypt` et `fey-shadow-fair`.
 Voir [« Ajouter un module d'aventure »](#ajouter-un-module-daventure) plus bas.
 
 ## Lancement

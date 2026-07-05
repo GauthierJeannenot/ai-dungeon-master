@@ -12,8 +12,12 @@
   disponibilité). Importé par des composants client → rien de serveur non
   plus. `requireAvailableAdventure` = démarrage d'une partie (lève si inconnu
   ou verrouillé) ; `getAdventureDefinition` = lecture fail-safe (défaut).
-- `lib/player-template.ts` : gabarit héros PARTAGÉ app + moteur — modifier ici,
-  jamais dupliquer.
+- `lib/character-registry.ts` : catalogue GLOBAL des personnages jouables
+  (prétirés SRD) + `buildPlayerState` (fusion personnage × deltas d'aventure),
+  PARTAGÉ app + moteur — importable par le serveur MCP, donc rien d'app-only.
+  C'est la source unique de l'état joueur initial (remplace l'ancien
+  `player-template.ts`). Les données SRD (armes/sorts/compétences) vivent dans
+  `lib/srd/`. Voir docs/playable-characters.md.
 
 ## Persistance — Postgres unique
 

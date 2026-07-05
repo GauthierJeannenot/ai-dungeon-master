@@ -1,13 +1,14 @@
-# Personnages jouables & classes (SRD 5) — conception (CIBLE, NON IMPLÉMENTÉ)
+# Personnages jouables & classes (SRD 5) — conception (IMPLÉMENTÉ)
 
-> **Statut : CIBLE — rien de ce document n'est implémenté.** Ce document est la
-> référence de conception pour permettre au joueur de choisir son personnage
-> (classe, stats, équipement, capacités) au démarrage d'une partie, sur
-> n'importe quelle aventure. Il est écrit pour être implémenté tel quel ; si
-> une décision change pendant l'implémentation, METTRE À JOUR ce document dans
-> le même commit (docs/ a déjà divergé du code — ne pas recommencer).
-> Une fois implémenté, remplacer ce bandeau par « IMPLÉMENTÉ » (modèle :
-> docs/multi-map-adventures.md).
+> **Statut : IMPLÉMENTÉ (les 5 phases).** Ce document reste la référence de
+> conception ; si une décision change, METTRE À JOUR ce document dans le même
+> commit (docs/ a déjà divergé du code — ne pas recommencer). Le joueur choisit
+> son personnage (classe, stats, équipement, capacités) au démarrage d'une
+> partie, sur n'importe quelle aventure. Catalogue : `characters/<id>/`
+> (fighter/rogue/wizard/cleric). Registres : `lib/character-registry.ts` +
+> `lib/srd/{weapons,spells,skills}.ts`. Tests : tests/character-registry.test.cjs,
+> tests/mcp-characters.test.cjs, plus les 400/409 de tests/dm-adventure-selection
+> et le round-trip character_id de tests/db-stores.
 
 ## Objectif
 
