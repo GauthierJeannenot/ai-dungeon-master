@@ -10,7 +10,7 @@ import { GRAMMYS_MAP } from './map'
 // n'inclut que les map.ts) : ne rien y importer d'app-only à l'exécution.
 
 const WELCOME =
-  "Le vieux sorcier Tyndareus le Vert t'a engagé pour une mission singulière : retrouver la recette secrète des célèbres tartes aux pommes de Grammy. Après des jours de route, te voici enfin devant la vieille boulangerie, abandonnée depuis longtemps et, dit-on, infestée de gobelins. L'odeur des pommes du verger flotte encore dans l'air, et la porte entrebâillée t'invite à entrer. Que fais-tu ?"
+  "Le vieux sorcier Tyndareus le Vert t'a engagé pour une mission singulière : retrouver la recette secrète des célèbres tartes aux pommes de Grammy. Après des jours de route, te voici enfin devant la vieille boulangerie, abandonnée depuis longtemps et, dit-on, infestée de gobelins. L'odeur des pommes du verger flotte encore dans l'air, et la porte entrebâillée t'invite à entrer. Juste à côté de toi, un grand arbre noueux se dresse en silence — et tu jurerais qu'il te fixe avec insistance. Que fais-tu ?"
 
 // Placeholders du champ de saisie par salle (clé 'default' = repli).
 const PLACEHOLDERS: Record<string, string[]> = {
