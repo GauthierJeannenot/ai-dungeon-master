@@ -72,15 +72,14 @@ multi-maps par rapport à un module 1-map :
 ```ts
 // maps[0] est la carte de départ ; l'ordre = ordre de progression.
 maps: [
-  { id: 'fair', name: 'La Foire aux Chandelles', grid: { cols: 17, rows: 15 } },
-  { id: 'wood', name: 'Le Bois-Ricanant',        grid: { cols: 15, rows: 13 } },
-  // Optionnel : cellSize (px) fixe la taille de case MINIMALE au rendu. Absent
+  // cellSize (px, optionnel) fixe la taille de case MINIMALE au rendu. Absent
   // = DEFAULT_CELL_SIZE (48). Si la carte tient dans le conteneur, les cases
   // s'agrandissent pour le remplir (letterbox) ; sinon elles restent à cellSize
   // et la carte devient scrollable au cliquer-glisser. Purement du rendu : le
   // moteur ne lit JAMAIS cellSize (ses bornes viennent de `grid`). Générer alors
   // le PNG à ≥ cellSize px/case pour rester net. Voir docs/battlemap-viewport.md.
-  // { id: 'grande', name: '…', grid: { cols: 30, rows: 24 }, cellSize: 64 },
+  { id: 'fair', name: 'La Foire aux Chandelles', grid: { cols: 24, rows: 16 }, cellSize: 64 },
+  { id: 'wood', name: 'Le Bois-Ricanant',        grid: { cols: 16, rows: 24 }, cellSize: 64 },
 ],
 
 // Chaque salle porte son mapId (absent = première map, réservé aux modules 1-map).
@@ -183,10 +182,13 @@ regex `^# Carte <mapId> …`) :
 
 - Une image PNG par carte : `public/battlemaps/<adventureId>-<mapId>.png`.
 - Dimensions = multiples exacts de la grille de SA carte (cases carrées) —
-  vérifié par test. Exemple : grille 17×15 → 1360×1200 (80 px/case).
-- Script générateur par module : copier
-  `scripts/generate-battlemap-fey-shadow-fair.cjs` (il génère les deux
-  images du module de référence).
+  vérifié par test. Le module de référence vise la résolution native MAXIMALE
+  des images générées par ChatGPT (1536×1024 paysage, 1024×1536 portrait) à
+  64 px/case : grille 24×16 → 1536×1024, grille 16×24 → 1024×1536. Une
+  illustration ChatGPT s'y dépose alors telle quelle, sans redimensionnement.
+- Script générateur par module (placeholders procéduraux aux bonnes
+  dimensions) : copier `scripts/generate-battlemap-fey-shadow-fair.cjs`
+  (il génère les deux images du module de référence).
 
 ## Étape 5 — Enregistrement et validation
 
