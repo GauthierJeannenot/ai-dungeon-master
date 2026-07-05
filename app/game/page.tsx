@@ -8,6 +8,7 @@ import CombatTracker from '@/components/CombatTracker'
 import Link from 'next/link'
 import { GameState, ChatMessage, DMResponse, DMRequest, ConversationTurn, DMClientMeta, type DMQuota, type DMTurnUsage } from '@/lib/types'
 import { getAdventure, DEFAULT_ADVENTURE_ID, type AdventureDefinition } from '@/lib/adventures'
+import { DEFAULT_CHARACTER_ID, isKnownCharacterId } from '@/lib/character-registry'
 import { buildInitialGameState } from '@/lib/initial-game-state'
 
 // Battlemap uses browser APIs — load client-only
@@ -17,8 +18,11 @@ function generateId(): string {
   return `msg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
 }
 
-// Clés sessionStorage préfixées par module : changer d'aventure dans le même
-// onglet isole les états (deux parties de modules différents coexistent).
+// Clés sessionStorage préfixées par module ET par personnage : deux parties de
+// modules ou de personnages différents coexistent dans le même onglet. Le
+// personnage PAR DÉFAUT (guerrier) garde le préfixe historique `ai-dm:<adv>:`
+// (aucune partie en cours perdue à la mise à jour) ; les autres personnages
+// ajoutent `<characterId>:`.
 interface SessionKeys {
   sessionId: string
   gameState: string
@@ -26,8 +30,9 @@ interface SessionKeys {
   summaryContext: string
   budget: string
 }
-function makeSessionKeys(adventureId: string): SessionKeys {
-  const prefix = `ai-dm:${adventureId}:`
+function makeSessionKeys(adventureId: string, characterId: string = DEFAULT_CHARACTER_ID): SessionKeys {
+  const charSegment = characterId === DEFAULT_CHARACTER_ID ? '' : `${characterId}:`
+  const prefix = `ai-dm:${adventureId}:${charSegment}`
   return {
     sessionId: `${prefix}session-id`,
     gameState: `${prefix}game-state`,
@@ -350,12 +355,13 @@ function phaseLabel(phase: GameState['phase']): { label: string; color: string }
   }
 }
 
-function GameView({ adventure, resumeSessionId }: { adventure: AdventureDefinition; resumeSessionId?: string | null }) {
+function GameView({ adventure, characterId, resumeSessionId }: { adventure: AdventureDefinition; characterId: string; resumeSessionId?: string | null }) {
   const router = useRouter()
-  // Clés sessionStorage et état initial DÉRIVÉS du module actif. Stables par
-  // adventure.id ; un changement de module (nouvelle URL) reconstruit tout.
-  const keys = useMemo(() => makeSessionKeys(adventure.id), [adventure.id])
-  const initialGameState = useMemo(() => buildInitialGameState(adventure.id), [adventure.id])
+  // Clés sessionStorage et état initial DÉRIVÉS du module ET du personnage
+  // actifs. Stables par (adventure.id, characterId) ; un changement de l'un
+  // (nouvelle URL) reconstruit tout.
+  const keys = useMemo(() => makeSessionKeys(adventure.id, characterId), [adventure.id, characterId])
+  const initialGameState = useMemo(() => buildInitialGameState(adventure.id, characterId), [adventure.id, characterId])
 
   const [gameState, setGameState] = useState<GameState>(initialGameState)
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -529,6 +535,7 @@ function GameView({ adventure, resumeSessionId }: { adventure: AdventureDefiniti
         clientRequestId,
         sessionId: activeSessionId,
         adventureId: adventure.id,
+        characterId,
         gameState,
         history,
         summaryContext,
@@ -860,6 +867,10 @@ function GamePageResolver() {
   const router = useRouter()
   const requested = params.get('adventure') ?? DEFAULT_ADVENTURE_ID
   const resumeSessionId = params.get('session')
+  // Personnage choisi (?character=). Inconnu → guerrier par défaut (fail-safe :
+  // le vrai verrou reste le 400/409 de /api/dm).
+  const requestedCharacter = params.get('character')
+  const characterId = isKnownCharacterId(requestedCharacter) ? requestedCharacter! : DEFAULT_CHARACTER_ID
   const adventure = getAdventure(requested)
   const playable = adventure?.available ? adventure : null
 
@@ -868,8 +879,9 @@ function GamePageResolver() {
   }, [playable, router])
 
   if (!playable) return null
-  // key : un changement de module remonte un GameView neuf (états/refs isolés).
-  return <GameView key={playable.id} adventure={playable} resumeSessionId={resumeSessionId} />
+  // key : un changement de module OU de personnage remonte un GameView neuf
+  // (états/refs isolés).
+  return <GameView key={`${playable.id}:${characterId}`} adventure={playable} characterId={characterId} resumeSessionId={resumeSessionId} />
 }
 
 export default function GamePage() {

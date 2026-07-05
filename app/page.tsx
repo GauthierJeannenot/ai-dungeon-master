@@ -10,6 +10,7 @@ import { isStripeConfigured } from '@/lib/stripe'
 import AuthControls from '@/components/landing/AuthControls'
 import BuyTokensPanel from '@/components/landing/BuyTokensPanel'
 import BuyModuleButton from '@/components/landing/BuyModuleButton'
+import CharacterPicker from '@/components/landing/CharacterPicker'
 import MyGamesPanel from '@/components/landing/MyGamesPanel'
 
 function formatEur(cents: number): string {
@@ -147,30 +148,25 @@ export default async function LandingPage() {
                     <span>{adventure.level}</span>
                     <span className="w-1 h-1 rounded-full bg-stone-700" />
                     <span>{adventure.duration}</span>
-                    <span className="ml-auto">
-                      {!adventure.available || !adventure.playPath ? (
-                        <span
-                          aria-disabled="true"
-                          className="inline-block px-4 py-2 bg-stone-800 text-stone-500 text-sm font-semibold rounded cursor-not-allowed select-none"
-                        >
-                          🔒 Verrouillé
-                        </span>
-                      ) : needsPurchase && adventure.priceCents ? (
-                        <BuyModuleButton
-                          moduleId={adventure.id}
-                          priceCents={adventure.priceCents}
-                          authenticated={authenticated}
-                          paymentsEnabled={paymentsEnabled}
-                        />
-                      ) : (
-                        <Link
-                          href={adventure.playPath}
-                          className="inline-block px-4 py-2 bg-amber-800 hover:bg-amber-700 text-white text-sm font-semibold rounded transition-colors"
-                        >
-                          Démarrer
-                        </Link>
-                      )}
-                    </span>
+                  </div>
+                  <div className="pt-1">
+                    {!adventure.available || !adventure.playPath ? (
+                      <span
+                        aria-disabled="true"
+                        className="inline-block px-4 py-2 bg-stone-800 text-stone-500 text-sm font-semibold rounded cursor-not-allowed select-none"
+                      >
+                        🔒 Verrouillé
+                      </span>
+                    ) : needsPurchase && adventure.priceCents ? (
+                      <BuyModuleButton
+                        moduleId={adventure.id}
+                        priceCents={adventure.priceCents}
+                        authenticated={authenticated}
+                        paymentsEnabled={paymentsEnabled}
+                      />
+                    ) : (
+                      <CharacterPicker playPath={adventure.playPath} />
+                    )}
                   </div>
                 </article>
               )

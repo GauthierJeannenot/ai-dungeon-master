@@ -577,6 +577,9 @@ export interface DMRequest {
   // Module d'aventure choisi (nouvelle session). Ignoré si la session existe
   // déjà — l'aventure de la session fait foi (mismatch → 409).
   adventureId?: string
+  // Personnage choisi (nouvelle session). Miroir d'adventureId : ignoré si la
+  // session existe déjà — le personnage de la session fait foi (mismatch → 409).
+  characterId?: string
   gameState?: GameState
   // Historique récent gardé verbatim (derniers N messages player/dm)
   history?: ConversationTurn[]

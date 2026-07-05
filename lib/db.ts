@@ -67,6 +67,7 @@ CREATE TABLE IF NOT EXISTS game_sessions (
   schema_version INTEGER NOT NULL DEFAULT 1,
   owner_id TEXT,
   adventure_id TEXT,
+  character_id TEXT,
   game_state JSONB NOT NULL,
   history JSONB NOT NULL DEFAULT '[]',
   summary_context TEXT,
@@ -171,6 +172,7 @@ export function __setDbPoolForTests(testPool: Pool): void {
 const ADDITIVE_MIGRATIONS_SQL = [
   'ALTER TABLE game_sessions ADD COLUMN IF NOT EXISTS owner_id TEXT',
   'ALTER TABLE game_sessions ADD COLUMN IF NOT EXISTS adventure_id TEXT',
+  'ALTER TABLE game_sessions ADD COLUMN IF NOT EXISTS character_id TEXT',
 ]
 
 async function applyAdditiveMigrations(): Promise<void> {
