@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import type { GameState, MonsterState, PlayerState, WorldNpcDisposition } from '@/lib/types'
+import CharacterSheetModal from './CharacterSheetModal'
 
 interface BattlemapProps {
   gameState: GameState
@@ -57,6 +58,8 @@ export default function Battlemap({
 }: BattlemapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [tooltip, setTooltip] = useState<TooltipState | null>(null)
+  // Fiche de personnage ouverte en modale (clic sur le pion joueur / son tooltip).
+  const [sheetOpen, setSheetOpen] = useState(false)
   const [prevPositions, setPrevPositions] = useState<Record<string, { x: number; y: number }>>({})
   const [animating, setAnimating] = useState<Set<string>>(new Set())
   // Dimensions réelles du conteneur — la carte remplit tout l'espace alloué au
@@ -115,6 +118,14 @@ export default function Battlemap({
       x: e.clientX - rect.left,
       y: e.clientY - rect.top,
     })
+  }, [])
+
+  // Le pion joueur (et son tooltip de survol) ouvre la fiche complète en modale,
+  // au lieu du tooltip d'aperçu réservé aux monstres/PNJ.
+  const handleOpenSheet = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
+    setTooltip(null)
+    setSheetOpen(true)
   }, [])
 
   const aliveMonsters = Object.values(gameState.monsters).filter(m => m.isAlive)
@@ -211,7 +222,7 @@ export default function Battlemap({
           cellH={cellH}
           isCurrentTurn={gameState.currentTurn === 'player' || gameState.phase !== 'combat'}
           isAnimating={animating.has('player')}
-          onClick={(e) => handleTokenClick(e, gameState.player)}
+          onOpenSheet={handleOpenSheet}
         />
 
         {/* Tooltip */}
@@ -223,6 +234,13 @@ export default function Battlemap({
           />
         )}
       </div>
+
+      {/* Fiche complète du personnage joueur (modale, position fixe) */}
+      <CharacterSheetModal
+        player={gameState.player}
+        open={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+      />
     </div>
   )
 }
@@ -283,14 +301,14 @@ function npcTokenStyle(disposition: WorldNpcDisposition): { background: string; 
 }
 
 function TokenPlayer({
-  player, cellW, cellH, isCurrentTurn, isAnimating, onClick
+  player, cellW, cellH, isCurrentTurn, isAnimating, onOpenSheet
 }: {
   player: PlayerState
   cellW: number
   cellH: number
   isCurrentTurn: boolean
   isAnimating: boolean
-  onClick: (e: React.MouseEvent) => void
+  onOpenSheet: (e: React.MouseEvent) => void
 }) {
   const cell = Math.min(cellW, cellH)
   const px = player.position.x * cellW + cellW / 2
@@ -298,8 +316,11 @@ function TokenPlayer({
   const r = cell * 0.38
 
   return (
+    // `group` : le survol du pion révèle un aperçu cliquable (ouvre la fiche).
+    // Un enfant en :hover compte comme survol du parent → pas de « trou » entre
+    // le pion et l'aperçu même s'il déborde hors de la boîte du pion.
     <div
-      className="absolute pointer-events-auto cursor-pointer"
+      className="group absolute pointer-events-auto cursor-pointer"
       style={{
         left: px - r,
         top: py - r,
@@ -307,7 +328,8 @@ function TokenPlayer({
         height: r * 2,
         transition: isAnimating ? 'left 0.4s ease, top 0.4s ease' : undefined,
       }}
-      onClick={onClick}
+      onClick={onOpenSheet}
+      title={`${player.name} — voir la fiche`}
     >
       <div className={`relative w-full h-full rounded-full flex items-center justify-center font-bold text-white select-none
         ${isCurrentTurn ? 'ring-2 ring-yellow-300 ring-offset-1 ring-offset-transparent' : ''}
@@ -331,6 +353,19 @@ function TokenPlayer({
             backgroundColor: getHPColor(player.hp.current, player.hp.max),
           }}
         />
+      </div>
+
+      {/* Aperçu au survol : PV / CA + invite à ouvrir la fiche. Cliquable
+          (pointer-events-auto) → même action que le clic sur le pion. */}
+      <div
+        className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-40 w-max max-w-[180px] pointer-events-auto cursor-pointer rounded-lg border border-amber-800/60 bg-stone-900/95 px-2.5 py-1.5 shadow-xl"
+        onClick={onOpenSheet}
+      >
+        <div className="text-xs font-bold text-amber-300 whitespace-nowrap">{player.name}</div>
+        <div className="text-[11px] text-stone-300 whitespace-nowrap">
+          PV {player.hp.current}/{player.hp.max} · CA {player.ac}
+        </div>
+        <div className="mt-0.5 text-[10px] text-amber-400/80 whitespace-nowrap">📋 Voir la fiche</div>
       </div>
     </div>
   )

@@ -461,7 +461,17 @@ Chaque point est le miroir exact du traitement `adventureId` existant :
 6. **Landing** (components/landing) : sur la carte d'une aventure, un
    sélecteur de personnage (les 4 du catalogue, avec classe + résumé una
    ligne) avant « Jouer ». Défaut : guerrier — le lien actuel sans
-   `?character=` reste valide.
+   `?character=` reste valide. Le **survol** d'une classe affiche un aperçu
+   détaillé de sa fiche (popover) : stats, CA/PV/vitesse, sauvegardes,
+   compétences, capacités, sorts, équipement.
+7. **Fiche de personnage** (components/CharacterSheet.tsx +
+   CharacterSheetModal.tsx, modèle de vue lib/character-sheet-view.ts) :
+   composant présentiel PARTAGÉ landing (aperçu depuis un `CharacterTemplate`)
+   et jeu (modale depuis le `PlayerState` live — PV courants, emplacements de
+   sort restants, ressources, conditions). En jeu, un clic sur le pion joueur
+   de la battlemap (ou sur son aperçu de survol) ouvre la modale. Le modèle de
+   vue résout les ids SRD (sorts, compétences) en libellés FR ; aucun
+   vocabulaire de module (composant global).
 
 Monétisation : les personnages sont **gratuits** v1. L'axe « personnage
 payant » (entitlement par characterId) est possible plus tard — ne pas le
