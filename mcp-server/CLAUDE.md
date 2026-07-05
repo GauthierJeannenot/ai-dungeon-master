@@ -12,17 +12,20 @@ jamais côté LLM ni côté route.
 2. **Compilation séparée** : `mcp-server/tsconfig.json` compile vers
    `mcp-server/dist/` (le client lance `dist/mcp-server/index.js`). Après tout
    changement ici ou dans un fichier partagé importé (`lib/types.ts`,
-   `lib/adventure-map.ts`, `lib/player-template.ts`, `adventures/*/map.ts`) :
-   `npm run build:mcp`, sinon les tests/le dev tournent sur l'ancien binaire.
-   Un nouveau fichier partagé doit être ajouté au `include` de ce tsconfig.
+   `lib/adventure-map.ts`, `lib/character-registry.ts`, `lib/srd/*.ts`,
+   `adventures/*/map.ts`, `characters/*/sheet.ts`) : `npm run build:mcp`, sinon
+   les tests/le dev tournent sur l'ancien binaire. Un nouveau fichier partagé
+   doit être ajouté au `include` de ce tsconfig.
 3. **Frontière moteur/app** : ne JAMAIS importer `adventures/<id>/definition.ts`
    ni quoi que ce soit d'app-only (next, server-logger…). Le moteur ne voit que
    `map.ts` + `lib/adventure-map.ts` + `lib/types.ts` + `lib/player-template.ts`.
    Un champ nécessaire au moteur va dans `AdventureMapData`, pas dans la
    définition.
-4. **Aventure figée au spawn** (`adventure.ts`) : `ACTIVE_ADVENTURE_ID` est lu
-   UNE fois depuis `process.env.ADVENTURE_ID`. Ne jamais permettre d'en changer
-   pendant la vie du process — changer d'aventure = nouvelle session.
+4. **Aventure ET personnage figés au spawn** (`adventure.ts` / `character.ts`) :
+   `ACTIVE_ADVENTURE_ID` et `ACTIVE_CHARACTER_ID` sont lus UNE fois depuis
+   `process.env.ADVENTURE_ID` / `CHARACTER_ID`. Ne jamais permettre d'en changer
+   pendant la vie du process — changer d'aventure ou de personnage = nouvelle
+   session.
 
 ## État (game-state.ts)
 

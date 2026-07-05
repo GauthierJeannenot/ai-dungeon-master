@@ -56,6 +56,10 @@ décrite dans README.md, docs/intent-pipeline.md ou .env.example :
 - docs/multi-map-adventures.md est IMPLÉMENTÉ (référence de conception des
   aventures multi-maps ; premier module : adventures/fey-shadow-fair/). Le
   maintenir à jour dans le même commit que toute évolution du multi-map.
+- docs/playable-characters.md est IMPLÉMENTÉ (personnages jouables : catalogue
+  `characters/<id>/`, registres `lib/character-registry.ts` +
+  `lib/srd/{weapons,spells,skills}.ts`, session = aventure + personnage). Le
+  maintenir à jour dans le même commit que toute évolution des personnages.
 
 ## Invariants transverses (ne pas casser)
 
@@ -65,9 +69,13 @@ décrite dans README.md, docs/intent-pipeline.md ou .env.example :
 2. **Débit avant LLM, remboursement sur erreur serveur** : tout `return` 5xx
    postérieur au débit doit passer par `refundDebit` (les `return` ne passent
    pas par le `catch`).
-3. **Une session = une aventure, pour toujours** : l'aventure se choisit au
-   spawn du process moteur ; un `adventureId` différent sur une session
-   existante est un 409. Ne jamais introduire de bascule en cours de partie.
+3. **Une session = une aventure + UN personnage, pour toujours** : l'aventure
+   ET le personnage se choisissent au spawn du process moteur (`ADVENTURE_ID`
+   et `CHARACTER_ID`) ; un `adventureId` OU un `characterId` différent sur une
+   session existante est un 409. Ne jamais introduire de bascule en cours de
+   partie. Le catalogue de personnages (prétirés SRD) vit dans
+   `characters/<id>/` (registre `lib/character-registry.ts`) ; voir
+   docs/playable-characters.md (IMPLÉMENTÉ).
 4. **Jamais de `console.log` dans mcp-server/** : stdout = protocole MCP.
    Diagnostics sur stderr uniquement.
 5. **Zéro fuite inter-modules** : aucun vocabulaire d'un module (Grammy,

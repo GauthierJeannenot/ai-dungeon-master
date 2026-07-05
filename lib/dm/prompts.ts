@@ -27,19 +27,24 @@ const LLM_PROMPT_CACHE_TTL: '5m' | '1h' =
   process.env.LLM_PROMPT_CACHE_TTL === '5m' ? '5m' : '1h'
 const COMBAT_LOG_TAIL = parsePositiveInt(process.env.LLM_COMBAT_LOG_TAIL, 6)
 
-export function buildStaticPrompt(adventureId?: string): string {
-  const ctx = loadContextFiles(adventureId)
+export function buildStaticPrompt(adventureId?: string, characterId?: string): string {
+  const ctx = loadContextFiles(adventureId, characterId)
   const moduleIndex = loadAdventureModuleParsed(adventureId).index
   // Vocabulaire propre au module actif (lieux, PNJ) injecté dans les règles
   // ci-dessous : un module ne reçoit jamais les exemples d'un autre.
-  const g = getAdventureDefinition(adventureId).promptGuidance
+  const definition = getAdventureDefinition(adventureId)
+  const g = definition.promptGuidance
+  // Accroche narrative propre au couple aventure × personnage (le vocabulaire de
+  // module vit dans definition.ts, jamais dans characters/). Absente = fiche seule.
+  const hook = characterId ? definition.characterHooks?.[characterId] : undefined
+  const hookBlock = hook ? `\n\n### Accroche de cette aventure\n${hook}` : ''
 
   return `Tu es un Dungeon Master expert de D&D 5e, narrateur immersif et arbitre de règles rigoureux.
 Tu combines une narration cinématographique et épique avec une application stricte des règles mécaniques.
 
 ---
 ## FICHE DE PERSONNAGE DU JOUEUR
-${ctx.playerCharacter}
+${ctx.playerCharacter}${hookBlock}
 
 ---
 ## RÈGLES DU JOUEUR (actions, capacités de classe)
@@ -66,6 +71,7 @@ ${moduleIndex}
    - Provoquer / approcher une rencontre prévue par le module → \`start_encounter\` (sinon \`spawn_monster\` + \`enter_combat\`).
    - Un PNJ caché qui se montre au joueur (offrande acceptée, jet social réussi, embuscade qui se déclenche) → \`reveal_npc\` (par \`kind\` pour révéler tout un groupe, ou par \`npcId\`) pour afficher son token. Les PNJ existent et ont un token même hors combat (ex. ${g.visibleNpcExample}) ; ne narre l'apparition qu'APRÈS l'appel.
    - Subir un piège ou un effet à sauvegarde → \`resolve_saving_throw\`. Boire une potion → \`use_healing_potion\`. Attaquer → \`resolve_attack\` / \`resolve_player_attack\`.
+   - Lancer un sort (dégâts, soin, OU effet utilitaire comme créer de l'eau ou éclairer) → \`cast_spell\` : le moteur vérifie le sort connu, l'emplacement et la portée, et résout l'effet. Pour un sort utilitaire, narre l'effet dans les bornes du \`srdNote\` renvoyé — jamais au-delà. Utiliser une capacité de classe (second souffle, ruse) → \`use_class_feature\`. Ne narre JAMAIS l'effet d'un sort ou d'une capacité avant l'appel du tool.
    - **INTERDIT** : décrire l'issue (réussite, échec, dégâts, découverte, réaction d'un PNJ à un jet social, créature qui surgit) AVANT l'appel du tool. C'est le résultat du tool qui dicte ta narration, jamais l'inverse.
    - Seules les actions SANS incertitude mécanique (parler sans enjeu, contempler le décor, improviser une ruse de pure couleur) se narrent directement, sans tool.
 
@@ -254,12 +260,21 @@ export function buildDynamicPrompt(gameState: GameState, summaryContext?: string
   const roomBlock = roomHooks
     ? `---\n## SALLE ACTUELLE — ACCROCHES MÉCANIQUES DISPONIBLES\n${roomHooks}\nDès que l'action du joueur correspond à l'une de ces accroches, appelle le tool indiqué (ne narre pas l'issue à la place).\n\n`
     : ''
+  // Faits de monde établis mécaniquement (sorts utilitaires) et encore actifs sur
+  // la carte courante : portés par l'état, donc immunisés contre la compression
+  // d'historique. Absent = aucun (préfixe dynamique inchangé). Voir
+  // docs/playable-characters.md.
+  const currentMapId = gameState.currentMapId ?? getAdventureMap(adventureId).maps[0].id
+  const activeFacts = (gameState.worldFacts ?? []).filter(fact => fact.mapId === currentMapId)
+  const worldFactsBlock = activeFacts.length > 0
+    ? `---\n## FAITS ÉTABLIS (encore vrais dans la scène)\n${activeFacts.map(fact => `- ${fact.text}`).join('\n')}\nTiens compte de ces faits dans ta narration ; ne les contredis pas.\n\n`
+    : ''
   // #3 — La directive est placée en TOUT DERNIER (après l'état JSON) pour un effet de
   // récence maximal : c'est la dernière chose que le DM lit avant de répondre.
   const directiveBlock = directive
     ? `\n\n---\n## ⚠️ ACTION MÉCANIQUE REQUISE CE TOUR (classifieur d'intention)\n${directive}\nC'est le résultat du tool qui dicte ta narration — ne décris jamais l'issue avant l'appel.`
     : ''
-  return `${summaryBlock}${mapContextBlock}${roomDetailBlock}${roomBlock}---
+  return `${summaryBlock}${mapContextBlock}${roomDetailBlock}${roomBlock}${worldFactsBlock}---
 ## ÉTAT ACTUEL DU JEU
 \`\`\`json
 ${serializeGameState(gameState)}
@@ -269,7 +284,7 @@ ${serializeGameState(gameState)}
 export function buildSystemBlocks(gameState: GameState, summaryContext?: string, directive?: string): Anthropic.TextBlockParam[] {
   const staticBlock: Anthropic.TextBlockParam = {
     type: 'text',
-    text: buildStaticPrompt(gameState.adventureId),
+    text: buildStaticPrompt(gameState.adventureId, gameState.characterId),
   }
   if (LLM_PROMPT_CACHE_ENABLED) {
     staticBlock.cache_control = { type: 'ephemeral', ttl: LLM_PROMPT_CACHE_TTL }

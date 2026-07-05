@@ -1,5 +1,6 @@
 import { PlayerState, MonsterState } from '../lib/types'
 import { gridForMap } from '../lib/adventure-map'
+import { getWeapon } from '../lib/srd/weapons'
 import { ACTIVE_ADVENTURE_ID } from './adventure'
 import * as gs from './game-state'
 
@@ -22,18 +23,6 @@ export function mapBounds(): { minX: number; maxX: number; minY: number; maxY: n
   }
 }
 
-const ATTACK_RANGE_CELLS: Record<string, number> = {
-  longsword: 1,
-  shortsword: 1,
-  dagger: 4,
-  greataxe: 1,
-  greatsword: 1,
-  handaxe: 4,
-  rapier: 1,
-  mace: 1,
-  quarterstaff: 1,
-  unarmed: 1,
-}
 
 export class RuleViolation extends Error {
   constructor(
@@ -79,7 +68,10 @@ export function occupiesSpace(entity: Entity): boolean {
 }
 
 function speedCells(entity: Entity): number {
-  return Math.floor(entity.speed / 5)
+  const base = Math.floor(entity.speed / 5)
+  // Ruse : Sprint double le budget de mouvement du tour (roublard).
+  if (gs.hasDashUsed(entity.id)) return base * 2
+  return base
 }
 
 function assertEntity(entityId: string): Entity {
@@ -169,7 +161,7 @@ function occupiedByLivingEntity(cell: { x: number; y: number }, exceptId?: strin
 function attackRangeCells(weaponOrSpell: string, rangeCells?: number): number {
   if (rangeCells !== undefined) return rangeCells
   const key = weaponOrSpell.toLowerCase().replace(/\s+/g, '')
-  return ATTACK_RANGE_CELLS[key] ?? DEFAULT_MELEE_RANGE_CELLS
+  return getWeapon(key)?.rangeCells ?? DEFAULT_MELEE_RANGE_CELLS
 }
 
 export function validateMove(tokenId: string, toCell: { x: number; y: number }): { distance: number; remaining: number | null } {
@@ -271,6 +263,23 @@ export function validateActionUse(entityId: string): void {
     assertCurrentTurn(entityId)
     assertInInitiative(entityId)
     assertActionAvailable(entityId)
+  }
+}
+
+// Économie d'action BONUS (second souffle, Ruse). Hors combat : non contrainte
+// (comme l'action). En combat : tour courant + action bonus non déjà dépensée.
+export function validateBonusActionUse(entityId: string): void {
+  const entity = assertEntity(entityId)
+  assertAlive(entityId, entity)
+  if (gs.getState().phase === 'combat') {
+    assertCurrentTurn(entityId)
+    assertInInitiative(entityId)
+    if (gs.hasBonusActionUsed(entityId)) {
+      throw new RuleViolation('BONUS_ACTION_ALREADY_USED', `${entityId} has already used their bonus action this turn.`, {
+        entityId,
+        currentTurn: gs.getState().currentTurn,
+      })
+    }
   }
 }
 

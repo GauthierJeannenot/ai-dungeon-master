@@ -17,6 +17,9 @@ export interface StoredGameSession {
   // Module d'aventure de la partie. undefined pour les sessions antérieures à
   // ce champ → traitées comme le module par défaut (Grammy's) par la route.
   adventureId?: string
+  // Personnage de la partie. undefined pour les sessions antérieures à ce champ
+  // → traitées comme le guerrier par défaut par la route.
+  characterId?: string
   gameState: GameState
   history: ConversationTurn[]
   summaryContext?: string
@@ -63,6 +66,7 @@ interface GameSessionRow {
   schema_version: number
   owner_id: string | null
   adventure_id: string | null
+  character_id: string | null
   game_state: GameState
   history: ConversationTurn[]
   summary_context: string | null
@@ -92,6 +96,7 @@ export async function loadSession(sessionId: string | undefined): Promise<Stored
     sessionId: row.session_id,
     ownerId: row.owner_id ?? undefined,
     adventureId: row.adventure_id ?? undefined,
+    characterId: row.character_id ?? undefined,
     gameState: row.game_state,
     history: Array.isArray(row.history) ? row.history : [],
     summaryContext: row.summary_context ?? undefined,
@@ -120,16 +125,18 @@ export async function saveSession(
   }
 
   const safeId = safeSessionId(sessionId)
-  // owner_id/adventure_id : COALESCE pour ne jamais écraser une valeur existante
-  // par un null (une sauvegarde sans owner ne doit pas orpheliner la partie).
+  // owner_id/adventure_id/character_id : COALESCE pour ne jamais écraser une
+  // valeur existante par un null (une sauvegarde sans l'un ne doit pas
+  // orpheliner ni « débrancher » la partie de son aventure/personnage).
   await dbQuery(
     `INSERT INTO game_sessions
-       (session_id, schema_version, owner_id, adventure_id, game_state, history, summary_context, turn_traces, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now())
+       (session_id, schema_version, owner_id, adventure_id, character_id, game_state, history, summary_context, turn_traces, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, now())
      ON CONFLICT (session_id) DO UPDATE SET
        schema_version = EXCLUDED.schema_version,
        owner_id = COALESCE(EXCLUDED.owner_id, game_sessions.owner_id),
        adventure_id = COALESCE(EXCLUDED.adventure_id, game_sessions.adventure_id),
+       character_id = COALESCE(EXCLUDED.character_id, game_sessions.character_id),
        game_state = EXCLUDED.game_state,
        history = EXCLUDED.history,
        summary_context = EXCLUDED.summary_context,
@@ -140,6 +147,7 @@ export async function saveSession(
       SESSION_SCHEMA_VERSION,
       data.ownerId ?? null,
       data.adventureId ?? null,
+      data.characterId ?? null,
       JSON.stringify(data.gameState),
       JSON.stringify(data.history ?? []),
       data.summaryContext ?? null,

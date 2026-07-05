@@ -361,14 +361,10 @@ export const FEY_SHADOW_FAIR_MAP: AdventureMapData = {
   mapQuests: FEY_SHADOW_FAIR_MAP_QUESTS,
   mapTransitions: FEY_SHADOW_FAIR_MAP_TRANSITIONS,
   startCell: FEY_SHADOW_FAIR_START_CELL,
-  // Héros niveau 3 (suite de la Crypte des Marées) : 36 PV, deux potions.
+  // Niveau 3 (guerrier N3 = 36 PV). Kit de classe + objets propres au module.
   initialPlayer: {
     level: 3,
-    hp: { current: 36, max: 36 },
-    inventory: [
-      { id: 'longsword', name: 'Épée longue', type: 'weapon', damage: '1d8+3', description: 'Épée longue +3 STR' },
-      { id: 'shield', name: 'Bouclier', type: 'armor', acBonus: 2, description: 'Bouclier standard' },
-      { id: 'potion1', name: 'Potion de soin', type: 'potion', description: 'Restaure 2d4+2 HP' },
+    extraInventory: [
       { id: 'potion2', name: 'Potion de soin', type: 'potion', description: 'Restaure 2d4+2 HP' },
       { id: 'cracked_mirror', name: 'Miroir de poche fêlé', type: 'misc', description: "Reflète tout… sauf l'ombre du héros, évidemment. Les chiens-clins l'adorent." },
     ],

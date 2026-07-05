@@ -3,25 +3,59 @@ import { z } from 'zod'
 import { rollDice, getAbilityModifier, d20WithModifier } from '../dice'
 import * as gs from '../game-state'
 import * as rules from '../rules'
-import { EntityStats, AttackResult, SavingThrowResult, AbilityCheckResult, Condition } from '../../lib/types'
+import { EntityStats, AttackResult, SavingThrowResult, AbilityCheckResult, Condition, PlayerState, MonsterState } from '../../lib/types'
+import { getWeapon, resolveWeapon, attackAbilityFor } from '../../lib/srd/weapons'
+import { resolveSpell, type SpellSpec } from '../../lib/srd/spells'
+import { getSkill } from '../../lib/srd/skills'
 
-// Weapon damage dice by weapon name (D&D 5e)
-const WEAPON_DAMAGE: Record<string, string> = {
-  longsword: '1d8',
-  shortsword: '1d6',
-  dagger: '1d4',
-  greataxe: '1d12',
-  greatsword: '2d6',
-  handaxe: '1d6',
-  rapier: '1d8',
-  mace: '1d6',
-  quarterstaff: '1d6',
-  unarmed: '1d4',
-}
-
+// Dé de dégâts d'une arme (source de vérité : lib/srd/weapons.ts). Repli '1d6'
+// pour un nom d'arme inconnu du registre (comportement historique conservé).
 function getWeaponDamage(weaponOrSpell: string): string {
   const key = weaponOrSpell.toLowerCase().replace(/\s+/g, '')
-  return WEAPON_DAMAGE[key] ?? '1d6'
+  return getWeapon(key)?.damageDie ?? '1d6'
+}
+
+// Notation de dégâts avec modificateur d'aptitude correctement formaté :
+// « 1d8+3 », « 1d6-1 » ou « 1d4 » (mod nul). Évite le « 1d6+-1 » invalide
+// (possible depuis que l'aptitude d'attaque peut être négative — magicien).
+function withDamageMod(die: string, mod: number): string {
+  if (mod === 0) return die
+  return mod > 0 ? `${die}+${mod}` : `${die}${mod}`
+}
+
+// Attaque sournoise (roublard) : appliquée AUTOMATIQUEMENT — jamais un paramètre
+// LLM. Conditions VÉRIFIABLES (docs/playable-characters.md) : l'attaquant a
+// `sneak_attack`, l'arme est finesse/distance, et le joueur est invisible OU une
+// créature non hostile est au contact de la cible. Dés : ⌈niveau/2⌉ d6 (SRD).
+function computeSneakAttack(
+  player: PlayerState,
+  target: PlayerState | MonsterState,
+  weaponName: string
+): { dice: string; viaInvisibility: boolean; reason: string } | null {
+  if (!player.features?.includes('sneak_attack')) return null
+  const weapon = resolveWeapon(weaponName)
+  const usable = weapon.properties.includes('finesse') || weapon.properties.includes('ranged')
+  if (!usable) return null
+
+  const invisible = player.conditions.includes('invisible')
+  const allyAtContact = hasNonHostileAtContact(target)
+  if (!invisible && !allyAtContact) return null
+
+  const diceCount = Math.max(1, Math.ceil(player.level / 2))
+  return {
+    dice: `${diceCount}d6`,
+    viaInvisibility: invisible,
+    reason: invisible ? 'attaque furtive (invisible)' : 'attaque en tenaille (allié au contact)',
+  }
+}
+
+function hasNonHostileAtContact(target: PlayerState | MonsterState): boolean {
+  const state = gs.getState()
+  const near = (pos: { x: number; y: number }) =>
+    Math.max(Math.abs(pos.x - target.position.x), Math.abs(pos.y - target.position.y)) <= 1
+  const monsterAlly = Object.values(state.monsters).some(m => m.hostile === false && m.isAlive && m.id !== target.id && near(m.position))
+  const npcAlly = Object.values(state.npcs ?? {}).some(n => n.visible && n.disposition !== 'hostile' && near(n.position))
+  return monsterAlly || npcAlly
 }
 
 function doubleDiceNotation(notation: string): string {
@@ -149,9 +183,15 @@ export function resolveAttack(
     return rules.ruleErrorResult(err)
   }
 
-  const strMod = getAbilityModifier(attacker.stats.str)
+  // Aptitude d'attaque du JOUEUR dérivée de l'arme (distance→DEX, finesse→
+  // meilleure de FOR/DEX, sinon FOR). Les monstres gardent leur attackBonus.
+  const isPlayerAttacker = attackerId === 'player'
+  const attackAbilityKey = isPlayerAttacker
+    ? attackAbilityFor(resolveWeapon(weaponOrSpell), attacker.stats)
+    : 'str'
+  const abilityMod = getAbilityModifier(attacker.stats[attackAbilityKey])
   const profBonus = 'proficiencyBonus' in attacker ? attacker.proficiencyBonus : 2
-  const attackBonus = 'attackBonus' in attacker ? attacker.attackBonus : (strMod + profBonus)
+  const attackBonus = 'attackBonus' in attacker ? attacker.attackBonus : (abilityMod + profBonus)
   const targetDistance = distanceCells(attacker.position, target.position)
   const unconsciousMeleeTarget = target.conditions.includes('unconscious') && targetDistance <= 1
   const effectiveAdvantage = Boolean(advantage || unconsciousMeleeTarget)
@@ -182,11 +222,26 @@ export function resolveAttack(
   let targetDied = false
   let targetStatusDetail = ''
 
+  let sneakDetail = ''
   if (hit) {
-    const strModDamage = getAbilityModifier(attacker.stats.str)
-    const baseDamage = customDamageDice ?? ('damageDice' in attacker ? attacker.damageDice : `${getWeaponDamage(weaponOrSpell)}+${strModDamage}`)
+    const abilityModDamage = getAbilityModifier(attacker.stats[attackAbilityKey])
+    const baseDamage = customDamageDice ?? ('damageDice' in attacker ? attacker.damageDice : withDamageMod(getWeaponDamage(weaponOrSpell), abilityModDamage))
     damageRoll = rollDice(criticalHit ? doubleDiceNotation(baseDamage) : baseDamage)
-    damageDealt = Math.max(1, damageRoll.total)
+    let totalDamage = damageRoll.total
+
+    // Attaque sournoise du joueur (roublard) : conditions vérifiées par le
+    // moteur, jamais déclarées par le LLM. La condition invisible est consommée.
+    if (isPlayerAttacker && 'features' in attacker) {
+      const sneak = computeSneakAttack(attacker, target, weaponOrSpell)
+      if (sneak) {
+        const sneakRoll = rollDice(criticalHit ? doubleDiceNotation(sneak.dice) : sneak.dice)
+        totalDamage += sneakRoll.total
+        sneakDetail = ` | Sournoise ${sneak.dice}: ${sneakRoll.detail} (${sneak.reason})`
+        if (sneak.viaInvisibility) gs.removeCondition('player', 'invisible')
+      }
+    }
+
+    damageDealt = Math.max(1, totalDamage)
 
     if (targetId === 'player') {
       const playerWasDying = target.hp.current <= 0
@@ -210,7 +265,7 @@ export function resolveAttack(
   }
 
   const mechanicalSummary = hit
-    ? `Attaque: ${attackRoll.detail} vs CA ${targetAC} -> ${criticalHit ? 'CRITIQUE' : 'TOUCHE'} | Degats: ${damageRoll!.detail}${targetStatusDetail}`
+    ? `Attaque: ${attackRoll.detail} vs CA ${targetAC} -> ${criticalHit ? 'CRITIQUE' : 'TOUCHE'} | Degats: ${damageRoll!.detail}${sneakDetail}${targetStatusDetail}`
     : `Attaque: ${attackRoll.detail} vs CA ${targetAC} -> ${criticalMiss ? 'ECHEC CRITIQUE' : 'RATE'}`
 
   const result: AttackResult = {
@@ -268,6 +323,236 @@ export function resolvePlayerAttack({
   } catch (err) {
     return rules.ruleErrorResult(err)
   }
+}
+
+// ── SORTS (cast_spell) ────────────────────────────────────────────────────────
+// Le moteur juge le COÛT (sort connu, tour/action, portée, emplacement) et
+// résout l'effet fermé. Le LLM ne fait que narrer le résultat. Un sort coûte
+// l'ACTION ; les tours de magie (niveau 0) ne consomment pas d'emplacement.
+
+export interface CastSpellInput {
+  spellId?: string
+  spellName?: string
+  targetId?: string
+  targetName?: string
+}
+
+function spellcastingMod(player: PlayerState): number {
+  const ability = player.spellcastingAbility ?? 'int'
+  return getAbilityModifier(player.stats[ability])
+}
+
+// Remplace le marqueur MOD d'une notation de soin par le mod d'incantation.
+function resolveHealNotation(amount: string, mod: number): string {
+  if (!amount.includes('MOD')) return amount
+  const die = amount.split('+MOD')[0]
+  return withDamageMod(die, mod)
+}
+
+export function resolveCastSpell({ spellId, spellName, targetId, targetName }: CastSpellInput) {
+  const player = gs.getPlayer()
+  const spell = resolveSpell(spellId ?? spellName)
+
+  if (!spell) {
+    return rules.ruleErrorResult(new rules.RuleViolation('SPELL_UNKNOWN', `Unknown spell: "${spellId ?? spellName ?? ''}".`, { spellId, spellName }))
+  }
+  if (!player.knownSpells?.includes(spell.id)) {
+    return rules.ruleErrorResult(new rules.RuleViolation('SPELL_NOT_KNOWN', `The player does not know ${spell.label}.`, { spellId: spell.id, known: player.knownSpells ?? [] }))
+  }
+
+  // Économie d'action : un sort coûte l'action (vérification seule ici).
+  try {
+    rules.validateActionUse('player')
+  } catch (err) {
+    return rules.ruleErrorResult(err)
+  }
+
+  // Cible (pour les sorts ciblés) et portée.
+  let target: PlayerState | MonsterState | undefined
+  const needsEnemy = spell.effect.kind === 'attack_roll' || spell.effect.kind === 'save' || spell.effect.kind === 'auto_hit' || spell.effect.kind === 'condition'
+  if (needsEnemy) {
+    try {
+      const resolvedTargetId = selectPlayerTarget(targetId, targetName, 'nearest')
+      target = gs.getMonster(resolvedTargetId)
+    } catch (err) {
+      return rules.ruleErrorResult(err)
+    }
+    if (!target) {
+      return rules.ruleErrorResult(new rules.RuleViolation('TARGET_NOT_FOUND', 'No valid target for this spell.', { targetId, targetName }))
+    }
+    const distance = rules.distanceCells(player.position, target.position)
+    if (distance > spell.rangeCells) {
+      return rules.ruleErrorResult(new rules.RuleViolation('TARGET_OUT_OF_RANGE', `${target.name} is ${distance} cells away; ${spell.label} range is ${spell.rangeCells} cells.`, { distance, rangeCells: spell.rangeCells }))
+    }
+  }
+
+  // Emplacement disponible pour les sorts de niveau ≥ 1 (tours de magie exemptés).
+  if (spell.level >= 1 && (!player.spellSlots || player.spellSlots.level1.current <= 0)) {
+    return rules.ruleErrorResult(new rules.RuleViolation('SPELL_SLOTS_EXHAUSTED', `No level-1 spell slot remaining for ${spell.label}.`, { spellId: spell.id }))
+  }
+
+  // ── COMMIT : à partir d'ici, on débite et on résout ──────────────────────────
+  if (spell.level >= 1) gs.consumeSpellSlot(1)
+  if (gs.getState().phase === 'combat' && gs.getState().currentTurn === 'player') {
+    rules.recordAction('player')
+  }
+
+  const result = applySpellEffect(spell, player, target)
+  gs.addLogEntry({
+    round: gs.getState().round,
+    turn: gs.getState().currentTurn ?? 'player',
+    action: `${player.name} lance ${spell.label}`,
+    mechanicalDetail: result.mechanicalSummary,
+  })
+
+  return { content: [{ type: 'text' as const, text: JSON.stringify(result) }] }
+}
+
+function applySpellEffect(spell: SpellSpec, player: PlayerState, target: PlayerState | MonsterState | undefined) {
+  const mod = spellcastingMod(player)
+  const effect = spell.effect
+
+  switch (effect.kind) {
+    case 'attack_roll': {
+      const attackBonus = mod + player.proficiencyBonus
+      const roll = rollDice(d20WithModifier(attackBonus))
+      const natural = roll.rolls[0]
+      const critMiss = natural === 1
+      const critHit = natural === 20
+      const hit = critHit || (!critMiss && roll.total >= (target?.ac ?? 0))
+      let damageRoll
+      let targetHpAfter
+      let targetDied = false
+      if (hit && target) {
+        damageRoll = rollDice(critHit ? doubleDiceNotation(effect.damage) : effect.damage)
+        const updated = gs.updateMonsterHP(target.id, -Math.max(1, damageRoll.total))
+        targetHpAfter = updated.hp.current
+        targetDied = !updated.isAlive
+      }
+      const summary = hit
+        ? `${spell.label}: ${roll.detail} vs CA ${target?.ac} -> ${critHit ? 'CRITIQUE' : 'TOUCHE'} | Degats: ${damageRoll!.detail}${targetDied ? ' | MORT' : ''}`
+        : `${spell.label}: ${roll.detail} vs CA ${target?.ac} -> ${critMiss ? 'ECHEC CRITIQUE' : 'RATE'}`
+      return { spell: spell.id, effect: 'attack_roll', hit, roll, damageRoll, targetId: target?.id, targetHpAfter, targetDied, mechanicalSummary: summary }
+    }
+    case 'auto_hit': {
+      const damageRoll = rollDice(effect.damage)
+      let targetHpAfter
+      let targetDied = false
+      if (target) {
+        const updated = gs.updateMonsterHP(target.id, -Math.max(1, damageRoll.total))
+        targetHpAfter = updated.hp.current
+        targetDied = !updated.isAlive
+      }
+      const summary = `${spell.label}: touche automatique | Degats: ${damageRoll.detail}${targetDied ? ' | MORT' : ''}`
+      return { spell: spell.id, effect: 'auto_hit', hit: true, damageRoll, targetId: target?.id, targetHpAfter, targetDied, mechanicalSummary: summary }
+    }
+    case 'save': {
+      const dc = 8 + player.proficiencyBonus + mod
+      const saveMod = target ? getAbilityModifier(target.stats[effect.ability]) : 0
+      const roll = rollDice(d20WithModifier(saveMod))
+      const saved = roll.total >= dc
+      const fullRoll = rollDice(effect.damage)
+      const damageDealt = saved ? (effect.halfOnSave ? Math.floor(fullRoll.total / 2) : 0) : fullRoll.total
+      let targetHpAfter
+      let targetDied = false
+      if (target && damageDealt > 0) {
+        const updated = gs.updateMonsterHP(target.id, -damageDealt)
+        targetHpAfter = updated.hp.current
+        targetDied = !updated.isAlive
+      }
+      const summary = `${spell.label}: JS ${effect.ability.toUpperCase()} ${roll.detail} vs DD ${dc} -> ${saved ? 'REUSSI' : 'RATE'} | Degats: ${damageDealt} (${fullRoll.detail})${targetDied ? ' | MORT' : ''}`
+      return { spell: spell.id, effect: 'save', saved, dc, roll, damageDealt, targetId: target?.id, targetHpAfter, targetDied, mechanicalSummary: summary }
+    }
+    case 'condition': {
+      const dc = 8 + player.proficiencyBonus + mod
+      const saveMod = target ? getAbilityModifier(target.stats[effect.ability]) : 0
+      const roll = rollDice(d20WithModifier(saveMod))
+      const saved = roll.total >= dc
+      if (target && !saved) gs.applyCondition(target.id, effect.condition)
+      const summary = `${spell.label}: JS ${effect.ability.toUpperCase()} ${roll.detail} vs DD ${dc} -> ${saved ? 'REUSSI (aucun effet)' : `RATE (${effect.condition})`}`
+      return { spell: spell.id, effect: 'condition', saved, dc, roll, condition: effect.condition, targetId: target?.id, mechanicalSummary: summary }
+    }
+    case 'heal': {
+      const healRoll = rollDice(resolveHealNotation(effect.amount, mod))
+      const before = player.hp.current
+      const updated = gs.updatePlayerHP(healRoll.total)
+      const summary = `${spell.label}: soin ${healRoll.detail} | PV ${before}/${updated.hp.max} -> ${updated.hp.current}/${updated.hp.max}`
+      return { spell: spell.id, effect: 'heal', healRoll, hpBefore: before, hpAfter: updated.hp.current, mechanicalSummary: summary }
+    }
+    case 'utility': {
+      let fact
+      if (effect.fact) {
+        const state = gs.getState()
+        fact = gs.addWorldFact({
+          text: effect.fact.text,
+          source: `cast_spell:${spell.id}`,
+          mapId: state.currentMapId ?? '',
+          roomId: effect.fact.expires === 'room' ? (state.currentRoomId ?? undefined) : undefined,
+          expires: effect.fact.expires,
+        })
+      }
+      const summary = `${spell.label}: effet utilitaire — ${effect.srdNote}`
+      return { spell: spell.id, effect: 'utility', srdNote: effect.srdNote, worldFact: fact, mechanicalSummary: summary }
+    }
+  }
+}
+
+// ── CAPACITÉS DE CLASSE (use_class_feature) ─────────────────────────────────────
+
+export interface UseClassFeatureInput {
+  featureId: 'second_wind' | 'cunning_action'
+  option?: 'dash' | 'hide'
+}
+
+export function resolveUseClassFeature({ featureId, option }: UseClassFeatureInput) {
+  const player = gs.getPlayer()
+  if (!player.features?.includes(featureId)) {
+    return rules.ruleErrorResult(new rules.RuleViolation('FEATURE_NOT_AVAILABLE', `The player does not have the ${featureId} feature.`, { featureId, features: player.features ?? [] }))
+  }
+
+  // Économie d'action bonus (second souffle, Ruse coûtent l'action bonus).
+  try {
+    rules.validateBonusActionUse('player')
+  } catch (err) {
+    return rules.ruleErrorResult(err)
+  }
+
+  if (featureId === 'second_wind') {
+    if (!gs.consumeResource('second_wind')) {
+      return rules.ruleErrorResult(new rules.RuleViolation('RESOURCE_EXHAUSTED', 'Second Wind has already been used (recharges when changing map).', {}))
+    }
+    const healRoll = rollDice(`1d10+${player.level}`)
+    const before = player.hp.current
+    const updated = gs.updatePlayerHP(healRoll.total)
+    gs.markBonusActionUsed('player')
+    const summary = `Second souffle: ${healRoll.detail} | PV ${before}/${updated.hp.max} -> ${updated.hp.current}/${updated.hp.max}`
+    gs.addLogEntry({ round: gs.getState().round, turn: gs.getState().currentTurn ?? 'player', action: `${player.name} — Second souffle`, mechanicalDetail: summary })
+    return { content: [{ type: 'text' as const, text: JSON.stringify({ feature: 'second_wind', healRoll, hpBefore: before, hpAfter: updated.hp.current, mechanicalSummary: summary }) }] }
+  }
+
+  // cunning_action
+  const chosen = option ?? 'dash'
+  if (chosen === 'dash') {
+    gs.markDashUsed('player')
+    gs.markBonusActionUsed('player')
+    const summary = 'Ruse: Sprint — budget de mouvement doublé ce tour'
+    gs.addLogEntry({ round: gs.getState().round, turn: gs.getState().currentTurn ?? 'player', action: `${player.name} — Ruse (Sprint)`, mechanicalDetail: summary })
+    return { content: [{ type: 'text' as const, text: JSON.stringify({ feature: 'cunning_action', option: 'dash', mechanicalSummary: summary }) }] }
+  }
+
+  // hide : jet de Discrétion (DEX) avec maîtrise/expertise du personnage, DD 12 fixe.
+  const abilityMod = getAbilityModifier(player.stats.dex)
+  const hasProf = player.skillProficiencies?.includes('stealth')
+  const hasExpertise = player.expertise?.includes('stealth')
+  const profBonus = hasExpertise ? player.proficiencyBonus * 2 : hasProf ? player.proficiencyBonus : 0
+  const roll = rollDice(d20WithModifier(abilityMod + profBonus))
+  const dc = 12
+  const success = roll.total >= dc
+  if (success) gs.applyCondition('player', 'invisible')
+  gs.markBonusActionUsed('player')
+  const summary = `Ruse: Discretion ${roll.detail} vs DD ${dc} -> ${success ? 'CACHE (invisible)' : 'RATE'}`
+  gs.addLogEntry({ round: gs.getState().round, turn: gs.getState().currentTurn ?? 'player', action: `${player.name} — Ruse (se cacher)`, mechanicalDetail: summary })
+  return { content: [{ type: 'text' as const, text: JSON.stringify({ feature: 'cunning_action', option: 'hide', roll, dc, success, mechanicalSummary: summary }) }] }
 }
 
 // ── TOURS DES MONSTRES (résolution déterministe en un seul appel) ─────────────────
@@ -441,6 +726,32 @@ export function registerCombatTools(server: McpServer): void {
     }
   )
 
+  server.tool(
+    'cast_spell',
+    'Casts one of the player known spells. The engine validates that the spell is known, that it is the player turn with an action available, that the target is in range, and that a spell slot remains (level-1 spells). It resolves the closed effect (attack roll, saving throw, auto-hit, heal, or utility). Utility spells (create water, light) have no dice: the engine debits the cost and you narrate within the returned srdNote. Never narrate a spell effect before calling this.',
+    {
+      spellId: z.string().optional().describe('Exact spell id (e.g. "magic-missile", "cure-wounds") if known.'),
+      spellName: z.string().optional().describe('Natural-language spell name from the player (e.g. "projectile magique"). Prefer this when the player names a spell.'),
+      targetId: z.string().optional().describe('Exact monster ID for a targeted spell.'),
+      targetName: z.string().optional().describe('Natural-language monster name for a targeted spell.'),
+    },
+    async ({ spellId, spellName, targetId, targetName }) => {
+      return resolveCastSpell({ spellId, spellName, targetId, targetName })
+    }
+  )
+
+  server.tool(
+    'use_class_feature',
+    'Uses a player class feature that costs the bonus action: "second_wind" (Fighter — heals 1d10+level, once per map), or "cunning_action" (Rogue — option "dash" doubles this turn movement, option "hide" rolls Stealth DC 12 to become hidden/invisible). The engine validates the feature is available and the bonus action is free. Never narrate the effect before calling this.',
+    {
+      featureId: z.enum(['second_wind', 'cunning_action']).describe('The class feature to use.'),
+      option: z.enum(['dash', 'hide']).optional().describe('For cunning_action only: "dash" (double movement) or "hide" (Stealth to hide). Defaults to "dash".'),
+    },
+    async ({ featureId, option }) => {
+      return resolveUseClassFeature({ featureId, option })
+    }
+  )
+
   // Resolves EVERY consecutive monster turn in a single call (move + attack + advance),
   // collapsing what used to be many round-trips into one tool call + one narration.
   server.tool(
@@ -521,11 +832,12 @@ export function registerCombatTools(server: McpServer): void {
       entityId: z.string().optional().describe('Entity making the check; defaults to player.'),
       ability: z.enum(['str', 'dex', 'con', 'int', 'wis', 'cha']).describe('Ability used for the check.'),
       dc: z.number().int().optional().describe('Optional Difficulty Class to determine success.'),
-      proficient: z.boolean().optional().describe('Whether to add proficiency bonus. Defaults false.'),
-      expertise: z.boolean().optional().describe('Whether to add double proficiency bonus. Defaults false.'),
+      skill: z.string().optional().describe('Canonical skill id (e.g. "stealth", "persuasion", "perception"). When given for the player, the engine derives proficiency/expertise from the character sheet and IGNORES the proficient/expertise flags (anti-cheat).'),
+      proficient: z.boolean().optional().describe('Whether to add proficiency bonus. Defaults false. Ignored when a known skill is given for the player.'),
+      expertise: z.boolean().optional().describe('Whether to add double proficiency bonus. Defaults false. Ignored when a known skill is given for the player.'),
       label: z.string().optional().describe('Short label such as Persuasion, Intimidation, Athletics, or Perception.'),
     },
-    async ({ entityId, ability, dc, proficient, expertise, label }) => {
+    async ({ entityId, ability, dc, skill, proficient, expertise, label }) => {
       const resolvedEntityId = entityId ?? 'player'
       const entity = gs.getEntity(resolvedEntityId)
       if (!entity) {
@@ -539,22 +851,38 @@ export function registerCombatTools(server: McpServer): void {
         return rules.ruleErrorResult(err)
       }
 
-      const abilityMod = getAbilityModifier(entity.stats[ability as keyof EntityStats])
+      // Maîtrise décidée par le MOTEUR si un skill canonique est fourni pour le
+      // joueur : on dérive de la fiche et on ignore les flags déclarés (anti-triche).
+      // Sinon comportement historique (flags proficient/expertise).
+      let effAbility = ability as keyof EntityStats
+      let isProficient = Boolean(proficient)
+      let isExpertise = Boolean(expertise)
+      let resolvedLabel = label
+      const skillSpec = skill ? getSkill(skill) : undefined
+      if (skillSpec && 'skillProficiencies' in entity) {
+        const player = entity as PlayerState
+        effAbility = skillSpec.ability
+        isProficient = Boolean(player.skillProficiencies?.includes(skillSpec.id))
+        isExpertise = Boolean(player.expertise?.includes(skillSpec.id))
+        resolvedLabel = resolvedLabel ?? skillSpec.label
+      }
+
+      const abilityMod = getAbilityModifier(entity.stats[effAbility])
       const proficiencyBonus = 'proficiencyBonus' in entity ? entity.proficiencyBonus : 2
-      const proficiencyMod = expertise ? proficiencyBonus * 2 : proficient ? proficiencyBonus : 0
+      const proficiencyMod = isExpertise ? proficiencyBonus * 2 : isProficient ? proficiencyBonus : 0
       const totalMod = abilityMod + proficiencyMod
       const roll = rollDice(d20WithModifier(totalMod))
       const success = typeof dc === 'number' ? roll.total >= dc : undefined
-      const checkLabel = label?.trim() || `Test ${ability.toUpperCase()}`
+      const checkLabel = resolvedLabel?.trim() || `Test ${effAbility.toUpperCase()}`
       const mechanicalSummary = `${checkLabel}: ${roll.detail}${typeof dc === 'number' ? ` vs DD ${dc} -> ${success ? 'SUCCES' : 'ECHEC'}` : ''}`
 
       const result: AbilityCheckResult = {
         entityId: resolvedEntityId,
-        ability: ability as keyof EntityStats,
+        ability: effAbility,
         label: checkLabel,
         dc,
-        proficient: Boolean(proficient),
-        expertise: Boolean(expertise),
+        proficient: isProficient,
+        expertise: isExpertise,
         roll,
         success,
         mechanicalSummary,

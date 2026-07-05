@@ -33,6 +33,11 @@ export type Condition =
   | 'unconscious'
   | 'exhaustion'
 
+// Capacités de classe appliquées par le moteur (miroir du type de
+// lib/character-registry.ts, redéclaré ici pour éviter une dépendance de types
+// depuis mcp-server vers le registre). Liste fermée.
+export type ClassFeatureId = 'second_wind' | 'sneak_attack' | 'cunning_action' | 'spellcasting'
+
 export interface PlayerState {
   id: 'player'
   name: string
@@ -48,6 +53,18 @@ export interface PlayerState {
   inventory: Item[]
   speed: number         // feet per turn
   initiative?: number
+  // ── Personnage jouable (docs/playable-characters.md) ──────────────────────
+  // Tous OPTIONNELS : les états legacy (guerrier sans ces champs) restent
+  // lisibles et se comportent comme aujourd'hui (aucune capacité, attaques FOR).
+  characterId?: string                                  // slug du catalogue (défaut : fighter)
+  savingThrowProficiencies?: Array<keyof EntityStats>
+  skillProficiencies?: string[]                         // ids canoniques (lib/srd/skills)
+  expertise?: string[]                                  // compétences à double maîtrise
+  features?: ClassFeatureId[]
+  spellSlots?: { level1: { current: number; max: number } }
+  knownSpells?: string[]                                // cantrips + niveau 1 confondus (ids)
+  spellcastingAbility?: keyof EntityStats               // int (magicien), wis (clerc)
+  resources?: Record<string, { current: number; max: number }>  // ex. { second_wind: {…} }
 }
 
 export interface MonsterState {
@@ -223,11 +240,28 @@ export interface MapOutcome {
   objectivesDone: string[]          // ids des MapObjective remplis au départ
 }
 
+// Fait de monde établi mécaniquement (v1 : uniquement par cast_spell utility).
+// Champ DÉDIÉ et volontairement maigre : ne PAS ressusciter world.fictionFacts
+// (le moteur « world » a été retiré ; fictionFacts est typé mais rien ne le
+// produit — AGENTS.md). Porté par l'état, donc immunisé contre la compression
+// d'historique par construction. Voir docs/playable-characters.md.
+export interface WorldFact {
+  id: string
+  text: string                   // injectable tel quel dans le prompt dynamique
+  source: string                 // ex. 'cast_spell:create-water'
+  mapId: string
+  roomId?: string                // requis si expires === 'room'
+  expires: 'room' | 'map' | 'never'
+}
+
 export interface GameState {
   // Module d'aventure de la partie. Fixé à la création (défaut : module par
   // défaut) et préservé au round-trip replace_game_state. Le moteur MCP le
   // reçoit aussi via ADVENTURE_ID au spawn du process (mcp-server/adventure.ts).
   adventureId?: string
+  // Personnage jouable de la partie. Miroir d'adventureId : figé à la création,
+  // reçu via CHARACTER_ID au spawn, préservé au round-trip. Absent = guerrier.
+  characterId?: string
   phase: GamePhase
   player: PlayerState
   monsters: Record<string, MonsterState>   // serializable (no Map)
@@ -237,6 +271,8 @@ export interface GameState {
   round: number
   movementUsed: Record<string, number>  // grid cells spent by entity during its current turn
   actionUsed: Record<string, boolean>   // action economy consumed by entity during its current turn
+  bonusActionUsed?: Record<string, boolean>  // action bonus consommée (second souffle, ruse) — absent = legacy
+  dashUsed?: Record<string, boolean>    // Ruse:dash actif ce tour (double le budget de mouvement)
   combatLog: CombatLogEntry[]
   roomsVisited: string[]
   currentRoomId: string | null
@@ -247,6 +283,10 @@ export interface GameState {
   // ne peut plus être re-visitée. Préservé au round-trip replace_game_state.
   mapOutcomes?: Record<string, MapOutcome>
   encountersTriggered?: string[]
+  // Faits de monde produits par le moteur (sorts utilitaires). Injectés au
+  // prompt dynamique tant qu'ils vivent ; purgés par le moteur (sortie de salle,
+  // changement de carte, plafond FIFO). Absent = legacy/aucun.
+  worldFacts?: WorldFact[]
   sceneMemory?: SceneMemory
   world?: WorldState
 }
@@ -537,6 +577,9 @@ export interface DMRequest {
   // Module d'aventure choisi (nouvelle session). Ignoré si la session existe
   // déjà — l'aventure de la session fait foi (mismatch → 409).
   adventureId?: string
+  // Personnage choisi (nouvelle session). Miroir d'adventureId : ignoré si la
+  // session existe déjà — le personnage de la session fait foi (mismatch → 409).
+  characterId?: string
   gameState?: GameState
   // Historique récent gardé verbatim (derniers N messages player/dm)
   history?: ConversationTurn[]

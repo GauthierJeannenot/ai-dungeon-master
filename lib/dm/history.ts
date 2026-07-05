@@ -19,7 +19,7 @@ async function compressHistory(
   context: LlmCallContext
 ): Promise<string> {
   const transcript = oldTurns.map(turn => `${turn.role === 'player' ? 'Joueur' : 'MJ'}: ${turn.content}`).join('\n')
-  const prompt = `Résume en un court paragraphe (français) les événements clés de cette partie de D&D, en conservant les faits importants (lieux visités, PNJ rencontrés, objets obtenus, quêtes en cours, conséquences). Sois factuel et concis.
+  const prompt = `Résume en un court paragraphe (français) les événements clés de cette partie de D&D, en conservant les faits importants (lieux visités, PNJ rencontrés, objets obtenus, quêtes en cours, conséquences, et tout FAIT DURABLE établi dans la fiction — par exemple un élément d'environnement modifié par un sort ou une action). Sois factuel et concis.
 
 ${existingSummary ? `Résumé existant:\n${existingSummary}\n\n` : ''}Échanges à intégrer:\n${transcript}`
 

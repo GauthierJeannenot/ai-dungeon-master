@@ -34,6 +34,52 @@ test('unknown adventureId is a 400 before any work', async () => {
   assert.equal(res.status, 400)
 })
 
+test('unknown characterId is a 400 before any work', async () => {
+  const res = await POST(dmRequest({ message: 'je regarde', sessionId: 'char-unknown', characterId: 'paladin' }))
+  assert.equal(res.status, 400)
+})
+
+test('new session with a chosen character resolves and persists it', async () => {
+  const sessionId = 'char-default'
+  const res = await POST(dmRequest({ message: 'je vais en (5,13)', sessionId, characterId: 'wizard' }))
+  assert.equal(res.status, 200)
+  const data = await res.json()
+  assert.equal(data.newGameState.characterId, 'wizard')
+  assert.equal(data.newGameState.player.class, 'Magicien')
+  await deleteSession(sessionId)
+  await closeMCPClient(sessionId)
+})
+
+test('requesting a different character than the stored session is a 409', async () => {
+  const sessionId = 'char-mismatch'
+  await saveSession(sessionId, {
+    gameState: {
+      adventureId: 'grammys-country-apple-pie',
+      characterId: 'wizard',
+      phase: 'exploration',
+      player: {
+        id: 'player', name: 'Aldric', class: 'Magicien', level: 1,
+        hp: { current: 12, max: 12 }, ac: 12,
+        stats: { str: 8, dex: 14, con: 12, int: 16, wis: 12, cha: 10 },
+        proficiencyBonus: 2, position: { x: 4, y: 13 }, conditions: [], speed: 30, inventory: [],
+      },
+      monsters: {}, initiativeOrder: [], currentTurn: null, round: 0,
+      movementUsed: {}, actionUsed: {}, combatLog: [], roomsVisited: ['1'], currentRoomId: '1',
+    },
+    history: [],
+    summaryContext: undefined,
+    turnTraces: [],
+    adventureId: 'grammys-country-apple-pie',
+    characterId: 'wizard',
+  })
+
+  const res = await POST(dmRequest({ message: 'je regarde', sessionId, characterId: 'rogue' }))
+  assert.equal(res.status, 409)
+
+  await deleteSession(sessionId)
+  await closeMCPClient(sessionId)
+})
+
 test('new session with default adventure resolves to Grammy and plays', async () => {
   const sessionId = 'adv-default'
   const res = await POST(dmRequest({ message: 'je vais en (5,13)', sessionId }))

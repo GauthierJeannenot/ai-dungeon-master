@@ -10,15 +10,17 @@ docs/multi-adventure-architecture.md et docs/adventure-content-consolidation.md
 
 | Fichier | Rôle | Consommé par |
 |---|---|---|
-| `map.ts` | Données MOTEUR : rooms, entryCells, encounters, npcs, aliases, transitions, roomHooks, startCell, initialPlayer | moteur MCP **et** app (seul fichier compilé par mcp-server) |
-| `definition.ts` | Contenu APP : meta landing, welcomeMessage, chatPlaceholders, roomStatusHints, battlemapImage, grid, `promptGuidance` | app/prompts uniquement — **jamais importé par mcp-server** |
+| `map.ts` | Données MOTEUR : rooms, entryCells, encounters, npcs, aliases, transitions, roomHooks, startCell, `initialPlayer` (= `{ level, extraInventory? }` : le kit/PV viennent du PERSONNAGE) | moteur MCP **et** app (seul fichier compilé par mcp-server) |
+| `definition.ts` | Contenu APP : meta landing, welcomeMessage, chatPlaceholders, roomStatusHints, battlemapImage, grid, `promptGuidance`, `characterHooks` (accroche par personnage) | app/prompts uniquement — **jamais importé par mcp-server** |
 | `adventure-module.md` | Module narratif complet (salles `## Salle N`, annexes) → prompt DM | context-loader |
-| `player-character.md` | Fiche du héros du module | context-loader |
 | `player-rules.md` / `dm-rules.md` | Optionnels — repli sur le module par défaut (règles D&D génériques, repli VOULU) | context-loader |
 
-- `adventure-module.md` et `player-character.md` sont PAR MODULE : un module
-  connu sans son propre fichier = erreur, jamais de repli silencieux sur le
-  contenu d'une autre aventure.
+- La fiche du héros N'EST PLUS par module : elle vit dans
+  `characters/<id>/character-sheet.md` (catalogue GLOBAL, orthogonal aux
+  aventures — voir docs/playable-characters.md). L'accroche narrative propre au
+  couple aventure×personnage vit dans `definition.ts` (`characterHooks`).
+- `adventure-module.md` est PAR MODULE : un module connu sans son propre fichier
+  = erreur, jamais de repli silencieux sur le contenu d'une autre aventure.
 - Le parsing du module exige les en-têtes `## Salle N` (context-loader) : la
   table « Points d'entrée et de déplacement » et les annexes vivent dans
   l'index statique, le détail de la salle courante est injecté dynamiquement.
@@ -35,7 +37,9 @@ Ne les retoucher qu'avec `npm run playtest:mock` avant/après.
 ## Ajouter un module
 
 1. Créer `adventures/<id>/` : `map.ts` (format des modules existants),
-   `definition.ts`, `adventure-module.md`, `player-character.md`.
+   `definition.ts`, `adventure-module.md`. (Pas de player-character.md : la
+   fiche du personnage est globale, `characters/<id>/`.) Optionnel :
+   `definition.characterHooks` pour lier un personnage à l'aventure.
 2. Battlemap dans `public/battlemaps/` + entrée `battlemapImage`.
 3. Enregistrer : import dans `lib/adventure-map.ts` (ADVENTURE_MAPS) et
    `lib/adventures.ts` (ADVENTURES + AVAILABILITY).

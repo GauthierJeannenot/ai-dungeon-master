@@ -179,9 +179,12 @@ for (const adventure of ADVENTURES) {
   })
 
   test(`[${label}] initial player is coherent`, () => {
+    // Le PERSONNAGE apporte PV/kit ; l'aventure ne règle que le niveau + des
+    // objets propres optionnels (docs/playable-characters.md).
     assert.ok(map.initialPlayer.level >= 1, 'niveau du joueur invalide')
-    assert.ok(map.initialPlayer.hp.current > 0 && map.initialPlayer.hp.current <= map.initialPlayer.hp.max, 'PV incohérents')
-    assert.ok(Array.isArray(map.initialPlayer.inventory) && map.initialPlayer.inventory.length > 0, 'inventaire vide')
+    if (map.initialPlayer.extraInventory !== undefined) {
+      assert.ok(Array.isArray(map.initialPlayer.extraInventory), 'extraInventory doit être un tableau')
+    }
   })
 
   test(`[${label}] encounters reference real rooms, real monster types, coherent cells`, () => {

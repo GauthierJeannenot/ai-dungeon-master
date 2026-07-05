@@ -27,6 +27,7 @@ import {
   consumeDailyGlobalBudget,
 } from '@/lib/rate-limit'
 import { DEFAULT_ADVENTURE_ID, isKnownAdventureId } from '@/lib/adventure-map'
+import { DEFAULT_CHARACTER_ID, isKnownCharacterId } from '@/lib/character-registry'
 import { requireAvailableAdventure, getAdventureDefinition } from '@/lib/adventures'
 import {
   MODEL,
@@ -148,6 +149,10 @@ const PRIMARY_ACTION_TOOLS = new Set([
   'roll_ability_check',
   'roll_death_save',
   'use_healing_potion',
+  // Lancer un sort EST l'action majeure du message (comme une attaque). La
+  // capacité de classe (use_class_feature) est une action BONUS : pas ici, elle
+  // peut accompagner une action majeure.
+  'cast_spell',
   'move_token',
   'start_encounter',
   // Quitter une map EST l'action majeure du message (le moteur téléporte le
@@ -213,11 +218,12 @@ function selectToolsForPhase(tools: Anthropic.Tool[], phase: GamePhase): Anthrop
 async function syncGameStateToMcp(
   gameState: GameState | undefined,
   sessionId: string | undefined,
-  adventureId?: string
+  adventureId?: string,
+  characterId?: string
 ): Promise<GameState | undefined> {
   if (gameState) {
     try {
-      return await callMCPTool('replace_game_state', { gameState }, sessionId, adventureId) as GameState
+      return await callMCPTool('replace_game_state', { gameState }, sessionId, adventureId, characterId) as GameState
     } catch (err) {
       // NE JAMAIS retomber sur get_game_state ici : sur un process fraîchement
       // spawné il renverrait l'état INITIAL du module, qui serait ensuite
@@ -229,7 +235,7 @@ async function syncGameStateToMcp(
   }
   // Nouvelle session (aucun état fourni) : l'état initial du moteur est le bon.
   try {
-    return await callMCPTool('get_game_state', {}, sessionId, adventureId) as GameState
+    return await callMCPTool('get_game_state', {}, sessionId, adventureId, characterId) as GameState
   } catch {
     return undefined
   }
@@ -269,6 +275,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // et le mismatch 409 sont vérifiés plus bas, après chargement de la session).
   if (body.adventureId && !isKnownAdventureId(body.adventureId)) {
     return NextResponse.json({ error: `Module d'aventure inconnu : "${body.adventureId}"` }, { status: 400 })
+  }
+  // Idem pour le personnage (miroir d'adventureId) : id fourni mais inconnu → 400.
+  if (body.characterId && !isKnownCharacterId(body.characterId)) {
+    return NextResponse.json({ error: `Personnage inconnu : "${body.characterId}"` }, { status: 400 })
   }
 
   // ── Anti-abus : AVANT tout débit et tout appel LLM ──────────────────────────
@@ -384,6 +394,27 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       }
     }
 
+    // ── Résolution du personnage (miroir exact de l'aventure) ──────────────────
+    // Session existante → le personnage de LA SESSION fait foi (jamais de bascule
+    // en cours de partie : un id différent est un 409). Nouvelle session → l'id du
+    // body, sinon le guerrier par défaut. Colonne stockée en priorité, puis l'id
+    // porté par l'état (compat legacy).
+    const storedCharacterId = storedSession?.characterId ?? storedSession?.gameState?.characterId
+    let characterId: string
+    if (storedSession) {
+      characterId = storedCharacterId ?? DEFAULT_CHARACTER_ID
+      if (body.characterId && body.characterId !== characterId) {
+        await refundDebit(debited, { requestId, sessionId })
+        logEvent('warn', 'dm.session.character_mismatch', { requestId, sessionId, requested: body.characterId, actual: characterId })
+        return NextResponse.json(
+          { error: 'Cette partie se joue avec un autre personnage. Démarre une nouvelle partie pour en changer.' },
+          { status: 409 }
+        )
+      }
+    } else {
+      characterId = body.characterId ?? DEFAULT_CHARACTER_ID
+    }
+
     // ── Garde d'accès aux modules payants ─────────────────────────────────
     // Un module `requiresEntitlement` (ex. Tide Crypt) exige un compte connecté
     // AYANT acheté l'accès. Garde SERVEUR autoritaire : l'UI n'est qu'indicative.
@@ -427,6 +458,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     if (currentGameState && !currentGameState.adventureId) {
       currentGameState = { ...currentGameState, adventureId }
     }
+    // Idem pour le personnage (états historiques sans le champ).
+    if (currentGameState && !currentGameState.characterId) {
+      currentGameState = { ...currentGameState, characterId }
+    }
     const history = serverAuthoritative
       ? storedSession?.history ?? []
       : body.history ?? storedSession?.history ?? []
@@ -448,7 +483,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     // Synchronise l'état côté serveur MCP (ou récupère l'état initial). PREMIER
     // appel MCP de la requête → c'est ici que le process enfant est spawné avec
     // ADVENTURE_ID ; les appels suivants réutilisent ce process (même session).
-    const synced = await syncGameStateToMcp(currentGameState, sessionId, adventureId)
+    const synced = await syncGameStateToMcp(currentGameState, sessionId, adventureId, characterId)
     if (!synced) {
       // Retour (pas d'exception) : le catch ne s'exécute pas — rembourser ici.
       await refundDebit(debited, { requestId, sessionId })
@@ -674,7 +709,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           system: [
             {
               type: 'text',
-              text: buildStaticPrompt(currentGameState.adventureId) + '\n\nRéponds maintenant UNIQUEMENT avec la narration en prose, sans appeler de tools.',
+              text: buildStaticPrompt(currentGameState.adventureId, currentGameState.characterId) + '\n\nRéponds maintenant UNIQUEMENT avec la narration en prose, sans appeler de tools.',
             },
             { type: 'text', text: buildDynamicPrompt(currentGameState, summaryContext) },
           ],
@@ -712,6 +747,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       summaryContext,
       ownerId: storedSession?.ownerId ?? ownerId ?? undefined,
       adventureId: currentGameState.adventureId ?? adventureId,
+      characterId: currentGameState.characterId ?? characterId,
     })
 
     const usage: DMTurnUsage = {

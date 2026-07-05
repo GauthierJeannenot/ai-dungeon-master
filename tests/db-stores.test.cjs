@@ -105,6 +105,7 @@ test('db: game session save/load/delete round-trip', async () => {
     turnTraces: [],
     ownerId: 'user:42',
     adventureId: 'tide-crypt',
+    characterId: 'wizard',
   })
 
   const loaded = await sessionStore.loadSession('db-session-1')
@@ -115,8 +116,10 @@ test('db: game session save/load/delete round-trip', async () => {
   assert.equal(loaded.gameState.player.name, 'Héros')
   assert.equal(loaded.ownerId, 'user:42')
   assert.equal(loaded.adventureId, 'tide-crypt')
+  assert.equal(loaded.characterId, 'wizard')
 
-  // Upsert : la sauvegarde suivante écrase la précédente.
+  // Upsert : la sauvegarde suivante écrase la précédente. Une sauvegarde SANS
+  // characterId ne doit PAS l'effacer (COALESCE, comme owner_id/adventure_id).
   await sessionStore.saveSession('db-session-1', {
     gameState: { ...gameState, currentRoomId: '4' },
     history: loaded.history,
@@ -126,6 +129,8 @@ test('db: game session save/load/delete round-trip', async () => {
   const reloaded = await sessionStore.loadSession('db-session-1')
   assert.equal(reloaded.gameState.currentRoomId, '4')
   assert.equal(reloaded.summaryContext, undefined)
+  assert.equal(reloaded.characterId, 'wizard')
+  assert.equal(reloaded.adventureId, 'tide-crypt')
 
   await sessionStore.deleteSession('db-session-1')
   assert.equal(await sessionStore.loadSession('db-session-1'), null)

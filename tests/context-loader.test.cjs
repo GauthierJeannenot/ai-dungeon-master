@@ -19,14 +19,27 @@ test.after(() => {
   restoreTsRequire()
 })
 
-test('loads each module own adventure text and player sheet', () => {
+test('loads each module own adventure text and the chosen character sheet', () => {
   const grammy = loader.loadContextFiles('grammys-country-apple-pie')
   assert.match(grammy.adventureModule, /Grammy|boulangerie/i)
-  assert.match(grammy.playerCharacter, /Niveau.*1|Niveau : 1/i)
+  // Fiche GÉNÉRIQUE du personnage (défaut : guerrier) — plus de niveau/PV chiffrés.
+  assert.match(grammy.playerCharacter, /Guerrier/i)
 
   const tide = loader.loadContextFiles('tide-crypt')
   assert.match(tide.adventureModule, /Crypte des Marées|Morgane|phare/i)
-  assert.match(tide.playerCharacter, /Niveau.*2/i)
+})
+
+test('the character sheet is GLOBAL : même personnage → même fiche sur deux aventures', () => {
+  // Le personnage est orthogonal à l'aventure : le guerrier a la MÊME fiche
+  // partout (l'accroche narrative propre au couple vit dans definition.ts).
+  const grammyFighter = loader.loadContextFiles('grammys-country-apple-pie', 'fighter')
+  const tideFighter = loader.loadContextFiles('tide-crypt', 'fighter')
+  assert.equal(grammyFighter.playerCharacter, tideFighter.playerCharacter)
+
+  // Un personnage différent → fiche différente (classe, sorts, capacités).
+  const wizard = loader.loadContextFiles('grammys-country-apple-pie', 'wizard')
+  assert.match(wizard.playerCharacter, /Magicien/i)
+  assert.notEqual(wizard.playerCharacter, grammyFighter.playerCharacter)
 })
 
 test('tide-crypt falls back to Grammy player rules but keeps its own dm rules', () => {
@@ -35,30 +48,32 @@ test('tide-crypt falls back to Grammy player rules but keeps its own dm rules', 
   // player-rules.md n'existe pas côté tide-crypt → repli sur les règles joueur
   // génériques de Grammy's (mécaniques D&D communes, sans vocabulaire de module).
   assert.equal(tide.playerRules, grammy.playerRules)
-  // dm-rules.md, adventure-module.md et player-character.md sont PROPRES à
-  // tide-crypt (son dm-rules.md évite d'hériter du bestiaire Grammy — Mac,
-  // dryades, verger — qui fuyait auparavant dans le prompt de la crypte).
   assert.notEqual(tide.dmRules, grammy.dmRules)
   assert.doesNotMatch(tide.dmRules, /Mac le|dryade|verger|Grukk/i)
   assert.notEqual(tide.adventureModule, grammy.adventureModule)
-  assert.notEqual(tide.playerCharacter, grammy.playerCharacter)
+})
+
+test('unknown character id defaults to the fighter sheet (fail-safe)', () => {
+  const fighter = loader.loadContextFiles('grammys-country-apple-pie', 'fighter')
+  const unknown = loader.loadContextFiles('grammys-country-apple-pie', 'paladin')
+  assert.equal(unknown.playerCharacter, fighter.playerCharacter)
 })
 
 test('unknown module defaults to the default module content (fail-safe)', () => {
   const grammy = loader.loadContextFiles('grammys-country-apple-pie')
-  // Id inconnu du registre → repli fail-safe sur le module par défaut pour TOUS
-  // les fichiers (perModule ou non), puisqu'aucun contenu propre n'existe.
   const unknown = loader.loadContextFiles('does-not-exist')
   assert.equal(unknown.adventureModule, grammy.adventureModule)
-  assert.equal(unknown.playerCharacter, grammy.playerCharacter)
 })
 
-test('the default module ships all four context files (fallback guard)', () => {
-  // Le repli n'a plus de constante en dur : il s'appuie entièrement sur les
-  // fichiers du module par défaut. Ils doivent tous exister sur le disque.
+test('the default module ships its rules files, and every character ships a sheet', () => {
+  // player-character.md a disparu des modules : la fiche vit dans characters/.
   const dir = path.join(process.cwd(), 'adventures', 'grammys-country-apple-pie')
-  for (const file of ['player-character.md', 'player-rules.md', 'dm-rules.md', 'adventure-module.md']) {
+  for (const file of ['player-rules.md', 'dm-rules.md', 'adventure-module.md']) {
     assert.ok(fs.existsSync(path.join(dir, file)), `fichier de repli manquant : ${file}`)
+  }
+  for (const id of ['fighter', 'rogue', 'wizard', 'cleric']) {
+    const sheet = path.join(process.cwd(), 'characters', id, 'character-sheet.md')
+    assert.ok(fs.existsSync(sheet), `fiche de personnage manquante : ${id}`)
   }
 })
 

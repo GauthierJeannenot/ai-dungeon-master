@@ -50,6 +50,12 @@ const ItemSchema = z.object({
   description: z.string().optional(),
 })
 
+const AbilityKeySchema = z.enum(['str', 'dex', 'con', 'int', 'wis', 'cha'])
+const ResourcePoolSchema = z.object({
+  current: z.number().int().min(0),
+  max: z.number().int().min(0),
+})
+
 const PlayerStateSchema = z.object({
   id: z.literal('player'),
   name: z.string(),
@@ -65,6 +71,18 @@ const PlayerStateSchema = z.object({
   inventory: z.array(ItemSchema),
   speed: z.number().int().positive(),
   initiative: z.number().optional(),
+  // Personnage jouable : SANS ces champs, zod les STRIPPERAIT du round-trip
+  // replace_game_state et le personnage perdrait classe/sorts/ressources au
+  // premier tour (docs/playable-characters.md). Tous optionnels (legacy).
+  characterId: z.string().optional(),
+  savingThrowProficiencies: z.array(AbilityKeySchema).optional(),
+  skillProficiencies: z.array(z.string()).optional(),
+  expertise: z.array(z.string()).optional(),
+  features: z.array(z.enum(['second_wind', 'sneak_attack', 'cunning_action', 'spellcasting'])).optional(),
+  spellSlots: z.object({ level1: ResourcePoolSchema }).optional(),
+  knownSpells: z.array(z.string()).optional(),
+  spellcastingAbility: AbilityKeySchema.optional(),
+  resources: z.record(z.string(), ResourcePoolSchema).optional(),
 })
 
 const MonsterStateSchema = z.object({
@@ -112,8 +130,20 @@ const CombatLogEntrySchema = z.object({
 // coder de vocabulaire de module dans le moteur.
 const SceneMemorySchema = z.record(z.string(), z.unknown())
 
+const WorldFactSchema = z.object({
+  id: z.string(),
+  text: z.string(),
+  source: z.string(),
+  mapId: z.string(),
+  roomId: z.string().optional(),
+  expires: z.enum(['room', 'map', 'never']),
+})
+
 const GameStateSchema = z.object({
   phase: z.enum(['exploration', 'combat', 'dialogue']),
+  // Personnage de la partie (miroir d'adventureId). Sans ce champ, zod le
+  // stripperait au round-trip et la session retomberait sur le guerrier.
+  characterId: z.string().optional(),
   player: PlayerStateSchema,
   monsters: z.record(z.string(), MonsterStateSchema),
   npcs: z.record(z.string(), NpcStateSchema).optional(),
@@ -122,6 +152,9 @@ const GameStateSchema = z.object({
   round: z.number().int().min(0),
   movementUsed: z.record(z.string(), z.number().min(0)).optional().default({}),
   actionUsed: z.record(z.string(), z.boolean()).optional().default({}),
+  bonusActionUsed: z.record(z.string(), z.boolean()).optional().default({}),
+  dashUsed: z.record(z.string(), z.boolean()).optional().default({}),
+  worldFacts: z.array(WorldFactSchema).optional().default([]),
   combatLog: z.array(CombatLogEntrySchema),
   roomsVisited: z.array(z.string()),
   currentRoomId: z.string().nullable(),
