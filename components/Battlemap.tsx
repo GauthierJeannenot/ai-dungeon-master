@@ -2,10 +2,15 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import type { GameState, MonsterState, PlayerState, WorldNpcDisposition } from '@/lib/types'
+import { DEFAULT_CELL_SIZE } from '@/lib/adventure-map'
 import CharacterSheetModal from './CharacterSheetModal'
 
 interface BattlemapProps {
   gameState: GameState
+  // Taille de case MINIMALE en px. Si la map tient dans le conteneur, les cases
+  // s'agrandissent pour le remplir (letterbox) ; sinon elles restent à cette
+  // taille et la carte devient scrollable au cliquer-glisser. Défaut
+  // DEFAULT_CELL_SIZE. Vient de la map courante (AdventureMapSpec.cellSize).
   cellSize?: number
   // Battlemap du module actif (toujours fournie par la page de jeu depuis la
   // définition du module) ; dimensions de grille par défaut 17×15.
@@ -49,14 +54,24 @@ function hpPercent(current: number, max: number): number {
   return Math.min(100, Math.max(0, (current / max) * 100))
 }
 
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value))
+}
+
+// Distance (px) au-delà de laquelle un cliquer-glisser compte comme un pan et
+// non comme un clic sur un token.
+const DRAG_THRESHOLD_PX = 5
+
 export default function Battlemap({
   gameState,
-  cellSize = 48,
+  cellSize = DEFAULT_CELL_SIZE,
   image,
   cols = 17,
   rows = 15,
 }: BattlemapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
+  // Surface (carte translatée) — référentiel des coordonnées de tooltip.
+  const surfaceRef = useRef<HTMLDivElement>(null)
   const [tooltip, setTooltip] = useState<TooltipState | null>(null)
   // Fiche de personnage ouverte en modale (clic sur le pion joueur / son tooltip).
   const [sheetOpen, setSheetOpen] = useState(false)
@@ -65,6 +80,14 @@ export default function Battlemap({
   // Dimensions réelles du conteneur — la carte remplit tout l'espace alloué au
   // lieu d'être figée à cols×cellSize. null tant qu'on n'a pas mesuré (1er rendu).
   const [dims, setDims] = useState<{ w: number; h: number } | null>(null)
+  // Décalage de la carte (px, ≤ 0) quand elle déborde du conteneur. Clampé au
+  // rendu (pas dans un effet) → resize et changement de map re-clampent gratis.
+  const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
+  const [isDragging, setIsDragging] = useState(false)
+  // État du drag en cours (mutable, hors cycle de rendu).
+  const dragRef = useRef<{ startX: number; startY: number; panX: number; panY: number; moved: boolean } | null>(null)
+  // Un pan venant de se terminer : avale le clic natif émis après pointerup.
+  const suppressClickRef = useRef(false)
 
   useEffect(() => {
     const el = containerRef.current
@@ -111,7 +134,11 @@ export default function Battlemap({
     entity: PlayerState | MonsterState | MapNpcToken
   ) => {
     e.stopPropagation()
-    const rect = containerRef.current?.getBoundingClientRect()
+    // Clic issu d'un pan : ignorer (le clic natif suit pointerup).
+    if (suppressClickRef.current) { suppressClickRef.current = false; return }
+    // Coordonnées dans la SURFACE (translatée), pas le conteneur : le tooltip
+    // est rendu dans la surface et doit rester ancré au token pendant un pan.
+    const rect = surfaceRef.current?.getBoundingClientRect()
     if (!rect) return
     setTooltip({
       entity,
@@ -124,6 +151,7 @@ export default function Battlemap({
   // au lieu du tooltip d'aperçu réservé aux monstres/PNJ.
   const handleOpenSheet = useCallback((e: React.MouseEvent) => {
     e.stopPropagation()
+    if (suppressClickRef.current) { suppressClickRef.current = false; return }
     setTooltip(null)
     setSheetOpen(true)
   }, [])
@@ -131,39 +159,116 @@ export default function Battlemap({
   const aliveMonsters = Object.values(gameState.monsters).filter(m => m.isAlive)
   const npcTokens = deriveNpcTokens(gameState)
 
-  // Taille de la carte : dimensions du module actif (défaut 17×15).
+  // Taille de la grille : dimensions de la map courante (défaut 17×15), étendues
+  // si une entité déborde (fail-safe : un token hors bornes reste visible).
   const gridCols = Math.max(cols, ...aliveMonsters.map(m => m.position.x + 2), ...npcTokens.map(npc => npc.position.x + 2), gameState.player.position.x + 2)
   const gridRows = Math.max(rows, ...aliveMonsters.map(m => m.position.y + 2), ...npcTokens.map(npc => npc.position.y + 2), gameState.player.position.y + 2)
 
-  // La carte remplit tout le conteneur : chaque cellule s'étire (cellW×cellH)
-  // pour couvrir l'espace mesuré. Avant la 1re mesure, repli sur cellSize fixe.
-  const cellW = dims ? dims.w / gridCols : cellSize
-  const cellH = dims ? dims.h / gridRows : cellSize
-  const mapW = dims ? dims.w : gridCols * cellSize
-  const mapH = dims ? dims.h : gridRows * cellSize
+  // Cases CARRÉES, cellSize = minimum. Si la grille tient dans le conteneur, la
+  // case grandit pour le remplir ; sinon elle reste au minimum et la carte
+  // déborde (scroll). Avant la 1re mesure, repli sur le minimum.
+  const fitCell = dims ? Math.min(dims.w / gridCols, dims.h / gridRows) : cellSize
+  const cell = Math.max(cellSize, fitCell)
+  const mapW = gridCols * cell
+  const mapH = gridRows * cell
+
+  // Décalage de la surface : letterbox centré si la carte tient sur un axe,
+  // scroll clampé si elle déborde. Sans mesure encore, pas de décalage.
+  const offsetX = !dims ? 0 : mapW <= dims.w ? (dims.w - mapW) / 2 : clamp(pan.x, dims.w - mapW, 0)
+  const offsetY = !dims ? 0 : mapH <= dims.h ? (dims.h - mapH) / 2 : clamp(pan.y, dims.h - mapH, 0)
+  const overflowing = dims ? (mapW > dims.w || mapH > dims.h) : false
+
+  // Changement de map : le pan précédent n'a plus de sens sur une autre grille.
+  useEffect(() => {
+    setPan({ x: 0, y: 0 })
+  }, [image])
+
+  // Auto-follow : recadre sur le pion joueur s'il sort (ou approche) du champ
+  // visible. Jamais pendant un drag ; inutile en mode fit (tout est visible).
+  useEffect(() => {
+    if (!dims || dragRef.current) return
+    if (mapW <= dims.w && mapH <= dims.h) return
+    const px = (gameState.player.position.x + 0.5) * cell
+    const py = (gameState.player.position.y + 0.5) * cell
+    // Marge d'une case : on recadre dès que le pion approche du bord visible.
+    const outX = mapW > dims.w && (px < -offsetX + cell || px > -offsetX + dims.w - cell)
+    const outY = mapH > dims.h && (py < -offsetY + cell || py > -offsetY + dims.h - cell)
+    if (outX || outY) {
+      setPan({ x: dims.w / 2 - px, y: dims.h / 2 - py })
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameState.player.position.x, gameState.player.position.y, cols, rows, image, dims])
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    // Nouvelle interaction : purge un éventuel flag resté armé (drag sans clic
+    // de suivi, p. ex. relâché hors cible, ou carte redevenue non-scrollable).
+    suppressClickRef.current = false
+    // Bouton gauche uniquement, et seulement s'il y a de quoi scroller.
+    if (e.button !== 0 || !overflowing) return
+    dragRef.current = { startX: e.clientX, startY: e.clientY, panX: offsetX, panY: offsetY, moved: false }
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    const drag = dragRef.current
+    if (!drag) return
+    const dx = e.clientX - drag.startX
+    const dy = e.clientY - drag.startY
+    // Tant qu'on n'a pas franchi le seuil, on laisse le clic vivre (tooltip/fiche).
+    if (!drag.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return
+    drag.moved = true
+    if (!isDragging) setIsDragging(true)
+    setPan({ x: drag.panX + dx, y: drag.panY + dy })
+  }
+
+  const handlePointerUp = (e: React.PointerEvent) => {
+    const drag = dragRef.current
+    if (!drag) return
+    // Un vrai pan : avaler le clic natif qui suit pointerup (sinon il ferme le
+    // tooltip ou ouvre la fiche).
+    if (drag.moved) suppressClickRef.current = true
+    dragRef.current = null
+    setIsDragging(false)
+    if (e.currentTarget.hasPointerCapture?.(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId)
+    }
+  }
 
   return (
     <div
       ref={containerRef}
-      className="relative w-full h-full overflow-hidden bg-stone-900 rounded-lg border border-amber-900/40 cursor-default"
-      onClick={() => setTooltip(null)}
+      className={`relative w-full h-full overflow-hidden bg-stone-900 rounded-lg border border-amber-900/40 ${
+        overflowing ? (isDragging ? 'cursor-grabbing' : 'cursor-grab') : 'cursor-default'
+      }`}
+      style={{ touchAction: 'none' }}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
+      onClick={() => {
+        if (suppressClickRef.current) { suppressClickRef.current = false; return }
+        setTooltip(null)
+      }}
     >
-      {/* Surface de la carte — étirée aux dimensions réelles du conteneur */}
+      {/* Surface de la carte — cases carrées, translatée (letterbox ou scroll) */}
       <div
+        ref={surfaceRef}
         className="relative"
         style={{
           width: mapW,
           height: mapH,
+          transform: `translate(${offsetX}px, ${offsetY}px)`,
+          transition: isDragging ? undefined : 'transform 0.3s ease',
         }}
       >
-        {/* Image de la battlemap — pixel art généré (17×15 cases exactes, voir
-            scripts/generate-battlemap.cjs). backgroundSize 100% garde chaque case
-            image alignée sur chaque case de la grille ; imageRendering pixelated
-            préserve les pixels nets à l'agrandissement. */}
+        {/* Image de la battlemap du module actif (prop `image`, fournie par la
+            page de jeu depuis la map courante). backgroundSize 100% aligne
+            chaque case image sur chaque case de la grille ; imageRendering
+            pixelated préserve les pixels nets à l'agrandissement. */}
         <div
           className="absolute inset-0"
           style={{
-            backgroundImage: 'url(/battlemaps/grammys_bakery.png)',
+            backgroundImage: `url(${image})`,
             backgroundSize: '100% 100%',   // étire l'image pour couvrir toute la grille
             backgroundRepeat: 'no-repeat',
             backgroundColor: '#3a2d1a',    // fallback si image absente
@@ -178,9 +283,9 @@ export default function Battlemap({
           height={mapH}
         >
           <defs>
-            <pattern id="grid" width={cellW} height={cellH} patternUnits="userSpaceOnUse">
+            <pattern id="grid" width={cell} height={cell} patternUnits="userSpaceOnUse">
               <path
-                d={`M ${cellW} 0 L 0 0 0 ${cellH}`}
+                d={`M ${cell} 0 L 0 0 0 ${cell}`}
                 fill="none"
                 stroke="rgba(180,140,60,0.2)"
                 strokeWidth="0.5"
@@ -195,8 +300,8 @@ export default function Battlemap({
           <TokenMonster
             key={monster.id}
             monster={monster}
-            cellW={cellW}
-            cellH={cellH}
+            cellW={cell}
+            cellH={cell}
             isCurrentTurn={gameState.currentTurn === monster.id}
             isAnimating={animating.has(monster.id)}
             onClick={(e) => handleTokenClick(e, monster)}
@@ -208,8 +313,8 @@ export default function Battlemap({
           <TokenNpc
             key={npc.id}
             npc={npc}
-            cellW={cellW}
-            cellH={cellH}
+            cellW={cell}
+            cellH={cell}
             isAnimating={animating.has(`npc:${npc.id}`)}
             onClick={(e) => handleTokenClick(e, npc)}
           />
@@ -218,8 +323,8 @@ export default function Battlemap({
         {/* Player token */}
         <TokenPlayer
           player={gameState.player}
-          cellW={cellW}
-          cellH={cellH}
+          cellW={cell}
+          cellH={cell}
           isCurrentTurn={gameState.currentTurn === 'player' || gameState.phase !== 'combat'}
           isAnimating={animating.has('player')}
           onOpenSheet={handleOpenSheet}

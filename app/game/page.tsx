@@ -798,7 +798,7 @@ function GameView({ adventure, characterId, resumeSessionId }: { adventure: Adve
         <div className="flex-[45] lg:flex-[65] min-w-0 min-h-0 p-2 overflow-hidden">
           <Battlemap
             gameState={gameState}
-            cellSize={52}
+            cellSize={currentMapSpec.cellSize}
             image={currentBattlemapImage}
             cols={currentMapSpec.grid.cols}
             rows={currentMapSpec.grid.rows}

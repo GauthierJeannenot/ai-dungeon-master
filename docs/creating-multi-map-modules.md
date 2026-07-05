@@ -74,6 +74,13 @@ multi-maps par rapport à un module 1-map :
 maps: [
   { id: 'fair', name: 'La Foire aux Chandelles', grid: { cols: 17, rows: 15 } },
   { id: 'wood', name: 'Le Bois-Ricanant',        grid: { cols: 15, rows: 13 } },
+  // Optionnel : cellSize (px) fixe la taille de case MINIMALE au rendu. Absent
+  // = DEFAULT_CELL_SIZE (48). Si la carte tient dans le conteneur, les cases
+  // s'agrandissent pour le remplir (letterbox) ; sinon elles restent à cellSize
+  // et la carte devient scrollable au cliquer-glisser. Purement du rendu : le
+  // moteur ne lit JAMAIS cellSize (ses bornes viennent de `grid`). Générer alors
+  // le PNG à ≥ cellSize px/case pour rester net. Voir docs/battlemap-viewport.md.
+  // { id: 'grande', name: '…', grid: { cols: 30, rows: 24 }, cellSize: 64 },
 ],
 
 // Chaque salle porte son mapId (absent = première map, réservé aux modules 1-map).
