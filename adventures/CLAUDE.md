@@ -13,13 +13,18 @@ docs/multi-adventure-architecture.md et docs/adventure-content-consolidation.md
 | `map.ts` | Données MOTEUR : rooms, entryCells, encounters, npcs, aliases, transitions, roomHooks, startCell, `initialPlayer` (= `{ level, extraInventory? }` : le kit/PV viennent du PERSONNAGE) | moteur MCP **et** app (seul fichier compilé par mcp-server) |
 | `definition.ts` | Contenu APP : meta landing, welcomeMessage, chatPlaceholders, roomStatusHints, battlemapImage, grid, `promptGuidance`, `characterHooks` (accroche par personnage) | app/prompts uniquement — **jamais importé par mcp-server** |
 | `adventure-module.md` | Module narratif complet (salles `## Salle N`, annexes) → prompt DM | context-loader |
-| `player-rules.md` / `dm-rules.md` | Optionnels — repli sur `adventures/_shared/` (règles D&D génériques, repli VOULU) | context-loader |
+| `player-rules.md` | REQUIS — règles côté joueur PROPRES au module (jamais de repli entre modules) | context-loader |
+| `bestiary.md` | REQUIS — bestiaire & notes de maîtrise du module : blocs de stats reskinnés (types moteur), calibrage au niveau, mise en scène | context-loader |
 
-- `adventures/_shared/` n'est PAS un module : ce sont les règles D&D de repli
-  (player-rules.md, dm-rules.md générique avec bestiaire des types moteur)
-  servies à tout module qui ne redéfinit pas les siennes. AUCUN vocabulaire de
-  module là-dedans (verrouillé par no-module-leaks) — les reskins et notes de
-  mise en scène vont dans le `dm-rules.md` du module (modèle : tide-crypt).
+- **Il n'y a PLUS de `dm-rules.md` par module** : les règles DM génériques
+  vivent dans `adventures/_shared/dm-rules.md`, l'UNIQUE fichier partagé entre
+  modules — AUCUN vocabulaire de module là-dedans (verrouillé par
+  no-module-leaks). Tout ce qui est propre à une aventure (bestiaire, reskins,
+  calibrage niveau, notes de mise en scène DM) va dans son `bestiary.md`
+  (modèles : tide-crypt, fey-shadow-fair).
+- `bestiary.md`, `player-rules.md` et `adventure-module.md` sont PAR MODULE :
+  un module connu sans l'un d'eux = erreur au chargement, jamais de repli
+  silencieux sur le contenu d'une autre aventure.
 
 - La fiche du héros N'EST PLUS par module : elle vit dans
   `characters/<id>/character-sheet.md` (catalogue GLOBAL, orthogonal aux
@@ -43,9 +48,11 @@ Ne les retoucher qu'avec `npm run playtest:mock` avant/après.
 ## Ajouter un module
 
 1. Créer `adventures/<id>/` : `map.ts` (format des modules existants),
-   `definition.ts`, `adventure-module.md`. (Pas de player-character.md : la
-   fiche du personnage est globale, `characters/<id>/`.) Optionnel :
-   `definition.characterHooks` pour lier un personnage à l'aventure.
+   `definition.ts`, `adventure-module.md`, `player-rules.md` et `bestiary.md`
+   (tous REQUIS — partir de ceux d'un module existant). (Pas de
+   player-character.md : la fiche du personnage est globale,
+   `characters/<id>/`. Pas de dm-rules.md : partagé dans `_shared/`.)
+   Optionnel : `definition.characterHooks` pour lier un personnage à l'aventure.
 2. Battlemap dans `public/battlemaps/` + entrée `battlemapImage`.
 3. Enregistrer : import dans `lib/adventure-map.ts` (ADVENTURE_MAPS) et
    `lib/adventures.ts` (ADVENTURES + AVAILABILITY).

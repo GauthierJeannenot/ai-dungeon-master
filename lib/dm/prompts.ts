@@ -55,6 +55,10 @@ ${ctx.playerRules}
 ${ctx.dmRules}
 
 ---
+## BESTIAIRE DU MODULE
+${ctx.bestiary}
+
+---
 ## MODULE D'AVENTURE (INDEX)
 ${moduleIndex}
 

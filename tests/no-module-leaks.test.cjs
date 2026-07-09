@@ -66,13 +66,10 @@ function walk(dir) {
   return out
 }
 
-// adventures/_shared/ = règles servies en repli à TOUS les modules : le
-// vocabulaire d'un module y serait une fuite inter-modules directe dans les
-// prompts. Seule exception : « dryade », nom de créature SRD/MM 2025 (template
-// moteur `dryad`, commun à tous les modules), légitime dans le bestiaire
-// générique — ce n'est pas le PNJ de Grammy's.
-const SHARED_RULES_ALLOWED = new Set([String(/\bdryades?\b/i)])
-
+// adventures/_shared/ = règles DM servies à TOUS les modules (seul contenu
+// partagé) : le vocabulaire d'un module y serait une fuite inter-modules
+// directe dans les prompts. Le bestiaire et les reskins vivent dans le
+// bestiary.md de chaque module — rien à excuser ici.
 test('no adventure-specific vocabulary leaks into adventures/_shared', () => {
   const violations = []
   const base = path.join(process.cwd(), 'adventures', '_shared')
@@ -80,7 +77,6 @@ test('no adventure-specific vocabulary leaks into adventures/_shared', () => {
     if (path.extname(entry) !== '.md') continue
     const source = fs.readFileSync(path.join(base, entry), 'utf8')
     for (const term of LEAK_TERMS) {
-      if (SHARED_RULES_ALLOWED.has(String(term))) continue
       const match = source.match(term)
       if (match) {
         violations.push(`adventures/_shared/${entry} → "${match[0]}"`)
@@ -90,8 +86,8 @@ test('no adventure-specific vocabulary leaks into adventures/_shared', () => {
   assert.deepEqual(
     violations,
     [],
-    `Vocabulaire de module dans les règles partagées :\n${violations.join('\n')}\n` +
-    `→ ce contenu appartient au dm-rules.md/adventure-module.md du module concerné.`
+    `Vocabulaire de module dans les règles DM partagées :\n${violations.join('\n')}\n` +
+    `→ ce contenu appartient au bestiary.md/adventure-module.md du module concerné.`
   )
 })
 
