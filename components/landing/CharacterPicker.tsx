@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { listCharacters, DEFAULT_CHARACTER_ID } from '@/lib/character-registry'
 import { characterSheetFromTemplate } from '@/lib/character-sheet-view'
@@ -9,21 +9,50 @@ import CharacterSheet from '@/components/CharacterSheet'
 // Sélecteur de personnage prétiré sur la carte d'une aventure. Le choix est
 // ajouté au lien de jeu (?character=<id>) ; défaut = guerrier (le lien sans
 // paramètre reste valide côté page de jeu). Le survol d'une classe affiche un
-// aperçu détaillé (popover) de sa fiche. Voir docs/playable-characters.md.
+// aperçu détaillé (popover) de sa fiche ; au tactile (pas de hover), le clic
+// fait office de toggle. Voir docs/playable-characters.md.
 export default function CharacterPicker({ playPath }: { playPath: string }) {
   const characters = listCharacters()
   const [selected, setSelected] = useState<string>(DEFAULT_CHARACTER_ID)
-  // Aperçu au survol : la fiche du personnage survolé (indépendant de la
-  // sélection). null = aucun survol → pas de popover.
+  // Aperçu affiché : la fiche du personnage survolé/sélectionné (indépendant
+  // de la sélection courante). null = aucun aperçu → pas de popover.
   const [previewed, setPreviewed] = useState<string | null>(null)
   const active = characters.find(c => c.id === selected) ?? characters[0]
   const previewChar = previewed ? characters.find(c => c.id === previewed) : undefined
   const href = `${playPath}&character=${selected}`
+  const wrapperRef = useRef<HTMLDivElement>(null)
+
+  function handleSelect(id: string) {
+    setSelected(id)
+    // Toggle au clic : reclique sur la classe déjà prévisualisée → ferme le
+    // popover (comportement prévisible au doigt, sans dépendre du hover).
+    setPreviewed(prev => (prev === id ? null : id))
+  }
+
+  useEffect(() => {
+    if (!previewed) return
+
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') setPreviewed(null)
+    }
+    function onPointerDown(e: PointerEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setPreviewed(null)
+      }
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      document.removeEventListener('pointerdown', onPointerDown)
+    }
+  }, [previewed])
 
   return (
     <div className="w-full flex flex-col gap-2">
       <span className="text-[10px] uppercase tracking-wider text-stone-500">Personnage</span>
-      <div className="relative" onMouseLeave={() => setPreviewed(null)}>
+      <div ref={wrapperRef} className="relative" onMouseLeave={() => setPreviewed(null)}>
         <div className="flex flex-wrap gap-1.5">
           {characters.map(c => {
             const isActive = c.id === selected
@@ -31,7 +60,7 @@ export default function CharacterPicker({ playPath }: { playPath: string }) {
               <button
                 key={c.id}
                 type="button"
-                onClick={() => setSelected(c.id)}
+                onClick={() => handleSelect(c.id)}
                 onMouseEnter={() => setPreviewed(c.id)}
                 onFocus={() => setPreviewed(c.id)}
                 aria-pressed={isActive}
@@ -51,10 +80,21 @@ export default function CharacterPicker({ playPath }: { playPath: string }) {
             scrollable : le `pb-2` sert d'espacement visuel SANS créer de zone
             morte entre les boutons et la carte (survol continu → pas de
             fermeture au passage). Le survol de la carte ne déclenche pas le
-            onMouseLeave du parent (elle en est un descendant). */}
+            onMouseLeave du parent (elle en est un descendant). Fermeture :
+            bouton ×, Échap, ou tap/clic en dehors (voir l'effet ci-dessus). */}
         {previewChar && (
           <div className="absolute bottom-full left-0 right-0 pb-2 z-50">
-            <div className="rounded-lg border border-amber-800/60 bg-stone-900/98 p-3 shadow-2xl max-h-[22rem] overflow-y-auto overscroll-contain">
+            <div className="relative rounded-lg border border-amber-800/60 bg-stone-900/98 pt-3 pr-9 pb-3 pl-3 shadow-2xl max-h-[22rem] overflow-y-auto overscroll-contain">
+              <button
+                type="button"
+                onClick={() => setPreviewed(null)}
+                aria-label="Fermer l'aperçu"
+                className="absolute top-2 right-2 z-10 flex h-7 w-7 items-center justify-center rounded text-stone-400 hover:text-stone-100 hover:bg-stone-800 transition-colors"
+              >
+                <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" className="h-4 w-4">
+                  <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
+                </svg>
+              </button>
               <CharacterSheet data={characterSheetFromTemplate(previewChar)} variant="compact" />
             </div>
           </div>
