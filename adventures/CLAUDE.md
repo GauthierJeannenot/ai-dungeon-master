@@ -13,7 +13,13 @@ docs/multi-adventure-architecture.md et docs/adventure-content-consolidation.md
 | `map.ts` | Données MOTEUR : rooms, entryCells, encounters, npcs, aliases, transitions, roomHooks, startCell, `initialPlayer` (= `{ level, extraInventory? }` : le kit/PV viennent du PERSONNAGE) | moteur MCP **et** app (seul fichier compilé par mcp-server) |
 | `definition.ts` | Contenu APP : meta landing, welcomeMessage, chatPlaceholders, roomStatusHints, battlemapImage, grid, `promptGuidance`, `characterHooks` (accroche par personnage) | app/prompts uniquement — **jamais importé par mcp-server** |
 | `adventure-module.md` | Module narratif complet (salles `## Salle N`, annexes) → prompt DM | context-loader |
-| `player-rules.md` / `dm-rules.md` | Optionnels — repli sur le module par défaut (règles D&D génériques, repli VOULU) | context-loader |
+| `player-rules.md` / `dm-rules.md` | Optionnels — repli sur `adventures/_shared/` (règles D&D génériques, repli VOULU) | context-loader |
+
+- `adventures/_shared/` n'est PAS un module : ce sont les règles D&D de repli
+  (player-rules.md, dm-rules.md générique avec bestiaire des types moteur)
+  servies à tout module qui ne redéfinit pas les siennes. AUCUN vocabulaire de
+  module là-dedans (verrouillé par no-module-leaks) — les reskins et notes de
+  mise en scène vont dans le `dm-rules.md` du module (modèle : tide-crypt).
 
 - La fiche du héros N'EST PLUS par module : elle vit dans
   `characters/<id>/character-sheet.md` (catalogue GLOBAL, orthogonal aux

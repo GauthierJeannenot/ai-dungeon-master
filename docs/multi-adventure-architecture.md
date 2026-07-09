@@ -147,8 +147,10 @@ objet `AdventureMapData` et à faire de même pour Grammy's.
 1. `lib/context-loader.ts` : `loadContextFiles(adventureId)` lit
    `adventures/<id>/*.md` ; fichiers manquants → fallback sur les DEFAULT_*
    actuels (déjà en place) ; caches par adventureId. ⚠️ tide-crypt n'a pas de
-   `player-rules.md` ni `dm-rules.md` propres : fallback = fichiers Grammy's
-   (règles génériques D&D) — c'est voulu, le documenter dans le loader.
+   `player-rules.md` propre : fallback = règles génériques D&D — c'est voulu,
+   le documenter dans le loader. *(Évolution post-refactor : le repli des
+   fichiers de règles vit désormais dans `adventures/_shared/`, plus dans le
+   module Grammy's.)*
 2. `lib/dm/prompts.ts` : `buildStaticPrompt(adventureId)`,
    `buildDynamicPrompt(gameState, …)` lit `gameState.adventureId`. Idem
    `lib/dm/planner.ts` pour `describeRoomHooks`.

@@ -1,6 +1,7 @@
 // Le context-loader charge les fichiers markdown du bon module, avec repli sur
-// le module par défaut (Grammy's) pour les fichiers de règles qu'un module ne
-// redéfinit pas (tide-crypt n'a ni player-rules.md ni dm-rules.md).
+// adventures/_shared/ pour les fichiers de règles qu'un module ne redéfinit pas
+// (règles D&D génériques, sans vocabulaire de module). Le contenu PROPRE au
+// module (adventure-module.md) ne se replie jamais sur une autre aventure.
 
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
@@ -42,15 +43,31 @@ test('the character sheet is GLOBAL : même personnage → même fiche sur deux 
   assert.notEqual(wizard.playerCharacter, grammyFighter.playerCharacter)
 })
 
-test('tide-crypt falls back to Grammy player rules but keeps its own dm rules', () => {
+test('modules without their own rules fall back to the shared files', () => {
+  const sharedPlayerRules = fs.readFileSync(
+    path.join(process.cwd(), 'adventures', '_shared', 'player-rules.md'), 'utf-8')
+  const sharedDmRules = fs.readFileSync(
+    path.join(process.cwd(), 'adventures', '_shared', 'dm-rules.md'), 'utf-8')
+
+  // Aucun module ne redéfinit player-rules.md → tout le monde reçoit le partagé.
   const grammy = loader.loadContextFiles('grammys-country-apple-pie')
   const tide = loader.loadContextFiles('tide-crypt')
-  // player-rules.md n'existe pas côté tide-crypt → repli sur les règles joueur
-  // génériques de Grammy's (mécaniques D&D communes, sans vocabulaire de module).
-  assert.equal(tide.playerRules, grammy.playerRules)
+  const fey = loader.loadContextFiles('fey-shadow-fair')
+  assert.equal(grammy.playerRules, sharedPlayerRules)
+  assert.equal(tide.playerRules, sharedPlayerRules)
+  assert.equal(fey.playerRules, sharedPlayerRules)
+
+  // dm-rules.md : Grammy's et tide-crypt ont leur propre version (bestiaire et
+  // notes de mise en scène du module) ; fey-shadow-fair reçoit le partagé.
+  assert.notEqual(grammy.dmRules, sharedDmRules)
+  assert.notEqual(tide.dmRules, sharedDmRules)
+  assert.equal(fey.dmRules, sharedDmRules)
   assert.notEqual(tide.dmRules, grammy.dmRules)
-  assert.doesNotMatch(tide.dmRules, /Mac le|dryade|verger|Grukk/i)
   assert.notEqual(tide.adventureModule, grammy.adventureModule)
+
+  // Anti-fuite : le repli partagé ne transporte le vocabulaire d'AUCUN module.
+  assert.doesNotMatch(tide.dmRules, /Mac le|dryade|verger|Grukk/i)
+  assert.doesNotMatch(fey.dmRules, /Grammy|Grukk|Mac le|verger|boulangerie|salle \d/i)
 })
 
 test('unknown character id defaults to the fighter sheet (fail-safe)', () => {
@@ -65,11 +82,11 @@ test('unknown module defaults to the default module content (fail-safe)', () => 
   assert.equal(unknown.adventureModule, grammy.adventureModule)
 })
 
-test('the default module ships its rules files, and every character ships a sheet', () => {
+test('the shared rules files exist, and every character ships a sheet', () => {
   // player-character.md a disparu des modules : la fiche vit dans characters/.
-  const dir = path.join(process.cwd(), 'adventures', 'grammys-country-apple-pie')
-  for (const file of ['player-rules.md', 'dm-rules.md', 'adventure-module.md']) {
-    assert.ok(fs.existsSync(path.join(dir, file)), `fichier de repli manquant : ${file}`)
+  const sharedDir = path.join(process.cwd(), 'adventures', '_shared')
+  for (const file of ['player-rules.md', 'dm-rules.md']) {
+    assert.ok(fs.existsSync(path.join(sharedDir, file)), `fichier de repli manquant : _shared/${file}`)
   }
   for (const id of ['fighter', 'rogue', 'wizard', 'cleric']) {
     const sheet = path.join(process.cwd(), 'characters', id, 'character-sheet.md')

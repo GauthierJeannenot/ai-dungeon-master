@@ -4,7 +4,9 @@
 // Ce test empêche le prochain module de re-fuiter dans les prompts ou l'UI.
 //
 // Portée : lib/, components/, app/ (pas mcp-server — le bestiaire moteur y est
-// assumé et partagé ; pas adventures/ — c'est là que le contenu vit ; pas tests/).
+// assumé et partagé ; pas adventures/<id>/ — c'est là que le contenu vit ; pas
+// tests/). EXCEPTION : adventures/_shared/ (règles de repli communes) est
+// scanné aussi — voir le test dédié ci-dessous.
 // On ignore les commentaires (bruit) et les slugs d'identifiant de module
 // (« grammys-country-apple-pie » est un identifiant technique, pas du contenu).
 
@@ -63,6 +65,35 @@ function walk(dir) {
   }
   return out
 }
+
+// adventures/_shared/ = règles servies en repli à TOUS les modules : le
+// vocabulaire d'un module y serait une fuite inter-modules directe dans les
+// prompts. Seule exception : « dryade », nom de créature SRD/MM 2025 (template
+// moteur `dryad`, commun à tous les modules), légitime dans le bestiaire
+// générique — ce n'est pas le PNJ de Grammy's.
+const SHARED_RULES_ALLOWED = new Set([String(/\bdryades?\b/i)])
+
+test('no adventure-specific vocabulary leaks into adventures/_shared', () => {
+  const violations = []
+  const base = path.join(process.cwd(), 'adventures', '_shared')
+  for (const entry of fs.readdirSync(base)) {
+    if (path.extname(entry) !== '.md') continue
+    const source = fs.readFileSync(path.join(base, entry), 'utf8')
+    for (const term of LEAK_TERMS) {
+      if (SHARED_RULES_ALLOWED.has(String(term))) continue
+      const match = source.match(term)
+      if (match) {
+        violations.push(`adventures/_shared/${entry} → "${match[0]}"`)
+      }
+    }
+  }
+  assert.deepEqual(
+    violations,
+    [],
+    `Vocabulaire de module dans les règles partagées :\n${violations.join('\n')}\n` +
+    `→ ce contenu appartient au dm-rules.md/adventure-module.md du module concerné.`
+  )
+})
 
 test('no adventure-specific vocabulary leaks into lib/components/app', () => {
   const violations = []

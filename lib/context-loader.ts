@@ -18,6 +18,12 @@ function adventureDir(adventureId: string): string {
   return path.join(process.cwd(), 'adventures', adventureId)
 }
 
+// Règles D&D génériques partagées par tous les modules (player-rules.md,
+// dm-rules.md par défaut). Le `_` évite toute collision avec un id de module.
+function sharedRulesDir(): string {
+  return path.join(process.cwd(), 'adventures', '_shared')
+}
+
 function characterDir(characterId: string): string {
   return path.join(process.cwd(), 'characters', characterId)
 }
@@ -40,28 +46,30 @@ function readFileOrNull(dir: string, filename: string): string | null {
   }
 }
 
-// Chargement d'un fichier de contexte avec repli maîtrisé sur le module par
-// défaut :
+// Chargement d'un fichier de contexte avec repli maîtrisé :
 //   - perModule=false (player-rules.md, dm-rules.md) : règles D&D génériques ;
-//     un module qui ne les redéfinit pas retombe TOUJOURS sur celles du module
-//     par défaut (repli volontaire, pas de vocabulaire d'un autre module).
-//   - perModule=true (adventure-module.md, player-character.md) : contenu PROPRE
-//     au module ; le repli n'a lieu QUE si l'id est inconnu du registre
-//     (fail-safe). Un module CONNU qui n'a pas son propre fichier est une erreur
-//     — jamais servir en silence le module d'une autre aventure.
-// Aucune constante en dur : le module par défaut (adventures/<default>/) fait foi.
+//     un module qui ne les redéfinit pas retombe TOUJOURS sur celles de
+//     adventures/_shared/ (repli volontaire, garanti sans vocabulaire de
+//     module — verrouillé par tests/no-module-leaks.test.cjs).
+//   - perModule=true (adventure-module.md) : contenu PROPRE au module ; le
+//     repli sur le module par défaut n'a lieu QUE si l'id est inconnu du
+//     registre (fail-safe). Un module CONNU qui n'a pas son propre fichier est
+//     une erreur — jamais servir en silence le module d'une autre aventure.
 function readWithFallback(adventureId: string, filename: string, opts: { perModule: boolean }): string {
   const own = readFileOrNull(adventureDir(adventureId), filename)
   if (own !== null) return own
 
-  if (!opts.perModule || !isKnownAdventureId(adventureId)) {
+  if (!opts.perModule) {
+    const shared = readFileOrNull(sharedRulesDir(), filename)
+    if (shared !== null) return shared
+  } else if (!isKnownAdventureId(adventureId)) {
     const fallback = readFileOrNull(adventureDir(DEFAULT_ADVENTURE_ID), filename)
     if (fallback !== null) return fallback
   }
 
   throw new Error(
     `Fichier de contexte manquant : adventures/${adventureId}/${filename}` +
-    (opts.perModule ? '' : ` (et repli adventures/${DEFAULT_ADVENTURE_ID}/${filename} indisponible)`)
+    (opts.perModule ? '' : ` (et repli adventures/_shared/${filename} indisponible)`)
   )
 }
 
