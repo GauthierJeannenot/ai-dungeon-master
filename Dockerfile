@@ -44,6 +44,7 @@ COPY --from=builder   /app/.next        ./.next
 COPY --from=builder   /app/mcp-server/dist ./mcp-server/dist
 COPY public        ./public
 COPY adventures    ./adventures
+COPY characters    ./characters
 COPY next.config.ts package.json package-lock.json ./
 
 # Dossier optionnel pour la persistance de logs opt-in (APP_LOG_PERSIST_ENABLED).
