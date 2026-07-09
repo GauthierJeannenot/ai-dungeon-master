@@ -19,7 +19,7 @@ const ITEM_TYPE_STYLES: Record<string, { icon: string; ring: string }> = {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="space-y-1.5">
-      <h4 className="text-[10px] uppercase tracking-wider text-amber-500/80 font-semibold">{title}</h4>
+      <h4 className="font-display text-[11px] uppercase tracking-wider text-amber-500/80 font-semibold">{title}</h4>
       {children}
     </section>
   )
@@ -48,7 +48,7 @@ export default function CharacterSheet({
       {/* En-tête : identité + PV / CA / vitesse / maîtrise */}
       <header className="flex flex-col gap-2">
         <div className="flex items-baseline justify-between gap-2">
-          <h3 className={`font-bold text-amber-300 ${compact ? 'text-base' : 'text-xl'}`}>{data.name}</h3>
+          <h3 className={`font-display font-semibold text-amber-300 ${compact ? 'text-base' : 'text-xl'}`}>{data.name}</h3>
           <span className="text-xs text-stone-400">
             {data.className}
             {data.level !== null ? ` · niv. ${data.level}` : ''}

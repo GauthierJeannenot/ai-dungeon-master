@@ -73,7 +73,7 @@ export default function MyGamesPanel() {
           >
             <div className="min-w-0 flex-1">
               <div className="font-semibold text-stone-100 truncate">{session.adventureTitle}</div>
-              <div className="text-xs text-stone-500 mt-0.5">
+              <div className="text-xs text-stone-400 mt-0.5">
                 {phaseLabel(session.phase)} · {session.turnCount} tour{session.turnCount > 1 ? 's' : ''} ·
                 {' '}HP {session.playerHp.current}/{session.playerHp.max} · {timeAgo(session.updatedAt)}
               </div>
@@ -86,7 +86,7 @@ export default function MyGamesPanel() {
                 Reprendre
               </Link>
             ) : (
-              <span className="flex-shrink-0 text-xs text-stone-600">indisponible</span>
+              <span className="flex-shrink-0 text-xs text-stone-400">indisponible</span>
             )}
             <button
               type="button"

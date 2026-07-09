@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect, useMemo, Suspense } from 'react'
+import { useState, useCallback, useEffect, useMemo, useRef, Suspense } from 'react'
 import dynamic from 'next/dynamic'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Chat from '@/components/Chat'
@@ -13,6 +13,10 @@ import { buildInitialGameState } from '@/lib/initial-game-state'
 
 // Battlemap uses browser APIs — load client-only
 const Battlemap = dynamic(() => import('@/components/Battlemap'), { ssr: false })
+
+// HUD de télémétrie (coûts LLM, cache, narrateur) : outil de debug, pas une
+// info de jeu — masqué par défaut, opt-in via variable d'environnement.
+const debugHudEnabled = process.env.NEXT_PUBLIC_DEBUG_HUD === 'true'
 
 function generateId(): string {
   return `msg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
@@ -381,6 +385,25 @@ function GameView({ adventure, characterId, resumeSessionId }: { adventure: Adve
   const currentBattlemapImage = adventure.battlemapImages?.[currentMapSpec.id] ?? adventure.battlemapImage
   const [budgetSummary, setBudgetSummary] = useState<ClientBudgetSummary>(emptyBudgetSummary)
   const [quota, setQuota] = useState<DMQuota | null>(null)
+  // Battlemap repliable sous `lg` (sans effet au-dessus) : repliée par défaut
+  // hors combat pour laisser la place au journal, dépliée automatiquement à
+  // l'entrée en combat. Le joueur garde la main pour replier/déplier ensuite.
+  const [mapExpanded, setMapExpanded] = useState(() => gameState.phase === 'combat')
+  const previousPhaseRef = useRef(gameState.phase)
+  useEffect(() => {
+    if (gameState.phase === 'combat' && previousPhaseRef.current !== 'combat') {
+      setMapExpanded(true)
+    }
+    previousPhaseRef.current = gameState.phase
+  }, [gameState.phase])
+  const currentRoomName = useMemo(
+    () => adventure.map.rooms.find(room => room.id === gameState.currentRoomId)?.name ?? null,
+    [adventure, gameState.currentRoomId]
+  )
+  const aliveMonsterCount = useMemo(
+    () => Object.values(gameState.monsters).filter(monster => monster.isAlive).length,
+    [gameState.monsters]
+  )
 
   // Charge l'état du compte (solde de tokens ou quota invité). Crée aussi le
   // cookie invité et crédite le bonus de bienvenue au premier passage.
@@ -737,22 +760,32 @@ function GameView({ adventure, characterId, resumeSessionId }: { adventure: Adve
   const alertColor = alertLevel >= 4 ? 'text-red-300' : alertLevel >= 2 ? 'text-amber-300' : 'text-stone-300'
 
   return (
-    <div className="flex flex-col h-screen bg-stone-950 text-stone-100 overflow-hidden">
+    <div className="flex flex-col h-dvh bg-stone-950 text-stone-100 overflow-hidden">
       {/* Top bar */}
       <header className="flex-shrink-0 min-h-10 bg-stone-900 border-b border-amber-900/40 flex flex-wrap items-center px-3 sm:px-4 py-1 gap-2 sm:gap-4">
         <Link
           href="/"
           title="Retour à l'accueil"
-          className="flex items-center gap-1 text-[11px] sm:text-xs text-amber-200 bg-stone-800 hover:bg-stone-700 border border-amber-900/40 px-2 py-1 rounded transition-colors"
+          className="flex min-h-9 sm:min-h-0 items-center gap-1 text-[11px] sm:text-xs text-amber-200 bg-stone-800 hover:bg-stone-700 border border-amber-900/40 px-2.5 sm:px-2 py-1 rounded transition-colors"
         >
           <span aria-hidden="true">←</span>
           <span className="hidden sm:inline">Accueil</span>
         </Link>
-        <Link href="/" className="font-bold text-amber-500 hover:text-amber-400 tracking-wider text-xs sm:text-sm transition-colors" title="Retour à l'accueil">
+        <Link href="/" className="font-display font-semibold text-amber-500 hover:text-amber-400 tracking-wider text-xs sm:text-sm transition-colors" title="Retour à l'accueil">
           ⚔ AI DUNGEON MASTER
         </Link>
         <div className="hidden sm:block h-4 w-px bg-stone-700" />
         <span className={`text-xs font-mono font-bold ${phaseColor}`}>{phaseText}</span>
+        {alertLevel > 0 && (
+          <span
+            title="Niveau d'alerte de la scène"
+            className={`text-[11px] sm:text-xs font-mono border px-1.5 py-0.5 rounded ${alertColor} ${
+              alertLevel >= 4 ? 'border-red-800/60 bg-red-950/40' : alertLevel >= 2 ? 'border-amber-800/60 bg-amber-950/30' : 'border-stone-700 bg-stone-800/60'
+            }`}
+          >
+            ⚠ {alertLevel}/5
+          </span>
+        )}
         <div className="hidden sm:block h-4 w-px bg-stone-700" />
         <span className="hidden sm:inline text-xs text-stone-500">
           {gameState.player.name} · {gameState.player.class} niv.{gameState.player.level}
@@ -767,7 +800,7 @@ function GameView({ adventure, characterId, resumeSessionId }: { adventure: Adve
           <Link
             href="/"
             title={quota?.kind === 'user' ? 'Messages restants — acheter un pack' : "Messages d'essai restants — se connecter"}
-            className={`text-[11px] sm:text-xs font-mono border px-2 py-0.5 rounded transition-colors ${
+            className={`flex min-h-9 sm:min-h-0 items-center text-[11px] sm:text-xs font-mono border px-2 py-0.5 rounded transition-colors ${
               quotaInfo.warning
                 ? 'text-red-300 border-red-800/60 bg-red-950/40 hover:bg-red-900/40'
                 : 'text-amber-300 border-amber-900/40 bg-stone-800 hover:bg-stone-700'
@@ -780,59 +813,108 @@ function GameView({ adventure, characterId, resumeSessionId }: { adventure: Adve
           type="button"
           onClick={resetGame}
           disabled={isLoading || !hasLoadedSession}
-          className="ml-auto text-[11px] sm:text-xs text-amber-200 bg-stone-800 hover:bg-stone-700 disabled:opacity-40 border border-amber-900/40 px-2 py-1 rounded transition-colors"
+          className="ml-auto flex min-h-9 sm:min-h-0 items-center text-[11px] sm:text-xs text-amber-200 bg-stone-800 hover:bg-stone-700 disabled:opacity-40 border border-amber-900/40 px-2.5 sm:px-2 py-1 rounded transition-colors"
         >
           <span className="sm:hidden">Nouvelle</span>
           <span className="hidden sm:inline">Nouvelle partie</span>
         </button>
-        {error && (
-          <span className="text-xs text-red-400 bg-red-900/20 px-2 py-0.5 rounded">
-            {error}
-          </span>
-        )}
       </header>
+
+      {/* Bannière d'erreur — hors du header pour ne pas gonfler le flex-wrap
+          (un message long y écraserait les infos de jeu sur mobile). */}
+      {error && (
+        <div className="flex-shrink-0 flex items-start gap-2 bg-red-950/50 border-b border-red-900/50 px-3 sm:px-4 py-1.5 text-xs text-red-200">
+          <span className="min-w-0 flex-1 break-words">{error}</span>
+          <button
+            type="button"
+            onClick={() => setError(null)}
+            aria-label="Fermer l'alerte"
+            className="flex-shrink-0 text-red-300/80 hover:text-red-100 leading-none px-1"
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       {/* Main layout */}
       <div className="flex flex-col lg:flex-row flex-1 overflow-hidden">
-        {/* Left: Battlemap (65%) */}
-        <div className="flex-[45] lg:flex-[65] min-w-0 min-h-0 p-2 overflow-hidden">
-          <Battlemap
-            gameState={gameState}
-            cellSize={currentMapSpec.cellSize}
-            image={currentBattlemapImage}
-            cols={currentMapSpec.grid.cols}
-            rows={currentMapSpec.grid.rows}
-          />
-          {/* Battlemap et grille de la MAP COURANTE du module actif */}
+        {/* Left: Battlemap (65% sur lg ; repliable sous lg pour laisser la
+            place au journal — voir mapExpanded) */}
+        <div
+          className={
+            mapExpanded
+              ? 'flex-[45] lg:flex-[65] min-w-0 min-h-0 p-2 overflow-hidden'
+              : 'flex-shrink-0 lg:flex-[65] lg:min-h-0 lg:p-2 lg:overflow-hidden min-w-0 px-2 pt-2'
+          }
+        >
+          {/* Bandeau replié (mobile/tablette uniquement) : aperçu + chevron pour déplier */}
+          <button
+            type="button"
+            onClick={() => setMapExpanded(true)}
+            className={`w-full items-center justify-between gap-2 rounded-lg border border-amber-900/30 bg-stone-900 px-3 py-2.5 text-xs text-stone-300 lg:hidden ${mapExpanded ? 'hidden' : 'flex'}`}
+          >
+            <span className="truncate">
+              {currentRoomName ?? 'Carte'}
+              {aliveMonsterCount > 0 ? ` · ${aliveMonsterCount} ennemi${aliveMonsterCount > 1 ? 's' : ''}` : ''}
+            </span>
+            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" className="h-4 w-4 flex-shrink-0 text-stone-400">
+              <path fillRule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
+            </svg>
+          </button>
+
+          {/* Battlemap et grille de la MAP COURANTE du module actif — toujours
+              visible sur lg ; repliable en dessous (voir bandeau ci-dessus) */}
+          <div className={`relative h-full ${mapExpanded ? 'block' : 'hidden'} lg:block`}>
+            <Battlemap
+              gameState={gameState}
+              cellSize={currentMapSpec.cellSize}
+              image={currentBattlemapImage}
+              cols={currentMapSpec.grid.cols}
+              rows={currentMapSpec.grid.rows}
+            />
+            <button
+              type="button"
+              onClick={() => setMapExpanded(false)}
+              aria-label="Replier la carte"
+              title="Replier la carte"
+              className="absolute right-2 top-2 z-30 flex h-8 w-8 items-center justify-center rounded-full border border-amber-900/40 bg-stone-900/90 text-stone-300 lg:hidden"
+            >
+              <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" className="h-4 w-4 rotate-180">
+                <path fillRule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         {/* Right: Chat + CombatTracker (35%) */}
         <div className="flex-[55] lg:flex-[35] min-w-0 lg:min-w-[320px] w-full lg:max-w-[480px] flex flex-col gap-2 p-2 overflow-hidden">
-          <div className="flex-shrink-0 border border-stone-800 bg-stone-900/70 px-3 py-2 text-[11px] text-stone-400">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              <div>
-                <div className="uppercase tracking-wide text-stone-600">Partie</div>
-                <div className="font-mono text-stone-200">{formatUsd(budgetSummary.estimatedCostUsd)}</div>
+          {debugHudEnabled && (
+            <div className="flex-shrink-0 border border-stone-800 bg-stone-900/70 px-3 py-2 text-[11px] text-stone-400">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div>
+                  <div className="uppercase tracking-wide text-stone-500">Partie</div>
+                  <div className="font-mono text-stone-200">{formatUsd(budgetSummary.estimatedCostUsd)}</div>
+                </div>
+                <div>
+                  <div className="uppercase tracking-wide text-stone-500">Tour</div>
+                  <div className="font-mono text-stone-200">{formatUsd(budgetSummary.lastTurnCostUsd)}</div>
+                </div>
+                <div>
+                  <div className="uppercase tracking-wide text-stone-500">LLM</div>
+                  <div className="font-mono text-stone-200">{budgetSummary.llmCalls} appel{budgetSummary.llmCalls > 1 ? 's' : ''}</div>
+                </div>
+                <div>
+                  <div className="uppercase tracking-wide text-stone-500">Alerte</div>
+                  <div className={`font-mono ${alertColor}`}>{alertLevel}/5</div>
+                </div>
               </div>
-              <div>
-                <div className="uppercase tracking-wide text-stone-600">Tour</div>
-                <div className="font-mono text-stone-200">{formatUsd(budgetSummary.lastTurnCostUsd)}</div>
-              </div>
-              <div>
-                <div className="uppercase tracking-wide text-stone-600">LLM</div>
-                <div className="font-mono text-stone-200">{budgetSummary.llmCalls} appel{budgetSummary.llmCalls > 1 ? 's' : ''}</div>
-              </div>
-              <div>
-                <div className="uppercase tracking-wide text-stone-600">Alerte</div>
-                <div className={`font-mono ${alertColor}`}>{alertLevel}/5</div>
+              <div className="mt-1 grid grid-cols-2 gap-x-2 gap-y-0.5 font-mono text-[10px] text-stone-500 sm:grid-cols-[auto_1fr_auto]">
+                <span className="min-w-0">cache {budgetSummary.cacheReadInputTokens}/{budgetSummary.cacheCreationInputTokens}</span>
+                <span className="min-w-0 text-right sm:text-center">narrateur {narratorLabel(budgetSummary.lastNarrator)}</span>
+                <span className="min-w-0 text-right sm:col-auto">route {budgetSummary.lastLlmRoute}</span>
               </div>
             </div>
-            <div className="mt-1 grid grid-cols-2 gap-x-2 gap-y-0.5 font-mono text-[10px] text-stone-500 sm:grid-cols-[auto_1fr_auto]">
-              <span className="min-w-0">cache {budgetSummary.cacheReadInputTokens}/{budgetSummary.cacheCreationInputTokens}</span>
-              <span className="min-w-0 text-right sm:text-center">narrateur {narratorLabel(budgetSummary.lastNarrator)}</span>
-              <span className="min-w-0 text-right sm:col-auto">route {budgetSummary.lastLlmRoute}</span>
-            </div>
-          </div>
+          )}
           {quotaExhausted && (
             <div className="flex-shrink-0 border border-red-800/60 bg-red-950/40 px-3 py-2 text-xs text-red-200">
               {quota?.kind === 'user'

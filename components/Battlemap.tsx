@@ -336,6 +336,8 @@ export default function Battlemap({
             entity={tooltip.entity}
             x={tooltip.x}
             y={tooltip.y}
+            mapW={mapW}
+            mapH={mapH}
           />
         )}
       </div>
@@ -581,25 +583,40 @@ function TokenNpc({
   )
 }
 
+// Largeur/hauteur approximatives du tooltip pour décider d'un flip près des
+// bords de la carte (la carte est en overflow-hidden : sans flip, un tooltip
+// ancré à droite/en bas serait coupé).
+const TOOLTIP_W = 280
+const TOOLTIP_EST_H = 170
+
 function EntityTooltip({
-  entity, x, y
+  entity, x, y, mapW, mapH
 }: {
   entity: PlayerState | MonsterState | MapNpcToken
   x: number
   y: number
+  mapW: number
+  mapH: number
 }) {
   const isMonster = 'isAlive' in entity
   const isNpc = 'disposition' in entity
   const stats = !isNpc ? entity.stats : null
 
+  // Flip horizontal si le tooltip déborderait à droite ; vertical s'il
+  // déborderait en bas. Position clampée dans les bornes de la carte.
+  const flipX = x + 12 + TOOLTIP_W > mapW
+  const left = flipX ? Math.max(0, x - 12 - TOOLTIP_W) : x + 12
+  const flipY = y - 10 + TOOLTIP_EST_H > mapH
+  const top = flipY ? Math.max(0, y - TOOLTIP_EST_H) : Math.max(0, y - 10)
+
   return (
     <div
       className="absolute z-50 bg-stone-900/95 border border-amber-800/60 rounded-lg p-3 shadow-xl text-sm pointer-events-none"
       style={{
-        left: x + 12,
-        top: Math.max(0, y - 10),
+        left,
+        top,
         minWidth: 200,
-        maxWidth: 280,
+        maxWidth: TOOLTIP_W,
       }}
     >
       <div className="font-bold text-amber-400 mb-1">{entity.name}</div>

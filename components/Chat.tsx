@@ -286,7 +286,7 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
         <span className="text-[10px] text-amber-700 uppercase tracking-widest font-semibold pl-1">
           Dungeon Master
         </span>
-        <div className="min-w-0 break-words bg-stone-800/60 border-l-2 border-amber-700/60 rounded-r-lg px-3 py-2 text-stone-200 italic leading-relaxed text-sm font-serif">
+        <div className="min-w-0 break-words bg-stone-800/60 border-l-2 border-amber-700/60 rounded-r-lg px-3 py-2 text-stone-200 italic leading-relaxed text-[15px] font-serif">
           {msg.content}
         </div>
       </div>
@@ -800,7 +800,7 @@ export default function Chat({
     <div className="flex flex-col h-full bg-stone-900/50 rounded-lg border border-amber-900/30 overflow-hidden">
       <div className="px-3 sm:px-4 py-2.5 border-b border-amber-900/30 bg-stone-900/80 flex flex-wrap items-center gap-2 flex-shrink-0">
         <div className="w-2 h-2 bg-amber-600 rounded-full" />
-        <span className="flex-1 min-w-[9rem] text-amber-500 font-semibold text-sm tracking-wide leading-tight">Journal de l&apos;Aventure</span>
+        <span className="font-display flex-1 min-w-[9rem] text-amber-500 font-semibold text-sm tracking-wide leading-tight">Journal de l&apos;Aventure</span>
         <div className="w-full sm:w-auto sm:ml-auto flex items-center justify-start sm:justify-end gap-1 min-w-0">
           {availableVoices.length > 1 && (
             <select
@@ -832,13 +832,13 @@ export default function Chat({
             disabled={!speechSynthesisSupported}
             title="Lire les réponses du DM à voix haute"
             aria-label="Lire les réponses du DM à voix haute"
-            className={`hidden sm:flex h-7 min-w-[4.25rem] items-center justify-center rounded border px-2 text-[11px] font-semibold transition-colors ${
+            className={`flex h-9 sm:h-7 min-w-[3.5rem] sm:min-w-[4.25rem] items-center justify-center rounded border px-2 text-[10px] sm:text-[11px] font-semibold transition-colors ${
               speakerEnabled
                 ? 'border-amber-500/60 bg-amber-800/70 text-amber-50'
                 : 'border-stone-700 bg-stone-800 text-stone-300 hover:bg-stone-700'
             } disabled:opacity-40`}
           >
-            <span className="sm:hidden">Voix</span>
+            <span className="sm:hidden">{speakerEnabled ? 'Voix ●' : 'Voix ○'}</span>
             <span className="hidden sm:inline">{speakerEnabled ? 'Voix ON' : 'Voix OFF'}</span>
           </button>
           <button
@@ -847,7 +847,7 @@ export default function Chat({
             disabled={!recognitionSupported || isLoading}
             title="Parler au Dungeon Master"
             aria-label="Parler au Dungeon Master"
-            className={`h-7 min-w-[3rem] sm:min-w-[4rem] rounded border px-1.5 sm:px-2 text-[10px] sm:text-[11px] font-semibold transition-colors ${
+            className={`h-9 sm:h-7 min-w-[3rem] sm:min-w-[4rem] rounded border px-1.5 sm:px-2 text-[10px] sm:text-[11px] font-semibold transition-colors ${
               isListening
                 ? 'border-red-400/70 bg-red-900/70 text-red-50'
                 : 'border-blue-500/50 bg-blue-950/60 text-blue-100 hover:bg-blue-900/70'
@@ -858,9 +858,9 @@ export default function Chat({
         </div>
       </div>
 
-      <div className="min-w-0 flex-1 overflow-y-auto px-3 py-3 space-y-3 scrollbar-thin scrollbar-thumb-stone-700">
+      <div className="min-w-0 flex-1 overflow-y-auto px-3 py-3 space-y-3">
         {messages.length === 0 && (
-          <div className="text-center text-stone-600 text-sm italic mt-8 px-4">
+          <div className="text-center text-stone-400 text-sm italic mt-8 px-4">
             La table est prete. Tentez quelque chose de brillant, douteux, ou les deux.
           </div>
         )}
@@ -887,12 +887,12 @@ export default function Chat({
             // Miroir UX du plafond serveur DM_MAX_MESSAGE_CHARS (défaut 2000) :
             // évite le 400 côté client. Le serveur reste l'autorité.
             maxLength={2000}
-            className="min-w-0 flex-1 bg-stone-800/80 border border-stone-600/50 rounded-lg px-3 py-2 text-stone-200 placeholder-stone-600 text-sm resize-none focus:outline-none focus:border-amber-700/60 disabled:opacity-50 leading-relaxed"
+            className="min-w-0 flex-1 bg-stone-800/80 border border-stone-600/50 rounded-lg px-3 py-2 text-stone-200 placeholder-stone-500 text-sm resize-none focus:outline-none focus:border-amber-700/60 disabled:opacity-50 leading-relaxed"
           />
           <button
             onClick={handleSend}
             disabled={isLoading || isListening || !inputValue.trim()}
-            className="flex-shrink-0 px-4 py-2 bg-amber-800 hover:bg-amber-700 disabled:bg-stone-700 disabled:opacity-40 text-white rounded-lg text-sm font-semibold transition-colors h-[4.5rem] flex items-center justify-center"
+            className="flex-shrink-0 self-stretch px-4 py-2 bg-amber-800 hover:bg-amber-700 disabled:bg-stone-700 disabled:opacity-40 text-white rounded-lg text-sm font-semibold transition-colors flex items-center justify-center"
           >
             {isLoading ? (
               <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -901,7 +901,7 @@ export default function Chat({
             )}
           </button>
         </div>
-        <div className={`text-[10px] mt-1 pl-1 min-h-4 ${voiceError ? 'text-red-400' : isListening ? 'text-blue-300' : 'text-stone-600'}`}>
+        <div className={`text-[10px] mt-1 pl-1 min-h-4 ${voiceError ? 'text-red-400' : isListening ? 'text-blue-300' : 'text-stone-400'}`}>
           {voiceStatus}
         </div>
       </div>

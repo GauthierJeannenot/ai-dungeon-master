@@ -65,7 +65,7 @@ export default async function LandingPage() {
       {/* Header */}
       <header className="border-b border-amber-900/40 bg-stone-900">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-4">
-          <span className="font-bold text-amber-500 tracking-wider text-sm">⚔ AI DUNGEON MASTER</span>
+          <span className="font-display font-semibold text-amber-500 tracking-wider text-sm">⚔ AI DUNGEON MASTER</span>
           <div className="ml-auto">
             <AuthControls
               authenticated={Boolean(session?.userId)}
@@ -80,7 +80,7 @@ export default async function LandingPage() {
       <main className="max-w-5xl mx-auto px-4">
         {/* Hero */}
         <section className="py-14 sm:py-20 text-center">
-          <h1 className="text-3xl sm:text-5xl font-bold text-amber-400 tracking-tight">
+          <h1 className="font-display text-3xl sm:text-5xl font-semibold text-amber-400 tracking-tight">
             Un Dungeon Master IA, une table toujours ouverte
           </h1>
           <p className="mt-4 text-stone-400 max-w-2xl mx-auto text-sm sm:text-base leading-relaxed">
@@ -110,7 +110,7 @@ export default async function LandingPage() {
 
         {/* Modules d'aventure */}
         <section className="pb-14">
-          <h2 className="text-xl font-bold text-stone-200 mb-1">Modules d&apos;aventure</h2>
+          <h2 className="font-display text-xl font-semibold text-stone-200 mb-1">Modules d&apos;aventure</h2>
           <p className="text-sm text-stone-500 mb-6">Choisissez votre prochaine table.</p>
           <div className="grid gap-5 md:grid-cols-2">
             {ADVENTURES.map(adventure => {
@@ -132,7 +132,7 @@ export default async function LandingPage() {
                   className={`relative rounded-xl border bg-gradient-to-b ${accent.glow} to-stone-900/80 p-6 flex flex-col gap-3 transition-colors ${accent.border} ${adventure.available ? '' : 'opacity-70'}`}
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <h3 className="text-lg font-bold text-stone-100">{adventure.title}</h3>
+                    <h3 className="font-display text-lg font-semibold text-stone-100">{adventure.title}</h3>
                     <span className={`flex-shrink-0 text-[10px] uppercase tracking-wider border px-2 py-0.5 rounded ${accent.badge}`}>
                       {badgeLabel}
                     </span>
@@ -144,7 +144,7 @@ export default async function LandingPage() {
                       🔒 Module payant — connectez-vous et débloquez l&apos;accès définitif.
                     </p>
                   )}
-                  <div className="mt-auto pt-3 flex items-center gap-3 text-xs text-stone-500">
+                  <div className="mt-auto pt-3 flex items-center gap-3 text-xs text-stone-400">
                     <span>{adventure.level}</span>
                     <span className="w-1 h-1 rounded-full bg-stone-700" />
                     <span>{adventure.duration}</span>
@@ -176,7 +176,7 @@ export default async function LandingPage() {
 
         {/* Tarifs */}
         <section className="pb-16">
-          <h2 className="text-xl font-bold text-stone-200 mb-1">Messages</h2>
+          <h2 className="font-display text-xl font-semibold text-stone-200 mb-1">Messages</h2>
           <p className="text-sm text-stone-500 mb-6">
             Chaque message envoyé au Dungeon Master est décompté de votre solde. Les nouveaux
             comptes reçoivent des messages de bienvenue ; les visiteurs anonymes disposent
@@ -190,7 +190,7 @@ export default async function LandingPage() {
         </section>
       </main>
 
-      <footer className="border-t border-stone-900 py-6 text-center text-xs text-stone-600">
+      <footer className="border-t border-stone-900 py-6 text-center text-xs text-stone-400">
         AI Dungeon Master — propulsé par Claude · D&D 5e
       </footer>
     </div>
