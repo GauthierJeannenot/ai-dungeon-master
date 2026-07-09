@@ -5,9 +5,10 @@ import { DEFAULT_CHARACTER_ID, isKnownCharacterId } from './character-registry'
 
 interface ContextFiles {
   playerCharacter: string   // Fiche de personnage : stats, inventaire, capacités
-  playerRules: string       // Règles D&D côté joueur : actions, capacités de classe
-  dmRules: string
-  adventureModule: string
+  playerRules: string       // Règles D&D côté joueur, PAR module : actions, capacités de classe
+  dmRules: string           // Règles DM génériques : UNIQUE fichier partagé (adventures/_shared/)
+  bestiary: string          // Bestiaire & notes de maîtrise PAR module (reskins, calibrage)
+  adventureModule: string   // Module narratif PAR module
 }
 
 // Cache par (module, personnage) : la fiche de personnage dépend du personnage,
@@ -16,6 +17,22 @@ const cachedFiles = new Map<string, ContextFiles>()
 
 function adventureDir(adventureId: string): string {
   return path.join(process.cwd(), 'adventures', adventureId)
+}
+
+// Règles DM génériques, SEUL contenu partagé entre modules (dm-rules.md).
+// Le `_` évite toute collision avec un id de module.
+function sharedRulesDir(): string {
+  return path.join(process.cwd(), 'adventures', '_shared')
+}
+
+// dm-rules.md est l'unique fichier commun : jamais redéfini par module (le
+// contenu propre à une aventure — bestiaire, calibrage, mise en scène — vit
+// dans son bestiary.md). Verrouillé sans vocabulaire de module par
+// tests/no-module-leaks.test.cjs.
+function readSharedDmRules(): string {
+  const shared = readFileOrNull(sharedRulesDir(), 'dm-rules.md')
+  if (shared !== null) return shared
+  throw new Error('Fichier de contexte manquant : adventures/_shared/dm-rules.md')
 }
 
 function characterDir(characterId: string): string {
@@ -40,29 +57,21 @@ function readFileOrNull(dir: string, filename: string): string | null {
   }
 }
 
-// Chargement d'un fichier de contexte avec repli maîtrisé sur le module par
-// défaut :
-//   - perModule=false (player-rules.md, dm-rules.md) : règles D&D génériques ;
-//     un module qui ne les redéfinit pas retombe TOUJOURS sur celles du module
-//     par défaut (repli volontaire, pas de vocabulaire d'un autre module).
-//   - perModule=true (adventure-module.md, player-character.md) : contenu PROPRE
-//     au module ; le repli n'a lieu QUE si l'id est inconnu du registre
-//     (fail-safe). Un module CONNU qui n'a pas son propre fichier est une erreur
-//     — jamais servir en silence le module d'une autre aventure.
-// Aucune constante en dur : le module par défaut (adventures/<default>/) fait foi.
-function readWithFallback(adventureId: string, filename: string, opts: { perModule: boolean }): string {
+// Chargement d'un fichier de contexte PROPRE au module (adventure-module.md,
+// player-rules.md, bestiary.md) : le repli sur le module par défaut n'a lieu
+// QUE si l'id est inconnu du registre (fail-safe). Un module CONNU qui n'a pas
+// son propre fichier est une erreur — jamais servir en silence le contenu
+// d'une autre aventure.
+function readPerModule(adventureId: string, filename: string): string {
   const own = readFileOrNull(adventureDir(adventureId), filename)
   if (own !== null) return own
 
-  if (!opts.perModule || !isKnownAdventureId(adventureId)) {
+  if (!isKnownAdventureId(adventureId)) {
     const fallback = readFileOrNull(adventureDir(DEFAULT_ADVENTURE_ID), filename)
     if (fallback !== null) return fallback
   }
 
-  throw new Error(
-    `Fichier de contexte manquant : adventures/${adventureId}/${filename}` +
-    (opts.perModule ? '' : ` (et repli adventures/${DEFAULT_ADVENTURE_ID}/${filename} indisponible)`)
-  )
+  throw new Error(`Fichier de contexte manquant : adventures/${adventureId}/${filename}`)
 }
 
 export function loadContextFiles(
@@ -77,9 +86,10 @@ export function loadContextFiles(
     // Fiche = personnage GÉNÉRIQUE (globale) ; l'accroche narrative propre au
     // couple aventure×personnage est ajoutée par prompts.ts (characterHooks).
     playerCharacter: readCharacterSheet(characterId),
-    playerRules: readWithFallback(adventureId, 'player-rules.md', { perModule: false }),
-    dmRules: readWithFallback(adventureId, 'dm-rules.md', { perModule: false }),
-    adventureModule: readWithFallback(adventureId, 'adventure-module.md', { perModule: true }),
+    playerRules: readPerModule(adventureId, 'player-rules.md'),
+    dmRules: readSharedDmRules(),
+    bestiary: readPerModule(adventureId, 'bestiary.md'),
+    adventureModule: readPerModule(adventureId, 'adventure-module.md'),
   }
   cachedFiles.set(cacheKey, files)
   return files

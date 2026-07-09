@@ -4,7 +4,9 @@
 // Ce test empêche le prochain module de re-fuiter dans les prompts ou l'UI.
 //
 // Portée : lib/, components/, app/ (pas mcp-server — le bestiaire moteur y est
-// assumé et partagé ; pas adventures/ — c'est là que le contenu vit ; pas tests/).
+// assumé et partagé ; pas adventures/<id>/ — c'est là que le contenu vit ; pas
+// tests/). EXCEPTION : adventures/_shared/ (règles de repli communes) est
+// scanné aussi — voir le test dédié ci-dessous.
 // On ignore les commentaires (bruit) et les slugs d'identifiant de module
 // (« grammys-country-apple-pie » est un identifiant technique, pas du contenu).
 
@@ -63,6 +65,31 @@ function walk(dir) {
   }
   return out
 }
+
+// adventures/_shared/ = règles DM servies à TOUS les modules (seul contenu
+// partagé) : le vocabulaire d'un module y serait une fuite inter-modules
+// directe dans les prompts. Le bestiaire et les reskins vivent dans le
+// bestiary.md de chaque module — rien à excuser ici.
+test('no adventure-specific vocabulary leaks into adventures/_shared', () => {
+  const violations = []
+  const base = path.join(process.cwd(), 'adventures', '_shared')
+  for (const entry of fs.readdirSync(base)) {
+    if (path.extname(entry) !== '.md') continue
+    const source = fs.readFileSync(path.join(base, entry), 'utf8')
+    for (const term of LEAK_TERMS) {
+      const match = source.match(term)
+      if (match) {
+        violations.push(`adventures/_shared/${entry} → "${match[0]}"`)
+      }
+    }
+  }
+  assert.deepEqual(
+    violations,
+    [],
+    `Vocabulaire de module dans les règles DM partagées :\n${violations.join('\n')}\n` +
+    `→ ce contenu appartient au bestiary.md/adventure-module.md du module concerné.`
+  )
+})
 
 test('no adventure-specific vocabulary leaks into lib/components/app', () => {
   const violations = []

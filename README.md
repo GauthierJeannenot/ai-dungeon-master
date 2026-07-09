@@ -34,7 +34,7 @@ Le joueur choisit un personnage prétiré (Guerrier, Roublard, Magicien, Clerc �
 
 ### Ajouter un module d'aventure
 
-1. `adventures/<id>/adventure-module.md` (format « ## Salle N » + « Point d'entrée ») et `map.ts` (exporter un `AdventureMapData` : rooms, entryCells, encounters — **types de monstres existants du moteur uniquement**, npcs, aliases, transitions, roomHooks, startCell, `initialPlayer` = `{ level, extraInventory? }`). Règles propres facultatives (`player-rules.md`, `dm-rules.md`) sinon repli automatique. (La fiche du héros est globale : `characters/<id>/`, pas de `player-character.md`.)
+1. `adventures/<id>/adventure-module.md` (format « ## Salle N » + « Point d'entrée ») et `map.ts` (exporter un `AdventureMapData` : rooms, entryCells, encounters — **types de monstres existants du moteur uniquement**, npcs, aliases, transitions, roomHooks, startCell, `initialPlayer` = `{ level, extraInventory? }`). Chaque module fournit aussi ses `player-rules.md` et `bestiary.md` (requis) ; seules les règles DM génériques sont partagées (`adventures/_shared/dm-rules.md`). (La fiche du héros est globale : `characters/<id>/`, pas de `player-character.md`.)
 2. `adventures/<id>/definition.ts` : exporter un `AdventureContent` (meta landing, `welcomeMessage`, `chatPlaceholders`, `roomStatusHints`, et surtout `promptGuidance` — le vocabulaire du module injecté dans les prompts DM ; **aucun terme d'un autre module**).
 3. Battlemap 17×15 : dupliquer `scripts/generate-battlemap-grammys-country-apple-pie.cjs` → `scripts/generate-battlemap-<id>.cjs`, sortie `public/battlemaps/<id>.png`.
 4. Enregistrer la carte dans `lib/adventure-map.ts` (`ADVENTURE_MAPS`), importer la définition dans `lib/adventures.ts` et l'ajouter à `AVAILABILITY`.
@@ -205,8 +205,11 @@ Le playtest agrège appels LLM, cout estime, routes `none/short/rich/blocked`, t
 Chaque module vit dans son dossier `adventures/<id>/` :
 
 - `adventures/<id>/adventure-module.md` — Carte des salles, monstres, trésors, triggers
-- `adventures/<id>/player-rules.md` — Règles côté joueur *(optionnel : repli sur celles du module par défaut)*
-- `adventures/<id>/dm-rules.md` — Tables de monstres, règles de combat *(optionnel : repli sur le module par défaut)*
+- `adventures/<id>/player-rules.md` — Règles côté joueur propres au module *(requis)*
+- `adventures/<id>/bestiary.md` — Bestiaire & notes de maîtrise du module : stats reskinnées, calibrage, mise en scène *(requis)*
+
+Les règles DM génériques sont le SEUL contenu partagé entre modules :
+`adventures/_shared/dm-rules.md` — sans aucun vocabulaire de module.
 - `adventures/<id>/map.ts` — Données typées (salles, rencontres, PNJ, hooks, `startCell`, `initialPlayer` = niveau + objets propres)
 
 La fiche du personnage n'est PLUS par module : elle vit dans le catalogue global

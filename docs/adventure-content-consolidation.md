@@ -74,8 +74,9 @@ adventures/<id>/
                           #   battlemapImage, grid
   adventure-module.md     # (déjà)
   player-character.md     # (déjà)
-  player-rules.md         # optionnel (repli module par défaut)
-  dm-rules.md             # optionnel (repli module par défaut)
+  player-rules.md         # (depuis le refactor « règles par module » : REQUIS par
+  bestiary.md             #   module, avec bestiary.md ; dm-rules.md est devenu
+                          #   l'unique fichier partagé, adventures/_shared/dm-rules.md)
 
 public/battlemaps/<id>.png              # TOUTES les battlemaps (Grammy incluse)
 scripts/generate-battlemap-<id>.cjs     # un générateur par module
