@@ -217,11 +217,13 @@ export const GRAMMYS_MAP: AdventureMapData = {
       'Mac le Tréant (pommier animé) a déjà son token visible en (3,13) : non hostile si ignoré ; hostile si on menace les plantes.',
       'Si Mac devient hostile : spawn_monster (awakened_tree, à sa position) + enter_combat (son token PNJ laisse place au combattant).',
       'DD 12 Persuasion ou Investigation (roll_ability_check) → il évoque les secrets des dryades du verger.',
+      'Mac ne sait RIEN de la recette (ni contenu, ni deux moitiés, ni emplacements) : il ne révèle JAMAIS ces informations et renvoie vers les dryades.',
       'Grandes portes barrées : DD 14 Force (roll_ability_check) pour enfoncer, ou contourner par le quai de chargement (salle 7).',
     ].join('\n'),
     '2': [
       "Trois dryades malicieuses, présentes mais CACHÉES (tokens invisibles) : n'apparaissent que sur offrande ou DD 13 Persuasion (roll_ability_check).",
       'Dès qu’elles se montrent (offrande acceptée ou DD 13 réussi) : appelle reveal_npc({ kind: "dryad" }) pour afficher leurs trois tokens — peut accompagner le roll_ability_check du même message.',
+      'Une fois amadouées, elles racontent en gloussant que les gobelins essaient de faire des tartes depuis des semaines sans jamais y arriver.',
       'DD 17 Persuasion ou Investigation → elles révèlent que la recette est en deux moitiés (bureau salle 5 + appartement salle 9).',
       'Si offensées : reveal_npc({ kind: "dryad", disposition: "offended" }) puis elles bombardent de pommes pourries jusqu’au départ du joueur (pas de vrai combat).',
     ].join('\n'),

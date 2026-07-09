@@ -77,6 +77,7 @@ Le chemin de gravier serpente à travers une pelouse envahie par les mauvaises h
 - Ne s'implique pas si on le laisse tranquille
 - Si les plantes sont menacées → hostile (vise à neutraliser, jamais tuer)
 - DD 12 Persuasion ou Investigation → révèle que les dryades du verger connaissent des secrets
+- **Mac ne sait RIEN de la recette** : ni son contenu, ni qu'elle est en deux moitiés, ni où elle se trouve. Il ne doit JAMAIS donner ces informations — seules les dryades les connaissent. Si on l'interroge sur la recette, il renvoie vers les dryades.
 - Peut éveiller les **9 arbustes** devant le bâtiment à volonté
 
 **Grandes portes** : barre de bois côté intérieur
@@ -106,6 +107,7 @@ Les pommiers plus anciens sont disposés en rangées ordonnées, mais les jeunes
 **Trois dryades** (malicieuses, farouches, non hostiles) :
 - Positions suggérées : (3, 1), (8, 1), (13, 1)
 - Ne se montrent pas sans offrande ou DD 13 Persuasion
+- Une fois amadouées (offrande acceptée ou DD 13 réussi) → racontent en gloussant que les gobelins essaient de faire des tartes depuis des semaines sans jamais y arriver — leurs fournées ratées empestent jusqu'au verger
 - DD 17 Persuasion ou Investigation → révèlent que la moitié de la recette est dans le bureau (salle 5) et l'autre dans l'appartement (salle 9)
 - Bonus : entrée par le quai de chargement (salle 7) permet de surprendre les gobelins
 - Si offensées : lancent des pommes pourries jusqu'à ce que le joueur parte
