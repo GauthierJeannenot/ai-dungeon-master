@@ -37,14 +37,18 @@ export const FEY_SHADOW_FAIR_START_CELL: GridCell = { x: 4, y: 14 }
 
 export const FEY_SHADOW_FAIR_ROOMS: AdventureRoom[] = [
   // ── Carte fair — La Foire aux Chandelles (24×16) ──────────────────────────
-  { id: '1', name: 'Le Pré aux Lanternes', mapId: 'fair', zone: { minX: 0, maxX: 23, minY: 13, maxY: 15 } },
-  { id: '2', name: "L'Allée des Baraques", mapId: 'fair', zone: { minX: 0, maxX: 9, minY: 9, maxY: 12 } },
-  { id: '3', name: "Le Carrousel de Limaces et la Piste d'Escargots", mapId: 'fair', zone: { minX: 12, maxX: 21, minY: 9, maxY: 12 } },
-  { id: '4', name: 'La Tente du Bonneteau', mapId: 'fair', zone: { minX: 0, maxX: 5, minY: 0, maxY: 4 } },
-  { id: '5', name: 'Le Portail des Vers Luisants', mapId: 'fair', zone: { minX: 14, maxX: 19, minY: 0, maxY: 4 } },
-  { id: '6', name: 'Le Grand Chapiteau', mapId: 'fair', zone: { minX: 0, maxX: 6, minY: 5, maxY: 8 } },
-  { id: '7', name: 'La Théière à Bulles', mapId: 'fair', zone: { minX: 16, maxX: 21, minY: 5, maxY: 8 } },
-  { id: '8', name: 'Le Verger aux Ripailles', mapId: 'fair', zone: { minX: 8, maxX: 14, minY: 5, maxY: 8 } },
+  // Zones alignées sur la battlemap finale (fey-shadow-fair-fair.png) :
+  // haut = bonneteau / baraques de jeux (palais des miroirs derrière) / portail ;
+  // milieu = chapiteau / allée de Madame Bougie / carrousel + piste ;
+  // bas = pré + billetterie / verger (frappe-la-cloche) / théière (fioles).
+  { id: '1', name: 'Le Pré aux Lanternes', mapId: 'fair', zone: { minX: 0, maxX: 11, minY: 11, maxY: 15 } },
+  { id: '2', name: "L'Allée des Baraques", mapId: 'fair', zone: { minX: 7, maxX: 12, minY: 5, maxY: 10 } },
+  { id: '3', name: "Le Carrousel de Limaces et la Piste d'Escargots", mapId: 'fair', zone: { minX: 13, maxX: 23, minY: 5, maxY: 10 } },
+  { id: '4', name: 'La Tente du Bonneteau', mapId: 'fair', zone: { minX: 0, maxX: 6, minY: 0, maxY: 4 } },
+  { id: '5', name: 'Le Portail des Vers Luisants', mapId: 'fair', zone: { minX: 14, maxX: 23, minY: 0, maxY: 4 } },
+  { id: '6', name: 'Le Grand Chapiteau', mapId: 'fair', zone: { minX: 0, maxX: 6, minY: 5, maxY: 10 } },
+  { id: '7', name: 'La Théière à Bulles', mapId: 'fair', zone: { minX: 18, maxX: 23, minY: 11, maxY: 15 } },
+  { id: '8', name: 'Le Verger aux Ripailles', mapId: 'fair', zone: { minX: 12, maxX: 17, minY: 11, maxY: 15 } },
   { id: '9', name: 'Le Palais des Miroirs', mapId: 'fair', zone: { minX: 7, maxX: 12, minY: 0, maxY: 4 } },
   // ── Carte wood — Le Bois-Ricanant (16×24, sud → nord) ─────────────────────
   { id: '10', name: 'La Clairière des Champignons Moqueurs', mapId: 'wood', zone: { minX: 0, maxX: 15, minY: 19, maxY: 23 } },
@@ -59,13 +63,13 @@ export const FEY_SHADOW_FAIR_ROOMS: AdventureRoom[] = [
 // Points d'entrée par salle (cibles move_token du DM).
 export const FEY_SHADOW_FAIR_ENTRY_CELLS: Record<string, GridCell> = {
   '1': { x: 4, y: 14 },
-  '2': { x: 5, y: 10 },
-  '3': { x: 13, y: 10 },
-  '4': { x: 3, y: 2 },
+  '2': { x: 7, y: 8 },
+  '3': { x: 16, y: 10 },
+  '4': { x: 3, y: 3 },
   '5': { x: 16, y: 2 },
-  '6': { x: 3, y: 6 },
-  '7': { x: 18, y: 6 },
-  '8': { x: 11, y: 6 },
+  '6': { x: 4, y: 8 },
+  '7': { x: 19, y: 13 },
+  '8': { x: 14, y: 13 },
   '9': { x: 9, y: 2 },
   '10': { x: 4, y: 21 },
   '11': { x: 7, y: 16 },
@@ -81,10 +85,10 @@ export const FEY_SHADOW_FAIR_ENCOUNTERS: Record<string, EncounterDefinition> = {
     id: 'fair_pickpockets',
     roomId: '2',
     name: "Tire-goussets de l'Allée",
-    playerCell: { x: 6, y: 10 },
+    playerCell: { x: 9, y: 9 },
     monsters: [
-      { monsterType: 'goblin_minion', cell: { x: 7, y: 9 }, name: 'Tire-gousset gobelin' },
-      { monsterType: 'goblin_minion', cell: { x: 8, y: 10 }, name: 'Tire-gousset gobelin' },
+      { monsterType: 'goblin_minion', cell: { x: 10, y: 8 }, name: 'Tire-gousset gobelin' },
+      { monsterType: 'goblin_minion', cell: { x: 11, y: 9 }, name: 'Tire-gousset gobelin' },
     ],
   },
   bonneteau_bouncers: {
@@ -111,10 +115,10 @@ export const FEY_SHADOW_FAIR_ENCOUNTERS: Record<string, EncounterDefinition> = {
     id: 'feast_flan',
     roomId: '8',
     name: 'Le Grand Flan se vexe',
-    playerCell: { x: 11, y: 7 },
+    playerCell: { x: 15, y: 13 },
     monsters: [
       // zombie (22 HP, CA 8, vitesse 20) : parfait pour un flan géant offensé.
-      { monsterType: 'zombie', cell: { x: 9, y: 7 }, name: 'Le Grand Flan', hpOverride: 16 },
+      { monsterType: 'zombie', cell: { x: 13, y: 13 }, name: 'Le Grand Flan', hpOverride: 16 },
     ],
   },
   mirror_reflections: {
@@ -210,7 +214,7 @@ export const FEY_SHADOW_FAIR_NPCS: AdventureNpcSpec[] = [
     name: 'Madame Bougie',
     kind: 'merchant',
     roomId: '2',
-    cell: { x: 2, y: 10 },
+    cell: { x: 8, y: 8 },
     disposition: 'neutral',
     visibleFromStart: true,
     description: "Tenancière de la foire, cire fondue dans les cheveux, sourire en flamme de veilleuse. Seule à savoir ouvrir le Portail des Vers Luisants — et ne l'ouvre qu'aux gens qu'elle apprécie.",
@@ -221,16 +225,19 @@ export const FEY_SHADOW_FAIR_NPCS: AdventureNpcSpec[] = [
     kind: 'shrub',
     roomId: '3',
     cell: { x: 19, y: 10 },
-    disposition: 'helpful',
+    // Neutre tant que le joueur ne l'a pas abordé : seul un compagnon HELPFUL
+    // traverse avec le joueur (applyMapTravel) — pas d'apparition irrationnelle
+    // dans le bois si on ne lui a jamais parlé.
+    disposition: 'neutral',
     visibleFromStart: true,
-    description: "Arbuste éveillé en pot, employé du carrousel, s'ennuie à mourir. Rêve de voir le Bois-Ricanant — suivra le joueur si on l'emporte (compagnon de la transition).",
+    description: "Arbuste éveillé en pot, employé du carrousel, s'ennuie à mourir. Rêve de voir le Bois-Ricanant — ne traverse avec le joueur que si on accepte de l'emmener (disposition helpful, compagnon de la transition).",
   },
   {
     id: 'pipotin',
     name: 'Pipotin',
     kind: 'barker',
     roomId: '4',
-    cell: { x: 1, y: 1 },
+    cell: { x: 3, y: 2 },
     disposition: 'wary',
     visibleFromStart: true,
     description: "Gobelin bonimenteur, apprenti de Maître Filou. Sait où son patron s'est enfui avec l'ombre — et vend l'information contre trois compliments sincères ou une pièce.",
@@ -250,7 +257,7 @@ export const FEY_SHADOW_FAIR_NPCS: AdventureNpcSpec[] = [
     name: 'Théophile',
     kind: 'tea_goblin',
     roomId: '7',
-    cell: { x: 20, y: 6 },
+    cell: { x: 20, y: 12 },
     disposition: 'helpful',
     visibleFromStart: true,
     description: "Gobelin tisanier de la Théière à Bulles, ceinturon de petites cuillères. Ne parle qu'en rimes approximatives et exige qu'on lui réponde pareil. Vend des tours de bulle qui survolent TOUTE la foire.",
@@ -260,7 +267,7 @@ export const FEY_SHADOW_FAIR_NPCS: AdventureNpcSpec[] = [
     name: 'Mirabelle',
     kind: 'bard',
     roomId: '8',
-    cell: { x: 13, y: 5 },
+    cell: { x: 14, y: 12 },
     disposition: 'neutral',
     visibleFromStart: true,
     description: "Ménestrelle gnome installée sur une balançoire accrochée à un poirier. Semble tout savoir avant tout le monde, parle par énigmes, et jure que le héros est « exactement là où il doit être ». Personne ne l'a jamais vue payer son billet.",
@@ -338,7 +345,7 @@ export const FEY_SHADOW_FAIR_NPCS: AdventureNpcSpec[] = [
 ]
 
 export const FEY_SHADOW_FAIR_NAMED_LOCATION_CELLS: Array<{ id: string; pattern: RegExp; cell: GridCell }> = [
-  { id: 'madame_bougie', pattern: /\b(madame bougie|bougie|chandeliere|chandelière|tenanciere|tenancière)\b/, cell: { x: 2, y: 10 } },
+  { id: 'madame_bougie', pattern: /\b(madame bougie|bougie|chandeliere|chandelière|tenanciere|tenancière)\b/, cell: { x: 7, y: 8 } },
   { id: 'billetterie', pattern: /\b(billetterie|billets?|nicodeme|nicodème)\b/, cell: { x: 7, y: 14 } },
   { id: 'firefly_gate', pattern: /\b(portail|vers luisants|arche luisante)\b/, cell: { x: 16, y: 2 } },
 ]
@@ -507,19 +514,19 @@ export const FEY_SHADOW_FAIR_ROOM_HOOKS: Record<string, string> = {
     "DD 12 Charisme (roll_ability_check) auprès de Nicodème ou des badauds → apprendre que Madame Bougie (Allée, salle 2) décide de QUI passe le Portail des Vers Luisants.",
   ].join('\n'),
   '2': [
-    'Madame Bougie a son token visible en (2,10) : neutre, marchande de chandelles-souvenirs qui chuchotent.',
+    'Madame Bougie a son token visible en (8,8) : neutre, marchande de chandelles-souvenirs qui chuchotent.',
     "DD 13 Persuasion OU un vrai service rendu (tire-goussets réglés, compliment non flagorneur) → reveal_npc({ npcId: \"madame_bougie\", disposition: \"helpful\" }) : elle promet d'ouvrir le portail. OBJECTIF DE QUÊTE (charm_bougie). Flagornerie grossière → offended pour une scène.",
     'Deux tire-goussets gobelins détroussent les badauds : start_encounter("fair_pickpockets") si le joueur les prend sur le fait (DD 12 Perception) ou s\'il se fait voler sa bourse (échec). Combat évitable : DD 12 Intimidation les fait tout rendre. Objectif optionnel stop_pickpockets.',
     "Jeux forains le long de l'allée : lancer d'anneaux sur almiraj téléporteur (DD 13 DEX) et concours de poésie gnome (DD 13 CHA) — un succès vaut un lot (babiole féerique au choix du DM, à ajouter via add_item).",
   ].join('\n'),
   '3': [
-    'Le carrousel tourne à dos de limaces géantes (une lenteur assumée et payante) ; à côté, la Piste d\'Escargots accueille des courses d\'escargots de compétition. Barnabé, arbuste éveillé en pot, token visible en (19,10), disposition helpful.',
+    'Le carrousel tourne à dos de limaces géantes (une lenteur assumée et payante) ; à côté, la Piste d\'Escargots accueille des courses d\'escargots de compétition. Barnabé, arbuste éveillé en pot, token visible en (19,10), NEUTRE tant qu\'on ne l\'a pas abordé.',
     "Entrer dans la salle suffit à l'objectif optionnel ride_carousel (trigger_room_event enter).",
-    'DD 10 Charisme (roll_ability_check) avec Barnabé → il supplie qu\'on l\'emmène au Bois-Ricanant : rappeler au joueur qu\'il TRAVERSERA avec lui (compagnon de la transition firefly_gate).',
+    'DD 10 Charisme (roll_ability_check) avec Barnabé OU accepter simplement de l\'emmener → reveal_npc({ npcId: "barnabe", disposition: "helpful" }) : il supplie qu\'on l\'emmène au Bois-Ricanant et TRAVERSERA avec le joueur (compagnon de la transition firefly_gate). Sans cet accord acté, il reste à la foire.',
     "Course d'escargots (1 poinçon) : jockey d'un escargot de course, DD 12 Sagesse (Dressage, roll_ability_check) → victoire, lot + ovation. La limace de tête (elle parle, très lentement) souffle que Maître Filou a « fiiilé côté Boiiis » (indice vers la tente et le portail).",
   ].join('\n'),
   '4': [
-    "Pipotin le bonimenteur, token visible en (1,1), wary : il garde la tente de Maître Filou (parti la veille avec l'ombre).",
+    "Pipotin le bonimenteur, token visible en (3,2), wary : il garde la tente de Maître Filou (parti la veille avec l'ombre).",
     'ENTRER dans la salle (trigger_room_event enter) remplit l\'objectif REQUIS find_filou_trail : Pipotin lâche que son patron a filé par le Portail des Vers Luisants vers le Bois-Ricanant.',
     "DD 12 Persuasion (ou 1 po) → Pipotin donne en plus le conseil : « Le Prince rend tout à qui le fait rire. Tout. Même les ombres. »",
     'DD 12 Investigation sur la table → un jeu de cartes oublié, TOUTES l\'as de trèfle (preuve de triche, précieuse à la Cour).',
@@ -528,7 +535,7 @@ export const FEY_SHADOW_FAIR_ROOM_HOOKS: Record<string, string> = {
   '5': [
     "L'arche du portail est éteinte tant que Madame Bougie n'est pas helpful : narrer des vers luisants endormis, refus doux du passage.",
     "Quand le joueur franchit DÉLIBÉRÉMENT le portail (et confirme, car c'est SANS RETOUR) → travel_to_map({ toMapId: \"wood\" }). Si le moteur refuse (MAP_QUEST_INCOMPLETE), les vers luisants forment les mots des objectifs manquants dans l'air, avec une faute d'orthographe.",
-    "Rappeler ce qui serait laissé derrière : tire-goussets impunis, Barnabé (salle 3) si le joueur ne lui a pas parlé, Miroslav inconsolé, achats non faits.",
+    "Rappeler ce qui serait laissé derrière : tire-goussets impunis, Barnabé (salle 3) s'il n'est pas devenu un ami — seul un compagnon helpful traverse —, Miroslav inconsolé, achats non faits.",
   ].join('\n'),
   '6': [
     "Sous le Grand Chapiteau : contorsionniste halfeline qui tient dans une boîte à chapeau, jongleuse gobeline qui rattrape TOUT ce qu'on lui lance (huit objets max — elle le précise), clowns gnomes en canon. Ernestine la guenon à vielle, token visible en (1,6), neutre : quémande UN bouton avec sa pancarte rimée.",
@@ -536,12 +543,12 @@ export const FEY_SHADOW_FAIR_ROOM_HOOKS: Record<string, string> = {
     "Chahuter le spectacle ou lancer un neuvième objet à la jongleuse → les loups savants ratent leur numéro de cerceaux et s'échappent : start_encounter(\"circus_wolves\"). Combat évitable : DD 12 Sagesse (Dressage) ou leur tendre un cerceau — ils sautent au travers et saluent.",
   ].join('\n'),
   '7': [
-    'Théophile le gobelin tisanier, token visible en (20,6), helpful : il ne parle qu\'en rimes et vend des tours de bulle (1 poinçon).',
+    'Théophile le gobelin tisanier, token visible en (20,12), helpful : il ne parle qu\'en rimes et vend des tours de bulle (1 poinçon).',
     "Lui répondre en rimes (DD 12 CHA, roll_ability_check) → il offre un sachet de « thé d'aplomb » : le boire donne de l'aplomb pour UNE scène sociale (avantage narratif à faire valoir, add_item).",
     "Tour de bulle : la bulle s'élève et survole TOUTE la foire — décrire les neuf attractions vues du ciel (moment d'exposition idéal). DD 10 DEX (roll_ability_check) → diriger la bulle et la faire éclater au-dessus de la salle de son choix (move_token vers l'entrée de cette salle) ; échec → atterrissage au hasard, dans un arbre ou sur le toit d'une baraque.",
   ].join('\n'),
   '8': [
-    "Tables de banquet, échassiers qui cueillent les fruits, une quantité déraisonnable de crème anglaise. Mirabelle la ménestrelle gnome, token visible en (13,5), neutre, sur sa balançoire : cryptique, elle sait déjà pourquoi le héros est là.",
+    "Tables de banquet, échassiers qui cueillent les fruits, une quantité déraisonnable de crème anglaise. Mirabelle la ménestrelle gnome, token visible en (14,12), neutre, sur sa balançoire : cryptique, elle sait déjà pourquoi le héros est là.",
     "ENTRER dans la salle remplit l'objectif optionnel taste_orchard (trigger_room_event enter).",
     "Concours de gâteaux des fées (1 poinçon) : trois DD 10 CON (roll_ability_check) d'affilée → victoire, le lot est un petit gâteau d'invisibilité (add_item, une utilisation). Un échec = moustache de crème (dégâts d'orgueil uniquement).",
     "Raconter honnêtement sa mésaventure à Mirabelle (DD 12 CHA) → elle offre un couplet porte-bonheur : « Le Prince rend tout à qui le fait rire » (recoupe le conseil de Pipotin) et souffle qu'un mime de la foire a perdu PLUS qu'une ombre.",

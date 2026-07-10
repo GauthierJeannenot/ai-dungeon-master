@@ -36,10 +36,18 @@ async function withEngine(fn) {
 // helpful (reveal_npc est scopé à la salle courante → aller salle 2 d'abord),
 // puis visiter la salle 4 (tente).
 async function completeFairRequiredQuest(client) {
-  await callTool(client, 'move_token', { tokenId: 'player', toCell: { x: 5, y: 10 } })
+  await callTool(client, 'move_token', { tokenId: 'player', toCell: { x: 7, y: 8 } })
   const reveal = await callTool(client, 'reveal_npc', { npcId: 'madame_bougie', disposition: 'helpful' })
   assert.ok(!reveal.error, `reveal_npc a échoué : ${JSON.stringify(reveal)}`)
-  await callTool(client, 'move_token', { tokenId: 'player', toCell: { x: 3, y: 2 } })
+  await callTool(client, 'move_token', { tokenId: 'player', toCell: { x: 3, y: 3 } })
+}
+
+// Acte l'amitié avec Barnabé (salle 3) : seul un compagnon HELPFUL traverse
+// avec le joueur — un PNJ jamais abordé reste sur sa map.
+async function befriendBarnabe(client) {
+  await callTool(client, 'move_token', { tokenId: 'player', toCell: { x: 13, y: 10 } })
+  const reveal = await callTool(client, 'reveal_npc', { npcId: 'barnabe', disposition: 'helpful' })
+  assert.ok(!reveal.error, `reveal_npc barnabe a échoué : ${JSON.stringify(reveal)}`)
 }
 
 test('initial state starts on the first map with mapOutcomes empty', async () => {
@@ -80,6 +88,8 @@ test('travel_to_map is refused during combat even with the quest complete', asyn
 test('travel applies arrival, companion transfer, monster purge and outcome (partial)', async () => {
   await withEngine(async client => {
     await completeFairRequiredQuest(client)
+    // Barnabé devenu ami : il doit traverser (un PNJ neutre resterait).
+    await befriendBarnabe(client)
     // Un monstre traîne sur la foire (spawné hors combat) : il doit être purgé.
     await callTool(client, 'spawn_monster', { monsterType: 'goblin', cell: { x: 8, y: 13 }, name: 'Badaud gobelin' })
 
@@ -111,6 +121,20 @@ test('travel applies arrival, companion transfer, monster purge and outcome (par
   })
 })
 
+test('a companion never befriended (non-helpful) stays on his map', async () => {
+  await withEngine(async client => {
+    // Quête requise remplie SANS jamais aborder Barnabé (il reste neutral).
+    await completeFairRequiredQuest(client)
+    const travel = await callTool(client, 'travel_to_map', { toMapId: 'wood' })
+    assert.ok(!travel.error, `travel_to_map a échoué : ${JSON.stringify(travel)}`)
+    assert.deepEqual(travel.companionsMoved, [], 'aucun compagnon ne doit traverser sans amitié actée')
+
+    const state = await callTool(client, 'get_game_state')
+    assert.equal(state.npcs.barnabe.mapId, 'fair', 'Barnabé jamais abordé doit rester à la foire')
+    assert.equal(state.npcs.barnabe.roomId, '3')
+  })
+})
+
 test('travel outcome is total when optional objectives are also done', async () => {
   await withEngine(async client => {
     await completeFairRequiredQuest(client)
@@ -126,7 +150,7 @@ test('travel outcome is total when optional objectives are also done', async () 
     const mime = await callTool(client, 'reveal_npc', { npcId: 'miroslav', disposition: 'helpful' })
     assert.ok(!mime.error, `reveal_npc miroslav a échoué : ${JSON.stringify(mime)}`)
     // Optionnel 4 : goûter aux réjouissances du Verger (salle 8).
-    await callTool(client, 'move_token', { tokenId: 'player', toCell: { x: 11, y: 6 } })
+    await callTool(client, 'move_token', { tokenId: 'player', toCell: { x: 14, y: 13 } })
 
     const travel = await callTool(client, 'travel_to_map', { toMapId: 'wood' })
     assert.ok(!travel.error, `travel_to_map a échoué : ${JSON.stringify(travel)}`)
@@ -173,6 +197,7 @@ test('movement bounds follow the current map grid', async () => {
 test('currentMapId, mapOutcomes and npc mapId survive replace_game_state', async () => {
   await withEngine(async client => {
     await completeFairRequiredQuest(client)
+    await befriendBarnabe(client)
     await callTool(client, 'travel_to_map', { toMapId: 'wood' })
     const before = await callTool(client, 'get_game_state')
 

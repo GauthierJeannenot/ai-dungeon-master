@@ -20,7 +20,7 @@ Aux nuits de lune-miel, la Foire aux Chandelles s'installe au pré communal — 
 
 **Le passage entre les deux cartes est SANS RETOUR** (transition `firefly_gate`, tool `travel_to_map`). Avant le départ, TOUJOURS : (1) rappeler ce qui resterait inachevé sur la foire, (2) demander une confirmation explicite au joueur. Après le passage, la foire n'existe plus — n'y faire référence qu'au passé.
 
-**Barnabé le compagnon.** Si le joueur a sympathisé avec Barnabé (salle 3), l'arbuste éveillé traverse AVEC lui (compagnon de la transition) et devient la mascotte comique du Bois : il s'émerveille, se trompe de direction avec assurance, et peut servir de numéro comique devant le Prince.
+**Barnabé le compagnon.** Si le joueur a sympathisé avec Barnabé (salle 3) — amitié actée par `reveal_npc({ npcId: "barnabe", disposition: "helpful" })`, seul un compagnon helpful traverse —, l'arbuste éveillé traverse AVEC lui (compagnon de la transition) et devient la mascotte comique du Bois : il s'émerveille, se trompe de direction avec assurance, et peut servir de numéro comique devant le Prince. Sans cet accord, il reste à la foire et n'apparaît JAMAIS dans le Bois.
 
 **Les avantages se cumulent en scène finale.** Le module sème des atouts pour la Cour : le pas de l'Ombre Soliste, l'annonce des chiens-clins (« l'Invité Qui Joue »), le couplet de Mirabelle, le thé d'aplomb de Théophile, les cartes-preuves de la tente, le numéro de Barnabé. Chacun se traduit en avantage narratif ou mécanique au moment de faire rire le Prince — récompenser la préparation.
 
@@ -62,20 +62,21 @@ Première carte du module (grille 24×16, cases x:0-23 / y:0-15 — grande carte
 | Depuis → Vers | Coordonnée d'arrivée | Condition |
 |---------------|---------------------|-----------|
 | Départ (pré aux lanternes) | (4, 14) | Position initiale — sous l'arche d'entrée de la foire |
-| Pré → Allée des Baraques | (5, 10) | Remonter entre les échoppes |
-| Pré/Allée → Carrousel et Piste d'Escargots | (13, 10) | Sur la droite, musique de boîte à meuh |
-| Allée → Grand Chapiteau | (3, 6) | Le chapiteau à trois pointes, au-dessus de l'allée |
-| Allée/Chapiteau → Verger aux Ripailles | (11, 6) | Au centre de la foire, ça sent la crème anglaise |
-| Carrousel/Verger → Théière à Bulles | (18, 6) | La théière géante, côté est |
-| Chapiteau → Tente du Bonneteau | (3, 2) | Tente rayée, au fond à l'ouest |
-| Tente/Verger → Palais des Miroirs | (9, 2) | Façade de glaces tournoyantes |
-| Théière/Palais → Portail des Vers Luisants | (16, 2) | Arche de branches tressées, au fond de la foire |
+| Pré → Allée des Baraques (étal de Madame Bougie) | (7, 8) | Remonter vers le centre de la foire |
+| Allée → Jeux forains (anneaux, poésie gnome) | (8, 5) | Au nord de l'allée, devant les baraques |
+| Pré/Allée → Carrousel et Piste d'Escargots | (16, 10) | Sur la droite, musique de boîte à meuh |
+| Allée → Grand Chapiteau | (4, 8) | Le chapiteau à trois pointes, à l'ouest de l'allée |
+| Pré → Verger aux Ripailles | (14, 13) | Au sud-est, ça sent la crème anglaise |
+| Verger → Théière à Bulles | (19, 13) | Le stand aux fioles qui bullent, coin sud-est |
+| Chapiteau → Tente du Bonneteau | (3, 3) | Tente rayée, au fond à l'ouest |
+| Allée → Palais des Miroirs | (9, 2) | Façade de glaces tournoyantes, derrière les baraques de jeux |
+| Palais/Carrousel → Portail des Vers Luisants | (16, 2) | Arche de branches tressées, au fond de la foire |
 | Portail → Bois-Ricanant | travel_to_map | SANS RETOUR — quête de carte requise |
 
 **Le joueur commence à : (4, 14) — le Pré aux Lanternes, sous l'arche d'entrée**
 
 ## Salle 1 — Le Pré aux Lanternes
-**Zone** : x:0-23, y:13-15 (bande d'herbe au bas de la carte)
+**Zone** : x:0-11, y:11-15 (l'herbe et la guérite, moitié ouest du bas de la carte)
 **Point d'entrée** : (4, 14)
 
 ### Description
@@ -91,12 +92,13 @@ L'herbe est constellée de lanternes plantées comme des salades lumineuses. Ça
 - Ambiance à jouer : chaque lanterne murmure un compliment quand on passe devant. Celles près du héros toussotent, gênées.
 
 ## Salle 2 — L'Allée des Baraques
-**Zone** : x:0-9, y:9-12
-**Point d'entrée** : (5, 10)
+**Zone** : x:7-12, y:5-10
+**Point d'entrée jeux forains** : (8, 5)
+**Point d'entrée Madame Bougie** : (7, 8)
 
 ### Contenu
 **Madame Bougie** (tenancière, non hostile) :
-- Position : (2, 10) — derrière son étal de chandelles-souvenirs qui chuchotent
+- Position : (8, 8) — derrière son étal de chandelles-souvenirs qui chuchotent
 - OBJECTIF REQUIS (charm_bougie) : DD 13 Persuasion OU un vrai service rendu (tire-goussets réglés, course honnête, bouton donné à Ernestine dont elle entend parler) → elle devient helpful (`reveal_npc` avec disposition) et promet d'ouvrir le portail : « Revenez me voir quand vous partez, mon petit. Et ne revenez pas, c'est le principe. »
 - Flagornerie grossière → elle devient offended pour une scène (« Mes chandelles détectent le suif, jeune homme. »)
 
@@ -111,15 +113,15 @@ L'herbe est constellée de lanternes plantées comme des salades lumineuses. Ça
 - Lots : babioles féeriques (baguette à étincelles, toupie qui rit, corne de licorne en sucre)
 
 ## Salle 3 — Le Carrousel de Limaces et la Piste d'Escargots
-**Zone** : x:12-21, y:9-12
-**Point d'entrée** : (13, 10)
+**Zone** : x:13-23, y:5-10
+**Point d'entrée** : (16, 10)
 
 ### Contenu
 Le carrousel tourne à dos de limaces géantes — un demi-tour par chanson, lenteur assumée, supplément « sensations fortes » pour la limace qui a le hoquet. À côté, la Piste d'Escargots : huit escargots de course caparaçonnés aux couleurs de leur écurie, des pixies pour équipes de stand, une tribune en délire.
 
-**Barnabé** (arbuste éveillé en pot, helpful) :
+**Barnabé** (arbuste éveillé en pot, neutral tant qu'on ne l'a pas abordé) :
 - Position : (19, 10) — il fait la file du carrousel depuis trois lunes, personne ne le laisse monter (« pas de racines sur les limaces »)
-- DD 10 CHA → il supplie qu'on l'emmène au Bois-Ricanant : « Je suis un BUISSON, monsieur. Un buisson qui n'a jamais vu de forêt. » S'il vient, il TRAVERSE le portail avec le joueur (compagnon).
+- DD 10 CHA OU accepter simplement de l'emmener → `reveal_npc({ npcId: "barnabe", disposition: "helpful" })` : il supplie qu'on l'emmène au Bois-Ricanant : « Je suis un BUISSON, monsieur. Un buisson qui n'a jamais vu de forêt. » Devenu helpful, il TRAVERSE le portail avec le joueur (compagnon). Sans cet accord, il reste à la foire.
 - Entrer dans la salle remplit l'objectif optionnel ride_carousel.
 
 **Course d'escargots** (1 poinçon) :
@@ -127,14 +129,14 @@ Le carrousel tourne à dos de limaces géantes — un demi-tour par chanson, len
 - Un tour payé au carrousel (2 pa) → la limace de tête (elle parle, lentement, très lentement) souffle que « Maîîître Fiiilou... est paaarti... côté Boiiis... »
 
 ## Salle 4 — La Tente du Bonneteau
-**Zone** : x:0-5, y:0-4
-**Point d'entrée** : (3, 2)
+**Zone** : x:0-6, y:0-4
+**Point d'entrée** : (3, 3)
 
 ### Contenu
 La tente rayée de Maître Filou, cartes encore tièdes sur la table. OBJECTIF REQUIS (find_filou_trail) : le simple fait d'entrer (trigger_room_event enter) suffit — Pipotin vend la mèche.
 
 **Pipotin** (gobelin bonimenteur, wary) :
-- Position : (1, 1) — il garde la baraque et l'honneur douteux de la maison
+- Position : (3, 2) — il garde la baraque et l'honneur douteux de la maison
 - Spontané : « Le patron ? Parti hier, par le Portail. Avec votre ombre. Elle a pas dit au revoir. »
 - DD 12 Persuasion (ou 1 po) → le conseil en or : « Le Prince rend tout à qui le fait rire. TOUT. Même les ombres. Même la dignité, c'est dire. »
 - La table : DD 12 Investigation → un jeu de cartes oublié, TOUTES l'as de trèfle (preuve de triche, précieuse salle 16)
@@ -142,7 +144,7 @@ La tente rayée de Maître Filou, cartes encore tièdes sur la table. OBJECTIF R
 **Videurs** : accuser la maison de tricher SANS preuve → `start_encounter("bonneteau_bouncers")`. Combat évitable : DD 13 CHA, excuse publique en vers (le satyre est sensible à la métrique).
 
 ## Salle 5 — Le Portail des Vers Luisants
-**Zone** : x:14-19, y:0-4
+**Zone** : x:14-23, y:0-4
 **Point d'entrée** : (16, 2)
 
 ### Contenu
@@ -153,8 +155,8 @@ Une arche de branches tressées, constellée de vers luisants endormis. Tant que
 - Passage réussi → Madame Bougie tend une chandelle éteinte : « Pour le retour. » (Elle sait. C'est sa petite farce à elle.)
 
 ## Salle 6 — Le Grand Chapiteau
-**Zone** : x:0-6, y:5-8
-**Point d'entrée** : (3, 6)
+**Zone** : x:0-6, y:5-10
+**Point d'entrée** : (4, 8)
 
 ### Contenu
 Trois pointes dorées qui tournent, des panneaux peints qui bougent tout seuls. Sur la piste, en boucle : une contorsionniste halfeline qui tient dans une boîte à chapeau, une jongleuse gobeline qui rattrape TOUT (huit objets maximum — elle le précise d'emblée), des clowns gnomes qui se lancent en canon, et le numéro des loups savants qui sautent dans des cerceaux.
@@ -166,14 +168,14 @@ Trois pointes dorées qui tournent, des panneaux peints qui bougent tout seuls. 
 **Les loups savants** : chahuter le spectacle, ou lancer un NEUVIÈME objet à la jongleuse → le numéro déraille, deux loups s'échappent : `start_encounter("circus_wolves")`. Combat évitable : DD 12 SAG (Dressage) ou leur tendre un cerceau — ils sautent au travers et saluent.
 
 ## Salle 7 — La Théière à Bulles
-**Zone** : x:16-21, y:5-8
-**Point d'entrée** : (18, 6)
+**Zone** : x:18-23, y:11-15
+**Point d'entrée** : (19, 13)
 
 ### Contenu
 Une théière haute comme une maison, peinte de dragons qui soufflent des bulles. On entre par la porte du socle, on ressort par le bec — enfermé dans une bulle qui s'envole au-dessus de la foire. Sept gobelins sirotent du thé autour du socle et commentent les décollages.
 
 **Théophile** (gobelin tisanier, helpful) :
-- Position : (20, 6) — ceinturon de petites cuillères, ne parle qu'en rimes approximatives (« bramble-billet », « théière-sorcière »)
+- Position : (20, 12) — ceinturon de petites cuillères, ne parle qu'en rimes approximatives (« bramble-billet », « théière-sorcière »)
 - Lui répondre en rimes : DD 12 CHA → il offre un sachet de **thé d'aplomb** : le boire donne de l'aplomb pour UNE scène sociale (avantage narratif à faire valoir — idéalement à la Cour).
 
 **Tour de bulle** (1 poinçon) :
@@ -181,14 +183,14 @@ Une théière haute comme une maison, peinte de dragons qui soufflent des bulles
 - DD 10 DEX → diriger la bulle et la faire éclater au-dessus de la salle de son choix (déplacement gratuit vers l'entrée de cette salle) ; échec → atterrissage au hasard, dans un arbre ou sur le toit d'une baraque (sans dégâts, avec témoins).
 
 ## Salle 8 — Le Verger aux Ripailles
-**Zone** : x:8-14, y:5-8
-**Point d'entrée** : (11, 6)
+**Zone** : x:12-17, y:11-15
+**Point d'entrée** : (14, 13)
 
 ### Contenu
 Tables de banquet sous les poiriers, échassiers qui cueillent les fruits en marchant, musiciens, et une quantité déraisonnable de crème anglaise. Entrer dans la salle remplit l'objectif optionnel taste_orchard.
 
 **Mirabelle** (ménestrelle gnome, non hostile) :
-- Position : (13, 5) — sur une balançoire accrochée à un poirier, luth sur les genoux
+- Position : (14, 12) — sur une balançoire accrochée à un poirier, luth sur les genoux
 - Sait déjà tout, sourit trop : « Vous êtes exactement là où vous devez être. » Personne ne l'a jamais vue payer son billet.
 - Raconter honnêtement sa mésaventure (DD 12 CHA) → elle offre un **couplet porte-bonheur** : « Le Prince rend tout à qui le fait rire » (recoupe Pipotin) et souffle qu'un mime de la foire a perdu PLUS qu'une ombre (piste vers Miroslav, salle 9).
 
