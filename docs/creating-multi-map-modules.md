@@ -27,9 +27,11 @@ l'auteur du projet, 2026-07-04) :
    salles 1–5, la carte 2 commence à la salle 6. Jamais deux salles « 1 ».
 4. **Chaque carte a sa propre grille et sa propre image de battlemap.** Les
    grilles peuvent avoir des dimensions différentes.
-5. **Les PNJ compagnons traversent, les autres restent.** Le sort des PNJ à
-   la transition est déclaré dans les données (`transition.companions`),
-   jamais improvisé en jeu.
+5. **Les PNJ compagnons devenus amis traversent, les autres restent.** Le sort
+   des PNJ à la transition est déclaré dans les données
+   (`transition.companions`), jamais improvisé en jeu — et un compagnon listé
+   ne traverse que si sa disposition est `helpful` au départ (amitié actée par
+   `reveal_npc({ npcId, disposition: "helpful" })`).
 6. **Le contexte des cartes quittées est compressé** : le moteur enregistre
    `mapOutcomes[mapId]` (complétion `partial`/`total` + objectifs remplis) et
    le prompt n'en garde qu'une ligne par carte. Concevoir des cartes peu
@@ -102,7 +104,7 @@ mapQuests: {
 mapTransitions: [
   { id: 'firefly_gate', fromMapId: 'fair', toMapId: 'wood',
     arrivalCell: { x: 3, y: 10 }, arrivalRoomId: '6',
-    companions: ['barnabe'],           // ids de PNJ existants
+    companions: ['barnabe'],           // ids de PNJ existants (ne traversent que si helpful)
     pattern: /\b(portail|vers luisants)\b/ },
 ],
 ```
@@ -232,7 +234,8 @@ et renvoie une erreur `isError` JSON avec un code exploitable par le DM :
 En cas de succès, le moteur, atomiquement : enregistre
 `mapOutcomes[fromMapId]` (`partial` si seuls les `required` sont remplis,
 `total` si tous), téléporte le joueur sur `arrivalCell`/`arrivalRoomId`,
-transfère les seuls PNJ `companions`, et journalise le voyage.
+transfère les seuls PNJ `companions` dont la disposition est `helpful`, et
+journalise le voyage.
 
 Côté prompts (`lib/dm/prompts.ts`), le bloc dynamique expose déjà : l'état de
 la quête de la carte courante (objectifs remplis/manquants, depuis les

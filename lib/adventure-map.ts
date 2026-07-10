@@ -70,7 +70,9 @@ export interface MapTransition {
   // Point d'arrivée sur la map de DESTINATION (coordonnées de sa grille).
   arrivalCell: GridCell
   arrivalRoomId: string
-  // PNJ qui traversent avec le joueur. Les autres restent (sens unique).
+  // PNJ candidats à la traversée avec le joueur. Seuls ceux devenus `helpful`
+  // (amitié actée en jeu via reveal_npc) traversent ; les autres restent, comme
+  // tous les PNJ non listés (sens unique).
   companions?: string[]
   pattern?: RegExp
 }

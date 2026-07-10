@@ -211,7 +211,9 @@ export function revealNpcs(params: {
     if (!inScope) continue
 
     const idMatch = params.npcId ? npc.id === params.npcId : false
-    const kindMatch = params.kind ? npc.kind === params.kind : false
+    // Tolérance id/kind : le LLM confond parfois les deux (kind:"madame_bougie"
+    // alors que c'est un id) — un kind qui correspond à un id exact matche aussi.
+    const kindMatch = params.kind ? (npc.kind === params.kind || npc.id === params.kind) : false
     if (!idMatch && !kindMatch) continue
 
     npc.visible = true
@@ -552,6 +554,11 @@ export function applyMapTravel(params: {
   for (const npcId of params.companions) {
     const npc = state.npcs?.[npcId]
     if (!npc) continue
+    // Un compagnon ne suit le joueur que s'il est devenu son ami : l'accord se
+    // matérialise en jeu par reveal_npc({ disposition: "helpful" }). Un PNJ
+    // jamais abordé (neutral/wary) reste sur sa map d'origine — pas
+    // d'apparition irrationnelle dans la suite de l'aventure.
+    if (npc.disposition !== 'helpful') continue
     const grid = getAdventureMap(state.adventureId).maps.find(m => m.id === params.toMapId)?.grid
     const cell = findFreeCellNear(params.arrivalCell, occupied, grid)
     npc.mapId = params.toMapId
