@@ -226,7 +226,8 @@ export interface NpcState {
   position: { x: number; y: number }
   roomId: string | null              // null = visible quelle que soit la salle (de sa map)
   // Map du module où vit le PNJ (absent = première map, états legacy). Un PNJ
-  // « compagnon » change de map via travel_to_map (transition.companions).
+  // « compagnon » change de map via travel_to_map (transition.companions) —
+  // uniquement s'il est disposition helpful au moment du départ.
   mapId?: string
   disposition: WorldNpcDisposition
   visible: boolean                   // false = présent mais pas encore révélé au joueur

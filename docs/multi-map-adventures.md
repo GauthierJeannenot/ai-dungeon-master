@@ -92,8 +92,10 @@ export interface MapTransition {
   // transition définit son point d'arrivée.
   arrivalCell: GridCell
   arrivalRoomId: string
-  // PNJ qui traversent avec le joueur (décision n°5). Les autres PNJ de la
-  // map quittée deviennent inaccessibles (sens unique).
+  // PNJ candidats à la traversée avec le joueur (décision n°5). Seuls ceux
+  // devenus `helpful` (amitié actée en jeu via reveal_npc) traversent : un
+  // compagnon jamais abordé reste sur sa map, comme les autres PNJ de la map
+  // quittée (sens unique).
   companions?: string[]        // npc ids
   pattern?: RegExp             // reconnaissance de l'intention, comme AdventureTransition
 }
@@ -202,10 +204,12 @@ Effets, atomiquement :
   (completion `totale` si tous les objectifs sont remplis, sinon `partielle`).
 - `state.currentMapId = toMapId`, joueur téléporté sur `arrivalCell`,
   `currentRoomId = arrivalRoomId`, salle marquée visitée.
-- Les PNJ listés dans `companions` (et eux seuls) passent sur la nouvelle map :
-  `mapId = toMapId`, position adjacente à `arrivalCell` (réutiliser la logique
-  de placement existante des PNJ). Les autres restent sur leur map (donc hors
-  de portée à jamais).
+- Les PNJ listés dans `companions` ET devenus `helpful` (et eux seuls) passent
+  sur la nouvelle map : `mapId = toMapId`, position adjacente à `arrivalCell`
+  (réutiliser la logique de placement existante des PNJ). Un compagnon jamais
+  abordé (neutral/wary) reste sur sa map, comme tous les autres PNJ (donc hors
+  de portée à jamais) — l'amitié s'acte en jeu par
+  `reveal_npc({ npcId, disposition: "helpful" })`.
 
 Exposer aussi l'état de quête en LECTURE (soit un tool `get_map_quest_status`,
 soit un champ dans le résultat de l'état renvoyé) pour que le prompt dynamique

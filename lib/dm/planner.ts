@@ -40,7 +40,7 @@ function buildDecideActionTool(toolNames: string[], revealNpcExample: string): A
         ability: { type: 'string', enum: ['str', 'dex', 'con', 'int', 'wis', 'cha'], description: 'Caractéristique pour un roll_ability_check / resolve_saving_throw.' },
         dc: { type: 'number', description: "Degré de Difficulté si connu (DD de l'accroche de salle)." },
         target: { type: 'string', description: "Cible ou objet visé (id de monstre, nom d'objet…)." },
-        sceneMarkers: { type: 'array', items: { type: 'string' }, description: `Marqueurs de scène à poser en plus (ex: "${revealNpcExample}", "trigger_room_event:enter").` },
+        sceneMarkers: { type: 'array', items: { type: 'string' }, description: `Marqueurs de scène à poser en plus (ex: "${revealNpcExample}", "trigger_room_event:enter"). Pour reveal_npc, la valeur est le kind du PNJ OU son id exact — jamais un nom inventé.` },
         confidence: { type: 'string', enum: ['low', 'medium', 'high'], description: 'Confiance dans la classification.' },
         reason: { type: 'string', description: 'Justification courte (1 phrase).' },
       },
@@ -198,9 +198,16 @@ export function parseSceneMarkers(decision: PlannerDecision | null, gameState: G
     if (tool === 'reveal_npc') {
       if (!value) continue
       seen.add(key)
+      // Le classifieur confond parfois id et kind (« reveal_npc:madame_bougie »
+      // alors que son kind est « merchant ») : on résout la valeur contre les
+      // PNJ de l'état — id exact connu → npcId, sinon on la traite comme un kind.
+      const isKnownNpcId = Boolean(gameState.npcs?.[value])
       calls.push({
         tool,
-        input: { kind: value, reason: "classifieur d'intention : marqueur de scène" },
+        input: {
+          ...(isKnownNpcId ? { npcId: value } : { kind: value }),
+          reason: "classifieur d'intention : marqueur de scène",
+        },
         label: `reveal_npc(${value})`,
       })
     } else if (tool === 'trigger_room_event') {
@@ -237,7 +244,21 @@ export async function executeSceneMarkers(
   for (const call of calls) {
     if (!availableToolNames.has(call.tool)) continue
     try {
-      await callMCPTool(call.tool, call.input, sessionId, adventureId)
+      const result = await callMCPTool(call.tool, call.input, sessionId, adventureId)
+      // Un refus du moteur (RuleViolation) revient en payload { error, code },
+      // sans throw : ne PAS le compter comme exécuté, sinon la note de scène
+      // ferait narrer au DM un élément jamais posé (ex. reveal_npc sur un PNJ
+      // absent de la salle).
+      if (isObjectRecord(result) && typeof result.error === 'string') {
+        logEvent('warn', 'dm.plan.scene_marker.rejected', {
+          requestId: meta.requestId,
+          sessionId,
+          tool: call.tool,
+          input: call.input,
+          code: result.code,
+        })
+        continue
+      }
       executed.push(call.label)
       try {
         state = await callMCPTool('get_game_state', {}, sessionId, adventureId) as GameState

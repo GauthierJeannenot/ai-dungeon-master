@@ -15,7 +15,7 @@ process.env.MONETIZATION_ENABLED = 'false'
 
 const restoreTsRequire = installTsRequireWithAliases()
 const { buildStaticPrompt } = require(path.join(process.cwd(), 'lib/dm/prompts.ts'))
-const { buildPlannerSystem } = require(path.join(process.cwd(), 'lib/dm/planner.ts'))
+const { buildPlannerSystem, parseSceneMarkers } = require(path.join(process.cwd(), 'lib/dm/planner.ts'))
 const { buildInitialGameState } = require(path.join(process.cwd(), 'lib/initial-game-state.ts'))
 
 test.after(() => {
@@ -52,4 +52,26 @@ test('grammy planner system keeps its original module examples (regression guard
   // Les exemples d'origine restent byte-identiques (le prompt Grammy ne bouge pas).
   assert.match(system, /je dépose une offrande au pied des arbres.*reveal_npc:dryad/)
   assert.match(system, /reveal_npc:dryad" quand des PNJ cachés se montrent/)
+})
+
+// parseSceneMarkers : le classifieur confond parfois id et kind. Un marqueur
+// « reveal_npc:<valeur> » dont la valeur est un id de PNJ connu de l'état doit
+// partir en { npcId }, sinon en { kind } (comportement historique).
+test('parseSceneMarkers resolves a known npc id to npcId, unknown values stay kind', () => {
+  const gs = buildInitialGameState('fey-shadow-fair')
+  const decision = {
+    requiresMechanic: true,
+    tool: 'roll_ability_check',
+    sceneMarkers: ['reveal_npc:madame_bougie', 'reveal_npc:archfey'],
+    confidence: 'high',
+    reason: 'test',
+  }
+  const calls = parseSceneMarkers(decision, gs)
+  assert.equal(calls.length, 2)
+  // « madame_bougie » est l'ID d'un PNJ du module → ciblé par npcId.
+  assert.equal(calls[0].input.npcId, 'madame_bougie')
+  assert.equal(calls[0].input.kind, undefined)
+  // « archfey » n'est pas un id connu → traité comme kind (Prince des Farces).
+  assert.equal(calls[1].input.kind, 'archfey')
+  assert.equal(calls[1].input.npcId, undefined)
 })
