@@ -147,7 +147,7 @@ test('db: lists sessions by owner, most recent first, with summaries', async () 
   await sessionStore.saveSession('own-a', {
     gameState: baseState('1'),
     history: [{ role: 'player', content: 'a' }, { role: 'dm', content: 'b' }, { role: 'player', content: 'c' }],
-    ownerId: 'user:owner-1', adventureId: 'tide-crypt', turnTraces: [],
+    ownerId: 'user:owner-1', adventureId: 'tide-crypt', characterId: 'wizard', turnTraces: [],
   })
   await sessionStore.saveSession('own-b', {
     gameState: baseState('4'),
@@ -167,6 +167,11 @@ test('db: lists sessions by owner, most recent first, with summaries', async () 
   assert.equal(a.phase, 'exploration')
   assert.equal(a.playerHp.max, 28)
   assert.equal(a.adventureId, 'tide-crypt')
+  // Le personnage remonte dans le résumé (lien de reprise ?character=).
+  assert.equal(a.characterId, 'wizard')
+  // Session legacy sans characterId : le résumé n'invente rien.
+  const b = mine.find(s => s.sessionId === 'own-b')
+  assert.equal(b.characterId, undefined)
 
   const other = await sessionStore.listSessionsByOwner('user:someone-else')
   assert.equal(other.length, 1)

@@ -34,11 +34,17 @@ export async function GET(): Promise<NextResponse> {
     const summaries = await listSessionsByOwner(ownerId)
     const sessions = summaries.map(summary => {
       const adventure = getAdventure(summary.adventureId)
+      // Le personnage doit voyager dans le lien de reprise : sans ?character=,
+      // la page de jeu retombe sur le personnage par défaut et /api/dm répond
+      // 409 (session = aventure + personnage, figés à la création).
+      const characterParam = summary.characterId
+        ? `&character=${encodeURIComponent(summary.characterId)}`
+        : ''
       return {
         ...summary,
         adventureTitle: adventure?.title ?? 'Aventure',
         playPath: adventure
-          ? `${adventure.playPath ?? '/game'}${adventure.playPath?.includes('?') ? '&' : '?'}session=${encodeURIComponent(summary.sessionId)}`
+          ? `${adventure.playPath ?? '/game'}${adventure.playPath?.includes('?') ? '&' : '?'}session=${encodeURIComponent(summary.sessionId)}${characterParam}`
           : null,
         available: adventure?.available ?? false,
       }
