@@ -37,7 +37,14 @@ import {
   createLlmMessage,
   type LlmCallContext,
 } from '@/lib/dm/llm'
-import { buildStaticPrompt, buildDynamicPrompt, buildSystemBlocks } from '@/lib/dm/prompts'
+import {
+  buildStaticPrompt,
+  buildDynamicPrompt,
+  buildStaticSystemBlocks,
+  buildTurnUserMessage,
+  withCachedHistoryPrefix,
+  promptCacheControl,
+} from '@/lib/dm/prompts'
 import { processHistory, HISTORY_KEEP_RECENT } from '@/lib/dm/history'
 import {
   planPlayerAction,
@@ -93,8 +100,10 @@ async function refundDebit(
 const LLM_PLANNER_ENABLED = process.env.LLM_PLANNER_ENABLED !== 'false'
 
 // Limite la boucle pour éviter les boucles infinies tout en laissant la place à
-// plusieurs tool calls + la narration finale.
-const MAX_TOOL_ITERATIONS = parsePositiveInt(process.env.LLM_MAX_CALLS_PER_REQUEST, 10)
+// plusieurs tool calls + la narration finale. Défaut 6 : le maximum observé en
+// production est 5 (médiane 3) — chaque itération = 1 appel Sonnet, donc c'est
+// aussi un plafond de coût par message. Surchargeable via LLM_MAX_CALLS_PER_REQUEST.
+const MAX_TOOL_ITERATIONS = parsePositiveInt(process.env.LLM_MAX_CALLS_PER_REQUEST, 6)
 
 // Plafond dur de tours conservés dans la session persistée (le surplus ancien
 // est couvert par summaryContext) — évite une ligne JSONB qui enfle sans fin.
@@ -562,9 +571,17 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       }
     }
 
+    // Contexte volatil (état + salle + directive du classifieur) GELÉ à l'ouverture
+    // du tour dans le message user courant : il ne sera pas re-sérialisé en cours de
+    // boucle (l'état frais vient des tool_result), ce qui garde le préfixe cacheable.
+    // Le système ne porte QUE le bloc statique, byte-identique sur toute la boucle.
+    const staticSystem = buildStaticSystemBlocks(currentGameState)
+    const turnDirective = [plannerDirective, sceneNote]
+      .filter((part): part is string => Boolean(part))
+      .join('\n') || undefined
     const messages: Anthropic.MessageParam[] = [
-      ...processedHistory.messages,
-      { role: 'user', content: message },
+      ...withCachedHistoryPrefix(processedHistory.messages),
+      buildTurnUserMessage(currentGameState, message, summaryContext, turnDirective),
     ]
 
     const toolsUsed: string[] = []
@@ -572,22 +589,24 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     let iterations = 0
     let primaryActionToolUsed: string | null = null
     let sawMcpToolError = false
-    // La directive du classifieur reste active jusqu'à ce que le tool planifié soit
-    // appelé : on la retire ensuite pour ne pas pousser à le rappeler (et déclencher
-    // PRIMARY_ACTION_ALREADY_RESOLVED) au tour suivant de la boucle.
+    // La directive du classifieur est gelée dans le message de tour (ci-dessus) ; son
+    // enforcement en cours de boucle passe désormais par `tool_choice` seul : tant que
+    // le tool planifié n'a pas réussi, on force un tool ; une fois satisfait, on repasse
+    // en `auto` et le transcript de tool_result rend la directive inerte.
     let plannedToolSatisfied = false
+    // Breakpoint de cache glissant : le dernier tool_result poussé porte le
+    // `cache_control` ; on le retire du précédent pour rester ≤ 4 breakpoints et faire
+    // avancer le point de coupe au fil des itérations.
+    let prevCachedToolResult: Anthropic.ToolResultBlockParam | null = null
 
     while (iterations < MAX_TOOL_ITERATIONS) {
       iterations++
 
-      // L'état peut avoir changé après un tool call : on reconstruit le contexte.
+      // L'état peut avoir changé après un tool call : on rafraîchit le contexte du
+      // mock (qui pilote les tools sur l'état frais). Le prompt LIVE, lui, ne
+      // re-sérialise pas l'état — il vient des tool_result accumulés dans `messages`.
       baseContext.gameState = currentGameState
 
-      // La directive mécanique tombe une fois son tool appelé ; la note de scène
-      // (marqueurs déjà exécutés par le serveur) persiste pour guider la narration.
-      const directiveParts = [plannedToolSatisfied ? null : plannerDirective, sceneNote]
-        .filter((part): part is string => Boolean(part))
-      const activeDirective = directiveParts.length > 0 ? directiveParts.join('\n') : undefined
       // #1 — Tant que le tool planifié n'a pas été appelé, on force le DM à passer par
       // un tool (impossible de narrer l'issue en sautant la mécanique). high → on force
       // EXACTEMENT le tool ; medium → on force « au moins un tool » et le DM choisit.
@@ -605,7 +624,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           model: MODEL,
           max_tokens: MAX_TOKENS,
           ...effortFor(MODEL),
-          system: buildSystemBlocks(currentGameState, summaryContext, activeDirective),
+          system: staticSystem,
           tools: mcpTools.length > 0 ? mcpTools : undefined,
           ...(toolChoice ? { tool_choice: toolChoice } : {}),
           messages,
@@ -696,10 +715,22 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         }
       }
 
+      // Breakpoint de cache glissant : marque le dernier tool_result de ce round et
+      // démarque celui du round précédent (≤ 4 breakpoints : statique, historique,
+      // message de tour, ce tool_result). L'itération suivante relit tout le transcript
+      // accumulé à 0,1×.
+      const cc = promptCacheControl()
+      if (cc && toolResults.length > 0) {
+        if (prevCachedToolResult) delete prevCachedToolResult.cache_control
+        const lastResult = toolResults[toolResults.length - 1]
+        lastResult.cache_control = cc
+        prevCachedToolResult = lastResult
+      }
       messages.push({ role: 'user', content: toolResults })
     }
 
-    // Dernière tentative de narration si la boucle s'est arrêtée sans prose.
+    // Dernière tentative de narration si la boucle s'est arrêtée sans prose. Appel
+    // one-shot (rare) : contexte volatil dans le message user, système statique seul.
     if (!narrative.trim()) {
       const finalResponse = await createLlmMessage(
         {
@@ -711,9 +742,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
               type: 'text',
               text: buildStaticPrompt(currentGameState.adventureId, currentGameState.characterId) + '\n\nRéponds maintenant UNIQUEMENT avec la narration en prose, sans appeler de tools.',
             },
-            { type: 'text', text: buildDynamicPrompt(currentGameState, summaryContext) },
           ],
-          messages: [{ role: 'user', content: message }],
+          messages: [
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: buildDynamicPrompt(currentGameState, summaryContext) },
+                { type: 'text', text: message },
+              ],
+            },
+          ],
         },
         { ...baseContext, operation: 'dm.final_narration' }
       )

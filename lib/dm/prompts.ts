@@ -13,8 +13,15 @@ import { parsePositiveInt } from './llm'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Construction des prompts du Dungeon Master.
-// Bloc statique (règles + module) mis en cache Anthropic. Bloc dynamique (état,
-// salle courante, directive du classifieur) reconstruit à chaque itération.
+//
+// Structure de cache Anthropic (voir docs/opus-brief-reduction-cout-llm.md) :
+// le SYSTÈME ne contient QUE le bloc statique (règles + module), byte-identique
+// sur toute la session ET sur toute la boucle tool-use → il reste caché. Le
+// contexte volatil (état, salle, directive) part dans le message user du TOUR
+// COURANT (bloc `buildDynamicPrompt`), GELÉ à l'ouverture du tour : en cours de
+// boucle, l'état frais vient des `tool_result`, pas d'une re-sérialisation qui
+// invaliderait le cache. Breakpoints : statique · fin d'historique · fin du
+// message de tour · glissant sur le dernier tool_result (géré par route.ts).
 // ─────────────────────────────────────────────────────────────────────────────
 
 const LLM_PROMPT_CACHE_ENABLED = process.env.LLM_PROMPT_CACHE_ENABLED !== 'false'
@@ -26,6 +33,14 @@ const LLM_PROMPT_CACHE_ENABLED = process.env.LLM_PROMPT_CACHE_ENABLED !== 'false
 const LLM_PROMPT_CACHE_TTL: '5m' | '1h' =
   process.env.LLM_PROMPT_CACHE_TTL === '5m' ? '5m' : '1h'
 const COMBAT_LOG_TAIL = parsePositiveInt(process.env.LLM_COMBAT_LOG_TAIL, 6)
+
+// Descripteur de breakpoint de cache réutilisé par tous les points de coupe
+// (statique, historique, tour, tool_result). `undefined` si le cache est
+// désactivé — aucun `cache_control` n'est alors posé.
+export type PromptCacheControl = { type: 'ephemeral'; ttl: '5m' | '1h' }
+export function promptCacheControl(): PromptCacheControl | undefined {
+  return LLM_PROMPT_CACHE_ENABLED ? { type: 'ephemeral', ttl: LLM_PROMPT_CACHE_TTL } : undefined
+}
 
 export function buildStaticPrompt(adventureId?: string, characterId?: string): string {
   const ctx = loadContextFiles(adventureId, characterId)
@@ -286,21 +301,59 @@ ${serializeGameState(gameState)}
 \`\`\`${directiveBlock}`
 }
 
-export function buildSystemBlocks(gameState: GameState, summaryContext?: string, directive?: string): Anthropic.TextBlockParam[] {
+// Système = bloc statique SEUL, avec breakpoint de cache. Byte-identique sur
+// toute la session (ne dépend que de l'aventure et du personnage) : c'est
+// l'invariant qui rend le cache Anthropic efficace — ne JAMAIS y réinjecter de
+// contenu variable (état, timestamp, directive), cf. lib/dm/CLAUDE.md.
+export function buildStaticSystemBlocks(gameState: GameState): Anthropic.TextBlockParam[] {
   const staticBlock: Anthropic.TextBlockParam = {
     type: 'text',
     text: buildStaticPrompt(gameState.adventureId, gameState.characterId),
   }
-  if (LLM_PROMPT_CACHE_ENABLED) {
-    staticBlock.cache_control = { type: 'ephemeral', ttl: LLM_PROMPT_CACHE_TTL }
+  const cc = promptCacheControl()
+  if (cc) staticBlock.cache_control = cc
+  return [staticBlock]
+}
+
+// Message user du TOUR COURANT : contexte volatil (état, salle, directive) gelé
+// à l'ouverture du tour, suivi du message brut du joueur. Le second bloc porte
+// le breakpoint de cache → tout le préfixe (statique + historique + ce tour)
+// est relu à 0,1× aux itérations suivantes de la boucle.
+export function buildTurnUserMessage(
+  gameState: GameState,
+  playerMessage: string,
+  summaryContext?: string,
+  directive?: string
+): Anthropic.MessageParam {
+  const playerBlock: Anthropic.TextBlockParam = { type: 'text', text: playerMessage }
+  const cc = promptCacheControl()
+  if (cc) playerBlock.cache_control = cc
+  return {
+    role: 'user',
+    content: [
+      { type: 'text', text: buildDynamicPrompt(gameState, summaryContext, directive) },
+      playerBlock,
+    ],
   }
-  return [
-    staticBlock,
-    {
-      type: 'text',
-      text: buildDynamicPrompt(gameState, summaryContext, directive),
-    },
-  ]
+}
+
+// Pose un breakpoint de cache sur le dernier bloc du dernier message d'une liste
+// (fin d'historique stable). Renvoie une NOUVELLE liste : les messages
+// d'historique (contenu string) sont convertis en blocs sans muter l'entrée.
+export function withCachedHistoryPrefix(messages: Anthropic.MessageParam[]): Anthropic.MessageParam[] {
+  const cc = promptCacheControl()
+  if (!cc || messages.length === 0) return messages
+  const out = messages.slice()
+  const last = out[out.length - 1]
+  const blocks: Anthropic.ContentBlockParam[] =
+    typeof last.content === 'string'
+      ? [{ type: 'text', text: last.content }]
+      : last.content.slice()
+  if (blocks.length > 0) {
+    blocks[blocks.length - 1] = { ...blocks[blocks.length - 1], cache_control: cc } as Anthropic.ContentBlockParam
+    out[out.length - 1] = { ...last, content: blocks }
+  }
+  return out
 }
 
 export function historyToMessages(history: ConversationTurn[]): Anthropic.MessageParam[] {
