@@ -15,8 +15,8 @@
 | **Accès module** | Achat **unique et définitif** par compte connecté (ex. Tide Crypt 5 €). Table `module_entitlements`. | lib/module-access.ts, lib/adventures.ts |
 
 Posséder un module ne dispense PAS de consommer un token par message : les deux
-axes se cumulent. Un module gratuit (Grammy's, fey-shadow-fair) ne consomme que
-des tokens.
+axes se cumulent. Un module gratuit (Grammy's) ne consomme que des tokens ;
+`tide-crypt` (5 €) et `fey-shadow-fair` (10 €) exigent en plus l'achat d'accès.
 
 ## Rendre un module payant : la modification, en entier
 
