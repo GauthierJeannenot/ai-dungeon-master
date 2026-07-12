@@ -18,10 +18,13 @@ export interface TokenPackage {
   highlight?: boolean
 }
 
+// Volumes recalibrés le 2026-07-12 (÷2,5) : coût API réel mesuré en production
+// ≈ 0,094 $/message (voir docs/opus-brief-reduction-cout-llm.md) — les anciens
+// volumes (50/200/600) vendaient chaque message ~2× sous son coût.
 export const TOKEN_PACKAGES: TokenPackage[] = [
-  { id: 'pack-apprenti', name: "Pack Apprenti", tokens: 50, amountCents: 299 },
-  { id: 'pack-aventurier', name: 'Pack Aventurier', tokens: 200, amountCents: 899, highlight: true },
-  { id: 'pack-heros', name: 'Pack Héros', tokens: 600, amountCents: 2499 },
+  { id: 'pack-apprenti', name: "Pack Apprenti", tokens: 20, amountCents: 299 },
+  { id: 'pack-aventurier', name: 'Pack Aventurier', tokens: 80, amountCents: 899, highlight: true },
+  { id: 'pack-heros', name: 'Pack Héros', tokens: 240, amountCents: 2499 },
 ]
 
 export function getTokenPackage(id: string): TokenPackage | null {

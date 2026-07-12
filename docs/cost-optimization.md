@@ -16,6 +16,24 @@ Le poste dominant est **l'input Sonnet répété à chaque itération** de la bo
 tool-use (prompt statique + état + historique). Le prompt caching le ramène à
 0,1× sur les tours suivants dans la fenêtre de 5 min.
 
+### Restructuration du caching (2026-07-12) — IMPLÉMENTÉ
+
+Mesure production (18 messages, session fey-shadow-fair) : **0,094 $/message**,
+dont **63 % en input non caché** (~6 500 tokens plein tarif par appel Sonnet
+malgré 62,8 % de hit cache). Cause : l'ancien `buildSystemBlocks` émettait un
+2ᵉ bloc système *dynamique* reconstruit à chaque itération (état muté), placé
+ENTRE le préfixe caché et les messages → il n'invalidait pas le statique mais
+laissait historique + transcript tool-use hors cache, re-payés 3-5×/message.
+
+Correctif (lib/dm/prompts.ts + app/api/dm/route.ts) : système = bloc statique
+SEUL ; contexte volatil déplacé dans le message user du tour courant, gelé à
+l'ouverture du tour (état frais via `tool_result`, pas de re-sérialisation) ;
+breakpoints de cache sur fin d'historique + message de tour + glissant sur le
+dernier `tool_result`. `LLM_MAX_CALLS_PER_REQUEST` défaut 10→6 (max observé 5).
+Cibles (à confirmer sur mesure live, cf. brief) : input non caché < 2 000
+tokens/appel Sonnet, hit cache > 85 %, ≤ 0,06 $/message. Détail et critères
+d'acceptation : docs/opus-brief-reduction-cout-llm.md.
+
 ## Corrections appliquées
 
 1. **Tarification par modèle** ([lib/anthropic-usage.ts](../lib/anthropic-usage.ts)) —
@@ -53,11 +71,12 @@ tool-use (prompt statique + état + historique). Le prompt caching le ramène à
    donc chaque aventure a sa propre entrée de cache Anthropic — c'est attendu et
    sain (les préfixes diffèrent légitimement). Ne pas chercher à « fusionner »
    les caches entre modules.
-1. **Ne pas invalider le cache pendant la boucle** : `buildDynamicPrompt`
-   change à chaque itération (état muté) — c'est le 2ᵉ bloc système, donc le
-   préfixe statique reste caché. RAS, mais toute future insertion de contenu
-   dynamique DANS le bloc statique (timestamp, sessionId…) casserait tout :
-   à surveiller en revue.
+1. **Ne pas invalider le cache pendant la boucle** — RÉSOLU le 2026-07-12
+   (voir « Restructuration du caching » ci-dessus). Le contexte volatil ne
+   vit plus dans un bloc système reconstruit à chaque itération : il est gelé
+   dans le message user du tour, et un breakpoint glissant cache le transcript
+   tool-use. Toute future insertion de contenu dynamique DANS le bloc statique
+   (`buildStaticPrompt`) casserait tout : à surveiller en revue.
 2. **Cache TTL 1h pour les sessions longues** (`LLM_PROMPT_CACHE_TTL=1h`) :
    write 2× au lieu de 1,25×, rentable dès que le joueur laisse passer >5 min
    entre deux messages (fréquent en jeu de rôle). Bon candidat par défaut en

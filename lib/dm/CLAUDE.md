@@ -6,19 +6,38 @@ sync MCP → compression historique (`history.ts`) → classifieur d'intention
 
 ## Prompt caching Anthropic — l'invariant n°1
 
-`buildSystemBlocks` (prompts.ts) émet DEUX blocs système : le bloc **statique**
-(règles + fiche + index du module, `cache_control: ephemeral`) et le bloc
-**dynamique** (état, salle courante, directive). Le cache ne fonctionne que si
-le préfixe statique est **byte-identique** d'un appel à l'autre :
+Structure retravaillée le 2026-07-12 pour maximiser le hit cache (voir
+docs/opus-brief-reduction-cout-llm.md, docs/cost-optimization.md). Trois règles :
 
-- ne JAMAIS insérer de contenu variable (timestamp, sessionId, état) dans
-  `buildStaticPrompt` — toute variation par requête casse le cache et
-  multiplie le coût d'input Sonnet.
+1. **Le SYSTÈME ne contient QUE le bloc statique.**
+   `buildStaticSystemBlocks` (prompts.ts) émet un seul bloc système (règles +
+   fiche + index du module, `cache_control: ephemeral`). Il ne dépend que de
+   l'aventure et du personnage → **byte-identique sur toute la session ET sur
+   toute la boucle tool-use**. Ne JAMAIS y réinjecter de contenu variable
+   (timestamp, sessionId, état, directive) : toute variation par requête casse
+   le cache et multiplie le coût d'input Sonnet.
+2. **Le contexte volatil part dans le message user du tour courant.**
+   `buildTurnUserMessage` (état, salle, directive du classifieur via
+   `buildDynamicPrompt`) est **gelé à l'ouverture du tour** : en cours de
+   boucle on NE re-sérialise PAS l'état — l'état frais vient des `tool_result`.
+   Re-sérialiser à chaque itération (comme l'ancien bloc système dynamique)
+   invaliderait le suffixe caché. Si un jour la narration « oublie » un
+   changement d'état en boucle, réinjecter un delta COMPACT en fin de
+   `tool_result`, jamais dans le système.
+3. **Breakpoints de cache (≤ 4)** : statique · fin d'historique
+   (`withCachedHistoryPrefix`) · fin du message de tour · **glissant** sur le
+   dernier `tool_result` (route.ts déplace le `cache_control` à chaque round).
+   `promptCacheControl()` est la source unique du descripteur (respecte
+   `LLM_PROMPT_CACHE_ENABLED`/`_TTL`).
+
 - une variante de cache par module d'aventure et par phase (tools filtrés
   exploration/combat) est voulue — ne pas « optimiser ».
 - toute reformulation du prompt statique invalide le cache des sessions en
   cours ET fausse les comparaisons playtest : reformuler = commit séparé,
   mesuré par `npm run playtest:mock` avant/après.
+- l'enforcement de la directive du classifieur passe par `tool_choice` (pas par
+  le texte, qui est gelé dans le message de tour) : tant que le tool planifié
+  n'a pas réussi, on force un tool ; satisfait → `auto`.
 
 ## Vocabulaire par module — jamais en dur
 

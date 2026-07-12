@@ -110,9 +110,11 @@ const AVAILABILITY: Record<string, boolean> = {
 // contenu narratif) — cf. verrou tests/no-module-leaks.
 const REQUIRES_ENTITLEMENT: Record<string, boolean> = {
   'tide-crypt': true,
+  'fey-shadow-fair': true,
 }
 const MODULE_PRICE_CENTS: Record<string, number> = {
   'tide-crypt': 500,
+  'fey-shadow-fair': 1000,
 }
 
 function toDefinition(content: AdventureContent): AdventureDefinition {
