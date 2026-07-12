@@ -206,7 +206,11 @@ export default function Battlemap({
     // Bouton gauche uniquement, et seulement s'il y a de quoi scroller.
     if (e.button !== 0 || !overflowing) return
     dragRef.current = { startX: e.clientX, startY: e.clientY, panX: offsetX, panY: offsetY, moved: false }
-    e.currentTarget.setPointerCapture(e.pointerId)
+    // NE PAS capturer le pointeur ici : la capture retargette le `click` natif
+    // vers le conteneur (l'élément capturant) au lieu du token, ce qui casserait
+    // le clic « ouvrir la fiche » / « aperçu » sur les pions. On ne capture qu'au
+    // franchissement du seuil de drag (handlePointerMove), une fois sûr que c'est
+    // un pan et non un clic.
   }
 
   const handlePointerMove = (e: React.PointerEvent) => {
@@ -216,7 +220,14 @@ export default function Battlemap({
     const dy = e.clientY - drag.startY
     // Tant qu'on n'a pas franchi le seuil, on laisse le clic vivre (tooltip/fiche).
     if (!drag.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return
-    drag.moved = true
+    if (!drag.moved) {
+      // Premier franchissement du seuil : c'est un vrai pan. On capture le
+      // pointeur MAINTENANT (voir handlePointerDown) pour suivre le drag hors
+      // du conteneur ; le `click` retargeté qui suivra sera avalé par
+      // suppressClickRef.
+      drag.moved = true
+      e.currentTarget.setPointerCapture(e.pointerId)
+    }
     if (!isDragging) setIsDragging(true)
     setPan({ x: drag.panX + dx, y: drag.panY + dy })
   }
@@ -423,9 +434,8 @@ function TokenPlayer({
   const r = cell * 0.38
 
   return (
-    // `group` : le survol du pion révèle un aperçu cliquable (ouvre la fiche).
-    // Un enfant en :hover compte comme survol du parent → pas de « trou » entre
-    // le pion et l'aperçu même s'il déborde hors de la boîte du pion.
+    // `group` : le survol du pion révèle un aperçu d'info (PV/CA). C'est le clic
+    // sur le pion lui-même qui ouvre la fiche complète (onOpenSheet ci-dessous).
     <div
       className="group absolute pointer-events-auto cursor-pointer"
       style={{
@@ -462,17 +472,15 @@ function TokenPlayer({
         />
       </div>
 
-      {/* Aperçu au survol : PV / CA + invite à ouvrir la fiche. Cliquable
-          (pointer-events-auto) → même action que le clic sur le pion. */}
+      {/* Aperçu au survol : PV / CA. Purement informatif (pointer-events-none) —
+          l'ouverture de la fiche passe par le clic sur le pion. */}
       <div
-        className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-40 w-max max-w-[180px] pointer-events-auto cursor-pointer rounded-lg border border-amber-800/60 bg-stone-900/95 px-2.5 py-1.5 shadow-xl"
-        onClick={onOpenSheet}
+        className="hidden group-hover:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-40 w-max max-w-[180px] pointer-events-none rounded-lg border border-amber-800/60 bg-stone-900/95 px-2.5 py-1.5 shadow-xl"
       >
         <div className="text-xs font-bold text-amber-300 whitespace-nowrap">{player.name}</div>
         <div className="text-[11px] text-stone-300 whitespace-nowrap">
           PV {player.hp.current}/{player.hp.max} · CA {player.ac}
         </div>
-        <div className="mt-0.5 text-[10px] text-amber-400/80 whitespace-nowrap">📋 Voir la fiche</div>
       </div>
     </div>
   )
