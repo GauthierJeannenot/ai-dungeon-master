@@ -31,6 +31,10 @@ export interface StoredGameSession {
 export interface StoredSessionSummary {
   sessionId: string
   adventureId?: string
+  // Personnage de la partie — nécessaire au lien de reprise (?character=) :
+  // sans lui, la reprise retombe sur le personnage par défaut et le premier
+  // message déclenche le 409 de /api/dm (session = aventure + personnage).
+  characterId?: string
   updatedAt: string
   phase: string
   playerHp: { current: number; max: number }
@@ -42,6 +46,7 @@ export interface StoredSessionSummary {
 export function summarizeStoredSession(
   sessionId: string,
   adventureId: string | undefined,
+  characterId: string | undefined,
   updatedAt: string,
   gameState: GameState,
   history: ConversationTurn[]
@@ -49,6 +54,7 @@ export function summarizeStoredSession(
   return {
     sessionId,
     adventureId: adventureId ?? gameState?.adventureId,
+    characterId: characterId ?? gameState?.characterId,
     updatedAt,
     phase: gameState?.phase ?? 'exploration',
     playerHp: gameState?.player?.hp ?? { current: 0, max: 0 },
@@ -175,11 +181,12 @@ export async function listSessionsByOwner(
   const result = await dbQuery<{
     session_id: string
     adventure_id: string | null
+    character_id: string | null
     updated_at: Date
     game_state: GameState
     history: ConversationTurn[]
   }>(
-    `SELECT session_id, adventure_id, updated_at, game_state, history
+    `SELECT session_id, adventure_id, character_id, updated_at, game_state, history
      FROM game_sessions
      WHERE owner_id = $1
      ORDER BY updated_at DESC
@@ -190,6 +197,7 @@ export async function listSessionsByOwner(
     summarizeStoredSession(
       row.session_id,
       row.adventure_id ?? undefined,
+      row.character_id ?? undefined,
       new Date(row.updated_at).toISOString(),
       row.game_state,
       Array.isArray(row.history) ? row.history : []
