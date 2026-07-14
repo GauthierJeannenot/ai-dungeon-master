@@ -672,6 +672,100 @@ test('MCP roll_ability_check resolves skill checks and consumes a combat action'
   })
 })
 
+test('MCP roll_ability_check rolls with advantage and logs the DM reason', async () => {
+  await withForcedDiceSequence('5,15', async () => {
+    await withMcpClient(async client => {
+      const check = await callTool(client, 'roll_ability_check', {
+        ability: 'cha',
+        dc: 14,
+        label: 'Persuasion',
+        advantage: true,
+        advantageReason: 'Le joueur exploite un fait établi de la scène.',
+      })
+
+      assert.equal(check.advantage, true)
+      assert.equal(check.disadvantage, false)
+      assert.equal(check.advantageReason, 'Le joueur exploite un fait établi de la scène.')
+      assert.equal(check.roll.rolls[0], 15)
+      assert.match(check.roll.detail, /^ADV: /)
+      assert.match(check.mechanicalSummary, /AVANTAGE: Le joueur exploite un fait établi de la scène\./)
+    })
+  })
+})
+
+test('MCP roll_ability_check rolls with disadvantage keeping the lower roll', async () => {
+  await withForcedDiceSequence('15,5', async () => {
+    await withMcpClient(async client => {
+      const check = await callTool(client, 'roll_ability_check', {
+        ability: 'dex',
+        label: 'Discrétion',
+        disadvantage: true,
+        advantageReason: 'Approche incohérente avec la scène établie.',
+      })
+
+      assert.equal(check.advantage, false)
+      assert.equal(check.disadvantage, true)
+      assert.equal(check.roll.rolls[0], 5)
+      assert.match(check.roll.detail, /^DIS: /)
+      assert.match(check.mechanicalSummary, /DESAVANTAGE: Approche incohérente/)
+    })
+  })
+})
+
+test('MCP roll_ability_check refuses advantage without a reason', async () => {
+  await withMcpClient(async client => {
+    const noReason = await callTool(client, 'roll_ability_check', {
+      ability: 'cha',
+      advantage: true,
+    })
+    assert.equal(noReason.code, 'ADVANTAGE_REASON_REQUIRED')
+
+    const blankReason = await callTool(client, 'roll_ability_check', {
+      ability: 'cha',
+      disadvantage: true,
+      advantageReason: '   ',
+    })
+    assert.equal(blankReason.code, 'ADVANTAGE_REASON_REQUIRED')
+  })
+})
+
+test('MCP roll_ability_check cancels simultaneous advantage and disadvantage', async () => {
+  await withForcedDiceSequence('9', async () => {
+    await withMcpClient(async client => {
+      const check = await callTool(client, 'roll_ability_check', {
+        ability: 'wis',
+        advantage: true,
+        disadvantage: true,
+        advantageReason: 'Avantage RP contrebalancé par la pénombre.',
+      })
+
+      assert.equal(check.roll.rolls.length, 1)
+      assert.equal(check.roll.rolls[0], 9)
+      assert.doesNotMatch(check.roll.detail, /ADV|DIS/)
+      assert.doesNotMatch(check.mechanicalSummary, /AVANTAGE|DESAVANTAGE/)
+    })
+  })
+})
+
+test('MCP resolve_player_attack logs the RP advantage reason', async () => {
+  await withForcedDiceSequence('18,4,6', async () => {
+    await withMcpClient(async client => {
+      const baseState = await callTool(client, 'get_game_state')
+      await callTool(client, 'replace_game_state', { gameState: makeCombatState(baseState) })
+
+      const attack = await callTool(client, 'resolve_player_attack', {
+        targetId: 'goblin_a',
+        weaponOrSpell: 'longsword',
+        advantage: true,
+        advantageReason: 'Le joueur exploite un élément du décor.',
+      })
+
+      assert.match(attack.attackRoll.detail, /^ADV: /)
+      assert.match(attack.mechanicalSummary, /AVANTAGE: Le joueur exploite un élément du décor\./)
+    })
+  })
+})
+
 test('MCP roll_ability_check is limited to the actor turn in combat', async () => {
   await withMcpClient(async client => {
     const baseState = await callTool(client, 'get_game_state')
