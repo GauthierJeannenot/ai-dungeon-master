@@ -46,7 +46,6 @@ function createInitialState(): GameState {
     movementUsed: {},
     actionUsed: {},
     bonusActionUsed: {},
-    dashUsed: {},
     combatLog: [],
     roomsVisited: initialRoomId ? [initialRoomId] : [],
     currentRoomId: initialRoomId,
@@ -144,9 +143,8 @@ export function replaceState(nextState: GameState): GameState {
     characterId: nextState.characterId ?? ACTIVE_CHARACTER_ID,
     movementUsed: structuredClone(nextState.movementUsed ?? {}),
     actionUsed: structuredClone(nextState.actionUsed ?? {}),
-    // Économie d'action bonus / Ruse:dash (états legacy sans ces champs = vide).
+    // Économie d'action bonus (états legacy sans ce champ = vide).
     bonusActionUsed: structuredClone(nextState.bonusActionUsed ?? {}),
-    dashUsed: structuredClone(nextState.dashUsed ?? {}),
     roomsVisited: structuredClone(nextState.roomsVisited ?? []),
     // Multi-map : états historiques sans ces champs = première map, aucune
     // map quittée. Doivent survivre au round-trip (docs/multi-map-adventures.md).
@@ -373,7 +371,7 @@ export function resetActionUsed(entityId: string): void {
   delete state.actionUsed[entityId]
 }
 
-// ── Économie d'action bonus (second souffle, Ruse) ───────────────────────────
+// ── Économie d'action bonus (second souffle) ─────────────────────────────────
 export function hasBonusActionUsed(entityId: string): boolean {
   return Boolean(state.bonusActionUsed?.[entityId])
 }
@@ -383,21 +381,10 @@ export function markBonusActionUsed(entityId: string): void {
   state.bonusActionUsed[entityId] = true
 }
 
-// ── Ruse : dash (double le budget de mouvement du tour) ──────────────────────
-export function hasDashUsed(entityId: string): boolean {
-  return Boolean(state.dashUsed?.[entityId])
-}
-
-export function markDashUsed(entityId: string): void {
-  state.dashUsed ??= {}
-  state.dashUsed[entityId] = true
-}
-
 export function resetTurnEconomy(entityId: string): void {
   resetMovement(entityId)
   resetActionUsed(entityId)
   if (state.bonusActionUsed) delete state.bonusActionUsed[entityId]
-  if (state.dashUsed) delete state.dashUsed[entityId]
 }
 
 export function spawnMonster(monster: MonsterState): void {
@@ -433,7 +420,6 @@ export function setInitiativeOrder(order: string[]): void {
   state.movementUsed = {}
   state.actionUsed = {}
   state.bonusActionUsed = {}
-  state.dashUsed = {}
 }
 
 export function advanceTurn(): string | null {
@@ -534,7 +520,6 @@ export function applyMapTravel(params: {
   state.movementUsed = {}
   state.actionUsed = {}
   state.bonusActionUsed = {}
-  state.dashUsed = {}
 
   // Repos narratif entre cartes : recharge des ressources de classe et des
   // emplacements de sorts à leur max (décision n°6, docs/playable-characters.md).

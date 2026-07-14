@@ -73,7 +73,7 @@ test('requesting a different character than the stored session is a 409', async 
     characterId: 'wizard',
   })
 
-  const res = await POST(dmRequest({ message: 'je regarde', sessionId, characterId: 'rogue' }))
+  const res = await POST(dmRequest({ message: 'je regarde', sessionId, characterId: 'bard' }))
   assert.equal(res.status, 409)
 
   await deleteSession(sessionId)

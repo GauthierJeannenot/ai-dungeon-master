@@ -17,12 +17,13 @@ const ABILITIES = ['str', 'dex', 'con', 'int', 'wis', 'cha']
 
 test('le catalogue expose les 4 classes attendues, guerrier par défaut', () => {
   const ids = registry.listCharacters().map(c => c.id)
-  assert.deepEqual(ids, ['fighter', 'rogue', 'wizard', 'cleric'])
+  assert.deepEqual(ids, ['fighter', 'bard', 'wizard', 'cleric'])
   assert.equal(registry.DEFAULT_CHARACTER_ID, 'fighter')
   assert.equal(registry.getCharacterTemplate('fighter').id, 'fighter')
-  // Fail-safe : id inconnu → guerrier.
+  // Fail-safe : id inconnu → guerrier (y compris l'ancien roublard retiré).
   assert.equal(registry.getCharacterTemplate('inconnu').id, 'fighter')
-  assert.equal(registry.isKnownCharacterId('rogue'), true)
+  assert.equal(registry.isKnownCharacterId('bard'), true)
+  assert.equal(registry.isKnownCharacterId('rogue'), false)
   assert.equal(registry.isKnownCharacterId('inconnu'), false)
   assert.equal(registry.isKnownCharacterId(null), false)
 })

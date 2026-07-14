@@ -30,7 +30,7 @@ paramétrés par `adventureId`.
 
 ### Personnages jouables
 
-Le joueur choisit un personnage prétiré (Guerrier, Roublard, Magicien, Clerc — inspirés du SRD 5.1, CC-BY-4.0) au démarrage d'une partie, sur n'importe quelle aventure. Le catalogue est global (`characters/<id>/`) ; le moteur MCP applique les mécaniques de classe (attaques selon l'arme, sorts via `cast_spell`, capacités via `use_class_feature`, attaque sournoise, emplacements). Conception et guide « ajouter un personnage » : [docs/playable-characters.md](docs/playable-characters.md) et `characters/CLAUDE.md`.
+Le joueur choisit un personnage prétiré (Guerrier, Barde, Magicien, Clerc — inspirés du SRD 5.1, CC-BY-4.0) au démarrage d'une partie, sur n'importe quelle aventure. Le catalogue est global (`characters/<id>/`) ; le moteur MCP applique les mécaniques de classe (attaques selon l'arme, sorts via `cast_spell` — y compris les sorts utilitaires narratifs qui posent des `WorldFact` —, capacités via `use_class_feature`, emplacements). Conception et guide « ajouter un personnage » : [docs/playable-characters.md](docs/playable-characters.md) et `characters/CLAUDE.md`.
 
 ### Ajouter un module d'aventure
 

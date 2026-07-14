@@ -36,7 +36,7 @@ export type Condition =
 // Capacités de classe appliquées par le moteur (miroir du type de
 // lib/character-registry.ts, redéclaré ici pour éviter une dépendance de types
 // depuis mcp-server vers le registre). Liste fermée.
-export type ClassFeatureId = 'second_wind' | 'sneak_attack' | 'cunning_action' | 'spellcasting'
+export type ClassFeatureId = 'second_wind' | 'spellcasting'
 
 export interface PlayerState {
   id: 'player'
@@ -63,7 +63,7 @@ export interface PlayerState {
   features?: ClassFeatureId[]
   spellSlots?: { level1: { current: number; max: number } }
   knownSpells?: string[]                                // cantrips + niveau 1 confondus (ids)
-  spellcastingAbility?: keyof EntityStats               // int (magicien), wis (clerc)
+  spellcastingAbility?: keyof EntityStats               // int (magicien), wis (clerc), cha (barde)
   resources?: Record<string, { current: number; max: number }>  // ex. { second_wind: {…} }
 }
 
@@ -272,8 +272,7 @@ export interface GameState {
   round: number
   movementUsed: Record<string, number>  // grid cells spent by entity during its current turn
   actionUsed: Record<string, boolean>   // action economy consumed by entity during its current turn
-  bonusActionUsed?: Record<string, boolean>  // action bonus consommée (second souffle, ruse) — absent = legacy
-  dashUsed?: Record<string, boolean>    // Ruse:dash actif ce tour (double le budget de mouvement)
+  bonusActionUsed?: Record<string, boolean>  // action bonus consommée (second souffle) — absent = legacy
   combatLog: CombatLogEntry[]
   roomsVisited: string[]
   currentRoomId: string | null

@@ -27,7 +27,7 @@ par tests/character-registry.test.cjs.
 ## Invariants (moteur seul juge — anti-triche)
 
 - Les mécaniques de classe sont appliquées par le MOTEUR (`cast_spell`,
-  `use_class_feature`, attaque sournoise auto), jamais déclarées par le LLM.
+  `use_class_feature`), jamais déclarées par le LLM.
 - N'utiliser QUE des armes de `lib/srd/weapons.ts`, des sorts de
   `lib/srd/spells.ts` et des compétences de `lib/srd/skills.ts` (ids anglais).
   Besoin d'une nouvelle arme/d'un nouveau sort ? On étend le registre (+ son

@@ -45,7 +45,7 @@ export const TIDE_CRYPT_CONTENT: AdventureContent = {
   roomStatusHints: ROOM_STATUS_HINTS,
   characterHooks: {
     fighter: "Vétéran auréolé de ta victoire à la boulangerie de Grammy, tu réponds à l'appel de Maël, le gardien du phare : quelque chose remue dans la crypte que les marées découvrent. Tu as appris que parler évite parfois de saigner.",
-    rogue: "Le gardien du phare Maël te promet bon salaire pour explorer la crypte que la marée découvre. Des tombes, des serrures, des pièges noyés : du travail pour des doigts agiles.",
+    bard: "Maël, le gardien du phare, cherche quelqu'un qui n'a pas peur du noir — et toi, tu cherches la complainte qui fera pleurer les tavernes : une crypte que la marée découvre, des morts qui murmurent. Chante juste, et remonte.",
     wizard: "Maël, le gardien du phare, a repéré des lueurs anormales dans la crypte des marées. Il fait appel à ton savoir : quelle magie ancienne s'y réveille au rythme du reflux ?",
     cleric: "Maël, le gardien du phare, t'implore d'apaiser les morts que la marée dérange dans la vieille crypte. Rendre le repos aux âmes troublées : c'est ta vocation.",
   },

@@ -68,10 +68,7 @@ export function occupiesSpace(entity: Entity): boolean {
 }
 
 function speedCells(entity: Entity): number {
-  const base = Math.floor(entity.speed / 5)
-  // Ruse : Sprint double le budget de mouvement du tour (roublard).
-  if (gs.hasDashUsed(entity.id)) return base * 2
-  return base
+  return Math.floor(entity.speed / 5)
 }
 
 function assertEntity(entityId: string): Entity {
@@ -266,7 +263,7 @@ export function validateActionUse(entityId: string): void {
   }
 }
 
-// Économie d'action BONUS (second souffle, Ruse). Hors combat : non contrainte
+// Économie d'action BONUS (second souffle). Hors combat : non contrainte
 // (comme l'action). En combat : tour courant + action bonus non déjà dépensée.
 export function validateBonusActionUse(entityId: string): void {
   const entity = assertEntity(entityId)

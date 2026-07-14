@@ -52,7 +52,6 @@ function combatAround(state, overrides = {}) {
     movementUsed: {},
     actionUsed: {},
     bonusActionUsed: {},
-    dashUsed: {},
     player: { ...state.player, position: { x: 5, y: 5 }, ...(overrides.player ?? {}) },
     monsters: { goblin: makeMonster('goblin', overrides.monsterPos) },
   }
@@ -171,27 +170,59 @@ test('use_class_feature refusé si la classe ne l\'a pas (magicien ≠ second so
 })
 
 test('roll_ability_check : maîtrise dérivée du personnage via skill (anti-triche)', async () => {
-  await withCharacter({ CHARACTER_ID: 'rogue' }, async (client) => {
-    // Roublard : expertise en discrétion (DEX 16 → +3 ; maîtrise +2 doublée → +4 ; total +7).
-    // Les flags proficient/expertise déclarés faux sont IGNORÉS quand skill est fourni.
-    const r = await callTool(client, 'roll_ability_check', { ability: 'str', skill: 'stealth', proficient: false, dc: 10 })
-    assert.equal(r.data.expertise, true)
+  await withCharacter({ CHARACTER_ID: 'bard' }, async (client) => {
+    // Barde : maîtrise en persuasion (CHA 16 → +3 ; maîtrise +2 ; total +5).
+    // Les flags déclarés sont IGNORÉS quand skill est fourni : proficient=false
+    // et expertise=true ne changent rien (le barde n'a pas d'expertise).
+    const r = await callTool(client, 'roll_ability_check', { ability: 'str', skill: 'persuasion', proficient: false, expertise: true, dc: 10 })
+    assert.equal(r.data.expertise, false)
     assert.equal(r.data.proficient, true)
-    assert.equal(r.data.roll.modifier, 7)
-    assert.equal(r.data.ability, 'dex')
+    assert.equal(r.data.roll.modifier, 5)
+    assert.equal(r.data.ability, 'cha')
   })
 })
 
-test('attaque sournoise (roublard) : auto quand invisible, condition consommée', async () => {
-  // Dés forcés : d20=20 (touche/critique garantie), puis dégâts rapière 2d8+3 et sournoise 2d6.
-  await withCharacter({ CHARACTER_ID: 'rogue', AI_DM_TEST_DICE_SEQUENCE: '20,4,4,3,3' }, async (client) => {
-    const initial = await getState(client)
-    const state = combatAround(initial, { monsterPos: { x: 5, y: 6 }, player: { conditions: ['invisible'] } })
-    await callTool(client, 'replace_game_state', { gameState: state })
-    const atk = await callTool(client, 'resolve_player_attack', { targetName: 'goblin', weaponOrSpell: 'rapier' })
-    assert.equal(atk.isError, false)
-    assert.ok(/Sournoise/.test(atk.data.mechanicalSummary), 'la sournoise figure dans le résumé')
+test('spawn barde : incantateur CHA au kit utilitaire', async () => {
+  await withCharacter({ CHARACTER_ID: 'bard' }, async (client) => {
     const s = await getState(client)
-    assert.ok(!s.player.conditions.includes('invisible'), 'invisible consommée par l\'attaque')
+    assert.equal(s.characterId, 'bard')
+    assert.equal(s.player.class, 'Barde')
+    assert.equal(s.player.stats.cha, 16)
+    assert.equal(s.player.ac, 13)
+    assert.equal(s.player.spellcastingAbility, 'cha')
+    assert.deepEqual(s.player.spellSlots, { level1: { current: 3, max: 3 } })
+    for (const id of ['vicious-mockery', 'minor-illusion', 'healing-word', 'thunderwave', 'disguise-self', 'speak-with-animals']) {
+      assert.ok(s.player.knownSpells.includes(id), `sort connu manquant : ${id}`)
+    }
+  })
+})
+
+test('moquerie cruelle (barde) : sauvegarde SAG, dégâts pleins sur échec, aucun emplacement', async () => {
+  // Dés forcés : JS SAG du gobelin (3-1=2 vs DD 13 → raté), puis dégâts 1d4=4.
+  await withCharacter({ CHARACTER_ID: 'bard', AI_DM_TEST_DICE_SEQUENCE: '3,4' }, async (client) => {
+    const initial = await getState(client)
+    await callTool(client, 'replace_game_state', { gameState: combatAround(initial, { monsterPos: { x: 5, y: 6 } }) })
+    const cast = await callTool(client, 'cast_spell', { spellId: 'vicious-mockery', targetName: 'goblin' })
+    assert.equal(cast.isError, false)
+    assert.equal(cast.data.effect, 'save')
+    assert.equal(cast.data.saved, false)
+    assert.equal(cast.data.dc, 13, 'DD = 8 + maîtrise 2 + mod CHA 3')
+    assert.equal(cast.data.damageDealt, 4)
+    const s = await getState(client)
+    assert.equal(s.player.spellSlots.level1.current, 3, 'un tour de magie ne consomme pas d\'emplacement')
+  })
+})
+
+test('déguisement (barde) : sort utilitaire narratif — coût débité, worldFact de carte', async () => {
+  await withCharacter({ CHARACTER_ID: 'bard' }, async (client) => {
+    const cast = await callTool(client, 'cast_spell', { spellId: 'disguise-self' })
+    assert.equal(cast.isError, false)
+    assert.equal(cast.data.effect, 'utility')
+    assert.ok(cast.data.srdNote.length > 0, 'le srdNote borne la narration du DM')
+    const s = await getState(client)
+    assert.equal(s.player.spellSlots.level1.current, 2, 'sort de niveau 1 : emplacement débité')
+    assert.equal(s.worldFacts.length, 1)
+    assert.equal(s.worldFacts[0].expires, 'map')
+    assert.ok(/Déguisement/.test(s.worldFacts[0].text))
   })
 })

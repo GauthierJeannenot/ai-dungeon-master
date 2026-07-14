@@ -5,7 +5,9 @@
 > commit (docs/ a déjà divergé du code — ne pas recommencer). Le joueur choisit
 > son personnage (classe, stats, équipement, capacités) au démarrage d'une
 > partie, sur n'importe quelle aventure. Catalogue : `characters/<id>/`
-> (fighter/rogue/wizard/cleric). Registres : `lib/character-registry.ts` +
+> (fighter/bard/wizard/cleric — le roublard v1 a été RETIRÉ avec ses mécaniques
+> moteur sneak_attack/cunning_action, remplacé par le barde).
+> Registres : `lib/character-registry.ts` +
 > `lib/srd/{weapons,spells,skills}.ts`. Tests : tests/character-registry.test.cjs,
 > tests/mcp-characters.test.cjs, plus les 400/409 de tests/dm-adventure-selection
 > et le round-trip character_id de tests/db-stores.
@@ -19,7 +21,7 @@ la position et l'inventaire varient par aventure (`initialPlayer` de
 est dupliquée par aventure.
 
 Cible : un **catalogue de personnages prétirés** inspirés du SRD 5 (Guerrier,
-Roublard, Magicien, Clerc), jouables sur **toutes** les aventures. Le joueur
+Barde, Magicien, Clerc), jouables sur **toutes** les aventures. Le joueur
 choisit son personnage au lancement d'une partie ; ce choix est figé pour
 toute la session, comme l'aventure. Le moteur MCP applique les mécaniques de
 classe (attaques selon l'arme, sorts, ressources) — le LLM ne fait que narrer.
@@ -42,8 +44,8 @@ classe (attaques selon l'arme, sorts, ressources) — le LLM ne fait que narrer.
    différent sur une session existante est un **409**. Jamais de changement de
    personnage en cours de partie.
 4. **Le moteur MCP est le seul juge des mécaniques de classe.** Emplacements
-   de sorts, sorts connus, économie d'action bonus, conditions d'attaque
-   sournoise : tout est validé par le moteur à partir de faits de `GameState`
+   de sorts, sorts connus, économie d'action bonus : tout est validé par le
+   moteur à partir de faits de `GameState`
    — jamais déclaré par le LLM ni par le client (anti-triche/anti-injection,
    invariant n°1).
 5. **Rétrocompatibilité totale sur le Guerrier.** Le personnage par défaut
@@ -103,13 +105,11 @@ landing (choix aventure + personnage)
 ```ts
 import type { EntityStats, Item } from './types'
 
-export type CharacterClassId = 'fighter' | 'rogue' | 'wizard' | 'cleric'
+export type CharacterClassId = 'fighter' | 'bard' | 'wizard' | 'cleric'
 
 // Capacités de classe que le MOTEUR sait appliquer. Liste fermée.
 export type ClassFeatureId =
   | 'second_wind'      // action bonus : soin 1d10+niveau, ressource 1/carte
-  | 'sneak_attack'     // passif : dés bonus si conditions vérifiables (voir Moteur)
-  | 'cunning_action'   // action bonus : dash (×2 mouvement) ou hide
   | 'spellcasting'     // active cast_spell + emplacements
 
 export interface CharacterTemplate {
@@ -124,7 +124,7 @@ export interface CharacterTemplate {
   hp: { base: number; perLevel: number }   // décision n°7 (équilibrage solo)
   savingThrowProficiencies: Array<keyof EntityStats>
   skillProficiencies: string[]     // ids canoniques (lib/srd/skills, voir Moteur)
-  expertise?: string[]             // compétences à double maîtrise (roublard)
+  expertise?: string[]             // compétences à double maîtrise (aucun prétiré v1)
   inventory: Item[]                // kit de classe (armes/armure/outils) — PAS les objets de quête
   features: ClassFeatureId[]
   spellcasting?: {
@@ -322,8 +322,8 @@ normalisé (comme le matching de cible existant). Les monstres gardent leur
 ### Économie d'action bonus
 
 Nouvelle mécanique parallèle à `actionUsed` : `bonusActionUsed`
-(reset dans `resetTurnEconomy`, consommée par `second_wind` et
-`cunning_action`). Hors combat, non contrainte (comme l'action).
+(reset dans `resetTurnEconomy`, consommée par `second_wind`).
+Hors combat, non contrainte (comme l'action).
 
 ### Nouveau tool `cast_spell`
 
@@ -402,28 +402,18 @@ Règles de frontière :
 ### Nouveau tool `use_class_feature`
 
 ```
-use_class_feature({ featureId: 'second_wind' | 'cunning_action', option?: 'dash' | 'hide' })
+use_class_feature({ featureId: 'second_wind' })
 ```
 
 - `second_wind` : guerrier uniquement (`features`), ressource disponible,
   action bonus libre → soin 1d10+niveau, décrémente la ressource.
-- `cunning_action` : roublard, action bonus libre. `dash` = double le budget
-  de mouvement du tour (crédite `movementUsed` négatif ou relève le plafond —
-  implémentation : plafond dynamique `speedCells × (dashed ? 2 : 1)`).
-  `hide` = jet de Discrétion (DEX, maîtrise/expertise du personnage) contre
-  DD 12 fixe v1 ; succès → condition `invisible` sur le joueur.
 - Recharge : `applyMapTravel` remet toutes les `resources` et les
   `spellSlots` à leur max (décision n°6).
-
-### Attaque sournoise (roublard)
-
-Appliquée AUTOMATIQUEMENT par `resolve_player_attack` (jamais un paramètre
-LLM) quand TOUTES ces conditions vérifiables sont vraies : l'attaquant a
-`sneak_attack` ; l'arme est `finesse` ou `ranged` ; et le joueur a la
-condition `invisible` (posée par `cunning_action:hide` ou un
-`apply_condition` moteur) **ou** un PNJ/monstre non hostile au joueur est
-adjacent à la cible (compagnon au contact). Effet : +1d6 aux dégâts (niveaux
-1-2), la condition `invisible` est consommée par l'attaque.
+- Historique : `cunning_action` (dash/hide) et l'attaque sournoise
+  automatique ont été RETIRÉS avec le roublard (remplacé par le barde) — le
+  budget `dashUsed` du GameState a disparu avec eux. Les réintroduire =
+  nouvelle variante `ClassFeatureId` + logique moteur + tests, comme toute
+  capacité.
 
 ### Jets de compétence : maîtrise décidée par le moteur
 
@@ -519,22 +509,26 @@ préparer maintenant.
 PV : `base` équilibré solo (~×1,7 SRD, précédent : guerrier 20). Le SRD 5.1
 est publié sous licence CC-BY-4.0 : ajouter l'attribution dans le README.
 
-| | `fighter` Guerrier | `rogue` Roublard | `wizard` Magicien | `cleric` Clerc |
+| | `fighter` Guerrier | `bard` Barde | `wizard` Magicien | `cleric` Clerc |
 |---|---|---|---|---|
-| Nom | Héros | Ombre | Aldric | Séréna |
-| FOR/DEX/CON | 16/12/14 | 10/16/12 | 8/14/12 | 14/10/14 |
-| INT/SAG/CHA | 10/12/10 | 13/12/14 | 16/12/10 | 10/16/12 |
-| CA | 16 (cotte + bouclier) | 14 (cuir) | 12 (10+DEX) | 16 (écailles + bouclier) |
+| Nom | Héros | Lyra | Aldric | Séréna |
+| FOR/DEX/CON | 16/12/14 | 8/14/12 | 8/14/12 | 14/10/14 |
+| INT/SAG/CHA | 10/12/10 | 10/12/16 | 16/12/10 | 10/16/12 |
+| CA | 16 (cotte + bouclier) | 13 (cuir + DEX) | 12 (10+DEX) | 16 (écailles + bouclier) |
 | PV base/perLevel | 20 / +8 | 16 / +6 | 12 / +5 | 18 / +7 |
-| Sauvegardes | FOR, CON | DEX, INT | INT, SAG | SAG, CHA |
-| Compétences | athlétisme, intimidation, perception, histoire | discrétion*, acrobaties, perception, escamotage*, persuasion | arcanes, investigation, histoire, perspicacité | médecine, perspicacité, religion, persuasion |
-| Kit | épée longue, bouclier, cotte de mailles, hache de main ×2, potion, pack | rapière, dague ×2, arc court + flèches, cuir, outils de voleur, potion, pack | bâton, dague, grimoire, potion, pack | masse d'armes, bouclier, écailles, symbole sacré, potion, pack |
-| Capacités | second_wind | sneak_attack, cunning_action, expertise* | spellcasting | spellcasting |
-| Sorts (tours) | — | — | rayon de givre (1d8), lumière (utilitaire) | flamme sacrée (save DEX 1d8), thaumaturgie (utilitaire) |
-| Sorts (niv. 1) | — | — | projectile magique (auto 3d4+3), mains brûlantes (save DEX 3d6 ½) | soins (1d8+SAG), éclair traçant/guiding bolt (attaque 4d6), création d'eau (utilitaire → WorldFact) |
-| Emplacements niv. 1 | — | — | 3 | 3 |
+| Sauvegardes | FOR, CON | DEX, CHA | INT, SAG | SAG, CHA |
+| Compétences | athlétisme, intimidation, perception, histoire | représentation, persuasion, tromperie, perspicacité, acrobaties | arcanes, investigation, histoire, perspicacité | médecine, perspicacité, religion, persuasion |
+| Kit | épée longue, bouclier, cotte de mailles, hache de main ×2, potion, pack | rapière, dague, cuir, luth (focaliseur), potion | bâton, dague, grimoire, potion, pack | masse d'armes, bouclier, écailles, symbole sacré, potion, pack |
+| Capacités | second_wind | spellcasting | spellcasting | spellcasting |
+| Sorts (tours) | — | moquerie cruelle (save SAG 1d4), illusion mineure (utilitaire → WorldFact salle) | rayon de givre (1d8), lumière (utilitaire) | flamme sacrée (save DEX 1d8), thaumaturgie (utilitaire) |
+| Sorts (niv. 1) | — | mot de guérison (soin 1d4+CHA), vague tonnante (save CON 2d8 ½), déguisement (utilitaire → WorldFact carte), communication avec les animaux (utilitaire → WorldFact carte) | projectile magique (auto 3d4+3), mains brûlantes (save DEX 3d6 ½) | soins (1d8+SAG), éclair traçant/guiding bolt (attaque 4d6), création d'eau (utilitaire → WorldFact) |
+| Emplacements niv. 1 | — | 3 | 3 | 3 |
 
-(* = expertise). Le guerrier est byte-identique à l'existant : `BASE_PLAYER`
+Le barde est le personnage « narratif » du catalogue : la moitié de son kit
+est faite de sorts UTILITAIRES (illusion mineure, déguisement, communication
+avec les animaux) — le moteur débite le coût et pose un WorldFact, le DM narre
+dans les bornes du `srdNote` (voir « Sorts utilitaires » ci-dessus).
+Le guerrier est byte-identique à l'existant : `BASE_PLAYER`
 devient `characters/fighter/sheet.ts` et `lib/player-template.ts` un ré-export
 de transition (supprimé quand plus aucun import ne le référence).
 
@@ -580,11 +574,11 @@ séparément.
 2. **Moteur.** `mcp-server/character.ts`, buildInitialPlayer fusionné,
    round-trip replaceState (characterId, bonusActionUsed, worldFacts),
    aptitude d'attaque par arme, économie bonus action, `cast_spell` (y
-   compris production des WorldFacts), `use_class_feature`, attaque
-   sournoise, recharge au travel_to_map, purge des worldFacts (sortie de
+   compris production des WorldFacts), `use_class_feature`, recharge au
+   travel_to_map, purge des worldFacts (sortie de
    salle / travel_to_map / plafond FIFO), `skill` sur roll_ability_check.
    Tests moteur dédiés (dés seedés) : un test par validation refusée + un
-   par effet de sort + sneak attack (les 2 chemins) + cycle de vie complet
+   par effet de sort + cycle de vie complet
    d'un WorldFact (création, survie au round-trip, purge).
 3. **Route + persistance + client.** DMRequest.characterId, 400/409,
    migration `character_id`, mcp-client (spawn env), page de jeu
