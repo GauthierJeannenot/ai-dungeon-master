@@ -1,6 +1,5 @@
 import NextAuth from 'next-auth'
 import Google from 'next-auth/providers/google'
-import GitHub from 'next-auth/providers/github'
 import PostgresAdapter from '@auth/pg-adapter'
 import { getAuthDbClient } from './db'
 
@@ -12,7 +11,6 @@ import { getAuthDbClient } from './db'
 // Variables d'environnement attendues (voir .env.example) :
 //   AUTH_SECRET          — `npx auth secret` pour en générer un
 //   AUTH_GOOGLE_ID / AUTH_GOOGLE_SECRET  — OAuth Google Cloud Console
-//   AUTH_GITHUB_ID / AUTH_GITHUB_SECRET  — OAuth GitHub Developer Settings
 //   DATABASE_URL         — Postgres (obligatoire)
 //
 // session.userId = users.id (clé stable du solde de tokens, indépendante du
@@ -29,7 +27,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
   adapter: PostgresAdapter(getAuthDbClient()),
   session: { strategy: 'database' },
-  providers: [Google, GitHub],
+  providers: [Google],
   callbacks: {
     session({ session, user }) {
       // Stratégie "database" → `user` vient de la table users.

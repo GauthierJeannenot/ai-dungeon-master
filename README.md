@@ -7,7 +7,7 @@ Application web de jeu de rôle D&D 5e avec un Dungeon Master IA (Claude) comme 
 - **Frontend** : Next.js 16, TypeScript, Tailwind CSS
 - **IA** : Anthropic SDK — Haiku 4.5 (classifieur d'intention) + Sonnet (narration)
 - **MCP** : `@modelcontextprotocol/sdk` — game engine déterministe
-- **Auth** : NextAuth v5 (OAuth 2.0 Google/GitHub) — sessions Postgres via
+- **Auth** : NextAuth v5 (OAuth 2.0 Google) — sessions Postgres via
   `@auth/pg-adapter` (stratégie « database »)
 - **Persistance** : Postgres unique (`DATABASE_URL`, requise) pour auth,
   sessions de jeu et crédits
@@ -128,8 +128,6 @@ ANTHROPIC_API_KEY=sk-ant-...
 AUTH_SECRET=...            # npx auth secret
 AUTH_GOOGLE_ID=...         # Google Cloud Console → OAuth credentials
 AUTH_GOOGLE_SECRET=...
-AUTH_GITHUB_ID=...         # GitHub → Settings → Developer settings → OAuth Apps
-AUTH_GITHUB_SECRET=...
 STRIPE_SECRET_KEY=...      # TO DO remplir les informations bancaires pour le paiement (dashboard Stripe)
 STRIPE_WEBHOOK_SECRET=...  # webhook checkout.session.completed → /api/stripe/webhook
 ```
@@ -304,7 +302,6 @@ DATABASE_URL        = ${{Postgres.DATABASE_URL}}
 AUTH_SECRET         = <npx auth secret>
 AUTH_URL            = https://<votre-domaine-railway>
 AUTH_GOOGLE_ID / AUTH_GOOGLE_SECRET       # OAuth Google
-AUTH_GITHUB_ID / AUTH_GITHUB_SECRET       # OAuth GitHub
 STRIPE_SECRET_KEY / STRIPE_WEBHOOK_SECRET # paiements (optionnel au début)
 LLM_MODE            = live
 ```
