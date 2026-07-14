@@ -51,14 +51,6 @@ export default function AuthControls({ authenticated, userName, userImage, balan
       >
         {pending === 'google' ? '...' : 'Google'}
       </button>
-      <button
-        type="button"
-        disabled={pending !== null}
-        onClick={() => { setPending('github'); signIn('github', { callbackUrl: '/' }) }}
-        className="text-xs font-semibold text-stone-100 bg-stone-800 hover:bg-stone-700 disabled:opacity-50 border border-amber-900/40 px-3 py-1.5 rounded transition-colors"
-      >
-        {pending === 'github' ? '...' : 'GitHub'}
-      </button>
     </div>
   )
 }
