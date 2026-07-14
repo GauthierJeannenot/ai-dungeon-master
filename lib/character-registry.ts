@@ -10,17 +10,15 @@ import type { EntityStats, Item, PlayerState } from './types'
 // objets additionnels. Voir docs/playable-characters.md.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type CharacterClassId = 'fighter' | 'rogue' | 'wizard' | 'cleric'
+export type CharacterClassId = 'fighter' | 'bard' | 'wizard' | 'cleric'
 
 // Capacités de classe que le MOTEUR sait appliquer. Liste fermée.
 export type ClassFeatureId =
   | 'second_wind'      // action bonus : soin 1d10+niveau, ressource 1/carte
-  | 'sneak_attack'     // passif : +dés si conditions vérifiables (voir moteur)
-  | 'cunning_action'   // action bonus : dash (×2 mouvement) ou hide
   | 'spellcasting'     // active cast_spell + emplacements
 
 export interface CharacterSpellcasting {
-  ability: keyof EntityStats   // int (magicien), wis (clerc)
+  ability: keyof EntityStats   // int (magicien), wis (clerc), cha (barde)
   cantrips: string[]           // ids de lib/srd/spells.ts (niveau 0)
   knownSpells: string[]        // sorts de niveau 1 connus/préparés
   slots: { level1: number }    // v1 : uniquement des emplacements de niveau 1
@@ -39,14 +37,14 @@ export interface CharacterTemplate {
   hp: { base: number; perLevel: number }   // PV = base + perLevel × (niveau − 1)
   savingThrowProficiencies: Array<keyof EntityStats>
   skillProficiencies: string[] // ids canoniques (lib/srd/skills.ts)
-  expertise?: string[]         // compétences à double maîtrise (roublard)
+  expertise?: string[]         // compétences à double maîtrise (aucun prétiré v1)
   inventory: Item[]            // kit de classe (armes/armure/outils)
   features: ClassFeatureId[]
   spellcasting?: CharacterSpellcasting
 }
 
 import { FIGHTER } from '../characters/fighter/sheet'
-import { ROGUE } from '../characters/rogue/sheet'
+import { BARD } from '../characters/bard/sheet'
 import { WIZARD } from '../characters/wizard/sheet'
 import { CLERIC } from '../characters/cleric/sheet'
 
@@ -54,13 +52,13 @@ export const DEFAULT_CHARACTER_ID: CharacterClassId = 'fighter'
 
 const CHARACTERS: Record<string, CharacterTemplate> = {
   [FIGHTER.id]: FIGHTER,
-  [ROGUE.id]: ROGUE,
+  [BARD.id]: BARD,
   [WIZARD.id]: WIZARD,
   [CLERIC.id]: CLERIC,
 }
 
 // Ordre d'affichage stable (sélecteur landing) : guerrier d'abord (défaut).
-const CHARACTER_ORDER: string[] = ['fighter', 'rogue', 'wizard', 'cleric']
+const CHARACTER_ORDER: string[] = ['fighter', 'bard', 'wizard', 'cleric']
 
 // Retourne le template demandé, ou celui par défaut si l'id est inconnu
 // (fail-safe : ni le moteur ni l'app ne doivent planter sur un id douteux).

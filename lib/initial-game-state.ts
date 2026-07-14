@@ -41,7 +41,6 @@ export function buildInitialGameState(
     movementUsed: {},
     actionUsed: {},
     bonusActionUsed: {},
-    dashUsed: {},
     combatLog: [],
     roomsVisited: roomId ? [roomId] : [],
     currentRoomId: roomId,

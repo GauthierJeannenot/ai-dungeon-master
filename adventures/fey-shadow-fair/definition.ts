@@ -85,7 +85,7 @@ export const FEY_SHADOW_FAIR_CONTENT: AdventureContent = {
   // Chaque personnage la vit à sa manière.
   characterHooks: {
     fighter: "Vainqueur de la boulangerie de Grammy et de la Crypte des Marées, tu as commis une erreur de débutant hier soir : tu as gagé ton OMBRE au bonneteau (les cartes étaient truquées — elles l'étaient). Elle suit maintenant Maître Filou dans la Foire aux Chandelles. Tu ne projettes plus aucune ombre, et tu vis TRÈS mal les gloussements.",
-    rogue: "Toi, une roublarde, t'être fait plumer au bonneteau ? Impensable — et pourtant Maître Filou t'a soutiré ton OMBRE avec des cartes truquées. Elle le suit dans la Foire aux Chandelles. Tu comptes bien la récupérer, par la ruse cette fois.",
+    bard: "Toi qui vis d'illusions et de tours de scène, te faire plumer au bonneteau ? Le comble — et pourtant Maître Filou t'a soutiré ton OMBRE avec des cartes truquées. Elle le suit dans la Foire aux Chandelles. Récupère-la, et fais-en au moins une chanson.",
     wizard: "Une ombre gagée au bonneteau ne se sépare pas d'un corps par magie ordinaire — et c'est pourtant ce que Maître Filou a fait de la tienne. Fascinant, humiliant, et à corriger. Elle le suit dans la Foire aux Chandelles.",
     cleric: "Ton ombre — part de ton âme, diraient les anciens — t'a été soustraite au bonneteau par Maître Filou. La récupérer dans la Foire aux Chandelles est autant une affaire spirituelle qu'une question d'orgueil.",
   },

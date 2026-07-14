@@ -26,8 +26,6 @@ const ABILITY_ORDER: Array<keyof EntityStats> = ['str', 'dex', 'con', 'int', 'wi
 // Libellés FR des capacités de classe (ClassFeatureId). Défaut = l'id brut.
 const FEATURE_LABELS: Record<string, string> = {
   second_wind: 'Second souffle',
-  sneak_attack: 'Attaque sournoise',
-  cunning_action: 'Ruse',
   spellcasting: 'Incantation',
 }
 

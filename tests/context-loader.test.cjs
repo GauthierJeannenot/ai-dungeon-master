@@ -99,7 +99,7 @@ test('the shared dm rules exist (single shared file), and every character ships 
   const sharedDir = path.join(process.cwd(), 'adventures', '_shared')
   assert.ok(fs.existsSync(path.join(sharedDir, 'dm-rules.md')), 'fichier manquant : _shared/dm-rules.md')
   assert.ok(!fs.existsSync(path.join(sharedDir, 'player-rules.md')), '_shared/player-rules.md ne doit plus exister (règles joueur PAR module)')
-  for (const id of ['fighter', 'rogue', 'wizard', 'cleric']) {
+  for (const id of ['fighter', 'bard', 'wizard', 'cleric']) {
     const sheet = path.join(process.cwd(), 'characters', id, 'character-sheet.md')
     assert.ok(fs.existsSync(sheet), `fiche de personnage manquante : ${id}`)
   }

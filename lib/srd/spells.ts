@@ -60,6 +60,19 @@ const SPELLS: SpellSpec[] = [
       srdNote: 'Menue manifestation de pouvoir divin : voix tonnante, tremblement bref, flammes qui vacillent — effet sensoriel, aucun dégât ni contrainte mécanique.',
     },
   },
+  {
+    id: 'vicious-mockery', label: 'Moquerie cruelle', level: 0, rangeCells: 12, target: 'enemy',
+    // Rider SRD (désavantage à la prochaine attaque) hors périmètre v1 : dégâts seuls.
+    effect: { kind: 'save', ability: 'wis', damage: '1d4', halfOnSave: false },
+  },
+  {
+    id: 'minor-illusion', label: 'Illusion mineure', level: 0, rangeCells: 6, target: 'any',
+    effect: {
+      kind: 'utility',
+      srdNote: "Crée un SON ou l'IMAGE IMMOBILE d'un objet (cube de 1,5 m) pendant 1 min ; ni lumière, ni odeur, ni effet physique — le toucher ou une Investigation réussie la perce.",
+      fact: { text: "Une illusion mineure (son ou image immobile, sort Illusion mineure) est en place dans la salle.", expires: 'room' },
+    },
+  },
 
   // ── Sorts de niveau 1 ───────────────────────────────────────────────────────
   {
@@ -86,6 +99,31 @@ const SPELLS: SpellSpec[] = [
       kind: 'utility',
       srdNote: "Crée jusqu'à ~40 L d'eau propre dans un récipient ou en pluie sur un cube de 9 m, OU éteint des flammes sur un cube de 9 m. Pas de dégât, pas de noyade.",
       fact: { text: "De l'eau a été créée sur place (sort Création d'eau).", expires: 'room' },
+    },
+  },
+  {
+    id: 'healing-word', label: 'Mot de guérison', level: 1, rangeCells: 12, target: 'self',
+    effect: { kind: 'heal', amount: '1d4+MOD' },
+  },
+  {
+    id: 'thunderwave', label: 'Vague tonnante', level: 1, rangeCells: 3, target: 'enemy',
+    // SRD : cube de 4,5 m autour du lanceur — simplification solo : une cible proche.
+    effect: { kind: 'save', ability: 'con', damage: '2d8', halfOnSave: true },
+  },
+  {
+    id: 'disguise-self', label: 'Déguisement', level: 1, rangeCells: 0, target: 'self',
+    effect: {
+      kind: 'utility',
+      srdNote: "Change l'apparence du lanceur (visage, vêtements, ±30 cm de taille) pendant 1 h ; purement visuel — le toucher ou une Investigation réussie perce l'illusion.",
+      fact: { text: "Le héros porte une apparence illusoire de son choix (sort Déguisement).", expires: 'map' },
+    },
+  },
+  {
+    id: 'speak-with-animals', label: 'Communication avec les animaux', level: 1, rangeCells: 0, target: 'self',
+    effect: {
+      kind: 'utility',
+      srdNote: "Comprend les bêtes et se fait comprendre d'elles pendant 10 min ; leur savoir reste celui d'une bête, et leur attitude reste la leur (aucun contrôle).",
+      fact: { text: 'Le héros comprend les animaux et peut leur parler (sort Communication avec les animaux).', expires: 'map' },
     },
   },
 ]

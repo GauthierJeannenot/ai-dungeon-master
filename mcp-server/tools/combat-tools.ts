@@ -23,41 +23,6 @@ function withDamageMod(die: string, mod: number): string {
   return mod > 0 ? `${die}+${mod}` : `${die}${mod}`
 }
 
-// Attaque sournoise (roublard) : appliquée AUTOMATIQUEMENT — jamais un paramètre
-// LLM. Conditions VÉRIFIABLES (docs/playable-characters.md) : l'attaquant a
-// `sneak_attack`, l'arme est finesse/distance, et le joueur est invisible OU une
-// créature non hostile est au contact de la cible. Dés : ⌈niveau/2⌉ d6 (SRD).
-function computeSneakAttack(
-  player: PlayerState,
-  target: PlayerState | MonsterState,
-  weaponName: string
-): { dice: string; viaInvisibility: boolean; reason: string } | null {
-  if (!player.features?.includes('sneak_attack')) return null
-  const weapon = resolveWeapon(weaponName)
-  const usable = weapon.properties.includes('finesse') || weapon.properties.includes('ranged')
-  if (!usable) return null
-
-  const invisible = player.conditions.includes('invisible')
-  const allyAtContact = hasNonHostileAtContact(target)
-  if (!invisible && !allyAtContact) return null
-
-  const diceCount = Math.max(1, Math.ceil(player.level / 2))
-  return {
-    dice: `${diceCount}d6`,
-    viaInvisibility: invisible,
-    reason: invisible ? 'attaque furtive (invisible)' : 'attaque en tenaille (allié au contact)',
-  }
-}
-
-function hasNonHostileAtContact(target: PlayerState | MonsterState): boolean {
-  const state = gs.getState()
-  const near = (pos: { x: number; y: number }) =>
-    Math.max(Math.abs(pos.x - target.position.x), Math.abs(pos.y - target.position.y)) <= 1
-  const monsterAlly = Object.values(state.monsters).some(m => m.hostile === false && m.isAlive && m.id !== target.id && near(m.position))
-  const npcAlly = Object.values(state.npcs ?? {}).some(n => n.visible && n.disposition !== 'hostile' && near(n.position))
-  return monsterAlly || npcAlly
-}
-
 function doubleDiceNotation(notation: string): string {
   return notation.replace(/^(\d*)d(\d+)/i, (_match, count, sides) => {
     const diceCount = count === '' ? 1 : Number(count)
@@ -218,26 +183,12 @@ export function resolveAttack(
   let targetDied = false
   let targetStatusDetail = ''
 
-  let sneakDetail = ''
   if (hit) {
     const abilityModDamage = getAbilityModifier(attacker.stats[attackAbilityKey])
     const baseDamage = customDamageDice ?? ('damageDice' in attacker ? attacker.damageDice : withDamageMod(getWeaponDamage(weaponOrSpell), abilityModDamage))
     damageRoll = rollDice(criticalHit ? doubleDiceNotation(baseDamage) : baseDamage)
-    let totalDamage = damageRoll.total
 
-    // Attaque sournoise du joueur (roublard) : conditions vérifiées par le
-    // moteur, jamais déclarées par le LLM. La condition invisible est consommée.
-    if (isPlayerAttacker && 'features' in attacker) {
-      const sneak = computeSneakAttack(attacker, target, weaponOrSpell)
-      if (sneak) {
-        const sneakRoll = rollDice(criticalHit ? doubleDiceNotation(sneak.dice) : sneak.dice)
-        totalDamage += sneakRoll.total
-        sneakDetail = ` | Sournoise ${sneak.dice}: ${sneakRoll.detail} (${sneak.reason})`
-        if (sneak.viaInvisibility) gs.removeCondition('player', 'invisible')
-      }
-    }
-
-    damageDealt = Math.max(1, totalDamage)
+    damageDealt = Math.max(1, damageRoll.total)
 
     if (targetId === 'player') {
       const playerWasDying = target.hp.current <= 0
@@ -261,7 +212,7 @@ export function resolveAttack(
   }
 
   const mechanicalSummary = hit
-    ? `Attaque: ${attackRoll.detail} vs CA ${targetAC} -> ${criticalHit ? 'CRITIQUE' : 'TOUCHE'} | Degats: ${damageRoll!.detail}${sneakDetail}${targetStatusDetail}${advantageNote}`
+    ? `Attaque: ${attackRoll.detail} vs CA ${targetAC} -> ${criticalHit ? 'CRITIQUE' : 'TOUCHE'} | Degats: ${damageRoll!.detail}${targetStatusDetail}${advantageNote}`
     : `Attaque: ${attackRoll.detail} vs CA ${targetAC} -> ${criticalMiss ? 'ECHEC CRITIQUE' : 'RATE'}${advantageNote}`
 
   const result: AttackResult = {
@@ -498,59 +449,32 @@ function applySpellEffect(spell: SpellSpec, player: PlayerState, target: PlayerS
 // ── CAPACITÉS DE CLASSE (use_class_feature) ─────────────────────────────────────
 
 export interface UseClassFeatureInput {
-  featureId: 'second_wind' | 'cunning_action'
-  option?: 'dash' | 'hide'
+  featureId: 'second_wind'
 }
 
-export function resolveUseClassFeature({ featureId, option }: UseClassFeatureInput) {
+export function resolveUseClassFeature({ featureId }: UseClassFeatureInput) {
   const player = gs.getPlayer()
   if (!player.features?.includes(featureId)) {
     return rules.ruleErrorResult(new rules.RuleViolation('FEATURE_NOT_AVAILABLE', `The player does not have the ${featureId} feature.`, { featureId, features: player.features ?? [] }))
   }
 
-  // Économie d'action bonus (second souffle, Ruse coûtent l'action bonus).
+  // Économie d'action bonus (le second souffle coûte l'action bonus).
   try {
     rules.validateBonusActionUse('player')
   } catch (err) {
     return rules.ruleErrorResult(err)
   }
 
-  if (featureId === 'second_wind') {
-    if (!gs.consumeResource('second_wind')) {
-      return rules.ruleErrorResult(new rules.RuleViolation('RESOURCE_EXHAUSTED', 'Second Wind has already been used (recharges when changing map).', {}))
-    }
-    const healRoll = rollDice(`1d10+${player.level}`)
-    const before = player.hp.current
-    const updated = gs.updatePlayerHP(healRoll.total)
-    gs.markBonusActionUsed('player')
-    const summary = `Second souffle: ${healRoll.detail} | PV ${before}/${updated.hp.max} -> ${updated.hp.current}/${updated.hp.max}`
-    gs.addLogEntry({ round: gs.getState().round, turn: gs.getState().currentTurn ?? 'player', action: `${player.name} — Second souffle`, mechanicalDetail: summary })
-    return { content: [{ type: 'text' as const, text: JSON.stringify({ feature: 'second_wind', healRoll, hpBefore: before, hpAfter: updated.hp.current, mechanicalSummary: summary }) }] }
+  if (!gs.consumeResource('second_wind')) {
+    return rules.ruleErrorResult(new rules.RuleViolation('RESOURCE_EXHAUSTED', 'Second Wind has already been used (recharges when changing map).', {}))
   }
-
-  // cunning_action
-  const chosen = option ?? 'dash'
-  if (chosen === 'dash') {
-    gs.markDashUsed('player')
-    gs.markBonusActionUsed('player')
-    const summary = 'Ruse: Sprint — budget de mouvement doublé ce tour'
-    gs.addLogEntry({ round: gs.getState().round, turn: gs.getState().currentTurn ?? 'player', action: `${player.name} — Ruse (Sprint)`, mechanicalDetail: summary })
-    return { content: [{ type: 'text' as const, text: JSON.stringify({ feature: 'cunning_action', option: 'dash', mechanicalSummary: summary }) }] }
-  }
-
-  // hide : jet de Discrétion (DEX) avec maîtrise/expertise du personnage, DD 12 fixe.
-  const abilityMod = getAbilityModifier(player.stats.dex)
-  const hasProf = player.skillProficiencies?.includes('stealth')
-  const hasExpertise = player.expertise?.includes('stealth')
-  const profBonus = hasExpertise ? player.proficiencyBonus * 2 : hasProf ? player.proficiencyBonus : 0
-  const roll = rollDice(d20WithModifier(abilityMod + profBonus))
-  const dc = 12
-  const success = roll.total >= dc
-  if (success) gs.applyCondition('player', 'invisible')
+  const healRoll = rollDice(`1d10+${player.level}`)
+  const before = player.hp.current
+  const updated = gs.updatePlayerHP(healRoll.total)
   gs.markBonusActionUsed('player')
-  const summary = `Ruse: Discretion ${roll.detail} vs DD ${dc} -> ${success ? 'CACHE (invisible)' : 'RATE'}`
-  gs.addLogEntry({ round: gs.getState().round, turn: gs.getState().currentTurn ?? 'player', action: `${player.name} — Ruse (se cacher)`, mechanicalDetail: summary })
-  return { content: [{ type: 'text' as const, text: JSON.stringify({ feature: 'cunning_action', option: 'hide', roll, dc, success, mechanicalSummary: summary }) }] }
+  const summary = `Second souffle: ${healRoll.detail} | PV ${before}/${updated.hp.max} -> ${updated.hp.current}/${updated.hp.max}`
+  gs.addLogEntry({ round: gs.getState().round, turn: gs.getState().currentTurn ?? 'player', action: `${player.name} — Second souffle`, mechanicalDetail: summary })
+  return { content: [{ type: 'text' as const, text: JSON.stringify({ feature: 'second_wind', healRoll, hpBefore: before, hpAfter: updated.hp.current, mechanicalSummary: summary }) }] }
 }
 
 // ── TOURS DES MONSTRES (résolution déterministe en un seul appel) ─────────────────
@@ -742,13 +666,12 @@ export function registerCombatTools(server: McpServer): void {
 
   server.tool(
     'use_class_feature',
-    'Uses a player class feature that costs the bonus action: "second_wind" (Fighter — heals 1d10+level, once per map), or "cunning_action" (Rogue — option "dash" doubles this turn movement, option "hide" rolls Stealth DC 12 to become hidden/invisible). The engine validates the feature is available and the bonus action is free. Never narrate the effect before calling this.',
+    'Uses a player class feature that costs the bonus action: "second_wind" (Fighter — heals 1d10+level, once per map). The engine validates the feature is available and the bonus action is free. Never narrate the effect before calling this.',
     {
-      featureId: z.enum(['second_wind', 'cunning_action']).describe('The class feature to use.'),
-      option: z.enum(['dash', 'hide']).optional().describe('For cunning_action only: "dash" (double movement) or "hide" (Stealth to hide). Defaults to "dash".'),
+      featureId: z.enum(['second_wind']).describe('The class feature to use.'),
     },
-    async ({ featureId, option }) => {
-      return resolveUseClassFeature({ featureId, option })
+    async ({ featureId }) => {
+      return resolveUseClassFeature({ featureId })
     }
   )
 
