@@ -333,6 +333,11 @@ export interface AbilityCheckResult {
   dc?: number
   proficient: boolean
   expertise: boolean
+  // Avantage/désavantage accordé par le DM (RP de qualité, approche incohérente
+  // avec la fiction) — la raison est exigée par le moteur quand un flag est posé.
+  advantage?: boolean
+  disadvantage?: boolean
+  advantageReason?: string
   roll: DiceRollResult
   success?: boolean
   mechanicalSummary: string

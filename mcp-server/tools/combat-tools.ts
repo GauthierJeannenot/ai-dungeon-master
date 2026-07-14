@@ -1,6 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
-import { rollDice, getAbilityModifier, d20WithModifier } from '../dice'
+import { rollDice, getAbilityModifier, d20WithModifier, rollD20WithAdvantage } from '../dice'
 import * as gs from '../game-state'
 import * as rules from '../rules'
 import { EntityStats, AttackResult, SavingThrowResult, AbilityCheckResult, Condition, PlayerState, MonsterState } from '../../lib/types'
@@ -161,7 +161,8 @@ export function resolveAttack(
   advantage?: boolean,
   disadvantage?: boolean,
   customDamageDice?: string,
-  rangeCells?: number
+  rangeCells?: number,
+  advantageReason?: string
 ) {
   const attacker = gs.getEntity(attackerId)
   const target = gs.getEntity(targetId)
@@ -196,18 +197,13 @@ export function resolveAttack(
   const unconsciousMeleeTarget = target.conditions.includes('unconscious') && targetDistance <= 1
   const effectiveAdvantage = Boolean(advantage || unconsciousMeleeTarget)
 
-  const roll1 = rollDice(d20WithModifier(attackBonus))
-  let attackRoll = roll1
-
-  if (effectiveAdvantage && !disadvantage) {
-    const roll2 = rollDice(d20WithModifier(attackBonus))
-    attackRoll = roll1.total >= roll2.total ? roll1 : roll2
-    attackRoll = { ...attackRoll, detail: `ADV: ${roll1.detail} / ${roll2.detail} -> kept ${attackRoll.total}` }
-  } else if (disadvantage && !effectiveAdvantage) {
-    const roll2 = rollDice(d20WithModifier(attackBonus))
-    attackRoll = roll1.total <= roll2.total ? roll1 : roll2
-    attackRoll = { ...attackRoll, detail: `DIS: ${roll1.detail} / ${roll2.detail} -> kept ${attackRoll.total}` }
-  }
+  const attackRoll = rollD20WithAdvantage(attackBonus, effectiveAdvantage, disadvantage)
+  // Raison d'un avantage/désavantage accordé par le DM (RP de qualité, position
+  // désavantageuse…) : journalisée pour la traçabilité, sans effet mécanique
+  // au-delà du flag lui-même.
+  const advantageNote = advantageReason?.trim() && effectiveAdvantage !== Boolean(disadvantage)
+    ? ` | ${effectiveAdvantage ? 'AVANTAGE' : 'DESAVANTAGE'}: ${advantageReason.trim()}`
+    : ''
 
   const targetAC = target.ac
   const naturalRoll = attackRoll.rolls[0]
@@ -265,8 +261,8 @@ export function resolveAttack(
   }
 
   const mechanicalSummary = hit
-    ? `Attaque: ${attackRoll.detail} vs CA ${targetAC} -> ${criticalHit ? 'CRITIQUE' : 'TOUCHE'} | Degats: ${damageRoll!.detail}${sneakDetail}${targetStatusDetail}`
-    : `Attaque: ${attackRoll.detail} vs CA ${targetAC} -> ${criticalMiss ? 'ECHEC CRITIQUE' : 'RATE'}`
+    ? `Attaque: ${attackRoll.detail} vs CA ${targetAC} -> ${criticalHit ? 'CRITIQUE' : 'TOUCHE'} | Degats: ${damageRoll!.detail}${sneakDetail}${targetStatusDetail}${advantageNote}`
+    : `Attaque: ${attackRoll.detail} vs CA ${targetAC} -> ${criticalMiss ? 'ECHEC CRITIQUE' : 'RATE'}${advantageNote}`
 
   const result: AttackResult = {
     attackerId,
@@ -305,6 +301,7 @@ export interface ResolvePlayerAttackInput {
   disadvantage?: boolean
   customDamageDice?: string
   rangeCells?: number
+  advantageReason?: string
 }
 
 export function resolvePlayerAttack({
@@ -316,10 +313,11 @@ export function resolvePlayerAttack({
   disadvantage,
   customDamageDice,
   rangeCells,
+  advantageReason,
 }: ResolvePlayerAttackInput) {
   try {
     const resolvedTargetId = selectPlayerTarget(targetId, targetName, targetHint ?? 'nearest')
-    return resolveAttack('player', resolvedTargetId, weaponOrSpell ?? 'longsword', advantage, disadvantage, customDamageDice, rangeCells)
+    return resolveAttack('player', resolvedTargetId, weaponOrSpell ?? 'longsword', advantage, disadvantage, customDamageDice, rangeCells, advantageReason)
   } catch (err) {
     return rules.ruleErrorResult(err)
   }
@@ -698,13 +696,14 @@ export function registerCombatTools(server: McpServer): void {
       attackerId: z.string().describe('Attacker entity ID'),
       targetId: z.string().describe('Target entity ID'),
       weaponOrSpell: z.string().describe('Weapon or spell name (e.g. "longsword", "fireball")'),
-      advantage: z.boolean().optional().describe('Roll with advantage (roll twice, take higher)'),
+      advantage: z.boolean().optional().describe('Roll with advantage (roll twice, take higher). May be granted for quality roleplay that concretely exploits an established scene element.'),
       disadvantage: z.boolean().optional().describe('Roll with disadvantage (roll twice, take lower)'),
+      advantageReason: z.string().optional().describe('One short sentence quoting the roleplay or scene element that justifies the advantage/disadvantage. Logged in the combat log.'),
       customDamageDice: z.string().optional().describe('Override damage dice (e.g. "2d8+4")'),
       rangeCells: z.number().int().positive().optional().describe('Optional attack range in grid cells; defaults to weapon range.'),
     },
-    async ({ attackerId, targetId, weaponOrSpell, advantage, disadvantage, customDamageDice, rangeCells }) => {
-      return resolveAttack(attackerId, targetId, weaponOrSpell, advantage, disadvantage, customDamageDice, rangeCells)
+    async ({ attackerId, targetId, weaponOrSpell, advantage, disadvantage, advantageReason, customDamageDice, rangeCells }) => {
+      return resolveAttack(attackerId, targetId, weaponOrSpell, advantage, disadvantage, customDamageDice, rangeCells, advantageReason)
     }
   )
 
@@ -716,13 +715,14 @@ export function registerCombatTools(server: McpServer): void {
       targetName: z.string().optional().describe('Natural-language monster name from the player, e.g. "Grukk", "Chef Grukk", or "hobgoblin". Prefer this when the player names a creature.'),
       targetHint: z.enum(['nearest', 'right', 'left', 'front', 'back', 'wounded']).optional().describe('Spatial/semantic target hint when the player did not name an exact monster ID.'),
       weaponOrSpell: z.string().optional().describe('Weapon or spell name; defaults to longsword.'),
-      advantage: z.boolean().optional().describe('Roll with advantage.'),
+      advantage: z.boolean().optional().describe('Roll with advantage. May be granted for quality roleplay that concretely exploits an established scene element (give advantageReason).'),
       disadvantage: z.boolean().optional().describe('Roll with disadvantage.'),
+      advantageReason: z.string().optional().describe('One short sentence quoting the roleplay or scene element that justifies the advantage/disadvantage. Logged in the combat log.'),
       customDamageDice: z.string().optional().describe('Override damage dice.'),
       rangeCells: z.number().int().positive().optional().describe('Optional attack range in grid cells; defaults to weapon range.'),
     },
-    async ({ targetId, targetName, targetHint, weaponOrSpell, advantage, disadvantage, customDamageDice, rangeCells }) => {
-      return resolvePlayerAttack({ targetId, targetName, targetHint, weaponOrSpell, advantage, disadvantage, customDamageDice, rangeCells })
+    async ({ targetId, targetName, targetHint, weaponOrSpell, advantage, disadvantage, advantageReason, customDamageDice, rangeCells }) => {
+      return resolvePlayerAttack({ targetId, targetName, targetHint, weaponOrSpell, advantage, disadvantage, advantageReason, customDamageDice, rangeCells })
     }
   )
 
@@ -836,8 +836,11 @@ export function registerCombatTools(server: McpServer): void {
       proficient: z.boolean().optional().describe('Whether to add proficiency bonus. Defaults false. Ignored when a known skill is given for the player.'),
       expertise: z.boolean().optional().describe('Whether to add double proficiency bonus. Defaults false. Ignored when a known skill is given for the player.'),
       label: z.string().optional().describe('Short label such as Persuasion, Intimidation, Athletics, or Perception.'),
+      advantage: z.boolean().optional().describe('Roll with advantage (two d20, keep higher). Grant ONLY when the player roleplay concretely exploits an established scene element in a plausible way — never just because the player asks for it. Requires advantageReason.'),
+      disadvantage: z.boolean().optional().describe('Roll with disadvantage (two d20, keep lower), e.g. when the approach clashes with the established fiction. Requires advantageReason.'),
+      advantageReason: z.string().optional().describe('One short sentence quoting the roleplay or scene element that justifies the advantage/disadvantage. REQUIRED when advantage or disadvantage is set; logged for traceability.'),
     },
-    async ({ entityId, ability, dc, skill, proficient, expertise, label }) => {
+    async ({ entityId, ability, dc, skill, proficient, expertise, label, advantage, disadvantage, advantageReason }) => {
       const resolvedEntityId = entityId ?? 'player'
       const entity = gs.getEntity(resolvedEntityId)
       if (!entity) {
@@ -849,6 +852,18 @@ export function registerCombatTools(server: McpServer): void {
         rules.validateAbilityCheck(resolvedEntityId)
       } catch (err) {
         return rules.ruleErrorResult(err)
+      }
+
+      // Avantage/désavantage accordé par le DM (RP de qualité, approche
+      // incohérente…) : la raison est OBLIGATOIRE — c'est la trace auditable de
+      // la décision du LLM, elle empêche un flag posé « gratuitement ».
+      const reason = advantageReason?.trim()
+      if ((advantage || disadvantage) && !reason) {
+        return rules.ruleErrorResult(new rules.RuleViolation(
+          'ADVANTAGE_REASON_REQUIRED',
+          'advantage/disadvantage requires advantageReason: one short sentence quoting the roleplay or scene element that justifies it.',
+          { advantage: Boolean(advantage), disadvantage: Boolean(disadvantage) }
+        ))
       }
 
       // Maîtrise décidée par le MOTEUR si un skill canonique est fourni pour le
@@ -871,10 +886,13 @@ export function registerCombatTools(server: McpServer): void {
       const proficiencyBonus = 'proficiencyBonus' in entity ? entity.proficiencyBonus : 2
       const proficiencyMod = isExpertise ? proficiencyBonus * 2 : isProficient ? proficiencyBonus : 0
       const totalMod = abilityMod + proficiencyMod
-      const roll = rollDice(d20WithModifier(totalMod))
+      const roll = rollD20WithAdvantage(totalMod, advantage, disadvantage)
       const success = typeof dc === 'number' ? roll.total >= dc : undefined
       const checkLabel = resolvedLabel?.trim() || `Test ${effAbility.toUpperCase()}`
-      const mechanicalSummary = `${checkLabel}: ${roll.detail}${typeof dc === 'number' ? ` vs DD ${dc} -> ${success ? 'SUCCES' : 'ECHEC'}` : ''}`
+      const advantageNote = reason && Boolean(advantage) !== Boolean(disadvantage)
+        ? ` | ${advantage ? 'AVANTAGE' : 'DESAVANTAGE'}: ${reason}`
+        : ''
+      const mechanicalSummary = `${checkLabel}: ${roll.detail}${typeof dc === 'number' ? ` vs DD ${dc} -> ${success ? 'SUCCES' : 'ECHEC'}` : ''}${advantageNote}`
 
       const result: AbilityCheckResult = {
         entityId: resolvedEntityId,
@@ -883,6 +901,9 @@ export function registerCombatTools(server: McpServer): void {
         dc,
         proficient: isProficient,
         expertise: isExpertise,
+        advantage: Boolean(advantage),
+        disadvantage: Boolean(disadvantage),
+        advantageReason: reason || undefined,
         roll,
         success,
         mechanicalSummary,

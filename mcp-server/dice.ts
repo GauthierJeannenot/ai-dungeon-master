@@ -67,6 +67,25 @@ export function d20WithModifier(modifier: number): string {
   return `1d20${modifier > 0 ? '+' : ''}${modifier}`
 }
 
+// Jet de d20 avec avantage/désavantage D&D 5e : deux jets, on garde le meilleur
+// (ADV) ou le pire (DIS). Avantage ET désavantage simultanés s'annulent → jet
+// simple (règle SRD). Source unique pour attaques et tests de caractéristique.
+export function rollD20WithAdvantage(
+  modifier: number,
+  advantage?: boolean,
+  disadvantage?: boolean
+): DiceRollResult {
+  const notation = d20WithModifier(modifier)
+  const roll1 = rollDice(notation)
+  if (Boolean(advantage) === Boolean(disadvantage)) return roll1
+
+  const roll2 = rollDice(notation)
+  const kept = advantage
+    ? (roll1.total >= roll2.total ? roll1 : roll2)
+    : (roll1.total <= roll2.total ? roll1 : roll2)
+  return { ...kept, detail: `${advantage ? 'ADV' : 'DIS'}: ${roll1.detail} / ${roll2.detail} -> kept ${kept.total}` }
+}
+
 export function getAbilityModifier(score: number): number {
   return Math.floor((score - 10) / 2)
 }
