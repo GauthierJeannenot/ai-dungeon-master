@@ -43,7 +43,7 @@ docs/opus-brief-reduction-cout-llm.md, docs/cost-optimization.md). Trois règles
 
 `renderSceneMap` génère la carte de la map COURANTE depuis GameState + map.ts,
 dans le bloc DYNAMIQUE (`## CARTE DE LA SCÈNE`). Deux niveaux : TOUJOURS les
-zones de salles + adjacences précalculées (`zonesTouch`/`directionLabel`),
+zones de salles + contiguïtés précalculées (`zonesTouch`/`directionLabel`),
 entrées et positions (joueur, PNJ révélés, monstres vivants) ; en COMBAT
 seulement, la grille ASCII tactique en plus (géométrie fine — hors combat elle
 coûterait des tokens par appel pour un signal déjà couvert). C'est LA carte de
@@ -52,6 +52,19 @@ main (leur section « Carte des salles » renvoie au bloc dynamique). Ne jamais
 déplacer cette carte dans le bloc statique (elle varie à chaque tour = cache
 cassé), ni réintroduire une grille figée dans un module .md (elle divergerait
 de l'état).
+
+Chaque contiguïté est scindée en « communique avec » (franchissable) et
+« contiguë mais cloisonnée » (mur). Le moteur déduit la salle courante de la
+POSITION (`inferRoomIdOnMap`, containment de zone), pas d'un graphe de portes —
+donc toute contiguïté est franchissable PAR DÉFAUT et l'absence de
+`doorTransition` n'est PAS un mur (celles-ci ne servent qu'à
+`relativeAdventureRoomIdForText`, la nav langage naturel). Les vraies cloisons
+sont donc des données AUTORÉES : `AdventureMapData.partitions` (map.ts) liste
+les paires de salles contiguës qui NE communiquent pas. Le champ est optionnel
+(absent ⇒ aucune cloison). Verrous : `tests/dm-scene-map.test.cjs` (rendu +
+cloisons Grammy's) et `tests/adventure-modules.test.cjs` (paires valides,
+même map, réellement contiguës). Marche à suivre pour cloisonner un module dans
+`adventures/CLAUDE.md`.
 
 ## Vocabulaire par module — jamais en dur
 

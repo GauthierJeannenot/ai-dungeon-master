@@ -253,4 +253,19 @@ export const GRAMMYS_MAP: AdventureMapData = {
       '2e MOITIÉ DE LA RECETTE ici. Négociation possible DD 14 CHA (Grukk veut nourriture / or / paix).',
     ].join('\n'),
   },
+
+  // Cloisons : salles contiguës sur la grille mais séparées par un mur — elles
+  // ne communiquent PAS directement (voir AdventureMapData.partitions). Tout le
+  // reste des contiguïtés est franchissable. Décisions actées :
+  // - 3 (Tas de déchets, DEHORS) / 8 (Sol de la boulangerie, DEDANS) : mur
+  //   extérieur du bâtiment — le tas s'atteint par l'extérieur, le sol par une
+  //   porte intérieure.
+  // - 5 (Le Bureau) / 7 (Quai de chargement) : aucune porte entre eux ; le
+  //   bureau se rejoint depuis le sol de la boulangerie, le quai par sa latérale.
+  // - 5 (Le Bureau) / 9 (Appartement) : rejoints séparément depuis le sol (8).
+  partitions: [
+    ['3', '8'],
+    ['5', '7'],
+    ['5', '9'],
+  ],
 }

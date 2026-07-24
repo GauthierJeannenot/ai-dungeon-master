@@ -146,6 +146,15 @@ export interface AdventureMapData {
   doorTransitions: AdventureTransition[]
   forwardTransitions: AdventureTransition[]
   roomHooks: Record<string, string>
+  // Cloisons : paires de salles géométriquement CONTIGUËS (leurs zones se
+  // touchent) qui ne communiquent PAS — un mur/une paroi les sépare. Le moteur
+  // déduit la salle courante de la POSITION du joueur (inferRoomIdOnMap), donc
+  // toute contiguïté est franchissable PAR DÉFAUT : on ne déclare ICI que les
+  // EXCEPTIONS. La relation est symétrique — l'ordre des deux salles est
+  // indifférent. Consommé par renderSceneMap (lib/dm/scene-map.ts) pour
+  // distinguer « communique avec » de « cloisonné » dans la carte de la scène.
+  // Optionnel : absent ⇒ aucune cloison (toutes les contiguïtés communiquent).
+  partitions?: Array<[string, string]>
 }
 
 // ── Registre des cartes de module ────────────────────────────────────────────

@@ -38,6 +38,18 @@ function roomContains(room, cell) {
     cell.y >= room.zone.minY && cell.y <= room.zone.maxY
 }
 
+// Deux zones se touchent (chevauchement ou bord commun, jamais un simple coin)
+// — même définition que lib/dm/scene-map.ts. Sert à valider que les cloisons
+// déclarées portent bien sur des salles réellement CONTIGUËS.
+function zonesTouch(a, b) {
+  const xOverlap = a.minX <= b.maxX && b.minX <= a.maxX
+  const yOverlap = a.minY <= b.maxY && b.minY <= a.maxY
+  if (xOverlap && yOverlap) return true
+  const xTouch = a.maxX + 1 === b.minX || b.maxX + 1 === a.minX
+  const yTouch = a.maxY + 1 === b.minY || b.maxY + 1 === a.minY
+  return (xTouch && yOverlap) || (yTouch && xOverlap)
+}
+
 // Types de monstres réellement définis dans le moteur MCP : extraits du source
 // de phase-tools.ts (entrées `key: { type: 'key', ... }` du template record).
 function engineMonsterTypes() {
@@ -255,6 +267,31 @@ for (const adventure of ADVENTURES) {
     }
     for (const alias of [...map.roomNavigationAliases, ...map.roomContextAliases]) {
       assert.ok(roomIds.has(alias.roomId), `alias vers salle inconnue ${alias.roomId}`)
+    }
+  })
+
+  test(`[${label}] partitions reference contiguous, same-map rooms without duplicates`, () => {
+    // Optionnel : un module sans cloison déclarée passe trivialement.
+    const partitions = map.partitions ?? []
+    assert.ok(Array.isArray(partitions), 'partitions doit être un tableau')
+    const seen = new Set()
+    const key = (a, b) => [a, b].sort().join('|')
+    for (const pair of partitions) {
+      assert.ok(Array.isArray(pair) && pair.length === 2, `cloison mal formée : ${JSON.stringify(pair)}`)
+      const [a, b] = pair
+      assert.notEqual(a, b, `cloison d'une salle avec elle-même : ${a}`)
+      const roomA = findRoom(a)
+      const roomB = findRoom(b)
+      assert.ok(roomA, `cloison vers salle inconnue ${a}`)
+      assert.ok(roomB, `cloison vers salle inconnue ${b}`)
+      assert.equal(roomMapId(roomA), roomMapId(roomB), `cloison entre salles de maps différentes (${a}, ${b})`)
+      // Une cloison n'a de sens qu'entre salles CONTIGUËS : sinon la scène-map
+      // ne l'affiche jamais (elle ne parcourt que les voisines) = donnée morte.
+      assert.ok(zonesTouch(roomA.zone, roomB.zone),
+        `cloison (${a}, ${b}) entre salles NON contiguës — déclaration sans effet`)
+      const k = key(a, b)
+      assert.ok(!seen.has(k), `cloison en double (${a}, ${b})`)
+      seen.add(k)
     }
   })
 

@@ -55,11 +55,27 @@ test('exploration : zones, entrées et adjacences précalculées, sans grille de
       assert.ok(rendered.includes(`entrée (${entry.x}, ${entry.y})`), `entrée de la salle ${room.id} absente`)
     }
   }
-  // Adjacence connue du module par défaut : Quai de chargement (7, x3-5 y5-7)
-  // borde le Sol de la boulangerie (8, x6-11 y5-8) à l'est.
-  assert.match(rendered, /Salle 7 : [^\n]*borde : [^\n]*8 \(est\)/)
-  assert.match(rendered, /Salle 8 : [^\n]*borde : [^\n]*7 \(ouest\)/)
+  // Contiguïté COMMUNICANTE du module par défaut : Quai de chargement (7,
+  // x3-5 y5-7) communique avec le Sol de la boulangerie (8, x6-11 y5-8) à l'est
+  // (porte latérale coulissante).
+  assert.match(rendered, /Salle 7 : [^\n]*communique avec : [^\n]*8 \(est\)/)
+  assert.match(rendered, /Salle 8 : [^\n]*communique avec : [^\n]*7 \(ouest\)/)
   assert.ok(rendered.includes(`LE JOUEUR, en (${state.player.position.x}, ${state.player.position.y})`))
+})
+
+test('cloisons : salles contiguës mais murées listées à part, jamais comme communicantes', () => {
+  // map.ts.partitions du module par défaut : {3,8}, {5,7}, {5,9}. Ces paires se
+  // touchent sur la grille mais ne communiquent PAS (murs).
+  const rendered = renderSceneMap(buildInitialGameState())
+
+  // Salle 3 (Tas de déchets, dehors) touche 8 (Sol de la boulangerie, dedans)
+  // sans communiquer : seule voisine, donc AUCUN « communique avec » sur sa ligne.
+  assert.match(rendered, /Salle 3 :[^\n]*contiguë mais cloisonnée[^\n]*8 \(ouest\)/)
+  assert.doesNotMatch(rendered, /Salle 3 :[^\n]*communique avec/)
+
+  // Salle 5 (Le Bureau) communique avec 8, mais est cloisonnée d'avec 7 et 9.
+  assert.match(rendered, /Salle 5 : [^\n]*communique avec : [^\n]*8 \(nord-est\)/)
+  assert.match(rendered, /Salle 5 :[^\n]*contiguë mais cloisonnée[^\n]*7 \(nord\)[^\n]*9 \(est\)/)
 })
 
 test('PNJ révélés listés avec leurs coordonnées, PNJ cachés absents', () => {
@@ -117,14 +133,15 @@ test('multi-map : la carte suit currentMapId et exclut les salles des autres map
     assert.equal(rendered.includes(room.name), onSecond,
       `salle « ${room.name} » ${onSecond ? 'attendue' : 'interdite'} sur la carte de ${secondMap.id}`)
   }
-  // Le Bois-Ricanant se remonte sud → nord : la salle 11 borde la 10 au nord.
-  assert.match(rendered, /Salle 10 : [^\n]*borde : [^\n]*B \(nord\)/)
+  // Le Bois-Ricanant se remonte sud → nord : la 10 communique avec la 11 (B)
+  // au nord (aucune cloison déclarée sur cette map).
+  assert.match(rendered, /Salle 10 : [^\n]*communique avec : [^\n]*B \(nord\)/)
 })
 
 test('le bloc dynamique du prompt DM contient la carte de la scène', () => {
   const state = buildInitialGameState()
   const prompt = buildDynamicPrompt(state)
   assert.match(prompt, /## CARTE DE LA SCÈNE/)
-  assert.match(prompt, /Salles de la carte \(zones et adjacences\)/)
+  assert.match(prompt, /Salles de la carte \(zones, communications et cloisons\)/)
   assert.ok(prompt.includes('LE JOUEUR'), 'les positions doivent être injectées')
 })

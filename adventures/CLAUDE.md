@@ -10,7 +10,7 @@ docs/multi-adventure-architecture.md et docs/adventure-content-consolidation.md
 
 | Fichier | Rôle | Consommé par |
 |---|---|---|
-| `map.ts` | Données MOTEUR : rooms, entryCells, encounters, npcs, aliases, transitions, roomHooks, startCell, `initialPlayer` (= `{ level, extraInventory? }` : le kit/PV viennent du PERSONNAGE) | moteur MCP **et** app (seul fichier compilé par mcp-server) |
+| `map.ts` | Données MOTEUR : rooms, entryCells, encounters, npcs, aliases, transitions, roomHooks, startCell, `partitions?` (cloisons), `initialPlayer` (= `{ level, extraInventory? }` : le kit/PV viennent du PERSONNAGE) | moteur MCP **et** app (seul fichier compilé par mcp-server) |
 | `definition.ts` | Contenu APP : meta landing, welcomeMessage, chatPlaceholders, roomStatusHints, battlemapImage, grid, `promptGuidance`, `characterHooks` (accroche par personnage) | app/prompts uniquement — **jamais importé par mcp-server** |
 | `adventure-module.md` | Module narratif complet (salles `## Salle N`, annexes) → prompt DM | context-loader |
 | `player-rules.md` | REQUIS — règles côté joueur PROPRES au module (jamais de repli entre modules) | context-loader |
@@ -66,6 +66,38 @@ Ne les retoucher qu'avec `npm run playtest:mock` avant/après.
 6. Module payant (optionnel) : deux entrées dans lib/adventures.ts
    (`REQUIRES_ENTITLEMENT` + `MODULE_PRICE_CENTS`) — guide complet :
    docs/monetizing-a-module.md.
+
+## Cloisons de salles (`map.ts.partitions`)
+
+La carte de la scène (lib/dm/scene-map.ts) affiche, pour chaque salle, ses
+voisines en distinguant « communique avec » (accessible directement) et
+« contiguë mais cloisonnée » (voisine sur la grille, séparée par un mur). Le
+moteur déduit la salle courante de la POSITION du joueur (containment de zone) :
+**toute contiguïté est franchissable par défaut**, et l'absence de
+`doorTransition` n'est PAS un mur (les transitions ne servent qu'à la nav
+langage naturel). Les vrais murs sont donc des données à DÉCLARER.
+
+Statut : **implémenté pour Grammy's uniquement** (`partitions` = `{3,8}`,
+`{5,7}`, `{5,9}`). Les autres modules n'ont pas encore de `partitions` (champ
+optionnel ⇒ toutes leurs contiguïtés sont présentées comme communicantes).
+Pour cloisonner un module :
+
+1. Lister ses **contiguïtés candidates** : deux zones qui se touchent (bord
+   commun, pas un simple coin) SANS transition entre elles. Le repérage se fait
+   à la main depuis les `zone` de `map.ts`, ou par un script ad hoc calquant
+   `zonesTouch` (cf. l'historique de la branche `feat/scene-map-passage-graph`).
+2. Pour CHAQUE candidate, trancher via la table « Points d'entrée et de
+   déplacement » du `adventure-module.md` + la prose des salles : y a-t-il un
+   passage direct, oui ou non ? En cas de doute, **demander** — ne pas deviner.
+   (Extérieur vs intérieur, deux pièces rejointes séparément = souvent une
+   cloison.)
+3. Déclarer les paires NON communicantes dans `partitions: [['a','b'], …]`
+   (ordre indifférent, relation symétrique), avec un commentaire justifiant
+   chaque cloison.
+4. `npm run build:mcp` + `npm test` : `adventure-modules.test.cjs` vérifie que
+   chaque paire vise des salles réelles, de la même map, réellement contiguës
+   (une cloison entre salles non contiguës = donnée morte, échec du test).
+   Verrou de rendu : `dm-scene-map.test.cjs`.
 
 ## Modules multi-maps (docs/multi-map-adventures.md)
 

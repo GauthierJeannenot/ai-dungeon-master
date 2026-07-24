@@ -20,7 +20,7 @@ Le vieux sorcier Tyndareus le Vert a envoyé le joueur récupérer la recette se
 
 GRILLE : 17 colonnes (x:0-16) × 15 rangées (y:0-14).
 
-La carte de la scène — zones et adjacences des salles, points d'entrée, positions à jour du joueur, des PNJ révélés et des monstres, plus la grille tactique en combat — est fournie à chaque tour dans le bloc dynamique (« CARTE DE LA SCÈNE »). Fie-toi à elle pour situer la scène ; les coordonnées y sont exprimées en (x, y).
+La carte de la scène — zones des salles, communications (salles voisines accessibles directement) et cloisons (voisines sur la grille mais séparées par un mur), points d'entrée, positions à jour du joueur, des PNJ révélés et des monstres, plus la grille tactique en combat — est fournie à chaque tour dans le bloc dynamique (« CARTE DE LA SCÈNE »). Fie-toi à elle pour situer la scène ; les coordonnées y sont exprimées en (x, y).
 
 ---
 
