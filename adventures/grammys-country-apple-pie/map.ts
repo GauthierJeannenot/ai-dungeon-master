@@ -51,16 +51,6 @@ export const GRAMMYS_MAP: AdventureMapData = {
   },
 
   encounters: {
-    loading_dock_patrol: {
-      id: 'loading_dock_patrol',
-      roomId: '7',
-      name: 'Patrouille du quai de chargement',
-      playerCell: { x: 4, y: 6 },
-      monsters: [
-        { monsterType: 'goblin', cell: { x: 5, y: 5 }, name: 'Gobelin Patrouille' },
-        { monsterType: 'goblin', cell: { x: 5, y: 6 }, name: 'Gobelin Patrouille' },
-      ],
-    },
     bakery_floor_goblins: {
       id: 'bakery_floor_goblins',
       roomId: '8',
@@ -140,31 +130,6 @@ export const GRAMMYS_MAP: AdventureMapData = {
       visibleFromStart: false,
       description: 'Esprit malicieux du verger, caché dans les pommiers.',
     },
-    // Patrouille du quai : tokens visibles dès que le joueur entre en salle 7
-    // (la narration les décrit immédiatement). Mêmes noms que l'encounter
-    // loading_dock_patrol : si le combat démarre, les tokens monstres
-    // remplacent les tokens PNJ (filtre anti-doublon par nom). Cases distinctes
-    // des spawns de l'encounter — invariant adventure-modules.test.cjs.
-    {
-      id: 'goblin_patrol_1',
-      name: 'Gobelin Patrouille',
-      kind: 'goblin',
-      roomId: '7',
-      cell: { x: 4, y: 5 },
-      disposition: 'hostile',
-      visibleFromStart: true,
-      description: 'Gobelin en patrouille près de l\'ouverture vers la boulangerie.',
-    },
-    {
-      id: 'goblin_patrol_2',
-      name: 'Gobelin Patrouille',
-      kind: 'goblin',
-      roomId: '7',
-      cell: { x: 4, y: 7 },
-      disposition: 'hostile',
-      visibleFromStart: true,
-      description: 'Gobelin en patrouille près de l\'ouverture vers la boulangerie.',
-    },
   ],
 
   namedLocationCells: [
@@ -221,8 +186,8 @@ export const GRAMMYS_MAP: AdventureMapData = {
       'Grandes portes barrées : DD 14 Force (roll_ability_check) pour enfoncer, ou contourner par le quai de chargement (salle 7).',
     ].join('\n'),
     '2': [
-      "Trois dryades malicieuses, présentes mais CACHÉES (tokens invisibles) : n'apparaissent que sur offrande ou DD 13 Persuasion (roll_ability_check).",
-      'Dès qu’elles se montrent (offrande acceptée ou DD 13 réussi) : appelle reveal_npc({ kind: "dryad" }) pour afficher leurs trois tokens — peut accompagner le roll_ability_check du même message.',
+      "À l'ENTRÉE dans le verger : demande un DD 13 Perception (roll_ability_check) pour discerner les trois dryades cachées dans les arbres. Réussite → reveal_npc({ kind: \"dryad\" }) (le joueur les repère, tokens visibles) ; échec → elles restent CACHÉES (seuls le murmure des feuilles et un rire cristallin trahissent une présence).",
+      "Trois dryades malicieuses, farouches (tokens invisibles tant que non repérées) : repérées ou non, elles ne DISCUTENT que sur offrande ou DD 13 Persuasion (roll_ability_check) — à ce moment reveal_npc({ kind: \"dryad\" }) si ce n'est pas déjà fait (peut accompagner le roll_ability_check du même message).",
       'Une fois amadouées, elles racontent en gloussant que les gobelins essaient de faire des tartes depuis des semaines sans jamais y arriver.',
       'DD 17 Persuasion ou Investigation → elles révèlent que la recette est en deux moitiés (bureau salle 5 + appartement salle 9).',
       'Si offensées : reveal_npc({ kind: "dryad", disposition: "offended" }) puis elles bombardent de pommes pourries jusqu’au départ du joueur (pas de vrai combat).',
@@ -236,17 +201,18 @@ export const GRAMMYS_MAP: AdventureMapData = {
     ].join('\n'),
     '5': [
       'Coffre caché : DD 13 Perception pour trouver, DD 15 Dextérité ou DD 17 Force pour ouvrir (75 po, 50 pa, 25 pc).',
-      'Tiroir piégé = 1re MOITIÉ DE LA RECETTE (objectif) : DD 13 Perception pour repérer, DD 16 Dextérité pour désamorcer. Si déclenché : resolve_saving_throw(con, DD 15) → empoisonné + dégâts de poison.',
+      'Tiroir piégé = 1re MOITIÉ DE LA RECETTE (objectif) : trouvé AUTOMATIQUEMENT, AUCUN jet de Perception/Investigation pour le repérer. Piège DISSIMULÉ : ne PAS prévenir le joueur ; s\'il ouvre sans précaution, le piège se déclenche. DD 16 Dextérité (roll_ability_check) pour désamorcer UNIQUEMENT s\'il se méfie et tente d\'inspecter avant d\'ouvrir. Piège déclenché → resolve_saving_throw(con, DD 15) → empoisonné + dégâts de poison. La recette est récupérée dans tous les cas.',
     ].join('\n'),
     '7': [
-      'Patrouille de 2 gobelins déjà visible sur la carte en (4,5) et (4,7) — tokens PNJ, pas encore des combattants : ne PAS appeler reveal_npc.',
-      'DD 13 Discrétion (roll_ability_check) pour passer inaperçu.',
-      'Si repéré : start_encounter("loading_dock_patrol") — les combattants remplacent les tokens PNJ. Entrer discrètement ici donne la surprise sur les gobelins du sol de la boulangerie (salle 8).',
+      'Quai de chargement DÉSERT : aucune patrouille, aucun combat ici. C’est la porte dérobée discrète de la boulangerie.',
+      'Entrer dans la boulangerie (salle 8) par ce quai donne AVANTAGE sur le jet de Discrétion pour s’y glisser sans alerter les 3 gobelins charpentiers : roll_ability_check(stealth, DD 13, advantage).',
     ].join('\n'),
     '8': [
       'Armoire en verre (6,7) : 2 potions de soin ordinaires, sans verrou.',
       'Épices cachées : DD 15 Perception (roll_ability_check).',
-      '3 gobelins charpentiers dans les poutres : start_encounter("bakery_floor_goblins") si le joueur manipule les objets magiques (rouleaux, couteaux, fours). Négociation possible DD 14 CHA.',
+      '3 gobelins charpentiers CACHÉS dans les poutres : start_encounter("bakery_floor_goblins") si le joueur manipule les objets magiques (rouleaux, couteaux, fours), OU rate le jet de Discrétion en entrant. Négociation possible DD 14 CHA.',
+      "À l’ENTRÉE, résous D’ABORD la Discrétion PUIS la Perception. (1) DD 13 Discrétion (roll_ability_check) pour ne pas être entendu — AVANTAGE si arrivée par le quai de chargement (salle 7) : réussite → gobelins NON alertés (surprise sur eux si le combat éclate), échec → gobelins alertés.",
+      "(2) Perception (roll_ability_check) pour repérer les 3 gobelins dans les poutres, DD conditionné par la Discrétion : DD 10 si Discrétion réussie (gobelins non alertés, faciles à voir), DD 15 si Discrétion ratée (gobelins tapis). Réussite → pas de surprise contre le joueur ; échec → les gobelins ont la surprise sur lui.",
     ].join('\n'),
     '9': [
       'SALLE FINALE. Chef Grukk (hobgoblin) + 2 gobelins gardes : start_encounter("grammy_apartment_guards") à l’entrée.',
