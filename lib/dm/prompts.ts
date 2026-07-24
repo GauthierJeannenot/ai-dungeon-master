@@ -9,6 +9,7 @@ import {
 } from '@/lib/adventure-map'
 import { getAdventureDefinition } from '@/lib/adventures'
 import type { GameState, ConversationTurn } from '@/lib/types'
+import { renderSceneMap } from './scene-map'
 import { parsePositiveInt } from './llm'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -255,6 +256,10 @@ export function buildDynamicPrompt(gameState: GameState, summaryContext?: string
     ? `---\n## RÉSUMÉ DES ÉVÉNEMENTS PRÉCÉDENTS\n${summaryContext.trim()}\n\n`
     : ''
   const mapContextBlock = buildMapContextBlock(gameState)
+  // Carte de la scène (zones + adjacences, grille tactique en combat),
+  // régénérée depuis l'état à chaque tour (bloc dynamique : aucune incidence
+  // sur le cache du bloc statique).
+  const sceneMapBlock = `---\n## CARTE DE LA SCÈNE (générée depuis l'état du jeu — à jour ce tour)\n${renderSceneMap(gameState)}\n\n`
   const roomDetail = gameState.currentRoomId
     ? loadAdventureModuleParsed(adventureId).rooms[gameState.currentRoomId]
     : undefined
@@ -279,7 +284,7 @@ export function buildDynamicPrompt(gameState: GameState, summaryContext?: string
   const directiveBlock = directive
     ? `\n\n---\n## ⚠️ ACTION MÉCANIQUE REQUISE CE TOUR (classifieur d'intention)\n${directive}\nC'est le résultat du tool qui dicte ta narration — ne décris jamais l'issue avant l'appel.`
     : ''
-  return `${summaryBlock}${mapContextBlock}${roomDetailBlock}${roomBlock}${worldFactsBlock}---
+  return `${summaryBlock}${mapContextBlock}${sceneMapBlock}${roomDetailBlock}${roomBlock}${worldFactsBlock}---
 ## ÉTAT ACTUEL DU JEU
 \`\`\`json
 ${serializeGameState(gameState)}

@@ -20,29 +20,9 @@ Le phare de la pointe de Kerlouan s'est éteint il y a trois nuits, et les navir
 
 ## Carte des salles
 
-```
-GRILLE : 17 colonnes (x:0-16) × 15 rangées (y:0-14) — cellule 52px
+GRILLE : 17 colonnes (x:0-16) × 15 rangées (y:0-14).
 
-  0   1   2   3   4   5   6   7   8   9  10  11  12  13  14  15  16
-0 [ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext]
-1 [ext][ext][ext][ext][ext][ext][CHA][CHA][CHA][CHA][CHA][CHA][ext][ext][ext][ext][ext]
-2 [ext][ext][ext][ext][ext][ext][CHA][CHA][CHA][CHA][CHA][CHA][ext][ext][ext][ext][ext]
-3 [ext][ext][OSS][OSS][OSS][OSS][CHA][CHA][CHA][CHA][CHA][CHA][CLO][CLO][CLO][CLO][ext]
-4 [ext][ext][OSS][OSS][OSS][OSS][CHA][CHA][CHA][CHA][CHA][CHA][CLO][CLO][CLO][CLO][ext]
-5 [ext][ext][OSS][OSS][OSS][OSS][CHA][CHA][CHA][CHA][CHA][CHA][CLO][CLO][CLO][CLO][ext]
-6 [ext][ext][OSS][OSS][OSS][OSS][ANT][ANT][ANT][ANT][ANT][ANT][CLO][CLO][CLO][CLO][ext]
-7 [ext][ext][OSS][OSS][OSS][OSS][ANT][ANT][ANT][ANT][ANT][ANT][ext][ext][ext][ext][ext]
-8 [ext][ext][ext][ext][ext][ext][ANT][ANT][ANT][ANT][ANT][ANT][ext][PHA][PHA][PHA][ext]
-9 [ext][ext][EPA][EPA][EPA][ext][ext][PAS][PAS][PAS][PAS][ext][ext][PHA][PHA][PHA][ext]
-10[ext][ext][EPA][EPA][EPA][ext][ext][PAS][PAS][PAS][PAS][ext][ext][PHA][PHA][PHA][ext]
-11[ext][ext][EPA][EPA][EPA][ext][ext][PAS][PAS][PAS][PAS][ext][ext][PHA][PHA][PHA][ext]
-12[ext][ext][GRV][GRV][GRV][GRV][GRV][GRV][GRV][GRV][GRV][GRV][GRV][GRV][GRV][GRV][GRV]
-13[ext][ext][GRV][GRV][GRV][GRV][GRV][GRV][GRV][GRV][GRV][GRV][GRV][GRV][GRV][GRV][GRV]
-14[ext][ext][GRV][GRV][GRV][GRV][GRV][GRV][GRV][GRV][GRV][GRV][GRV][GRV][GRV][GRV][GRV]
-
-Légende : GRV=Grève aux Épaves | PHA=Phare éteint | EPA=Épave de la Sirène | PAS=Passage des Marées
-          ANT=Antichambre engloutie | OSS=Ossuaire des marins | CLO=Salle des Cloches | CHA=Chapelle de la Gardienne
-```
+La carte de la scène — zones et adjacences des salles, points d'entrée, positions à jour du joueur, des PNJ révélés et des monstres, plus la grille tactique en combat — est fournie à chaque tour dans le bloc dynamique (« CARTE DE LA SCÈNE »). Fie-toi à elle pour situer la scène ; les coordonnées y sont exprimées en (x, y).
 
 ---
 
