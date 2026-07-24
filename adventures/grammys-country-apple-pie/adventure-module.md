@@ -18,29 +18,9 @@ Le vieux sorcier Tyndareus le Vert a envoyé le joueur récupérer la recette se
 
 ## Carte des salles
 
-```
-GRILLE : 17 colonnes (x:0-16) × 15 rangées (y:0-14) — cellule 52px
+GRILLE : 17 colonnes (x:0-16) × 15 rangées (y:0-14).
 
-  0   1   2   3   4   5   6   7   8   9  10  11  12  13  14  15  16
-0 [ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext]
-1 [ext][ext][ext][Ver][Ver][Ver][Ver][Ver][Ver][Ver][Ver][Ver][Ver][Ver][Ver][Ver]
-2 [ext][ext][ext][Ver][Ver][Ver][Ver][Ver][Ver][Ver][Ver][Ver][Ver][Ver][Ver][Ver]
-3 [ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext]
-4 [ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext]
-5 [ext][ext][ext][QDC][QDC][QDC][BSF][BSF][BSF][BSF][BSF][BSF][TAS][TAS][ext][ext]
-6 [ext][ext][ext][QDC][QDC][QDC][BSF][BSF][BSF][BSF][BSF][BSF][TAS][TAS][ext][ext]
-7 [ext][ext][ext][QDC][QDC][QDC][BSF][BSF][BSF][BSF][BSF][BSF][TAS][TAS][ext][ext]
-8 [ext][ext][ext][ext][ext][BOU][BOU][BSF][BSF][BSF][BSF][BSF][ext][ext][ext][ext]
-9 [ext][ext][ext][ext][ext][BOU][BOU][APP][APP][APP][ENT][ENT][ENT][ENT][ext][ext]
-10[ext][ext][ext][ext][ext][BOU][BOU][APP][APP][APP][ENT][ENT][ENT][ENT][ext][ext]
-11[ext][ext][ext][ext][ext][BOU][BOU][APP][APP][APP][ENT][ENT][ENT][ENT][ext][ext]
-12[ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ENT][ENT][ENT][ENT][ext][ext]
-13[ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext]
-14[ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext][ext]
-
-Légende : QDC=Quai de chargement | BSF=Sol boulangerie | TAS=Tas déchets | Ver=Verger
-          BOU=Boutique/Bureau/Gardes | APP=Appartement Grammy | ENT=entrée
-```
+La carte de la scène — zones et adjacences des salles, points d'entrée, positions à jour du joueur, des PNJ révélés et des monstres, plus la grille tactique en combat — est fournie à chaque tour dans le bloc dynamique (« CARTE DE LA SCÈNE »). Fie-toi à elle pour situer la scène ; les coordonnées y sont exprimées en (x, y).
 
 ---
 

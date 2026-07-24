@@ -39,6 +39,20 @@ docs/opus-brief-reduction-cout-llm.md, docs/cost-optimization.md). Trois règles
   le texte, qui est gelé dans le message de tour) : tant que le tool planifié
   n'a pas réussi, on force un tool ; satisfait → `auto`.
 
+## Carte de la scène (scene-map.ts)
+
+`renderSceneMap` génère la carte de la map COURANTE depuis GameState + map.ts,
+dans le bloc DYNAMIQUE (`## CARTE DE LA SCÈNE`). Deux niveaux : TOUJOURS les
+zones de salles + adjacences précalculées (`zonesTouch`/`directionLabel`),
+entrées et positions (joueur, PNJ révélés, monstres vivants) ; en COMBAT
+seulement, la grille ASCII tactique en plus (géométrie fine — hors combat elle
+coûterait des tokens par appel pour un signal déjà couvert). C'est LA carte de
+référence du DM : les `adventure-module.md` n'ont plus de grille écrite à la
+main (leur section « Carte des salles » renvoie au bloc dynamique). Ne jamais
+déplacer cette carte dans le bloc statique (elle varie à chaque tour = cache
+cassé), ni réintroduire une grille figée dans un module .md (elle divergerait
+de l'état).
+
 ## Vocabulaire par module — jamais en dur
 
 Les prompts ne contiennent AUCUN nom propre de module : lieux, PNJ et exemples
