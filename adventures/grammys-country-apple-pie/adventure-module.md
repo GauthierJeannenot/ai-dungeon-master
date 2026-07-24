@@ -86,7 +86,8 @@ Les pommiers plus anciens sont disposés en rangées ordonnées, mais les jeunes
 ### Contenu
 **Trois dryades** (malicieuses, farouches, non hostiles) :
 - Positions suggérées : (3, 1), (8, 1), (13, 1)
-- Ne se montrent pas sans offrande ou DD 13 Persuasion
+- **À l'entrée dans le verger : DD 13 Perception pour les discerner** cachées dans les arbres. Réussite → le joueur les repère (`reveal_npc({ kind: "dryad" })`, tokens visibles) ; échec → elles restent dissimulées (seuls le murmure des feuilles et le rire cristallin trahissent une présence)
+- Repérées ou non, elles ne se montrent / ne discutent pas sans offrande ou DD 13 Persuasion
 - Une fois amadouées (offrande acceptée ou DD 13 réussi) → racontent en gloussant que les gobelins essaient de faire des tartes depuis des semaines sans jamais y arriver — leurs fournées ratées empestent jusqu'au verger
 - DD 17 Persuasion ou Investigation → révèlent que la moitié de la recette est dans le bureau (salle 5) et l'autre dans l'appartement (salle 9)
 - Bonus : entrée par le quai de chargement (salle 7) permet de surprendre les gobelins
@@ -152,11 +153,12 @@ Cette pièce au mobilier en acajou imposant et aux rideaux de velours prune cont
   - Contenu : 75 po, 50 pa, 25 pc
 
 - **Tiroir piégé** (OBJECTIF PRINCIPAL — 1ère moitié de la recette) :
-  - DD 13 Perception pour repérer le mécanisme
-  - DD 16 Dextérité pour désamorcer
+  - **Trouvé automatiquement** — AUCUN jet de Perception/Investigation pour repérer le tiroir ou la recette
+  - **Piège dissimulé** : ne PAS signaler le piège au joueur. S'il ouvre le tiroir sans précaution, le piège se déclenche.
+  - **DD 16 Dextérité pour désamorcer** — accessible seulement si le joueur se méfie et tente d'inspecter/désamorcer AVANT d'ouvrir ; réussite = piège neutralisé
   - Si déclenché → `resolve_saving_throw({ entityId: "player", ability: "con", dc: 15, onFailure: "empoisonné 1 heure" })`
   - Dégâts si piégé : `roll_dice({ notation: "1d10" })` dégâts de poison + 1 dégât perforant
-  - Contenu : **première moitié du parchemin de recette**
+  - Contenu : **première moitié du parchemin de recette** (récupérable même si le piège se déclenche)
 
 - **Anneau en argent** avec sceau de Grammy (~10 po)
 - Rideaux en bon état (~10 po chez un marchand)
@@ -175,20 +177,16 @@ trigger_room_event({ roomId: "5", eventType: "trap",
 **Point d'entrée** : (3, 6)
 
 ### Description
-Une porte coulissante en bois donne accès à cette salle aux murs de pierre bruts et au sol nu. Un vieux chariot en bois abandonné prend la poussière dans un coin. On peut voir, depuis ici, l'intérieur de la boulangerie : une patrouille de deux gobelins passe devant l'ouverture, l'air de rien.
+Une porte coulissante en bois donne accès à cette salle aux murs de pierre bruts et au sol nu. Un vieux chariot en bois abandonné prend la poussière dans un coin. Le quai est **désert** : c'est la porte dérobée de la boulangerie. Par la grande ouverture latérale, on aperçoit et on entend les gobelins s'affairer plus loin dans le sol de la boulangerie, sans qu'ils remarquent le quai.
 
 ### Contenu
-**Patrouille de gobelins** (2) — tokens déjà visibles sur la carte en (4, 5) et (4, 7) dès l'entrée dans la salle (PNJ scénarisés, pas encore des combattants — ne pas appeler `reveal_npc`) :
-- DD 13 Discrétion pour ne pas être repéré
-- Échec → l'un des gobelins renifle : *"Ça sent bizarre ici..."* — ils s'approchent pour inspecter
+**Quai vide** — aucune patrouille, aucun combat ici. Rien à révéler (`reveal_npc` inutile). Le seul intérêt de la salle est tactique : c'est un accès discret au sol de la boulangerie (salle 8).
 
-**Si repéré :**
+**Avantage tactique** : entrer dans le sol de la boulangerie **par ce quai** donne l'**avantage** sur le jet de Discrétion pour s'y glisser sans alerter les gobelins charpentiers :
 ```
-start_encounter({ encounterId: "loading_dock_patrol" })
+roll_ability_check({ ability: "stealth", dc: 13, advantage: true })
 ```
-Les combattants spawnes remplacent les tokens PNJ de la patrouille.
-
-**Avantage tactique** : entrer par ici donne le **round de surprise** sur les gobelins du sol de la boulangerie.
+(Voir salle 8 : réussir ce jet = surprise sur les gobelins si le combat éclate malgré tout.)
 
 ### Trigger — Entrée discrète
 ```
@@ -231,7 +229,18 @@ Le sol de la boulangerie est un vaste espace aux plafonds hauts avec des poutres
 
 ### ENCOUNTER PRINCIPAL — 3 gobelins dans les poutres
 
-**Trigger** : Si le joueur interagit avec les objets magiques (rouleaux, couteaux enchantés, ouvrir un four) :
+**Entrée discrète (résoudre EN PREMIER)** : DD 13 Discrétion pour se glisser sans alerter les gobelins.
+- **Avantage** sur ce jet si le joueur arrive par le quai de chargement (salle 7).
+- Réussite → gobelins **non alertés** (surprise sur eux si le joueur déclenche ensuite le combat).
+- Échec → gobelins **alertés**, ils tendent l'embuscade : déclencher l'encounter ci-dessous.
+
+**Repérer les gobelins (ENSUITE)** : Perception pour discerner les 3 gobelins tapis dans les poutres du plafond. **Le DD dépend du jet de Discrétion :**
+- **DD 10 si Discrétion réussie** (gobelins non alertés, à découvert — faciles à repérer)
+- **DD 15 si Discrétion ratée** (gobelins alertés et tapis — plus difficiles à voir)
+- Réussite → le joueur les voit : **pas de surprise contre lui** si le combat éclate.
+- Échec → il ne les remarque pas : **les gobelins ont la surprise** si le combat éclate.
+
+**Trigger** : Si le joueur rate le jet de Discrétion à l'entrée, OU s'il interagit avec les objets magiques (rouleaux, couteaux enchantés, ouvrir un four) :
 ```
 spawn_monster({ monsterType: "goblin", cell: {x:10, y:5}, name: "Gobelin Charpentier" })
 spawn_monster({ monsterType: "goblin", cell: {x:10, y:8}, name: "Gobelin Charpentier" })
@@ -292,7 +301,7 @@ enter_combat({ combatants: ["player", "[id_gobelin_1]", "[id_gobelin_2]", "[id_c
 - Si battu mais vivant → révèle l'existence du tiroir piégé dans le bureau
 
 ### Contenu — Tiroir piégé (OBJECTIF PRINCIPAL — 2ème moitié de la recette)
-- **Même mécanique que salle 5** : DD 13 Perception, DD 16 Dextérité, dégâts poison si raté
+- **Même mécanique que salle 5** : tiroir + recette **trouvés automatiquement** (aucun jet pour repérer), **piège dissimulé** (ne pas prévenir le joueur), **DD 16 Dextérité pour désamorcer** seulement si le joueur se méfie et tente d'inspecter avant d'ouvrir — sinon le piège se déclenche à l'ouverture ; dégâts de poison si déclenché
 - Contenu : **seconde moitié du parchemin de recette** + carnet de sorts de Grammy
   - Carnet contient : *Druidecraft, Enchevêtrement, Purification nourriture/eau, Communication avec les plantes*
   - Valeur d'ensemble : 75 po pour un mage intéressé
