@@ -10,8 +10,10 @@ import { firstMapId, getAdventureMap, getMapSpec } from '@/lib/adventure-map'
 // Deux niveaux de détail selon la phase :
 // - TOUJOURS : zones des salles de la map courante + graphe d'adjacence
 //   précalculé (quelle salle borde quelle salle, dans quelle direction),
-//   points d'entrée, positions du joueur, des PNJ révélés et des monstres
-//   vivants. C'est ce qui porte la narration spatiale.
+//   scindé en « communique avec » (contiguïté FRANCHISSABLE) et « contiguë
+//   mais cloisonnée » (contiguïté séparée par un mur, déclarée dans
+//   map.ts.partitions), points d'entrée, positions du joueur, des PNJ révélés
+//   et des monstres vivants. C'est ce qui porte la narration spatiale.
 // - COMBAT uniquement : en plus, la grille ASCII dessinée, pour la géométrie
 //   fine (contact, distances en cases). Hors combat elle coûterait des tokens
 //   à chaque appel pour un signal déjà couvert par zones + adjacence.
@@ -68,20 +70,32 @@ export function renderSceneMap(gameState: GameState): string {
 
   const mapRooms = mapData.rooms.filter(room => onCurrentMap(room.mapId))
 
-  // ── Salles : zone, entrée, statut, adjacences précalculées ────────────────
+  // ── Cloisons : paires de salles contiguës qui NE communiquent PAS (déclarées
+  // dans map.ts). Clé normalisée (ordre des deux salles indifférent) pour un
+  // test symétrique. Toute contiguïté ABSENTE de cet ensemble est franchissable.
+  const partitionKey = (a: string, b: string) => [a, b].sort().join('|')
+  const partitions = new Set((mapData.partitions ?? []).map(([a, b]) => partitionKey(a, b)))
+
+  // ── Salles : zone, entrée, statut, contiguïtés (communicantes vs cloisonnées)
   const roomLines = mapRooms.map(room => {
     const symbol = roomSymbol(room.id)
     const entry = mapData.entryCells[room.id]
     const status = gameState.currentRoomId === room.id
       ? ' — salle ACTUELLE'
       : gameState.roomsVisited.includes(room.id) ? ' — visitée' : ''
-    const neighbors = mapRooms
-      .filter(other => other.id !== room.id && zonesTouch(room.zone, other.zone))
-      .map(other => `${roomSymbol(other.id)} (${directionLabel(room.zone, other.zone)})`)
+    const neighbors = mapRooms.filter(other =>
+      other.id !== room.id && zonesTouch(room.zone, other.zone))
+    const label = (other: AdventureRoom) =>
+      `${roomSymbol(other.id)} (${directionLabel(room.zone, other.zone)})`
+    const communicating = neighbors
+      .filter(other => !partitions.has(partitionKey(room.id, other.id))).map(label)
+    const walled = neighbors
+      .filter(other => partitions.has(partitionKey(room.id, other.id))).map(label)
     const parts = [
       `${symbol} = Salle ${room.id} : ${room.name} (x ${room.zone.minX}-${room.zone.maxX}, y ${room.zone.minY}-${room.zone.maxY})`,
       entry ? `entrée (${entry.x}, ${entry.y})` : '',
-      neighbors.length > 0 ? `borde : ${neighbors.join(', ')}` : '',
+      communicating.length > 0 ? `communique avec : ${communicating.join(', ')}` : '',
+      walled.length > 0 ? `contiguë mais cloisonnée (mur, pas de passage direct) : ${walled.join(', ')}` : '',
     ].filter(Boolean)
     return parts.join(' — ') + status
   })
@@ -144,10 +158,10 @@ export function renderSceneMap(gameState: GameState): string {
   return [
     `Carte « ${currentMap.name} » — grille ${cols}×${rows}, coordonnées (x, y) : x = colonne (0-${cols - 1}), y = rangée (0-${rows - 1}), nord = y décroissant.`,
     ...gridSection,
-    'Salles de la carte (zones et adjacences) :',
+    'Salles de la carte (zones, communications et cloisons) :',
     ...roomLines,
     'Positions :',
     ...positionLines,
-    'Cette carte reflète l’état RÉEL du moteur à ce tour : appuie-toi dessus pour situer la scène, décrire ce qui borde le joueur, estimer les distances et choisir les coordonnées exactes de `move_token` (les « entrée (x, y) » ci-dessus sont les cibles sûres).',
+    'Cette carte reflète l’état RÉEL du moteur à ce tour : appuie-toi dessus pour situer la scène, estimer les distances et choisir les coordonnées exactes de `move_token` (les « entrée (x, y) » ci-dessus sont les cibles sûres). « communique avec » = salles accessibles directement depuis celle-ci ; « contiguë mais cloisonnée » = salle voisine sur la grille mais séparée par un mur — n’y fais pas passer le joueur directement, il faut contourner.',
   ].join('\n')
 }
