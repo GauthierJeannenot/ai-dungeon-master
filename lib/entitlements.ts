@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers'
 import { auth } from './auth'
+import { claimGuestSessions } from './session-store'
 import {
   GUEST_MESSAGE_LIMIT,
   ensureSignupBonus,
@@ -57,6 +58,8 @@ export async function resolveEntitlement(): Promise<Entitlement> {
   const session = await auth()
 
   if (session?.userId) {
+    const guestId = (await cookies()).get(GUEST_COOKIE_NAME)?.value
+    if (guestId) await claimGuestSessions(guestId, session.userId)
     const credits = await ensureSignupBonus(session.userId, session.user?.email ?? undefined)
     return {
       kind: 'user',

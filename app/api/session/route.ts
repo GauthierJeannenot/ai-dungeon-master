@@ -36,10 +36,10 @@ export async function DELETE(req: NextRequest): Promise<NextResponse> {
     // Appartenance : seule la partie de SON créateur peut être supprimée
     // (sessionId seul ne suffit pas — il transite côté client).
     if (MONETIZATION_ENABLED) {
+      const { resolveEntitlement } = await import('@/lib/entitlements')
+      const entitlement = await resolveEntitlement()
       const stored = await loadSession(sessionId)
       if (stored?.ownerId) {
-        const { resolveEntitlement } = await import('@/lib/entitlements')
-        const entitlement = await resolveEntitlement()
         const ownerId = entitlement.kind === 'user'
           ? `user:${entitlement.userId}`
           : `guest:${entitlement.guestId}`

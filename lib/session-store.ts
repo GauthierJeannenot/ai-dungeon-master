@@ -1,4 +1,5 @@
 import { dbQuery } from './db'
+import { acquireSessionLock } from './session-lock'
 import { ConversationTurn, GameState, TurnTrace } from './types'
 import { logEvent, summarizeGameState } from './server-logger'
 
@@ -217,5 +218,26 @@ export async function deleteSession(sessionId: string | undefined): Promise<void
     logEvent('info', 'session.delete.ok', { sessionId: safeId })
   } else {
     logEvent('debug', 'session.delete.miss', { sessionId: safeId })
+  }
+}
+
+// Appelé uniquement avec le cookie invité serveur et le compte authentifié.
+// Le verrou évite qu'un tour invité en cours réécrive ensuite l'ancien owner.
+export async function claimGuestSessions(guestId: string, userId: string): Promise<void> {
+  if (!/^[a-zA-Z0-9-]{8,64}$/.test(guestId) || !userId) return
+  const guestOwner = `guest:${guestId}`
+  const sessions = await dbQuery<{ session_id: string }>(
+    'SELECT session_id FROM game_sessions WHERE owner_id = $1', [guestOwner]
+  )
+  for (const { session_id: sessionId } of sessions.rows) {
+    const release = await acquireSessionLock(sessionId)
+    try {
+      await dbQuery(
+        'UPDATE game_sessions SET owner_id = $1 WHERE session_id = $2 AND owner_id = $3',
+        [`user:${userId}`, sessionId, guestOwner]
+      )
+    } finally {
+      release()
+    }
   }
 }

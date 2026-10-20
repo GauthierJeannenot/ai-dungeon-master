@@ -30,12 +30,12 @@ export async function GET(
 ): Promise<NextResponse> {
   try {
     const { sessionId } = await params
+    const ownerId = await currentOwnerId()
     const stored = await loadSession(sessionId)
     if (!stored) {
       return NextResponse.json({ error: 'Partie introuvable.' }, { status: 404 })
     }
 
-    const ownerId = await currentOwnerId()
     if (stored.ownerId && stored.ownerId !== ownerId) {
       logEvent('warn', 'sessions.get.owner_mismatch', { sessionId, ownerId })
       return NextResponse.json({ error: 'Cette partie appartient à un autre joueur.' }, { status: 403 })
@@ -62,9 +62,9 @@ export async function DELETE(
 ): Promise<NextResponse> {
   try {
     const { sessionId } = await params
+    const ownerId = await currentOwnerId()
     const stored = await loadSession(sessionId)
     if (stored?.ownerId) {
-      const ownerId = await currentOwnerId()
       if (stored.ownerId !== ownerId) {
         logEvent('warn', 'sessions.delete.owner_mismatch', { sessionId, ownerId })
         return NextResponse.json({ error: 'Cette partie appartient à un autre joueur.' }, { status: 403 })
