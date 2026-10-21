@@ -95,6 +95,9 @@ moteur en mémoire qui ne l'est pas.
   Pods v2, vérification de `mounts.global` ID + `/workspace`, remplacements
   multirégions. Clé Postgres `global:<id>`.
   Le prix v2 arrêté est zéro : devis avant reprise, prix réel après allocation.
+  Les devis GraphQL peuvent renvoyer `availableGpuCounts=null` : disponibilité
+  inconnue, pas une absence de stock. Un prix valide reste obligatoire ; une
+  liste de comptes explicite doit autoriser un GPU. Start/create confirme le stock.
   Ne jamais supprimer un Global Volume, même lors du rejet d'un nouveau Pod.
 
 ## Logs

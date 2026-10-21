@@ -98,6 +98,9 @@ L'état utilise une clé Postgres `global:<volume-id>`.
 
 Le tarif v2 vaut zéro pour un Pod arrêté : un devis est donc consulté avant
 la reprise, puis le prix réel est vérifié une fois alloué. Les états
+de disponibilité inconnue (`availableGpuCounts=null` dans les devis) ne sont
+pas assimilés à une rupture de stock : un devis valide sous plafond autorise
+une tentative, dont Runpod confirme la capacité. Les états
 `PROVISIONING` et `STARTING` sont attendus sans créer de doublon. Un modèle
 n'est déclaré prêt qu'une fois le Pod `RUNNING` avec un prix accepté.
 Le plafond de 3 $/h exclut toujours le stockage et les taxes, et la limite

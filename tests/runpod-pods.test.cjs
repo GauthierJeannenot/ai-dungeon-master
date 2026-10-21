@@ -51,7 +51,7 @@ function fixture(t, options = {}) {
       assert.equal(body.variables.offer.dataCenterId, undefined)
       const price = options.price ?? 2.89
       return Response.json({ data: { gpuTypes: [{ id: body.variables.gpu.id,
-        lowestPrice: { uninterruptablePrice: price, availableGpuCounts: [1] } }] } })
+        lowestPrice: { uninterruptablePrice: price, availableGpuCounts: 'counts' in options ? options.counts : null } }] } })
     }
     assert.equal(url.host, options.global ? 'api.runpod.io' : 'rest.runpod.io')
     if (pathname === '/v1/global-volumes/global-volume') return Response.json({ id: 'global-volume' })
@@ -134,6 +134,30 @@ test('no offer under the cap means no allocation', async t => {
   const f = fixture(t, { resumeUnavailable: true, price: 3.01 })
   await assert.rejects(createPodControl(config).setActive(true), /3 \$\/h/)
   assert.equal(f.created(), 0)
+})
+
+test('a valid A100 quote with null availability can resume without allocating a replacement', async t => {
+  const f = fixture(t, { price: 1.79, seed: { cost: 0, gpu: { id: 'NVIDIA A100 80GB PCIe', count: 1 } }, resumePrice: 1.79 })
+  await createPodControl(config).setActive(true)
+  assert.equal(f.pods.get('seed').status, 'RUNNING')
+  assert.equal(f.created(), 0)
+  assert.ok(f.calls.some(c => c.body?.variables?.gpu.id === 'NVIDIA A100 80GB PCIe'))
+})
+
+test('an explicit available single-GPU count allows resume', async t => {
+  const f = fixture(t, { counts: [1, 2] })
+  await createPodControl(config).setActive(true)
+  assert.equal(f.pods.get('seed').status, 'RUNNING')
+})
+
+test('explicitly unavailable or malformed counts never authorize paid operations', async t => {
+  for (const counts of [[], [2, 4], 'unknown']) {
+    const f = fixture(t, { counts, price: 1.79 })
+    await assert.rejects(createPodControl(config).setActive(true), /reprise reportée/)
+    assert.equal(f.calls.some(c => c.body?.action === 'start'), false)
+    assert.equal(f.created(), 0)
+    t.mock.restoreAll()
+  }
 })
 
 test('price increasing after allocation deletes the new Pod, never the volume, and blocks allocation loops', async t => {

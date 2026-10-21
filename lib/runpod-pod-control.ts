@@ -107,8 +107,12 @@ export function createPodControl(config: RunpodPodConfig) {
     if (!record(entry) || !record(entry.lowestPrice)) return null
     const offer = entry.lowestPrice
     const price = offer.uninterruptablePrice
-    if (typeof price !== 'number' || !Number.isFinite(price) || price <= 0 || price > config.maxHourlyUsd
-      || !Array.isArray(offer.availableGpuCounts) || !offer.availableGpuCounts.includes(1)) return null
+    if (typeof price !== 'number' || !Number.isFinite(price) || price <= 0 || price > config.maxHourlyUsd) return null
+    // Runpod renvoie aussi null pour ce champ sur un devis valide. Cela ne
+    // prouve pas une rupture de stock : le start/create confirme la capacité.
+    // Une liste explicitement renseignée reste contraignante.
+    if (offer.availableGpuCounts != null
+      && (!Array.isArray(offer.availableGpuCounts) || !offer.availableGpuCounts.includes(1))) return null
     return price
   }
   async function replace(): Promise<void> {
@@ -147,7 +151,7 @@ export function createPodControl(config: RunpodPodConfig) {
       if (!acceptable(await getPod(pod.id))) await rejectCreated(state)
       return
     }
-    throw new Error('Aucun GPU compatible disponible à 3 $/h maximum dans la région du volume. Nouvelle tentative ultérieure.')
+    throw new Error(`Aucun GPU autorisé disponible à ${config.maxHourlyUsd} $/h maximum. Nouvelle tentative ultérieure.`)
   }
   async function setActive(active: boolean): Promise<void> {
     const state = await recover(await loadManagedPod(config))
