@@ -14,6 +14,18 @@ const pg = installPgMem()
 const db = pg.db
 const credits = require(path.join(process.cwd(), 'lib/credits-store.ts'))
 const sessionStore = require(path.join(process.cwd(), 'lib/session-store.ts'))
+const podStore = require(path.join(process.cwd(), 'lib/runpod-pod-store.ts'))
+
+test('db: managed Pod state round-trips allocation and rejection markers', async () => {
+  const config = { globalVolumeId: 'db-pod-volume', podId: 'initial-pod', port: 8000 }
+  assert.deepEqual(await podStore.loadManagedPod(config), { podId: 'initial-pod' })
+  const state = { podId: 'replacement', pendingName: 'allocation-name', rejectedPod: true, blocked: true, created: true }
+  await podStore.saveManagedPod(config, state)
+  assert.deepEqual(await podStore.loadManagedPod(config), state)
+  // A different seed after restart must not overwrite the durable replacement.
+  assert.deepEqual(await podStore.loadManagedPod({ ...config, podId: 'obsolete-seed' }), state)
+  await assert.rejects(podStore.managedPodBaseUrl(config), /pas encore disponible/)
+})
 
 test.after(() => {
   pg.restore()

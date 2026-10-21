@@ -13,6 +13,12 @@ import { logEvent } from './server-logger'
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Tables NextAuth (@auth/pg-adapter — schéma officiel Auth.js) + tables métier.
+const RUNPOD_POD_STATE_SQL = `CREATE TABLE IF NOT EXISTS runpod_pod_state (
+  control_id TEXT PRIMARY KEY,
+  state JSONB NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);`
+
 export const DB_SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS verification_token (
   identifier TEXT NOT NULL,
@@ -114,6 +120,8 @@ CREATE TABLE IF NOT EXISTS guest_usage (
 -- continuent de consommer des tokens. user_id est TEXT (users.id sérialisé),
 -- sans FK, cohérent avec user_credits. L'idempotence des webhooks Stripe reste
 -- portée par la table stripe_events.
+${RUNPOD_POD_STATE_SQL}
+
 CREATE TABLE IF NOT EXISTS module_entitlements (
   user_id TEXT NOT NULL,
   module_id TEXT NOT NULL,
@@ -170,6 +178,7 @@ export function __setDbPoolForTests(testPool: Pool): void {
 // IF NOT EXISTS ne modifie pas une table existante). Tolérées en échec : sur
 // une base fraîche la colonne existe déjà via le CREATE.
 const ADDITIVE_MIGRATIONS_SQL = [
+  RUNPOD_POD_STATE_SQL,
   'ALTER TABLE game_sessions ADD COLUMN IF NOT EXISTS owner_id TEXT',
   'ALTER TABLE game_sessions ADD COLUMN IF NOT EXISTS adventure_id TEXT',
   'ALTER TABLE game_sessions ADD COLUMN IF NOT EXISTS character_id TEXT',

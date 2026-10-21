@@ -2,19 +2,21 @@ import Anthropic from '@anthropic-ai/sdk'
 import { logEvent } from '@/lib/server-logger'
 import { logAnthropicUsage, type AnthropicUsage, type AnthropicUsageLogEntry } from '@/lib/anthropic-usage'
 import type { GameState } from '@/lib/types'
+import { getLlmProvider } from './llm-config'
+import { createVllmMessage } from './vllm'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Client LLM du Dungeon Master : configuration des modèles, appel Anthropic
 // avec comptage d'usage, et mock déterministe pour les tests sans coût.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-})
+// Qwen et le mock n'ont besoin d'aucune clé Anthropic.
+let anthropic: Anthropic | undefined
+export const LLM_PROVIDER = getLlmProvider()
 
-export const MODEL = process.env.DM_MODEL || 'claude-sonnet-4-6'
+export const MODEL = process.env.DM_MODEL || (LLM_PROVIDER === 'vllm' ? 'Qwen/Qwen3.6-27B' : 'claude-sonnet-4-6')
 // Modèle du classifieur d'intention (pré-passe légère). Haiku : rapide et bon marché.
-export const PLANNER_MODEL = process.env.DM_PLANNER_MODEL || 'claude-haiku-4-5'
+export const PLANNER_MODEL = process.env.DM_PLANNER_MODEL || (LLM_PROVIDER === 'vllm' ? MODEL : 'claude-haiku-4-5')
 // Compression d'historique : tâche simple (résumé factuel) → Haiku suffit et coûte
 // ~3× moins cher que Sonnet. Surchargeable via DM_COMPRESS_MODEL.
 export const COMPRESS_MODEL = process.env.DM_COMPRESS_MODEL || PLANNER_MODEL
@@ -112,6 +114,9 @@ function firstAliveMonsterId(gameState: GameState): string | null {
 
 // Mock déterministe pour les tests : pilote les tools classiques.
 function createMockLlmMessage(params: Anthropic.MessageCreateParamsNonStreaming, context: LlmCallContext): Anthropic.Message {
+  if (context.operation === 'dm.final_narration') {
+    return mockTextMessage('La scène progresse; quelque chose dans le décor répond à ton geste.')
+  }
   if (context.operation === 'history.compress') {
     return mockTextMessage('Résumé mock: les échanges précédents sont conservés sous forme condensée pour les tests.')
   }
@@ -203,6 +208,7 @@ function recordUsage(message: Anthropic.Message, context: LlmCallContext, stopRe
     operation: context.operation,
     model: context.model ?? MODEL,
     usage,
+    provider: LLM_PROVIDER,
     stopReason: stopReason ?? message.stop_reason,
   })
   context.usageLog.push(entry)
@@ -217,6 +223,7 @@ export async function createLlmMessage(
     sessionId: context.sessionId,
     operation: context.operation,
     mode: LLM_MODE,
+    provider: LLM_PROVIDER,
   })
 
   if (LLM_MODE === 'mock') {
@@ -229,7 +236,13 @@ export async function createLlmMessage(
     throw new Error('Appels LLM payants désactivés (ALLOW_PAID_LLM=false). Utilise LLM_MODE=mock.')
   }
 
-  const message = await anthropic.messages.create(params)
+  let message: Anthropic.Message
+  if (LLM_PROVIDER === 'vllm') {
+    message = await createVllmMessage(params)
+  } else {
+    anthropic ??= new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+    message = await anthropic.messages.create(params)
+  }
   recordUsage(message, context)
   return message
 }

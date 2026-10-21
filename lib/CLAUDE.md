@@ -70,6 +70,33 @@ advisory lock) + routage sticky par session vers l'instance qui détient son
 process moteur. La persistance (Postgres) est déjà partagée ; c'est l'état
 moteur en mémoire qui ne l'est pas.
 
+## Runpod Serverless / Pods (opt-in)
+
+- `runpod-lifecycle.ts` : singleton global de présences par onglet + réservations
+  par TOUR DM, pas par appel LLM. Libérer via `finally`. Arrêt après 10 min sans
+  message après la fin des générations locales ET distantes. Heartbeats et
+  onglets ouverts ne prolongent pas le délai. Réveil explicite au prochain
+  message, qui attend la disponibilité du modèle avant son traitement. Le health
+  Runpod doit être vide avant PATCH 0/0 ; ne jamais annuler les tâches.
+- Timer initialisé au boot (`instrumentation.ts`) : même hypothèse mono-instance
+  Node persistante que les moteurs MCP. Pas de garantie d'arrêt si l'hôte gèle
+  ou tue le processus ; reprise conservatrice au boot. Configuration désactivée
+  par défaut et inerte en mock/appels payants bloqués. Ne jamais exposer la clé
+  de gestion au client ou piloter un endpoint fourni par une requête utilisateur.
+- `RUNPOD_MODE=pod` : état du Pod courant et marqueur de création en Postgres
+  (`runpod_pod_state`, clé = `global:<id>`). Un POST création ambigu ne doit
+  jamais être retenté sans récupération du nom unique. Vérifier devis/prix réel
+  ≤ 3 $/h et identité du volume avant utilisation. Ne jamais supprimer le volume
+  global ; seuls les Pods créés par le contrôleur puis refusés sont supprimés.
+- En Pods, le drainage vient des gauges vLLM running/waiting (et swapped si
+  présent), pas de /health Serverless. Métriques absentes = arrêt reporté.
+  L'adresse d'inférence est résolue depuis le Pod stocké, pas un ancien .env.
+- `RUNPOD_GLOBAL_VOLUME_ID` est requis (Global Volumes exclusivement) : API
+  Pods v2, vérification de `mounts.global` ID + `/workspace`, remplacements
+  multirégions. Clé Postgres `global:<id>`.
+  Le prix v2 arrêté est zéro : devis avant reprise, prix réel après allocation.
+  Ne jamais supprimer un Global Volume, même lors du rejet d'un nouveau Pod.
+
 ## Logs
 
 `server-logger.ts` : logs JSON structurés `[ai-dm:<event>]`, secrets masqués

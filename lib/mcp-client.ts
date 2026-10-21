@@ -70,6 +70,14 @@ function parseMcpTextPayload(text: string): unknown {
   return parsed
 }
 
+// Conserver aussi isError quand le SDK renvoie une erreur de schéma en texte
+// brut ; extraire content[0].text ne doit pas la transformer en réussite.
+function preserveMcpError(payload: unknown, isError: unknown): unknown {
+  if (isError !== true) return payload
+  if (payload && typeof payload === 'object' && 'error' in payload && typeof payload.error === 'string') return payload
+  return { error: typeof payload === 'string' ? payload : 'MCP tool returned an error.', code: 'MCP_TOOL_ERROR', detail: payload }
+}
+
 function cleanupIdleClients(now = Date.now()): void {
   // Nettoyage opportuniste pour éviter de garder des processus stdio indéfiniment.
   if (now - lastCleanup < 60_000) return
@@ -280,7 +288,7 @@ export async function callMCPTool(
             durationMs: Date.now() - startedAt,
             result: summarizeMcpPayload(parsed),
           })
-          return parsed
+          return preserveMcpError(parsed, result.isError)
         } catch {
           logEvent(result.isError ? 'warn' : 'debug', 'mcp.tool.result_text', {
             sessionId: normalizedSessionId,
@@ -289,7 +297,7 @@ export async function callMCPTool(
             durationMs: Date.now() - startedAt,
             text: textContent.text,
           })
-          return textContent.text
+          return preserveMcpError(textContent.text, result.isError)
         }
       }
     }
@@ -301,7 +309,7 @@ export async function callMCPTool(
       durationMs: Date.now() - startedAt,
       result,
     })
-    return result
+    return preserveMcpError(result, result.isError)
   } catch (err) {
     logEvent('error', 'mcp.tool.error', {
       sessionId: normalizedSessionId,

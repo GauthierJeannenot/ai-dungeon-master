@@ -5,5 +5,7 @@ export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
     const { validateServerConfig } = await import('./lib/config-check')
     validateServerConfig()
+    const { getRunpodLifecycle } = await import('./lib/runpod-lifecycle')
+    getRunpodLifecycle()
   }
 }

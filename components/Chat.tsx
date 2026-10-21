@@ -6,6 +6,7 @@ import { ChatMessage, DMClientMeta, GameState } from '@/lib/types'
 interface ChatProps {
   messages: ChatMessage[]
   isLoading: boolean
+  inputDisabled?: boolean
   gameState: GameState
   onSendMessage: (text: string, clientMeta?: DMClientMeta) => void
   inputValue: string
@@ -332,6 +333,7 @@ function TypingIndicator() {
 export default function Chat({
   messages,
   isLoading,
+  inputDisabled = false,
   gameState,
   onSendMessage,
   inputValue,
@@ -534,7 +536,7 @@ export default function Chat({
 
   function handleSend() {
     const text = inputValue.trim()
-    if (!text || isLoading) return
+    if (!text || isLoading || inputDisabled) return
     onSendMessage(text, { inputMode: 'text' })
     inputRef.current?.focus()
   }
@@ -565,7 +567,7 @@ export default function Chat({
       return
     }
 
-    if (isLoading) {
+    if (isLoading || inputDisabled) {
       logVoiceEvent('client.voice.recognition.discarded', {
         reason: 'dm_request_in_progress',
         transcriptChars: text.length,
@@ -611,7 +613,7 @@ export default function Chat({
       return
     }
 
-    if (isLoading) return
+    if (isLoading || inputDisabled) return
 
     const RecognitionConstructor = getSpeechRecognitionConstructor()
     if (!RecognitionConstructor) {
@@ -844,7 +846,7 @@ export default function Chat({
           <button
             type="button"
             onClick={handleMicClick}
-            disabled={!recognitionSupported || isLoading}
+            disabled={!recognitionSupported || isLoading || inputDisabled}
             title="Parler au Dungeon Master"
             aria-label="Parler au Dungeon Master"
             className={`h-9 sm:h-7 min-w-[3rem] sm:min-w-[4rem] rounded border px-1.5 sm:px-2 text-[10px] sm:text-[11px] font-semibold transition-colors ${
@@ -882,7 +884,7 @@ export default function Chat({
             onChange={e => onInputChange(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
-            disabled={isLoading || isListening}
+            disabled={isLoading || inputDisabled || isListening}
             rows={2}
             // Miroir UX du plafond serveur DM_MAX_MESSAGE_CHARS (défaut 2000) :
             // évite le 400 côté client. Le serveur reste l'autorité.
@@ -891,7 +893,7 @@ export default function Chat({
           />
           <button
             onClick={handleSend}
-            disabled={isLoading || isListening || !inputValue.trim()}
+            disabled={isLoading || inputDisabled || isListening || !inputValue.trim()}
             className="flex-shrink-0 self-stretch px-4 py-2 bg-amber-800 hover:bg-amber-700 disabled:bg-stone-700 disabled:opacity-40 text-white rounded-lg text-sm font-semibold transition-colors flex items-center justify-center"
           >
             {isLoading ? (

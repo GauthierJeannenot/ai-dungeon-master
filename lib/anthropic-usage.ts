@@ -23,6 +23,7 @@ export interface AnthropicUsageLogContext {
 }
 
 export interface AnthropicUsageLogEntry extends AnthropicUsageLogContext {
+  provider?: 'anthropic' | 'vllm'
   requestId: string
   operation: string
   model: string
@@ -108,6 +109,7 @@ export function logAnthropicUsage({
   usage,
   stopReason,
   metadata,
+  provider = 'anthropic',
 }: {
   requestId: string
   sessionId?: string
@@ -118,6 +120,7 @@ export function logAnthropicUsage({
   usage: AnthropicUsage
   stopReason?: string | null
   metadata?: Record<string, unknown>
+  provider?: 'anthropic' | 'vllm'
 }): AnthropicUsageLogEntry {
   const inputTokens = tokenCount(usage.input_tokens)
   const outputTokens = tokenCount(usage.output_tokens)
@@ -127,6 +130,7 @@ export function logAnthropicUsage({
   const cacheReadInputTokens = tokenCount(usage.cache_read_input_tokens)
 
   const entry: AnthropicUsageLogEntry = {
+    provider,
     requestId,
     sessionId,
     inputMode,
@@ -140,7 +144,12 @@ export function logAnthropicUsage({
     cacheCreation1hInputTokens,
     cacheReadInputTokens,
     totalInputTokens: inputTokens + cacheCreationInputTokens + cacheReadInputTokens,
-    estimatedCostUsd: estimateModelCostUsd(model, usage),
+    // La location GPU n'est pas déductible des tokens. Estimation optionnelle,
+    // nulle par défaut : aucun tarif Sonnet fictif sur les modèles auto-hébergés.
+    estimatedCostUsd: provider === 'vllm'
+      ? roundUsd(((inputTokens + cacheReadInputTokens) * vllmRate('VLLM_INPUT_USD_PER_MTOK')
+        + outputTokens * vllmRate('VLLM_OUTPUT_USD_PER_MTOK')) / 1_000_000)
+      : estimateModelCostUsd(model, usage),
     stopReason,
     serviceTier: usage.service_tier,
     inferenceGeo: usage.inference_geo,
@@ -149,6 +158,11 @@ export function logAnthropicUsage({
 
   logEvent('info', 'anthropic.usage', { ...entry })
   return entry
+}
+
+function vllmRate(name: string): number {
+  const value = Number(process.env[name] ?? 0)
+  return Number.isFinite(value) && value >= 0 ? value : 0
 }
 
 export function logAnthropicUsageSummary(

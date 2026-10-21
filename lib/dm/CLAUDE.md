@@ -91,6 +91,15 @@ dans lib/. Tout nouvel exemple dans un prompt passe par un champ de
 
 ## Modèles et coûts (llm.ts)
 
+- `LLM_PROVIDER=anthropic|vllm` (défaut Anthropic). Le client Anthropic est
+  paresseux ; ne jamais exiger sa clé en mode vLLM/mock. `vllm.ts` traduit le
+  contrat Messages vers Chat Completions, sans changer le moteur MCP. Guide :
+  `docs/qwen-runpod-vllm.md`. Pas de fallback payant implicite. En vLLM, les
+  trois modèles reprennent Qwen par défaut, mode instruct sans thinking.
+- La prose accompagnant un appel outil doit être ignorée (publication ET
+  transcript). Un refus métier ou MCP isError ne satisfait ni la directive ni
+  l'action primaire. Le fallback de narration garde les résultats du transcript.
+
 - `MODEL` (Sonnet, narration), `PLANNER_MODEL` (Haiku), `COMPRESS_MODEL`
   (Haiku) — surchargeables par env. `effortFor()` n'envoie `output_config`
   qu'aux modèles qui le supportent (sinon 400 API) : mettre à jour son regex

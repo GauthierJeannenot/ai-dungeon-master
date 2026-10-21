@@ -38,14 +38,13 @@ import {
   type LlmCallContext,
 } from '@/lib/dm/llm'
 import {
-  buildStaticPrompt,
-  buildDynamicPrompt,
   buildStaticSystemBlocks,
   buildTurnUserMessage,
   withCachedHistoryPrefix,
   promptCacheControl,
 } from '@/lib/dm/prompts'
 import { processHistory, HISTORY_KEEP_RECENT } from '@/lib/dm/history'
+import { beginRunpodGeneration } from '@/lib/runpod-lifecycle'
 import {
   planPlayerAction,
   buildDirective,
@@ -355,6 +354,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   const releaseLock = await acquireSessionLock(sessionId)
+  let releaseWorker: (() => void) | undefined
   const usageLog: AnthropicUsageLogEntry[] = []
 
   try {
@@ -450,6 +450,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         )
       }
     }
+
+    // Réserver le worker pour le TOUR COMPLET, après autorisation et débit.
+    // Le finally libère même en cas d'erreur/refus : aucun arrêt entre deux LLM.
+    releaseWorker = await beginRunpodGeneration()
 
     // État SERVEUR autoritaire (monétisation active) : le moteur MCP valide les
     // règles, donc l'état ne doit jamais venir du client — un gameState forgé
@@ -632,20 +636,26 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         baseContext
       )
 
-      for (const block of response.content) {
-        if (block.type === 'text' && block.text.trim()) {
-          narrative += (narrative ? '\n\n' : '') + block.text
-        }
-      }
-
-      if (response.stop_reason !== 'tool_use') break
-
       const toolUseBlocks = response.content.filter(
         (block): block is Anthropic.ToolUseBlock => block.type === 'tool_use'
       )
-      if (toolUseBlocks.length === 0) break
+      if (response.stop_reason === 'max_tokens') {
+        throw new Error('Réponse LLM tronquée : aucune action partielle ne sera exécutée.')
+      }
+      if (response.stop_reason !== 'tool_use') {
+        if (toolUseBlocks.length) throw new Error('Réponse LLM incohérente : appels outils sans fin tool_use.')
+        // Un fournisseur ignorant l'outil forcé ne doit pas publier une issue.
+        if (plannerDirective && !plannedToolSatisfied) continue
+        if (response.stop_reason !== 'end_turn') throw new Error('Réponse LLM interrompue avant la narration finale.')
+        narrative = response.content.filter((block): block is Anthropic.TextBlock => block.type === 'text')
+          .map(block => block.text).join('\n\n').trim()
+        break
+      }
+      if (toolUseBlocks.length === 0) throw new Error('Réponse LLM tool_use sans appel outil.')
 
-      messages.push({ role: 'assistant', content: response.content })
+      // Une prose accompagnant un appel peut inventer une issue avant résolution.
+      // Ni publication, ni réinjection de cette prose comme fait acquis.
+      messages.push({ role: 'assistant', content: response.content.filter(block => block.type !== 'text') })
       const toolResults: Anthropic.ToolResultBlockParam[] = []
 
       for (const toolUse of toolUseBlocks) {
@@ -678,6 +688,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         try {
           const input = isObjectRecord(toolUse.input) ? toolUse.input : {}
           const result = await callMCPTool(toolUse.name, input, sessionId, adventureId)
+          // Les refus métier sont des payloads, pas des exceptions. Ils ne
+          // consomment ni l'action primaire ni la directive : retry possible.
+          if (isObjectRecord(result) && (typeof result.error === 'string' || result.isError === true)) {
+            sawMcpToolError = true
+            logEvent('warn', 'dm.tool_use.rejected', { requestId, sessionId, toolName: toolUse.name, code: result.code })
+            toolResults.push({ type: 'tool_result', tool_use_id: toolUse.id, content: JSON.stringify(result), is_error: true })
+            continue
+          }
           // On ne comptabilise l'action « primaire » qu'en exploration : une action
           // résolue en combat ne doit pas bloquer une action d'exploration menée
           // après un end_combat survenu dans le même message joueur.
@@ -729,32 +747,32 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       messages.push({ role: 'user', content: toolResults })
     }
 
-    // Dernière tentative de narration si la boucle s'est arrêtée sans prose. Appel
-    // one-shot (rare) : contexte volatil dans le message user, système statique seul.
+    // Aucune narration libre si la mécanique obligatoire reste non résolue.
+    if (!narrative.trim() && plannerDirective && !plannedToolSatisfied) {
+      narrative = "L’action n’a pas pu être résolue par le moteur. Précise ton intention pour réessayer."
+    }
+    // Conserver les jets et les refus du transcript : l'état seul ne les raconte
+    // pas. Le système statique reste identique aussi dans cet appel final.
     if (!narrative.trim()) {
       const finalResponse = await createLlmMessage(
         {
           model: MODEL,
           max_tokens: MAX_TOKENS,
           ...effortFor(MODEL),
-          system: [
-            {
-              type: 'text',
-              text: buildStaticPrompt(currentGameState.adventureId, currentGameState.characterId) + '\n\nRéponds maintenant UNIQUEMENT avec la narration en prose, sans appeler de tools.',
-            },
-          ],
+          system: staticSystem,
           messages: [
+            ...messages,
             {
               role: 'user',
-              content: [
-                { type: 'text', text: buildDynamicPrompt(currentGameState, summaryContext) },
-                { type: 'text', text: message },
-              ],
+              content: 'Réponds maintenant uniquement en prose à partir des résultats outils ci-dessus. Une erreur ou un refus ne constitue jamais une réussite. Si l’action reste non résolue, indique-le sans inventer son issue.',
             },
           ],
         },
         { ...baseContext, operation: 'dm.final_narration' }
       )
+      if (finalResponse.stop_reason !== 'end_turn' || finalResponse.content.some(block => block.type === 'tool_use')) {
+        throw new Error('Le LLM n’a pas fourni une narration finale complète.')
+      }
       for (const block of finalResponse.content) {
         if (block.type === 'text') narrative += block.text
       }
@@ -828,6 +846,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const errorMessage = err instanceof Error ? err.message : 'Erreur interne du serveur'
     return NextResponse.json({ error: errorMessage }, { status: 500 })
   } finally {
+    releaseWorker?.()
     await releaseLock()
   }
 }

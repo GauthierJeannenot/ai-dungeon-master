@@ -114,13 +114,29 @@ npm install
 
 ## Configuration
 
-### 1. Clé API
+### 1. Fournisseur LLM
 
 Éditez `.env.local` et remplacez `your_key_here` par votre clé Anthropic :
 
 ```
 ANTHROPIC_API_KEY=sk-ant-...
 ```
+
+Anthropic reste le fournisseur par défaut. Pour Qwen auto-hébergé sur un Pod
+Runpod avec vLLM, suivre [le guide Qwen / Runpod / vLLM](docs/qwen-runpod-vllm.md)
+et définir `LLM_PROVIDER=vllm`, `VLLM_BASE_URL` et `VLLM_API_KEY`.
+Le moteur MCP reste dans le serveur de l'app ; seul le calcul LLM part sur le GPU.
+
+Pour Serverless, `RUNPOD_AUTO_MANAGE=true` active un worker partagé dès l'arrivée
+du premier joueur et demande son arrêt après 10 minutes sans message à compter
+de la fin des générations, même avec un onglet ouvert. Voir le guide pour les clés serveur et l'endpoint
+requis ; cette gestion demande une instance Node persistante.
+
+`RUNPOD_MODE=pod` applique la même gestion à un Pod réutilisable, avec un
+Global Volume (`RUNPOD_GLOBAL_VOLUME_ID`) et remplacement automatique sous un
+plafond de 3 $/h. Le Pod
+actif et les créations incertaines sont suivis dans Postgres. Voir le guide pour
+le template vLLM, les métriques de drainage et les limites de la vérification de prix.
 
 ### 2. Authentification & paiements
 
@@ -155,7 +171,9 @@ Modes et réglages effectivement lus par le code :
 
 | Variable | Effet |
 |----------|-------|
-| `LLM_MODE=live` | Appels Anthropic normaux (défaut) |
+| `LLM_MODE=live` | Appels du fournisseur choisi (défaut) |
+| `LLM_PROVIDER=anthropic` / `vllm` | Fournisseur LLM (Anthropic par défaut) |
+| `VLLM_BASE_URL` / `VLLM_API_KEY` | URL `/v1` et secret du serveur vLLM |
 | `LLM_MODE=mock` | Reponses deterministes locales, sans appel payant |
 | `ALLOW_PAID_LLM=false` | Refuse tout appel payant (ceinture de sécurité en mode `live`) |
 | `LLM_PLANNER_ENABLED=false` | Désactive la pré-passe d'intention (classifieur Haiku) |

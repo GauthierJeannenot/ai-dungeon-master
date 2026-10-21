@@ -10,6 +10,7 @@ import { GameState, ChatMessage, DMResponse, DMRequest, ConversationTurn, DMClie
 import { getAdventure, DEFAULT_ADVENTURE_ID, type AdventureDefinition } from '@/lib/adventures'
 import { DEFAULT_CHARACTER_ID, isKnownCharacterId } from '@/lib/character-registry'
 import { buildInitialGameState } from '@/lib/initial-game-state'
+import { useGamePresence } from '@/lib/use-game-presence'
 
 // Battlemap uses browser APIs — load client-only
 const Battlemap = dynamic(() => import('@/components/Battlemap'), { ssr: false })
@@ -374,6 +375,7 @@ function GameView({ adventure, characterId, resumeSessionId }: { adventure: Adve
   const [error, setError] = useState<string | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [hasLoadedSession, setHasLoadedSession] = useState(false)
+  const presence = useGamePresence(hasLoadedSession ? sessionId : null, adventure.id, characterId)
   // Résumé compressé des échanges anciens — stocké ici, renvoyé à chaque requête
   const [summaryContext, setSummaryContext] = useState<string | undefined>(undefined)
   // Map courante du module : image et grille suivent gameState.currentMapId
@@ -544,6 +546,7 @@ function GameView({ adventure, characterId, resumeSessionId }: { adventure: Adve
     setMessages(prev => [...prev, playerMsg])
 
     try {
+      await presence.ensureReady()
       // Construit l'historique : messages player/dm uniquement (pas mechanical),
       // sans le message courant qui vient d'être ajouté à la liste.
       // On l'exclut en prenant tous les messages AVANT l'ajout du playerMsg.
@@ -707,7 +710,7 @@ function GameView({ adventure, characterId, resumeSessionId }: { adventure: Adve
     } finally {
       setIsLoading(false)
     }
-  }, [gameState, hasLoadedSession, isLoading, messages, sessionId, summaryContext])
+  }, [gameState, hasLoadedSession, isLoading, messages, sessionId, summaryContext, presence.ready])
 
   const resetGame = useCallback(() => {
     if (isLoading) return
@@ -837,6 +840,11 @@ function GameView({ adventure, characterId, resumeSessionId }: { adventure: Adve
       )}
 
       {/* Main layout */}
+      {!presence.ready && (
+        <div role="status" className="flex-shrink-0 border-b border-amber-900/40 bg-stone-900 px-4 py-2 text-sm text-amber-200">
+          {presence.message}
+        </div>
+      )}
       <div className="flex flex-col lg:flex-row flex-1 overflow-hidden">
         {/* Left: Battlemap (65% sur lg ; repliable sous lg pour laisser la
             place au journal — voir mapExpanded) */}
@@ -934,6 +942,7 @@ function GameView({ adventure, characterId, resumeSessionId }: { adventure: Adve
             <Chat
               messages={messages}
               isLoading={isLoading || !hasLoadedSession}
+              inputDisabled={!hasLoadedSession}
               gameState={gameState}
               onSendMessage={sendMessage}
               inputValue={inputValue}

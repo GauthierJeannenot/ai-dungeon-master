@@ -1,4 +1,6 @@
 import { logEvent } from './server-logger'
+import { getLlmProvider, getVllmEndpoint } from './dm/llm-config'
+import { getRunpodConfig } from './runpod-config'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Validation de la configuration au démarrage du serveur (instrumentation.ts).
@@ -40,8 +42,23 @@ export function validateServerConfig(): void {
 
   // LLM : en prod, mode live sans clé = aucune narration possible.
   const llmMode = process.env.LLM_MODE === 'mock' ? 'mock' : 'live'
-  if (isProduction && llmMode === 'live' && !process.env.ANTHROPIC_API_KEY?.trim()) {
-    fatals.push('ANTHROPIC_API_KEY manquante en mode LLM live : aucun message DM ne peut aboutir.')
+  let llmProvider: string | undefined
+  try {
+    llmProvider = getLlmProvider()
+    if (llmMode === 'live' && llmProvider === 'vllm') {
+      if (getRunpodConfig()?.mode !== 'pod') getVllmEndpoint()
+      if (!process.env.VLLM_API_KEY?.trim()) fatals.push('VLLM_API_KEY manquante en mode vLLM live.')
+      const timeout = Number(process.env.VLLM_TIMEOUT_MS ?? 45000)
+      if (!Number.isInteger(timeout) || timeout <= 0) fatals.push('VLLM_TIMEOUT_MS doit être un entier positif.')
+    } else if (isProduction && llmMode === 'live' && !process.env.ANTHROPIC_API_KEY?.trim()) {
+      fatals.push('ANTHROPIC_API_KEY manquante en mode LLM live : aucun message DM ne peut aboutir.')
+    }
+  } catch (err) {
+    fatals.push(err instanceof Error ? err.message : 'Configuration LLM invalide.')
+  }
+
+  try { getRunpodConfig() } catch (err) {
+    fatals.push(err instanceof Error ? err.message : 'Configuration Runpod invalide.')
   }
 
   // Stripe : un checkout sans webhook encaisse SANS créditer les tokens.
@@ -96,6 +113,7 @@ export function validateServerConfig(): void {
     production: isProduction,
     monetizationEnabled,
     llmMode,
+    llmProvider,
     databaseEnabled: Boolean(databaseUrl),
     paymentsEnabled: Boolean(process.env.STRIPE_SECRET_KEY?.trim()),
     warnings: warnings.length,
