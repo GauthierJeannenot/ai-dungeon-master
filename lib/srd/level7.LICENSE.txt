@@ -1,0 +1,21 @@
+This work includes material taken from the System Reference Document 5.1
+("SRD 5.1") by Wizards of the Coast LLC and available at
+https://dnd.wizards.com/resources/systems-reference-document.
+The SRD 5.1 is licensed under the Creative Commons Attribution 4.0
+International License available at
+https://creativecommons.org/licenses/by/4.0/legalcode.
+
+Primary source: https://media.wizards.com/2023/downloads/dnd/SRD_CC_v5.1.pdf
+API source: https://www.dnd5eapi.co/api/2014/
+Original API class-level and spell responses and their SHA-256 digests are
+preserved in level7-sources.json. The official SRD is authoritative where
+community API class lists differ (Divination is on the cleric spell list).
+
+Additional API class-feature, subclass and spell responses and their SHA-256
+digests are preserved in subclass-sources.json.
+
+Local changes: French summaries, curated level-seven character builds using
+SRD fixed-average hit points, four SRD subclasses, explicit rule tools and
+stateful rests, reactions, concentration and spell effects. Utility narration
+and two-dimensional grid geometry retain the limits documented in
+../../docs/level7-srd2014.md. This is not a complete SRD spell catalogue.

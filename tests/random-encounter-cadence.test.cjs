@@ -1,0 +1,78 @@
+const test=require('node:test'),assert=require('node:assert/strict')
+Object.assign(process.env,{MONETIZATION_ENABLED:'false',LLM_MODE:'mock',ALLOW_PAID_LLM:'false'})
+const{installPgMem}=require('./helpers/pg-mem.cjs'),pg=installPgMem()
+const{ok,engine,adjacent}=require('./helpers/mcp-toolkit.cjs'),{setupCadence,check,stop,refused,persistCadence,forest}=require('./helpers/encounter-cadence-fixture.cjs')
+test.after(()=>pg.restore())
+test('optional present cadence reaches exact future boundaries, reuses unmodified17/18 and preserves both windows and source through SQL',async t=>{
+ const f=await setupCadence(t),initial=await f.call('get_game_state');assert.equal(f.adopted.firstDueAt,f.at+3600);assert.equal(f.adopted.source.startLine,3157);assert.equal(f.adopted.source.endLine,3168)
+ await refused(f.call,'check_random_encounter',check(f,'not-yet-due'),'ENCOUNTER_CADENCE_CHECK_NOT_DUE')
+ ok(await f.call('advance_time',{seconds:3600}));const miss=ok(await f.call('check_random_encounter',check(f,'actual-first-window')));assert.equal(miss.occurs,false);assert.deepEqual(miss.roll.rolls,[17]);assert.deepEqual(miss.cadence,{id:f.input.cadenceId,index:1,dueAt:f.at+3600})
+ const fresh=await persistCadence(t,f.call,'18,19');assert.equal(ok(await fresh('check_random_encounter',check(f,'actual-first-window'))).replayed,true)
+ ok(await fresh('advance_time',{seconds:3600}));const hit=ok(await fresh('check_random_encounter',check(f,'actual-second-window')));assert.equal(hit.occurs,true);assert.deepEqual(hit.roll.rolls,[18]);assert.equal(hit.roll.modifier,0);assert.equal(hit.cadence.index,2)
+ const after=await fresh('get_game_state');assert.equal(after.dmTools.randomEncounterCadence.episodes[f.input.cadenceId].nextAt,f.at+10800);assert.deepEqual(after.player.inventory,initial.player.inventory);assert.deepEqual(after.monsters,initial.monsters);assert.deepEqual(after.initiativeOrder,initial.initiativeOrder)
+ const restored=await persistCadence(t,fresh);assert.equal(ok(await restored('roll_dice',{notation:'1d20'})).total,19)
+})
+test('crossing the boundary, stopping it away, another nonce, omitted cadence and isolated SQL cursor edits refuse before time or dice',async t=>{
+ const f=await setupCadence(t,{dice:'19'});ok(await f.call('advance_time',{seconds:3599}))
+ await refused(f.call,'advance_time',{seconds:2},'ENCOUNTER_CADENCE_BOUNDARY');ok(await f.call('advance_time',{seconds:1}))
+ await refused(f.call,'advance_time',{seconds:1},'ENCOUNTER_CADENCE_CHECK_DUE')
+ await refused(f.call,'configure_random_encounter_cadence',stop(f),'ENCOUNTER_CADENCE_CHECK_DUE')
+ await refused(f.call,'configure_random_encounter_cadence',{...f.input,eventId:'cannot-reset-due',cadenceId:'different-period'},'ENCOUNTER_CADENCE_ALREADY_ACTIVE')
+ await refused(f.call,'check_random_encounter',{checkId:'not-a-silent-fill',method:'d20',reason:'La cadence due doit être explicitement nommée.'},'ENCOUNTER_CADENCE_ID_REQUIRED')
+ const fresh=await persistCadence(t,f.call);assert.equal(ok(await fresh('inspect_random_encounter_cadence')).checkDue,true)
+ const before=await fresh('get_game_state')
+ for(const mutate of[e=>e.nextAt++,e=>e.nextIndex++,e=>e.source.startLine++]){const bad=structuredClone(before);mutate(bad.dmTools.randomEncounterCadence.episodes[f.input.cadenceId]);await refused(fresh,'replace_game_state',{gameState:bad},'ENCOUNTER_CADENCE_STATE_MISMATCH')}
+ const input=check(f,'true-no-die-window','dm_no_occurrence'),r=ok(await fresh('check_random_encounter',input));assert.equal(r.roll,undefined);assert.equal(r.occurs,false)
+ ok(await fresh('configure_random_encounter_cadence',stop(f)));assert.equal(ok(await fresh('configure_random_encounter_cadence',f.input)).replayed,true);assert.equal(ok(await fresh('inspect_random_encounter_cadence')).active,null);ok(await fresh('advance_time',{seconds:7201}));assert.equal(ok(await fresh('check_random_encounter',input)).replayed,true)
+ assert.equal(ok(await fresh('roll_dice',{notation:'1d20'})).total,19)
+})
+test('a positive due-window check retains the actual source table and motivated documentary reroll chain without creating an encounter',async t=>{
+ const f=await setupCadence(t,{dice:'18,12,8,6,4,19'}),tableId=await forest(f.call)
+ ok(await f.call('advance_time',{seconds:3600}));ok(await f.call('check_random_encounter',check(f,'actual-positive-cadence')))
+ const first={checkId:'actual-positive-cadence',drawId:'actual-first-cadence-draw',tableId};assert.equal(ok(await f.call('draw_random_encounter',first)).roll.total,20)
+ const second={...first,drawId:'actual-contextual-cadence-draw',reroll:{previousDrawId:first.drawId,contextIncompatibleConfirmed:true,reason:'Cette proposition documentaire est réellement incompatible avec le contexte explicitement établi.'}}
+ assert.equal(ok(await f.call('draw_random_encounter',second)).roll.total,10)
+ const state=await f.call('get_game_state');assert.equal(Object.keys(state.monsters).length,0);assert.equal(state.phase,'exploration');assert.equal(state.dmTools.randomEncounterCadence.episodes[f.input.cadenceId].checkIds.length,1)
+ const fresh=await persistCadence(t,f.call);assert.equal(ok(await fresh('draw_random_encounter',second)).replayed,true);assert.equal(ok(await fresh('check_random_encounter',check(f,'actual-positive-cadence'))).replayed,true);assert.equal(ok(await fresh('roll_dice',{notation:'1d20'})).total,19)
+})
+test('a true hourly travel segment and its distance persist at the cadence boundary, then further walking refuses before effort until explicit check',async t=>{
+ const call=await engine(t,{dice:'19'}),reason='Route réelle et choix de marche du MJ.'
+ ok(await call('begin_nutrition_tracking',{eventId:'cadence-food-history',operation:'begin',standardNeedsConfirmed:true,hotWeather:false,source:reason,foodDebtHalfDays:0,priorDeprivation:'none'}))
+ ok(await call('begin_travel_tracking',{eventId:'cadence-walking-history',dayStartsAt:0,knownWalkingSeconds:0,historyKnown:true,source:reason}))
+ ok(await call('create_travel_route',{journeyId:'actual-cadence-journey',origin:'Origine réelle sur cette carte.',destination:'Destination physique établie séparément.',distanceFeet:528000,terrain:'normal',actualRouteConfirmed:true,source:reason}))
+ const f=await setupCadence(t,{call}),step={eventId:'actual-cadence-walk',journeyId:'actual-cadence-journey',pace:'normal',scale:'hour',durationSeconds:3600,stopAtDestination:false,activity:'watch',rank:'front',openTerrain:true,source:reason}
+ const result=ok(await call('advance_travel',step));assert.equal(result.distanceFeet,15840);assert.equal(result.elapsedSeconds,3600)
+ await refused(call,'advance_travel',{...step,eventId:'cannot-walk-through-check',durationSeconds:1},'ENCOUNTER_CADENCE_CHECK_DUE')
+ const fresh=await persistCadence(t,call);assert.equal(ok(await fresh('advance_travel',step)).replayed,true);ok(await fresh('check_random_encounter',check(f,'walking-source-no-die','dm_no_occurrence')))
+ assert.equal((await fresh('get_game_state')).dmTools.travel.routes[step.journeyId].progressedFeet,15840);assert.equal(ok(await fresh('roll_dice',{notation:'1d20'})).total,19)
+})
+test('real rest checkpoints preserve exact elapsed rest, refuse an indivisible long rest before benefit, and do not auto-roll a cadence check',async t=>{
+ const f=await setupCadence(t,{dice:'19'})
+ await refused(f.call,'take_rest',{kind:'long'},'ENCOUNTER_CADENCE_BOUNDARY')
+ ok(await f.call('begin_rest',{restId:'actual-cadence-short-rest',kind:'short'}))
+ ok(await f.call('advance_rest',{restId:'actual-cadence-short-rest',eventId:'actual-rest-half',seconds:1800,activity:'light',reason:'Vraie première demi-heure de repos léger.'}))
+ const fresh=await persistCadence(t,f.call);ok(await fresh('advance_rest',{restId:'actual-cadence-short-rest',eventId:'actual-rest-end-boundary',seconds:1800,activity:'light',reason:'Vraie seconde demi-heure au bord exact.'}))
+ assert.equal(ok(await fresh('inspect_random_encounter_cadence')).checkDue,true);const finished=ok(await fresh('finish_rest',{restId:'actual-cadence-short-rest'}));assert.equal(finished.elapsedSeconds,3600)
+ ok(await fresh('check_random_encounter',check(f,'rest-boundary-explicit','dm_no_occurrence')));assert.equal(ok(await fresh('roll_dice',{notation:'1d20'})).total,19)
+})
+test('active cadence refuses actual combat, encounter spawn and map departure before mutation; explicit stop permits the existing initiative',async t=>{
+ const f=await setupCadence(t,{dice:'20,10,19'}),s=await f.call('get_game_state'),target=ok(await f.call('spawn_monster',{monsterType:'bandit',cell:adjacent(s)[0]}))
+ await refused(f.call,'enter_combat',{combatants:['player',target.id]},'ENCOUNTER_CADENCE_ACTIVE')
+ await refused(f.call,'start_encounter',{monsters:[{monsterType:'bandit',cell:adjacent(await f.call('get_game_state'))[0]}]},'ENCOUNTER_CADENCE_ACTIVE')
+ await refused(f.call,'travel_to_map',{toMapId:'does-not-select-any-map'},'ENCOUNTER_CADENCE_ACTIVE')
+ ok(await f.call('configure_random_encounter_cadence',stop(f)));ok(await f.call('enter_combat',{combatants:['player',target.id]}));assert.equal(ok(await f.call('roll_dice',{notation:'1d20'})).total,19)
+})
+
+test('a genuinely trained brewer cannot commit indivisible8h work under a1h cadence; an explicit future8h adoption admits the actual paid craft and retains its due check',async t=>{
+ const call=await engine(t,{characterId:'wizard',dice:'19'}),{prepareHerbalismCourse,prepareBrewAtCurrentSite}=require('./helpers/xge-brewing-fixture.cjs')
+ const course=await prepareHerbalismCourse(call);await course.completeInstruction();ok(await call('complete_xge_training',course.completion));await course.nextDay()
+ const brew=await prepareBrewAtCurrentSite(call,course.input.practiceToolItemId),f=await setupCadence(t,{call}),before=await call('get_game_state')
+ await refused(call,'brew_xge_healing_potion',brew,'ENCOUNTER_CADENCE_BOUNDARY');assert.equal((await call('get_game_state')).dmTools.wallet.gp,before.dmTools.wallet.gp)
+ ok(await call('configure_random_encounter_cadence',stop(f)))
+ const eight={...f.input,eventId:'actual-eight-hour-cadence-adoption',cadenceId:'actual-eight-hour-cadence',start:{...f.input.start,intervalHours:8}}
+ ok(await call('configure_random_encounter_cadence',eight));f.input=eight
+ const crafted=ok(await call('brew_xge_healing_potion',brew)),after=await call('get_game_state');assert.equal(after.worldTimeSeconds,before.worldTimeSeconds+28800);assert.ok(after.droppedItems[brew.potionItemId]);assert.equal(after.dmTools.wallet.gp,before.dmTools.wallet.gp-25)
+ assert.equal(ok(await call('inspect_random_encounter_cadence')).checkDue,true)
+ const fresh=await persistCadence(t,call);assert.equal(ok(await fresh('brew_xge_healing_potion',brew)).replayed,true);ok(await fresh('check_random_encounter',check(f,'actual-after-brewing-check','dm_no_occurrence')))
+ assert.equal((await fresh('get_game_state')).dmTools.randomEncounterCadence.episodes[eight.cadenceId].nextIndex,2);assert.equal(ok(await fresh('roll_dice',{notation:'1d20'})).total,19)
+})

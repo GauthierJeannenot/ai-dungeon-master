@@ -24,6 +24,45 @@ test.after(() => {
   restoreTsRequire()
 })
 
+test('city and village overviews explain direct destination selection; the manor and combat retain tactical geometry', () => {
+  const state = buildInitialGameState('sarah-of-yellowcrest-manor')
+  for (const [mapId, roomId] of [['waterdeep', '7'], ['greenfast', '11']]) {
+    state.currentMapId = mapId; state.currentRoomId = roomId
+    const rendered = renderSceneMap(state)
+    assert.match(rendered, /Carte d’exploration/)
+    assert.match(rendered, /même non contigus/)
+    assert.match(rendered, /Une porte fermée ou une décision peut arrêter ce trajet/)
+    assert.doesNotMatch(rendered, /communique avec|contiguë mais cloisonnée|Grille tactique/)
+  }
+  state.phase = 'combat'
+  assert.match(renderSceneMap(state), /Carte tactique/)
+  assert.match(renderSceneMap(state), /Grille tactique/)
+  state.phase = 'exploration'; state.currentMapId = 'temple'; state.currentRoomId = '17'
+  const manor = renderSceneMap(state)
+  assert.match(manor, /Carte tactique/)
+  assert.match(manor, /communique avec/)
+  assert.doesNotMatch(manor, /Carte d’exploration/)
+})
+
+test('mixed bakery guidance follows outdoor and indoor locations, including return and outdoor combat', () => {
+  const state = buildInitialGameState()
+  for (const roomId of ['1', '2', '3', '4', '8', '5', '7', '9', '4', '1']) {
+    state.currentRoomId = roomId; state.player.position = getAdventureMap().entryCells[roomId]
+    const text = renderSceneMap(state)
+    if (['1', '2', '3'].includes(roomId)) {
+      assert.match(text, /Carte d’exploration : les lieux extérieurs/)
+      assert.match(text, /Les intérieurs utilisent la navigation tactique dès le seuil franchi/)
+    } else {
+      assert.match(text, /Carte tactique/)
+      assert.match(text, /communique avec/)
+      assert.doesNotMatch(text, /Carte d’exploration/)
+    }
+  }
+  state.phase = 'combat'
+  assert.match(renderSceneMap(state), /Carte tactique/)
+  assert.match(renderSceneMap(state), /Grille tactique/)
+})
+
 // Extrait les lignes de la grille (entre les fences ```) et rend l'accès par
 // cellule : le glyphe de la cellule (x, y) est à l'index 4 + 3x de la ligne y.
 function parseGrid(rendered) {
@@ -38,8 +77,9 @@ function parseGrid(rendered) {
   }
 }
 
-test('exploration : zones, entrées et adjacences précalculées, sans grille dessinée', () => {
+test('intérieur hors combat : zones, entrées et adjacences précalculées, sans grille dessinée', () => {
   const state = buildInitialGameState()
+  state.currentRoomId = '4'; state.player.position = getAdventureMap().entryCells['4']
   const rendered = renderSceneMap(state)
   const defaultMap = firstMapId(state.adventureId)
   const mapData = getAdventureMap(state.adventureId)
@@ -66,7 +106,9 @@ test('exploration : zones, entrées et adjacences précalculées, sans grille de
 test('cloisons : salles contiguës mais murées listées à part, jamais comme communicantes', () => {
   // map.ts.partitions du module par défaut : {3,8}, {5,7}, {5,9}. Ces paires se
   // touchent sur la grille mais ne communiquent PAS (murs).
-  const rendered = renderSceneMap(buildInitialGameState())
+  const state = buildInitialGameState()
+  state.currentRoomId = '4'; state.player.position = getAdventureMap().entryCells['4']
+  const rendered = renderSceneMap(state)
 
   // Salle 3 (Tas de déchets, dehors) touche 8 (Sol de la boulangerie, dedans)
   // sans communiquer : seule voisine, donc AUCUN « communique avec » sur sa ligne.
@@ -99,9 +141,11 @@ test('PNJ révélés listés avec leurs coordonnées, PNJ cachés absents', () =
 test('combat : grille tactique dessinée, joueur et monstres vivants placés, morts absents', () => {
   const state = buildInitialGameState()
   state.phase = 'combat'
+  // Use actual cells in the current room; out-of-room actors are now excluded.
+  const liveCell = { x: 5, y: 13 }, deadCell = { x: 6, y: 13 }
   state.monsters = {
-    m1: { id: 'm1', name: 'Créature A', type: 'goblin', hp: { current: 5, max: 7 }, ac: 13, stats: {}, position: { x: 1, y: 0 }, conditions: [], xpValue: 50, attackBonus: 4, damageDice: '1d6', speed: 30, isAlive: true },
-    m2: { id: 'm2', name: 'Créature B', type: 'goblin', hp: { current: 0, max: 7 }, ac: 13, stats: {}, position: { x: 2, y: 0 }, conditions: [], xpValue: 50, attackBonus: 4, damageDice: '1d6', speed: 30, isAlive: false },
+    m1: { id: 'm1', name: 'Créature A', type: 'goblin', hp: { current: 5, max: 7 }, ac: 13, stats: {}, position: liveCell, conditions: [], xpValue: 50, attackBonus: 4, damageDice: '1d6', speed: 30, isAlive: true },
+    m2: { id: 'm2', name: 'Créature B', type: 'goblin', hp: { current: 0, max: 7 }, ac: 13, stats: {}, position: deadCell, conditions: [], xpValue: 50, attackBonus: 4, damageDice: '1d6', speed: 30, isAlive: false },
   }
   const rendered = renderSceneMap(state)
   const { rows } = getMapSpec(undefined, state.adventureId).grid
@@ -110,9 +154,9 @@ test('combat : grille tactique dessinée, joueur et monstres vivants placés, mo
   assert.equal(grid.rows.length, rows, `la grille doit avoir ${rows} rangées`)
   assert.equal(grid.glyphAt(state.player.position.x, state.player.position.y), '@',
     'le joueur doit apparaître à sa position')
-  assert.equal(grid.glyphAt(1, 0), 'M', 'le monstre vivant doit apparaître en (1, 0)')
-  assert.notEqual(grid.glyphAt(2, 0), 'M', 'le monstre mort ne doit pas apparaître')
-  assert.ok(rendered.includes('Créature A en (1, 0)'))
+  assert.equal(grid.glyphAt(liveCell.x, liveCell.y), 'M', 'le monstre vivant local doit apparaître')
+  assert.notEqual(grid.glyphAt(deadCell.x, deadCell.y), 'M', 'le monstre mort ne doit pas apparaître')
+  assert.ok(rendered.includes(`Créature A en (${liveCell.x}, ${liveCell.y})`))
   assert.ok(!rendered.includes('Créature B'))
 })
 
@@ -142,6 +186,6 @@ test('le bloc dynamique du prompt DM contient la carte de la scène', () => {
   const state = buildInitialGameState()
   const prompt = buildDynamicPrompt(state)
   assert.match(prompt, /## CARTE DE LA SCÈNE/)
-  assert.match(prompt, /Salles de la carte \(zones, communications et cloisons\)/)
+  assert.match(prompt, /Lieux de la carte d’exploration/)
   assert.ok(prompt.includes('LE JOUEUR'), 'les positions doivent être injectées')
 })

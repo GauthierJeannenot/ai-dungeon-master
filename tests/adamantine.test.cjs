@@ -1,0 +1,15 @@
+const test=require('node:test'),assert=require('node:assert/strict')
+Object.assign(process.env,{MONETIZATION_ENABLED:'false',LLM_MODE:'mock',ALLOW_PAID_LLM:'false'})
+const{setup,refused}=require('./helpers/adamantine-fixture.cjs')
+const{ok}=require('./helpers/mcp-toolkit.cjs')
+test('the real initial merchant version costs canonical normal plus500gp and only its actual held melee hit becomes critical',async t=>{
+ const f=await setup(t);assert.equal(f.prepared.priceCp,51500);await f.equip();await f.object()
+ const a=ok(await f.call('interact_object',f.attack()));assert.equal(a.hit,true);assert.equal(a.criticalHit,true);assert.equal(a.adamantineCritical,true);assert.equal(a.damageRoll.rolls.length,2);assert.equal(a.damageRoll.total,11)
+ const state=await f.call('get_game_state');assert.equal(state.player.inventory.find(i=>i.id==='longsword').adamantine,undefined);assert.equal(state.player.inventory.find(i=>i.id===f.input.itemId).magical,undefined)
+ const before=await f.call('get_game_state');assert.equal(ok(await f.call('interact_object',f.attack())).replayed,true);assert.deepEqual(await f.call('get_game_state'),before);assert.equal(ok(await f.call('roll_dice',{notation:'1d20'})).total,19)
+})
+test('a real ranged object hit consumes exactly one selected actual material arrow and uses its original source damage dice without coating the ordinary bow',async t=>{
+ const f=await setup(t,{kind:'ammunition',bow:true,dice:'17,2,3,19'});assert.equal(f.prepared.priceCp,50050);await f.equip();await f.object()
+ const a=ok(await f.call('interact_object',f.attack()));assert.equal(a.hit,true);assert.equal(a.criticalHit,true);assert.equal(a.damageRoll.rolls.length,2);assert.ok(a.ammunition.adamantine)
+ const state=await f.call('get_game_state');assert.equal(state.player.inventory.find(i=>i.id===f.input.itemId).quantity,9);assert.equal(state.player.inventory.find(i=>i.id==='actual-ordinary-bow').adamantine,undefined);assert.equal(Object.keys(state.dmTools.ammunition.expenditures).length,1);assert.equal(ok(await f.call('roll_dice',{notation:'1d20'})).total,19)
+})

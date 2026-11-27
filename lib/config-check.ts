@@ -1,4 +1,5 @@
 import { logEvent } from './server-logger'
+import { getLlmProvider, getOpenAIConfig, getOpenAIContextWindow } from './dm/llm-config'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Validation de la configuration au démarrage du serveur (instrumentation.ts).
@@ -18,8 +19,10 @@ const NUMERIC_ENV_VARS = [
   'DATABASE_POOL_MAX',
   'LLM_MAX_CALLS_PER_REQUEST',
   'LLM_MAX_TOKENS',
+  'LLM_COMPRESS_MAX_TOKENS',
   'LLM_HISTORY_KEEP_RECENT',
   'LLM_HISTORY_COMPRESS_THRESHOLD_CHARS',
+  'LLM_CONTEXT_RESERVE_TOKENS',
   'LLM_COMBAT_LOG_TAIL',
 ]
 
@@ -40,8 +43,17 @@ export function validateServerConfig(): void {
 
   // LLM : en prod, mode live sans clé = aucune narration possible.
   const llmMode = process.env.LLM_MODE === 'mock' ? 'mock' : 'live'
-  if (isProduction && llmMode === 'live' && !process.env.ANTHROPIC_API_KEY?.trim()) {
-    fatals.push('ANTHROPIC_API_KEY manquante en mode LLM live : aucun message DM ne peut aboutir.')
+  let llmProvider: string | undefined
+  try {
+    llmProvider = getLlmProvider()
+    if (llmMode === 'live' && process.env.ALLOW_PAID_LLM !== 'false') {
+      getOpenAIConfig()
+      const model = process.env.DM_MODEL || 'gpt-5.4-mini'
+      getOpenAIContextWindow(model)
+      getOpenAIContextWindow(process.env.DM_COMPRESS_MODEL || model)
+    }
+  } catch (err) {
+    fatals.push(err instanceof Error ? err.message : 'Configuration LLM invalide.')
   }
 
   // Stripe : un checkout sans webhook encaisse SANS créditer les tokens.
@@ -96,6 +108,7 @@ export function validateServerConfig(): void {
     production: isProduction,
     monetizationEnabled,
     llmMode,
+    llmProvider,
     databaseEnabled: Boolean(databaseUrl),
     paymentsEnabled: Boolean(process.env.STRIPE_SECRET_KEY?.trim()),
     warnings: warnings.length,

@@ -26,7 +26,7 @@ const alegreya = Alegreya({
 
 export const metadata: Metadata = {
   title: "AI Dungeon Master",
-  description: "D&D 5e avec un Dungeon Master IA propulsé par Claude",
+  description: "D&D 5e avec un Dungeon Master IA propulsé par Qwen",
 };
 
 export default function RootLayout({

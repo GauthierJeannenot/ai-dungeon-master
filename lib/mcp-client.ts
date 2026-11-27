@@ -1,3 +1,4 @@
+import { captureExchange, recordExchange } from './training-recorder'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import path from 'path'
@@ -13,9 +14,14 @@ interface ClientEntry {
   client: Client | null
   connectingPromise: Promise<Client> | null
   lastUsed: number
+  serverPath?: string
 }
 
-const clients = new Map<string, ClientEntry>()
+// Keep ownership of stdio children across Next's development module reloads.
+const developmentGlobal = globalThis as typeof globalThis & { __aiDmMcpClients?: Map<string, ClientEntry> }
+const clients = process.env.NODE_ENV === 'development'
+  ? (developmentGlobal.__aiDmMcpClients ??= new Map<string, ClientEntry>())
+  : new Map<string, ClientEntry>()
 let lastCleanup = 0
 
 function normalizeSessionId(sessionId: string | undefined): string {
@@ -70,6 +76,14 @@ function parseMcpTextPayload(text: string): unknown {
   return parsed
 }
 
+// Conserver aussi isError quand le SDK renvoie une erreur de schéma en texte
+// brut ; extraire content[0].text ne doit pas la transformer en réussite.
+function preserveMcpError(payload: unknown, isError: unknown): unknown {
+  if (isError !== true) return payload
+  if (payload && typeof payload === 'object' && 'error' in payload && typeof payload.error === 'string') return payload
+  return { error: typeof payload === 'string' ? payload : 'MCP tool returned an error.', code: 'MCP_TOOL_ERROR', detail: payload }
+}
+
 function cleanupIdleClients(now = Date.now()): void {
   // Nettoyage opportuniste pour éviter de garder des processus stdio indéfiniment.
   if (now - lastCleanup < 60_000) return
@@ -113,9 +127,9 @@ function pruneOldestClient(): void {
   clients.delete(sessionId)
 }
 
-async function createMCPClient(sessionId: string, adventureId?: string, characterId?: string): Promise<Client> {
+async function createMCPClient(sessionId: string, adventureId?: string, characterId?: string, serverPath?: string): Promise<Client> {
   const startedAt = Date.now()
-  const mcpServerPath = path.join(
+  const mcpServerPath = serverPath ?? path.join(
     process.cwd(),
     'mcp-server',
     'dist',
@@ -211,7 +225,7 @@ export async function getMCPClient(sessionId?: string, adventureId?: string, cha
   }
 
   // Première connexion de session — on stocke la promesse comme verrou.
-  entry.connectingPromise = createMCPClient(key, adventureId, characterId)
+  entry.connectingPromise = createMCPClient(key, adventureId, characterId, entry.serverPath)
     .then(c => {
       entry.client = c
       entry.connectingPromise = null
@@ -226,6 +240,19 @@ export async function getMCPClient(sessionId?: string, adventureId?: string, cha
     })
 
   return entry.connectingPromise
+}
+
+// Called once at the turn boundary, under the session lock and BEFORE state
+// restoration. Never check for edits between two model-authored tool calls.
+export async function prepareDevelopmentMCPClient(sessionId?: string): Promise<void> {
+  if (process.env.NODE_ENV !== 'development') return
+  const { getDevelopmentMcpServerPath } = await import('./dev-mcp')
+  const serverPath = await getDevelopmentMcpServerPath()
+  const key = normalizeSessionId(sessionId)
+  if (clients.get(key)?.serverPath === serverPath) return
+  await closeMCPClient(sessionId)
+  clients.set(key, { client: null, connectingPromise: null, lastUsed: Date.now(), serverPath })
+  logEvent('info', 'mcp.client.development_revision', { sessionId: key, serverPath })
 }
 
 export async function closeMCPClient(sessionId?: string): Promise<void> {
@@ -265,7 +292,7 @@ export async function callMCPTool(
 
   try {
     const mcpClient = await getMCPClient(sessionId, adventureId, characterId)
-    const result = await mcpClient.callTool({ name: toolName, arguments: args })
+    const result = await captureExchange('mcp', { name: toolName, arguments: args }, () => mcpClient.callTool({ name: toolName, arguments: args }))
 
     // Extract text content from MCP result
     if (result.content && Array.isArray(result.content)) {
@@ -280,7 +307,7 @@ export async function callMCPTool(
             durationMs: Date.now() - startedAt,
             result: summarizeMcpPayload(parsed),
           })
-          return parsed
+          return preserveMcpError(parsed, result.isError)
         } catch {
           logEvent(result.isError ? 'warn' : 'debug', 'mcp.tool.result_text', {
             sessionId: normalizedSessionId,
@@ -289,7 +316,7 @@ export async function callMCPTool(
             durationMs: Date.now() - startedAt,
             text: textContent.text,
           })
-          return textContent.text
+          return preserveMcpError(textContent.text, result.isError)
         }
       }
     }
@@ -301,7 +328,7 @@ export async function callMCPTool(
       durationMs: Date.now() - startedAt,
       result,
     })
-    return result
+    return preserveMcpError(result, result.isError)
   } catch (err) {
     logEvent('error', 'mcp.tool.error', {
       sessionId: normalizedSessionId,
@@ -321,6 +348,7 @@ export async function listMCPTools(sessionId?: string, adventureId?: string, cha
   try {
     const mcpClient = await getMCPClient(sessionId, adventureId, characterId)
     const result = await mcpClient.listTools()
+    await recordExchange('mcp.tools', result)
     logEvent('debug', 'mcp.tools.list.result', {
       sessionId: normalizedSessionId,
       durationMs: Date.now() - startedAt,

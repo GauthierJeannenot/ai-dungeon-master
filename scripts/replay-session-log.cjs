@@ -42,18 +42,9 @@ function turnFromTrace(trace) {
   if (!turn) return null
 
   const toolsUsed = Array.isArray(trace.toolsUsed) ? trace.toolsUsed.filter(tool => typeof tool === 'string') : []
-  const eventTypes = Array.isArray(trace.engineEvents)
-    ? trace.engineEvents
-        .map(event => event && typeof event === 'object' ? event.type : undefined)
-        .filter(type => typeof type === 'string')
-    : []
-
   return {
     ...turn,
     expectTools: toolsUsed.length > 0 ? [...new Set(toolsUsed)] : undefined,
-    expectEvents: eventTypes.length > 0 ? [...new Set(eventTypes)] : undefined,
-    expectTargetResolution: trace.targetResolution ? undefined : false,
-    traceId: typeof trace.traceId === 'string' ? trace.traceId : undefined,
   }
 }
 
@@ -154,8 +145,6 @@ function main() {
       path.join('scripts', 'playtest.cjs'),
       '--mode',
       option('--mode', process.env.LLM_MODE || 'mock'),
-      '--narration-mode',
-      option('--narration-mode', process.env.NARRATION_MODE || 'quality'),
       '--session-fixture',
       fixturePath,
     ]

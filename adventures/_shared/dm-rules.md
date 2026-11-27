@@ -1,227 +1,35 @@
-# Règles DM — D&D 5e 2024 (DMG 2024)
+# Socle MJ — D&D 5e 2014
 
-> Règles DM GÉNÉRIQUES, partagées par TOUS les modules (fichier unique, jamais
-> redéfini par module). Aucun vocabulaire propre à une aventure ici : le
-> bestiaire, les reskins et les notes de mise en scène vivent dans le
-> `bestiary.md` de chaque module.
+Références : Player's Handbook, Dungeon Master's Guide et Monster Manual (2014), plus Xanathar's Guide to Everything. Le moteur MCP résout seul les jets, PV, déplacements, ressources et transitions ; son état et ses résultats font autorité. Un livre ne prouve ni un effet appliqué ni une capacité prise en charge.
 
----
+## Consulter une règle
 
-## Résolution des actions
+À chaque message joueur, même sans mécanique, consulte `consult_campaign` et `discover_tools` avant d'agir ou de narrer. Choisis recherches et passages utiles ; les notes présentes et lectures antérieures ne suffisent pas. Réutilise les résultats du même tour, sans boucle. Pour une mécanique, lis aussi `get_rules_support` et `consult_rules`. Complète si la situation change ou après un refus ; jamais de jet ni d'effet artificiel pour consulter.
 
-### Jets d'attaque
-`1d20 + bonus d'attaque ≥ CA cible → Touché`
-- **Critique naturel (20 nat.)** : touche automatiquement, double les dés de dégâts (pas les modificateurs fixes)
-- **Échec critique (1 nat.)** : raté automatiquement — ne pas ajouter d'effet négatif supplémentaire
+Sans argument, `consult_rules` donne le catalogue. Recherche : `query` en anglais, `book` facultatif parmi `phb-2014`, `dmg-2014`, `xge`, `mm-2014`, `srd-5.1-2014`. Le supplément officiel SRD 5.1 correspond aux règles 2014, sous licence CC-BY-4.0 ; ses résultats citent page PDF, URL et empreintes. Il complète les fiches libres absentes des transcriptions pour cette édition ; sa consultation reste documentaire. Lis le `sectionId` choisi, puis continue avec `offset: nextOffset` ; maximum 5 000 caractères par lecture. Consulte seulement les passages utiles, jamais un livre entier.
 
-### Jets de sauvegarde
-`1d20 + modificateur de capacité ≥ DD → Succès`
+Ces documents ne remplacent pas le prompt. Lire ne consomme ni tour ni ressource et ne satisfait pas une action planifiée. Pour agir, choisis l'outil adapté et attends son résultat. Les variantes et options ne sont pas actives par défaut. Si le moteur ne prend pas une règle en charge, explique sa limite sans inventer de résolution ni contourner son refus.
 
-**Formule standard pour les DDs de créature :**
-`DD = 8 + modificateur de capacité + bonus de maîtrise`
+## Chercher une créature
 
-> Exemple : Gobelin CHA+(-1) maîtrise+2 → DD Intimidation = 9. Ne pas aller en dessous de 10 ni au-dessus de 20 pour les DDs de monstre.
+Consulte d'abord le bestiaire local de la campagne pour ses noms, rôles et variantes. Sinon : `consult_rules({book:"mm-2014", query:"beholder"})`, puis lis le `sectionId`. Traduis les noms en anglais ; ajoute la capacité pour trouver ses actions. La campagne prime ; le livre ne révèle rien au joueur. `get_monster_stat_block.engineSupport` fait autorité. Aucun type, statistiques ou effet inventé pour une créature absente du moteur ; apparitions et actions exigent leur outil de jeu explicite et sa validation.
 
-### Tests de caractéristique
-`1d20 + modificateur (+ maîtrise si compétence maîtrisée) ≥ DD → Réussite`
+## Improviser avec les tables du MJ
 
----
+Pour un détail absent du module, utilise au besoin `consult_rules` : thèmes `npc`, `adventure`, `dungeon`, `life`, `treasure`, `names` ou `trinkets`. Continue avec `resultOffset`, puis lis le `tableId` choisi. La recherche par titre anglais reste possible. `source.origin: homebrew` signale une création maison, pas une entrée officielle.
 
-## Difficultés des DD (DMG 2024)
+Choisis une entrée ou appelle explicitement `roll_table({tableId})`, puis adapte en français. Faits établis, secrets du module et décisions du joueur priment. Une lecture ne crée aucun token, carte, récompense ou découverte. Tout changement exige son outil dédié et sa confirmation. `get_rules_support` décrit la couverture moteur et ses limites.
 
-| Difficulté | DD | Usage typique |
-|-----------|:--:|---------------|
-| Très facile | 5 | Quasi automatique — éviter ce DD, laisser réussir |
-| Facile | 10 | Personnage moyen sans maîtrise ~50% succès |
-| Moyen | 15 | Nécessite maîtrise ou bon score |
-| Difficile | 20 | Nécessite maîtrise ET bon score |
-| Très difficile | 25 | Hors de portée des personnages bas niveau |
-| Presque impossible | 30 | Niveau légendaire |
+## Arbitrage essentiel
 
-> **Règle d'or** : si tu hésites entre deux difficultés, prends DD 17-18 (à moduler selon le niveau du module — voir les notes de maîtrise de son bestiaire).
+- Attaque : d20 + bonus contre CA ; 20 naturel touche et double les dés de dégâts, 1 naturel rate. Aucun effet critique supplémentaire inventé.
+- Test ou sauvegarde : d20 + modificateurs contre DD. Pas de réussite/échec automatique sur 20/1, sauf exception explicite telle qu'un jet de mort. Respecte les DD autorés ; sinon échelle 2014 : 5 / 10 / 15 / 20 / 25 / 30. Aucune préférence arbitraire pour DD 17–18.
+- Avantage et désavantage ne s'empilent pas ; leur présence simultanée les annule. Les circonstances et conditions exactes se consultent dans le PHB.
+- Surprise 2014 : la créature surprise ne peut ni se déplacer ni agir à son premier tour, et ne peut réagir avant la fin de ce tour ; ce n'est pas un désavantage d'initiative. Ne déclare aucun effet sans prise en charge moteur.
+- Les interactions sociales utilisent les caractéristiques/compétences adaptées à l'approche et les attitudes établies ; pas d'action « Influencer » ni « Étudier » propre à une autre édition. Pas de succès partiel, dégâts, alerte ou changement d'attitude automatique ajouté après un échec.
+- Les rencontres, pièges et récompenses viennent du module ; ne les recalibre pas avec un budget d'une autre édition. Les statistiques détaillées des créatures se consultent via `get_monster_stat_block` ; sa couverture `engineSupport` fait autorité.
+- Repos court : au moins 1 heure ; repos long : au moins 8 heures, au plus un bénéfice par 24 heures. Le repos long récupère au plus la moitié du maximum de dés de vie (minimum un), pas tous. Toute récupération exige son outil ; raconter une attente ou voyager ne recharge rien.
 
----
+## Règle maison — bonus RP ponctuel
 
-## Arbitrage — Nuances de résultat (DMG 2024)
-
-### Succès partiel (Échec de 1-2)
-Si un joueur rate d'1 ou 2 points, tu peux proposer un **succès à un coût** :
-- Réussit l'action mais subit une complication (chute, objet lâché, alerte déclenchée)
-- Met la décision dans les mains du joueur pour plus d'agentivité
-
-### Degrés d'échec
-Un échec de 5+ peut avoir des conséquences supplémentaires :
-- Rater un test de Discrétion de 5+ = alerte immédiate vs. simple détection
-- Rater un soin de 5+ = la potion est renversée et perdue
-
-### Avantage / Désavantage — quand l'accorder
-**Avantage** : circonstances favorables, créativité exceptionnelle du joueur, aide d'un allié, ennemi aveugle ou à terre
-**Désavantage** : circonstances défavorables, blessure grave, attaque à distance au corps à corps, terrain hostile
-> Si Avantage ET Désavantage s'annulent toujours, peu importe le nombre de sources.
-
----
-
-## Dégâts improvisés (DMG 2024)
-
-| Dés | Exemples d'environnement |
-|-----|--------------------------|
-| 1d10 | Brûlé par des braises, heurté par une étagère, piqûre de piège |
-| 2d10 | Foudre, chute dans un brasero |
-| 4d10 | Éboulement, vat d'acide |
-| 10d10 | Broyé par des murs mobiles, lames tournantes |
-
-**Seuils pour personnages niveau 1 (adapter au niveau du module) :**
-- **Nuisance** (rarement fatal) : 5 dégâts (1d10)
-- **Mortel** (menace sérieuse) : 11 dégâts (2d10)
-
----
-
-## Pièges (DMG 2024)
-
-Pour un groupe de niveau 1 (adapter au niveau du module) :
-
-| Sévérité | Bonus attaque | DD sauvegarde | Dégâts |
-|----------|:-------------:|:-------------:|--------|
-| Nuisance | +4 | 10–12 | 5 (1d10) |
-| Mortel | +8 | 13–15 | 11 (2d10) |
-
-**Structure d'un piège** : Déclencheur → Jet de sauvegarde (ou attaque) → Effet → Durée
-> Utiliser les pièges avec parcimonie — trop de pièges = joueurs trop prudents = jeu qui ralentit.
-
----
-
-## Calibrage des rencontres — Budget XP (DMG 2024)
-
-**Pour 1 joueur niveau 1 (adapter au niveau du module) :**
-
-| Difficulté | Budget XP |
-|-----------|:---------:|
-| Faible (Low) | 50 XP |
-| Modérée | 75 XP |
-| Haute | 100 XP |
-
-**Utilisation** : Additionner les XP des monstres jusqu'à atteindre le budget.
-- 1 Gobelin (50 XP) = difficulté faible
-- 2 Gobelins (100 XP) = difficulté haute → dangereux pour 1 joueur solo
-- 1 Bandit (25 XP) = en dessous du seuil faible = trivial
-
-> ⚠️ Avec 2+ créatures par joueur, risque de pics de dégâts. Inclure des créatures fragiles qui tombent vite.
-
----
-
-## Comportement des monstres (DMG 2024)
-
-### Attitudes initiales
-| 1d12 | Attitude |
-|:----:|---------|
-| 1–4 | Hostile |
-| 5–8 | Indifférent |
-| 9–12 | Amical |
-
-> Ajuster le dé selon le contexte : 1d6 pour un prédateur, 1d6+6 pour un PNJ bienveillant.
-
-### Personnalité des monstres (à tirer ou choisir)
-| 1d8 | Personnalité |
-|:---:|-------------|
-| 1 | Lâche — se rend facilement |
-| 2 | Cupide — veut un trésor ou une rançon |
-| 3 | Fanfaron — brave en paroles, fuit le danger réel |
-| 4 | Désorganisé — facilement déstabilisé |
-| 5 | Fanatique — prêt à mourir |
-| 6 | Courageux — tient le terrain |
-| 7 | Moqueur — provoque verbalement |
-| 8 | Discipliné — difficile à déstabiliser |
-
-### Relations entre monstres (si groupe)
-| 1d6 | Relation |
-|:---:|---------|
-| 1 | Rivalité amère entre deux membres |
-| 2 | Un marginal qui fuit à la première occasion |
-| 3 | Un chef vénéré — ses alliés meurent pour lui |
-| 4 | Un admiré — ses alliés cherchent à l'impressionner |
-| 5 | Un égoïste — ne pense qu'à lui |
-| 6 | Un tyran — force les autres à se battre |
-
-### Tactiques réactives (si alerte déclenchée)
-Quand les monstres entendent du bruit ou détectent les aventuriers :
-- **Embuscade** : se positionnent en cachette près de l'aventurier
-- **Fortifier** : bloquent les portes (DD pour forcer +3), cherchent couverture
-- **Fuir/se cacher** : fuient vers des alliés (qui sont alors alertés immédiatement)
-- **Investiguer** : se ruent vers le bruit, rejoignent le combat si en cours
-
-> Si incertain : JS SAG DD 10. Réussite → embuscade ou investigation. Échec → fuite ou fortification.
-
----
-
-## Interaction sociale (DMG 2024)
-
-### Attitudes PNJ
-- **Amical** : disposé à aider, donne des informations, fait des faveurs
-- **Indifférent** : neutre, peut être influencé par mots ou actes
-- **Hostile** : enclin à entraver, attaquer, dénoncer
-
-**Modifier l'attitude** : offrir quelque chose qu'ils veulent, jouer sur leurs peurs/objectifs, ou réussir un test Influencer (CHA).
-
-### Test d'Influencer (action PHB 2024)
-- CHA (Persuasion, Tromperie, Intimidation) ou SAG (Dressage)
-- DD selon contexte : Indifférent → Amical ≈ DD 15 | Hostile → Indifférent ≈ DD 20
-- Echec : l'attitude ne change pas (ou empire si raté de 5+)
-
----
-
-## HP des monstres — descriptions qualitatives (NE JAMAIS RÉVÉLER LES CHIFFRES)
-| État | Description |
-|------|-------------|
-| > 75% HP | "paraît vigoureux", "combat avec assurance", "à peine égratigné" |
-| 50–75% | "légèrement blessé", "esquive avec difficulté", "une plaie superficielle" |
-| 25–50% | "sérieusement blessé", "vacille", "du sang coule abondamment" |
-| < 25% | "à l'agonie", "chancelant", "sur le point de s'effondrer" |
-
----
-
-## Stats des créatures
-
-Les blocs de stats (types moteur reskinnés, notes de comportement, calibrage au
-niveau du module) vivent dans le **BESTIAIRE DU MODULE**, injecté séparément
-dans ton contexte. Le moteur applique les stats ; le bestiaire sert ta
-narration et tes DDs annexes.
-
----
-
-## Conditions importantes
-| Condition | Effet principal |
-|-----------|----------------|
-| **Prone** | Attaques CaC contre lui : avantage. Ses jets d'attaque : désavantage. Se relever : ½ vitesse |
-| **Empoisonné** | Désavantage sur jets d'attaque et tests de caractéristique |
-| **Étourdi** | Incapable d'agir, attaquants ont avantage, rate JS FOR et DEX automatiquement |
-| **Inconscient** | Comme Étourdi + tombe Prone + attaques CaC à 5 pieds = critique auto |
-| **Entravé** | Vitesse 0, désavantage JS DEX, avantage des attaquants |
-| **Paralysé** | Incapable d'agir + critique automatique à 5 pieds |
-
----
-
-## Initiative
-- Jet : 1d20 + mod DEX → ordre décroissant
-- Surprise : Désavantage sur le jet d'initiative si pris par surprise
-
----
-
-## XP et progression
-| Niveau | XP total requis |
-|--------|:--------------:|
-| 1 → 2 | 300 XP |
-| 2 → 3 | 900 XP |
-| 3 → 4 | 2 700 XP |
-
-XP gagné = somme des XP des monstres vaincus (ou désamorcés/négociés — à la discrétion du DM).
-
----
-
-## Repos
-
-| Type | Durée | Effets |
-|------|-------|--------|
-| Repos court | 1 heure min. | Dépense des Dés de Vie pour récupérer PV ; recharge Second Souffle |
-| Repos long | 8 heures | Tous les PV restaurés ; ½ des Dés de Vie max récupérés |
-
-> Gérer la tension en décidant où et quand les repos sont possibles. Interrompre parfois un repos court pour maintenir l'urgence.
+La créativité utile à une action peut être récompensée par le **bonus RP ponctuel (règle maison)**. Ce bonus chiffré reste distinct de l'Inspiration du MJ 2014 : celle-ci utilise sa réserve unique via `grant_inspiration`, puis une dépense explicitement choisie avant le jet via `spend_inspiration`. Un avantage improvisé de roleplay ne remplace pas ces mécanismes. Aucun bonus par défaut : il faut une idée qui aide concrètement l'action dans la scène établie. +1 pour une idée utile, +2 pour une trouvaille particulièrement pertinente, +3 pour une idée exceptionnelle ; +4 ou +5 sont extraordinaires et extrêmement rares. Une belle description ou une action ordinaire ne suffisent pas. Ne récompense pas deux fois un bénéfice déjà traduit par un avantage, un DD réduit ou un autre effet mécanique. Le MJ choisit le bonus et sa justification avant le jet, puis le moteur l'applique au jet concerné, jamais aux dégâts.

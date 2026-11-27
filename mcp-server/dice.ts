@@ -34,6 +34,12 @@ function nextForcedRoll(sides: number): number | null {
 
 export function rollDice(notation: string): DiceRollResult {
   const trimmed = notation.trim()
+  // SRD attacks such as a sprite's sword deal a fixed amount, without a die.
+  if (/^\d+$/.test(trimmed)) {
+    const total = Number(trimmed)
+    if (!Number.isSafeInteger(total) || total > 100000) throw new Error('Fixed value out of range')
+    return { notation: trimmed, rolls: [], modifier: 0, total, detail: `${trimmed}: ${total} (fixe)` }
+  }
   const match = trimmed.match(DICE_PATTERN)
 
   if (!match) {

@@ -1,0 +1,14 @@
+// Exactly one CONTROLLED positive legacy reserve, explicitly authorised parent/user.
+// Only hero.inspiration is prepared; no HP, proficiency, d20, cost, result or cursor.
+const test=require('node:test'),assert=require('node:assert/strict')
+Object.assign(process.env,{MONETIZATION_ENABLED:'false',LLM_MODE:'mock',ALLOW_PAID_LLM:'false'})
+const {installPgMem}=require('./helpers/pg-mem.cjs'),pg=installPgMem(),{ok}=require('./helpers/mcp-toolkit.cjs'),{setupCleaving,persistCleaving}=require('./helpers/cleaving-fixture.cjs')
+test.after(()=>pg.restore())
+test('CONTROLLED legacy Bardic reserve only: actual attack d20, held reaction, SQL and paid source cursor remain exact without claiming a public grant',async t=>{
+ const f=await setupCleaving(t,{types:['goblin','goblin'],dice:'20,1,18,17'}),before=await f.call('get_game_state'),legacy=structuredClone(before);legacy.hero.inspiration.push({targetId:'player',die:8,expiresAt:(legacy.worldTimeSeconds??0)+600});const unchanged=structuredClone(legacy);unchanged.hero.inspiration=before.hero.inspiration;assert.deepEqual(unchanged,before);ok(await f.call('replace_game_state',{gameState:legacy}))
+ const held=ok(await f.call('resolve_player_attack',f.input));assert.ok(held.pendingReaction.options.includes('bardic_inspiration'));const state=await f.call('get_game_state');assert.equal(state.hero.actionCredits,1);assert.equal(state.hero.attackAction,undefined);assert.equal(state.monsters[f.targets[0].id].hp.current,7);assert.deepEqual(state.hero.pending.roll.rolls,[18])
+ const fresh=await persistCleaving(t,f.call,'3,8,17')
+ for(const mutate of [s=>delete s.dmTools.cleaving,s=>delete s.hero.pending.command.cleaveId,s=>s.hero.pending.roll.total++,s=>s.dmTools.cleaving.events[s.hero.pending.command.cleaveId].input.originHp.current--]){const bad=structuredClone(state);mutate(bad);const r=await fresh('replace_game_state',{gameState:bad});assert.equal(r.code,'CLEAVING_STATE_MISMATCH',JSON.stringify(r));assert.deepEqual(await fresh('get_game_state'),state)}
+ const resolved=ok(await fresh('resolve_reaction',{pendingId:held.pendingReaction.id,choice:'bardic_inspiration'}));assert.deepEqual(resolved.attackRoll.rolls,[18]);assert.equal(resolved.attackRoll.total,28);assert.equal(resolved.damageRoll.total,14);assert.equal(resolved.cleaving.remainingDamage,7);const after=await fresh('get_game_state');assert.equal(after.hero.inspiration.length,0);assert.equal(after.hero.actionCredits,0);assert.equal(after.hero.attackAction.remaining,1);assert.equal(after.monsters[f.targets[0].id].hp.current,0)
+ const replay=await fresh('resolve_reaction',{pendingId:held.pendingReaction.id,choice:'bardic_inspiration'});assert.equal(replay.code,'REACTION_TRIGGER_INVALID');ok(await fresh('resolve_cleaving',{cleaveId:resolved.cleaving.cleaveId,stepId:'explicit-controlled-stop',choice:'stop'}));await persistCleaving(t,fresh);assert.equal(ok(await fresh('roll_dice',{notation:'1d20'})).total,17)
+})

@@ -1,0 +1,80 @@
+const test = require('node:test')
+const assert = require('node:assert/strict')
+const { engine, ok, replace, adjacent } = require('./helpers/mcp-toolkit.cjs')
+
+test('roll_table returns the source row for the engine die and has no game effect', async t => {
+  const call = await engine(t, { dice: '13,17' })
+  const tables = ok(await call('consult_rules', { topic: 'npc' }))
+  const tableId = tables.results.find(table => table.title === 'NPC Appearance').tableId
+  const before = await call('get_game_state')
+  const rolled = ok(await call('roll_table', { tableId }))
+  assert.equal(rolled.roll.total, 13)
+  assert.equal(rolled.row.low, 13)
+  assert.equal(rolled.row.high, 13)
+  assert.ok(rolled.source.sha256)
+  assert.deepEqual(await call('get_game_state'), before)
+  assert.equal(ok(await call('roll_dice', { notation: '1d20' })).total, 17)
+})
+
+test('tables inside any book section are selectable; life catalogs point to Xanathar', async t => {
+  const call = await engine(t)
+  const life = ok(await call('consult_rules', { topic: 'life' }))
+  assert.ok(life.results.length)
+  assert.ok(life.results.every(table => table.book === 'xge'))
+  const search = ok(await call('consult_rules', { book: 'phb-2014', query: 'adventuring gear' }))
+  const passages = await Promise.all(search.results.map(hit => call('consult_rules', { sectionId: hit.sectionId })))
+  const passage = passages.find(passage => passage.tables?.length)
+  assert.ok(passage, 'the actual supplied gear table must be indexed')
+  assert.ok(passage.tables.length)
+  assert.equal(ok(await call('consult_rules', { tableId: passage.tables[0].tableId })).book, 'phb-2014')
+})
+
+test('an invalid table/dice column is rejected before consuming the next die', async t => {
+  const call = await engine(t, { dice: '19' })
+  const catalog = ok(await call('consult_rules', { topic: 'npc' }))
+  assert.ok((await call('roll_table', { tableId: catalog.results[0].tableId, dieColumn: 1 })).error)
+  assert.ok((await call('roll_table', { tableId: '../.env' })).error)
+  assert.equal(ok(await call('roll_dice', { notation: '1d20' })).total, 19)
+})
+
+test('a created NPC retains identity, source statistics and confidential personality through hydration', async t => {
+  const call = await engine(t)
+  const before = await call('get_game_state')
+  const input = { npcId: 'improv-guide', name: 'Mila', statBlock: 'commoner', cell: adjacent(before)[0],
+    disposition: 'neutral', visible: false, description: 'Une guide à la voix calme.', personality: { ideal: 'La vérité.', secret: 'Une dette ancienne.' } }
+  const created = ok(await call('create_npc', input))
+  assert.equal(created.npc.visible, false)
+  assert.ok(created.source.sha256)
+  assert.equal(ok(await call('create_npc', input)).alreadyCreated, true)
+  const state = await call('get_game_state')
+  ok(await call('replace_game_state', { gameState: state }))
+  const resumed = await call('get_game_state')
+  assert.deepEqual(resumed.dmTools, state.dmTools)
+  assert.deepEqual(resumed.npcs[input.npcId], state.npcs[input.npcId])
+  assert.equal(resumed.adventureId, before.adventureId)
+  assert.equal(resumed.characterId, before.characterId)
+  const inspected = ok(await call('inspect_scene', { category: 'npcs' }))
+  assert.equal(inspected.entries[0].personality.secret, input.personality.secret)
+  assert.ok((await call('create_npc', { ...input, name: 'Someone else' })).error)
+  assert.deepEqual(await call('get_game_state'), resumed)
+  assert.ok((await call('create_npc', { ...input, npcId: 'bad-source', statBlock: 'invented-creature' })).error)
+})
+
+test('dungeon preparation is deterministic, validates artwork/topology and never installs an adventure', async t => {
+  const call = await engine(t)
+  const before = await call('get_game_state'), options = { seed: 'mcp-layout', width: 5, height: 6, count: 22 }
+  const first = ok(await call('generate_dungeon', options)), second = ok(await call('generate_dungeon', options))
+  assert.deepEqual(first, second)
+  assert.equal(first.validation.valid, true)
+  assert.equal(first.validation.playable, false)
+  assert.match(first.previewUrl, /width=5/)
+  assert.equal(ok(await call('validate_dungeon', { layout: first.layout })).valid, true)
+  const invalid = structuredClone(first.layout)
+  invalid.tiles[0].exits = invalid.tiles[0].exits === 15 ? 1 : 15
+  assert.equal(ok(await call('validate_dungeon', { layout: invalid })).valid, false)
+  const duplicate = structuredClone(first.layout)
+  duplicate.tiles.push(duplicate.tiles[0])
+  assert.equal(ok(await call('validate_dungeon', { layout: duplicate })).valid, false)
+  assert.ok((await call('generate_dungeon', { seed: 'bad', width: 3, height: 3, count: 10 })).error)
+  assert.deepEqual(await call('get_game_state'), before)
+})

@@ -38,6 +38,22 @@ par tests/character-registry.test.cjs.
 
 ## Ajouter un personnage
 
+Profils niveau 7 : `level7.ts` et `character-sheet-level7.md` complètent chacun
+des quatre personnages existants, sans nouveau `characterId`. Le registre
+sélectionne ces données uniquement quand le niveau d'aventure vaut 7. Toute
+évolution doit rester cohérente entre moteur, fiche prompt, aperçu landing et
+`docs/playable-characters.md`. Ne pas appliquer rétroactivement ces profils à
+une session hydratée, ni toucher aux templates historiques des niveaux 1–2.
+
+Profils niveau 3 : `level3.ts` et `character-sheet-level3.md` complètent aussi
+les quatre personnages, sélectionnés uniquement pour une nouvelle partie de
+niveau 3. Ils remplacent les anciens profils de ce niveau à la demande du
+joueur : capacités de niveau 3, règles SRD, PV solo conservés, répertoire
+narratif volontairement étendu pour les trois incantateurs (y compris les
+tours de magie). Ne pas modifier les profils des niveaux 1–2 ou 7 ni migrer
+automatiquement une sauvegarde. La fiche affichée et le prompt utilisent le
+même niveau. Sources et portée : docs/playable-characters.md.
+
 1. Créer `characters/<id>/` : `sheet.ts` (un `CharacterTemplate` complet) et
    `character-sheet.md` (fiche prompt générique, **sans niveau/PV chiffrés,
    sans vocabulaire de module**).

@@ -1,0 +1,11 @@
+const test=require('node:test'),assert=require('node:assert/strict')
+Object.assign(process.env,{LLM_MODE:'mock',ALLOW_PAID_LLM:'false',MONETIZATION_ENABLED:'false',DM_RATE_LIMIT_PER_MINUTE:'0',APP_LOG_PERSIST_ENABLED:'false',APP_LOG_LEVEL:'error',LLM_MAX_CALLS_PER_REQUEST:'12'})
+const{installPgMem}=require('./helpers/pg-mem.cjs'),pg=installPgMem()
+const{play,lastResult}=require('./helpers/dm-scripted-turn.cjs')
+const{engine,ok,occurrence}=require('./helpers/improvised-hazard-fixture.cjs')
+test.after(()=>pg.restore())
+test('POST transmits the explicitly established environmental occurrence, keeps its actual costs and allows only the separately selected primary check',async t=>{
+ const call=await engine(t,{dice:'3,17,19'}),input=await occurrence(call)
+ const{result,seen,selected,before}=await play(t,call,[{name:'resolve_improvised_hazard',input},{name:'inspect_improvised_hazards',input:{eventId:input.eventId}},{name:'roll_ability_check',input:{entityId:'player',ability:'wis',dc:10}},{name:'roll_ability_check',input:{entityId:'player',ability:'wis',dc:10}},params=>{assert.equal(lastResult(params).code,'PRIMARY_ACTION_ALREADY_RESOLVED');return 'Le danger déjà établi inflige ses seuls dégâts résolus, puis tu observes.'}],'Le MJ résout cette exposition réelle puis je choisis mon observation.')
+ assert.deepEqual(seen,selected.slice(0,-1));const after=result.newGameState;assert.equal(after.player.hp.current,before.player.hp.current-3);assert.equal(after.worldTimeSeconds,before.worldTimeSeconds);assert.equal(after.dmTools.improvisedHazards.events[input.eventId].result.rawDamage,3);assert.equal(ok(await call('roll_dice',{notation:'1d20'})).total,19)
+})

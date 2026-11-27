@@ -165,7 +165,7 @@ export default async function LandingPage() {
                         paymentsEnabled={paymentsEnabled}
                       />
                     ) : (
-                      <CharacterPicker playPath={adventure.playPath} />
+                      <CharacterPicker playPath={adventure.playPath} level={adventure.map.initialPlayer.level} />
                     )}
                   </div>
                 </article>
@@ -191,7 +191,7 @@ export default async function LandingPage() {
       </main>
 
       <footer className="border-t border-stone-900 py-6 text-center text-xs text-stone-400">
-        AI Dungeon Master — propulsé par Claude · D&D 5e
+        AI Dungeon Master — propulsé par Qwen · D&D 5e
       </footer>
     </div>
   )

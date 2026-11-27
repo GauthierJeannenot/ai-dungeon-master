@@ -1,0 +1,22 @@
+const test=require('node:test'),assert=require('node:assert/strict')
+Object.assign(process.env,{LLM_MODE:'mock',ALLOW_PAID_LLM:'false',MONETIZATION_ENABLED:'false',DM_RATE_LIMIT_PER_MINUTE:'0',APP_LOG_PERSIST_ENABLED:'false',APP_LOG_LEVEL:'error',LLM_MAX_CALLS_PER_REQUEST:'12'})
+const{installPgMem}=require('./helpers/pg-mem.cjs'),pg=installPgMem()
+const{setupGoods}=require('./helpers/trade-goods-fixture.cjs')
+const{play,lastResult}=require('./helpers/dm-scripted-turn.cjs')
+const{ok}=require('./helpers/mcp-toolkit.cjs')
+test.after(()=>pg.restore())
+test('API preserves exact lot qualification and existing purchase tools, actual denominations and SQL, with one player action only',async t=>{
+ const f=await setupGoods(t,{buy:false,qualify:false}),commands=[{name:'record_trade_good',input:f.qualification},{name:'record_merchant_stock',input:f.stock},{name:'create_trade_offer',input:f.purchaseOffer},{name:'purchase_trade_offer',input:f.purchase},{name:'inspect_trade_stock',input:{merchantId:f.offer.merchantId}},{name:'roll_ability_check',input:{entityId:'player',ability:'wis',dc:10}}]
+ const{result,seen,selected,before}=await play(t,f.call,[...commands,params=>{assert.equal(lastResult(params).code,'PRIMARY_ACTION_ALREADY_RESOLVED');return 'Le lot entier réellement qualifié t’est remis contre les pièces choisies ; ses mesures et sa source sont conservées.'}],'J’achète ce lot entier précisément qualifié au marchand actuel, aux conditions réellement convenues.')
+ assert.deepEqual(seen,selected.slice(0,-1));const after=result.newGameState;assert.equal(after.dmTools.tradeGoods.lots[f.goodsItem.id].input.sourceUnits,3);assert.ok(after.player.inventory.some(i=>i.id===f.goodsItem.id));assert.equal(after.droppedItems[f.goodsItem.id],undefined);assert.equal(after.dmTools.merchants.earnedCoins[f.offer.merchantId].sp,15);assert.equal(after.dmTools.wallet.sp,before.dmTools.wallet.sp-15);assert.equal(after.worldTimeSeconds,before.worldTimeSeconds+6);assert.equal(ok(await f.call('roll_dice',{notation:'1d20'})).total,19)
+})
+test('API whole-lot full-value resale keeps original structured units, real funded reserve and sold custody across SQL',async t=>{
+ const f=await setupGoods(t),commands=[{name:'create_trade_good_resale_offer',input:f.resaleOffer},{name:'sell_to_merchant',input:f.resale},{name:'inspect_merchant_resales',input:{merchantId:f.offer.merchantId}},{name:'roll_ability_check',input:{entityId:'player',ability:'wis',dc:10}}]
+ const{result,seen,selected,before}=await play(t,f.call,[...commands,params=>{assert.equal(lastResult(params).code,'PRIMARY_ACTION_ALREADY_RESOLVED');return 'Le même lot entier rejoint le marchand contre sa pleine valeur, payée avec ses pièces effectivement disponibles.'}],'Je revends ce même lot entier intact à sa pleine valeur au marchand qui l’accepte réellement.')
+ assert.deepEqual(seen,selected.slice(0,-1));const after=result.newGameState;assert.equal(after.dmTools.merchantResales.offers[f.resaleOffer.offerId].valuation,'trade_goods_full');assert.deepEqual(after.dmTools.merchantResales.custody[f.goodsItem.id].tradeGoodProvenance,before.dmTools.tradeGoods.lots[f.goodsItem.id]);assert.deepEqual(after.dmTools.tradeGoods,before.dmTools.tradeGoods);assert.equal(after.dmTools.wallet.sp,before.dmTools.wallet.sp+15);assert.equal(after.player.inventory.some(i=>i.id===f.goodsItem.id),false);assert.equal(after.worldTimeSeconds,before.worldTimeSeconds+6);assert.equal(ok(await f.call('roll_dice',{notation:'1d20'})).total,19)
+})
+test('API refused half-price proposal consumes no primary action or die before a distinct explicit player check',async t=>{
+ const f=await setupGoods(t,{dice:'17,19'}),commands=[{name:'create_trade_good_resale_offer',input:{...f.resaleOffer,priceCp:75}},{name:'roll_ability_check',input:{entityId:'player',ability:'wis',dc:10}}]
+ const{result,before}=await play(t,f.call,[commands[0],params=>{assert.equal(lastResult(params).code,'TRADE_GOOD_FULL_VALUE_REQUIRED');return commands[1]},'Le lot reste possédé et tes pièces intactes ; ton observation distincte est résolue.'],'Je propose ce montant explicitement, puis j’observe les lieux si cet accord est refusé.')
+ assert.deepEqual(result.newGameState.player.inventory,before.player.inventory);assert.deepEqual(result.newGameState.dmTools.wallet,before.dmTools.wallet);assert.equal(result.newGameState.worldTimeSeconds,before.worldTimeSeconds);assert.equal(ok(await f.call('roll_dice',{notation:'1d20'})).total,19)
+})

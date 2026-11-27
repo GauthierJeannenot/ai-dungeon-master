@@ -25,14 +25,30 @@ npm run build          # build:mcp + next build
 - `npm run build:mcp` est un prérequis à tout ce qui spawne le moteur (tests,
   dev, playtest) : le client cherche `mcp-server/dist/mcp-server/index.js`.
 - Validation minimale avant de conclure : `npm run typecheck` + `npm test`
-  (114+ tests). Si les prompts ou le contenu d'aventure changent, ajouter
-  `npm run playtest:mock` — ⚠️ il sort en exit 1 même sur master propre (seuils
-  aspirationnels + attentes du pipeline cible non implémenté) : comparer les
-  NOMBRES (23 tours, ratio ≈ 0,348), pas le code de sortie. Voir scripts/CLAUDE.md.
+  (600+ tests). Si les prompts, le mock ou le contenu d'aventure changent, ajouter
+  `npm run playtest:mock` : il teste le pipeline ACTUEL et doit sortir en exit 0.
+  Le harnais désactive ses limites de débit et vérifie outils MCP, état renvoyé,
+  persistance et résolution complète des tours. Voir scripts/CLAUDE.md.
 - Il n'y a PAS d'eval d'intention : le pipeline intent + son script
   `evaluate-intent-interpreter.cjs` ont été supprimés. docs/intent-pipeline.md
   décrit une cible non implémentée — ne pas recréer ce script sans décision
   explicite.
+
+## Suivi MCP — référence canonique
+
+`docs/suivi-integration-mcp.md` est la référence unique des travaux issus des
+audits déjà réalisés. Lire ce registre pour choisir et poursuivre un lot,
+puis le mettre à jour à chaque avancée : outils/fichiers réellement intégrés,
+tests exécutés, limites restantes et prochain travail concret.
+
+Instruction explicite de l'utilisateur : **ne pas refaire d'audit global et
+faire confiance à ce document**. Ne pas relancer les scanners des livres ou
+les scripts d'audit/consolidation pour reconstruire le backlog. Les matrices
+et JSON de `docs/rules-audit/` sont des archives, pas l'état courant. Ne pas
+régénérer le registre depuis ces archives. Consulter ponctuellement la règle
+et le code nécessaires au lot choisi reste permis ; vérifier et tester son
+implémentation reste obligatoire. Toute découverte nouvelle pendant un lot
+doit être ajoutée au registre avec sa provenance.
 
 ## ⚠️ Le README et docs/ décrivent des features SUPPRIMÉES
 
@@ -88,7 +104,31 @@ décrite dans README.md, docs/intent-pipeline.md ou .env.example :
    `DATABASE_URL`, qui est REQUISE : Postgres est le backend unique de
    persistance (tests/playtest via pool pg-mem injecté, pas de repli fichier).
 
+7. **Interprétation du joueur réservée à l'IA** : seul le modèle interprète le
+   message et choisit les outils MCP et leurs arguments. Aucun planner ni
+   classifieur intermédiaire. Aucun parseur d'intention, regex ou mot-clé côté serveur ne doit
+   choisir une action, une cible, des coordonnées ou réécrire les arguments du
+   modèle. Flux : message joueur → agent IA → MCP → moteur → résultats MCP →
+   agent IA → narration. Le serveur orchestre les appels structurés ; le moteur
+   valide les règles depuis les arguments et l'état. Les heuristiques du faux
+   LLM sont réservées au mode `mock`, jamais utilisées en `live`. Verrou de
+   régression : `tests/dm-agent-boundary.test.cjs` (absence de déclenchement
+   serveur sur citations/négations/hypothèses, transmission exacte des appels).
+   Aucun appel de jeu MCP ne doit être fabriqué côté serveur, même pour finir
+   un tour : retourner l'état incomplet à l'agent. Les événements de scène
+   exigent un appel explicite du DM. Les choix de
+   cible/arme/destination absents ou ambigus sont refusés, jamais complétés.
+   Verrous supplémentaires : `tests/agent-mcp-call-sites.test.cjs` et
+   `tests/mcp-agent-selection.test.cjs`. Les règles déterministes (dés, portée,
+   coûts, effets et tours de monstres explicitement demandés) restent au moteur.
+
 ## Guides par dossier
+
+Décision utilisateur du 1er novembre 2026 : appliquer les règles standard
+D&D 2014 par défaut. L'initiative est déterminée à l'entrée du combat, puis
+son ordre reste conservé pendant toute la rencontre. Cette décision remplace
+l'ancienne convention de relance à chaque round. Les variantes demandent
+un choix explicite ; ne pas les activer implicitement.
 
 Des CLAUDE.md locaux détaillent les pièges : `lib/`, `lib/dm/`, `mcp-server/`,
 `adventures/`, `tests/`, `scripts/`.

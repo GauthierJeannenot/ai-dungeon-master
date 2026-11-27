@@ -147,9 +147,9 @@ objet `AdventureMapData` et à faire de même pour Grammy's.
 1. `lib/context-loader.ts` : `loadContextFiles(adventureId)` lit
    `adventures/<id>/*.md` ; fichiers manquants → fallback sur les DEFAULT_*
    actuels (déjà en place) ; caches par adventureId. *(Évolution post-refactor :
-   plus de repli entre modules — chaque module fournit ses `player-rules.md` et
-   `bestiary.md` ; l'unique fichier partagé est
-   `adventures/_shared/dm-rules.md`.)*
+   plus de repli entre modules connus — chaque module fournit son `bestiary.md`.
+   Les socles `adventures/_shared/{dm-rules,player-rules}.md` sont obligatoires ;
+   le complément joueur `adventures/<id>/player-rules.md` est facultatif et ajouté après le socle.)*
 2. `lib/dm/prompts.ts` : `buildStaticPrompt(adventureId)`,
    `buildDynamicPrompt(gameState, …)` lit `gameState.adventureId`. Idem
    `lib/dm/planner.ts` pour `describeRoomHooks`.

@@ -1,0 +1,3240 @@
+{
+  "provenance": {
+    "kind": "actual_complete_W37_state_after_public_MCP_and_SQL",
+    "oldCompiledIndexSha256": "c08b392ba9e01bc0bbe8e9c787ceda3ca64b5bc1b26877d2b095b7f7a375c819",
+    "oldManifestSha256": "4e4d0b7999d4afaf808432be3bb212166cfbef6c52abfc2f031396e0777431e6",
+    "captureScriptSha256": "4f85ee008687e164ce138a1c006a95ef99c2faa54bd4b1c0020a6d49b463609c",
+    "recipe": [
+      {
+        "name": "get_game_state",
+        "input": {}
+      },
+      {
+        "name": "create_scene_object",
+        "input": {
+          "objectId": "w37-held-current-wall",
+          "name": "Face véritable avant le jet",
+          "description": "Qualification actuelle explicite du canevas, du fond dix pieds plus bas, du bord et de la véritable face solide ; aucune position passée reconstruite.",
+          "cell": {
+            "x": 4,
+            "y": 6
+          },
+          "kind": "obstacle",
+          "material": "stone",
+          "size": "large",
+          "resilience": "resilient"
+        }
+      },
+      {
+        "name": "create_trap",
+        "input": {
+          "trapId": "w37-held-current",
+          "name": "Ancienne fosse non résolue",
+          "template": "pit",
+          "cell": {
+            "x": 4,
+            "y": 8
+          }
+        }
+      },
+      {
+        "name": "record_scene_fact",
+        "input": {
+          "cell": {
+            "x": 4,
+            "y": 8
+          },
+          "description": "Qualification actuelle explicite du canevas, du fond dix pieds plus bas, du bord et de la véritable face solide ; aucune position passée reconstruite."
+        }
+      },
+      {
+        "name": "move_token",
+        "input": {
+          "tokenId": "player",
+          "toCell": {
+            "x": 5,
+            "y": 9
+          }
+        }
+      },
+      {
+        "name": "spawn_monster",
+        "input": {
+          "monsterType": "bandit",
+          "cell": {
+            "x": 4,
+            "y": 8
+          },
+          "name": "Témoin réel du vieux jet"
+        }
+      },
+      {
+        "name": "get_game_state",
+        "input": {}
+      },
+      {
+        "name": "use_subclass_feature",
+        "input": {
+          "featureId": "bardic_inspiration",
+          "targetId": "bandit_1794160559886_0"
+        }
+      },
+      {
+        "name": "get_game_state",
+        "input": {}
+      },
+      {
+        "name": "interact_trap",
+        "input": {
+          "trapId": "w37-held-current",
+          "action": "trigger",
+          "targetId": "bandit_1794160559886_0"
+        }
+      },
+      {
+        "name": "get_game_state",
+        "input": {}
+      }
+    ],
+    "originalNaturalD20": 8,
+    "syntheticFields": [],
+    "credentialOrUserDataIncluded": false,
+    "fictionalAuthoredGameState": true,
+    "controlledLegacyFixture": true
+  },
+  "gameState": {
+    "dmTools": {
+      "version": 1,
+      "objects": {
+        "w37-held-current-wall": {
+          "name": "Face véritable avant le jet",
+          "description": "Qualification actuelle explicite du canevas, du fond dix pieds plus bas, du bord et de la véritable face solide ; aucune position passée reconstruite.",
+          "cell": {
+            "x": 4,
+            "y": 6
+          },
+          "kind": "obstacle",
+          "material": "stone",
+          "size": "large",
+          "resilience": "resilient",
+          "locked": false,
+          "contents": [],
+          "id": "w37-held-current-wall",
+          "mapId": "candlekeep",
+          "roomId": "1",
+          "ac": 17,
+          "hp": {
+            "current": 27,
+            "max": 27
+          },
+          "state": "intact",
+          "creation": "{\"objectId\":\"w37-held-current-wall\",\"name\":\"Face véritable avant le jet\",\"description\":\"Qualification actuelle explicite du canevas, du fond dix pieds plus bas, du bord et de la véritable face solide ; aucune position passée reconstruite.\",\"cell\":{\"x\":4,\"y\":6},\"kind\":\"obstacle\",\"material\":\"stone\",\"size\":\"large\",\"resilience\":\"resilient\",\"locked\":false,\"contents\":[]}",
+          "contentsReleased": false
+        }
+      },
+      "traps": {
+        "w37-held-current": {
+          "id": "w37-held-current",
+          "name": "Ancienne fosse non résolue",
+          "template": "pit",
+          "cell": {
+            "x": 4,
+            "y": 8
+          },
+          "mapId": "candlekeep",
+          "roomId": "1",
+          "discovered": true,
+          "status": "triggered",
+          "victims": [],
+          "creation": "{\"trapId\":\"w37-held-current\",\"name\":\"Ancienne fosse non résolue\",\"template\":\"pit\",\"cell\":{\"x\":4,\"y\":8}}"
+        }
+      },
+      "npcs": {},
+      "itemUses": {},
+      "wallet": {
+        "cp": 0,
+        "sp": 0,
+        "ep": 0,
+        "gp": 250,
+        "pp": 0
+      },
+      "jumping": {
+        "version": 1,
+        "surfaces": {},
+        "supports": {},
+        "barriers": {},
+        "bodies": {},
+        "obstacles": {},
+        "jumps": {},
+        "receipts": {},
+        "footwork": {
+          "combatGeneration": 0,
+          "phase": "exploration",
+          "mapId": "candlekeep",
+          "at": 0,
+          "turnCounter": 0,
+          "lastCell": {
+            "x": 5,
+            "y": 9
+          },
+          "feet": 5,
+          "steps": [
+            {
+              "from": {
+                "x": 4,
+                "y": 8
+              },
+              "to": {
+                "x": 5,
+                "y": 9
+              },
+              "feet": 5
+            }
+          ]
+        }
+      }
+    },
+    "hero": {
+      "version": 1,
+      "hitDice": {
+        "die": 8,
+        "current": 7,
+        "max": 7
+      },
+      "reactionsUsed": {},
+      "effects": [],
+      "bonusSpellCast": false,
+      "actionSpellCast": false,
+      "preparedAtRest": true,
+      "inspiration": [
+        {
+          "targetId": "bandit_1794160559886_0",
+          "expiresAt": 600,
+          "die": 8
+        }
+      ],
+      "corpseTimes": {},
+      "turnStarted": {},
+      "actionCredits": 1,
+      "concentrationIds": {},
+      "movementTrail": [
+        {
+          "x": 4,
+          "y": 8
+        },
+        {
+          "x": 5,
+          "y": 9
+        }
+      ],
+      "pending": {
+        "id": "reaction-1794160559921-4aaccftgk06",
+        "kind": "save",
+        "sourceId": "bandit_1794160559886_0",
+        "targetId": "bandit_1794160559886_0",
+        "options": [
+          "bardic_inspiration",
+          "decline"
+        ],
+        "command": {
+          "type": "save",
+          "result": {
+            "entityId": "bandit_1794160559886_0",
+            "ability": "dex",
+            "dc": 10,
+            "roll": {
+              "notation": "1d20+1",
+              "rolls": [
+                8
+              ],
+              "modifier": 1,
+              "total": 9,
+              "detail": "1d20+1: [8]+1 = 9"
+            },
+            "success": false,
+            "mechanicalSummary": "JS DEX 1d20+1: [8]+1 = 9 vs DD 10 : ÉCHEC"
+          },
+          "inspiredActorId": "bandit_1794160559886_0",
+          "toolkitResolution": {
+            "domain": "trap-save",
+            "command": {
+              "trapId": "w37-held-current",
+              "targetId": "bandit_1794160559886_0"
+            }
+          }
+        },
+        "roll": {
+          "notation": "1d20+1",
+          "rolls": [
+            8
+          ],
+          "modifier": 1,
+          "total": 9,
+          "detail": "1d20+1: [8]+1 = 9"
+        }
+      }
+    },
+    "worldTimeSeconds": 0,
+    "turnCounter": 0,
+    "monsterEffects": [],
+    "monsterPowerImmunities": [],
+    "playerActionRevision": 1,
+    "combatGeneration": 0,
+    "npcActivationLedger": [],
+    "handledRequestIds": [],
+    "adventureId": "sarah-of-yellowcrest-manor",
+    "characterId": "bard",
+    "phase": "exploration",
+    "player": {
+      "toolProficiencies": [
+        "lute",
+        "flute",
+        "drum"
+      ],
+      "ruleset": "srd2014",
+      "subclassId": "lore",
+      "languages": [
+        "common",
+        "elvish"
+      ],
+      "id": "player",
+      "name": "Lyra",
+      "class": "Barde",
+      "characterId": "bard",
+      "level": 7,
+      "hp": {
+        "current": 45,
+        "max": 45
+      },
+      "deathSaves": {
+        "successes": 0,
+        "failures": 0
+      },
+      "ac": 14,
+      "stats": {
+        "str": 8,
+        "dex": 14,
+        "con": 12,
+        "int": 10,
+        "wis": 12,
+        "cha": 18
+      },
+      "proficiencyBonus": 3,
+      "position": {
+        "x": 5,
+        "y": 9
+      },
+      "conditions": [],
+      "inventory": [
+        {
+          "id": "rapier",
+          "name": "Rapière",
+          "type": "weapon",
+          "damage": "1d8+2",
+          "description": "Arme de finesse (DEX)"
+        },
+        {
+          "id": "dagger",
+          "name": "Dague",
+          "type": "weapon",
+          "damage": "1d4+2",
+          "description": "Finesse, lançable"
+        },
+        {
+          "id": "studded_leather",
+          "name": "Armure de cuir clouté",
+          "type": "armor",
+          "acBonus": 2,
+          "description": "CA 12 + DEX."
+        },
+        {
+          "id": "lute",
+          "name": "Luth",
+          "type": "misc",
+          "description": "Focaliseur d'incantation et gagne-pain"
+        },
+        {
+          "id": "potion1",
+          "name": "Potion de soin",
+          "type": "potion",
+          "description": "Restaure 2d4+2 HP"
+        },
+        {
+          "id": "healing_yellowcrest_1",
+          "name": "Potion de soins",
+          "type": "potion"
+        },
+        {
+          "id": "healing_yellowcrest_2",
+          "name": "Potion de soins",
+          "type": "potion"
+        },
+        {
+          "id": "healing_yellowcrest_3",
+          "name": "Potion de soins",
+          "type": "potion"
+        },
+        {
+          "id": "healing_yellowcrest_4",
+          "name": "Potion de soins",
+          "type": "potion"
+        }
+      ],
+      "speed": 30,
+      "savingThrowProficiencies": [
+        "dex",
+        "cha"
+      ],
+      "skillProficiencies": [
+        "performance",
+        "persuasion",
+        "deception",
+        "insight",
+        "acrobatics",
+        "arcana",
+        "history",
+        "investigation"
+      ],
+      "features": [
+        "spellcasting",
+        "jack_of_all_trades",
+        "bardic_inspiration",
+        "song_of_rest",
+        "font_of_inspiration",
+        "countercharm",
+        "cutting_words",
+        "additional_magical_secrets"
+      ],
+      "expertise": [
+        "persuasion",
+        "insight"
+      ],
+      "resources": {
+        "bardic_inspiration": {
+          "current": 3,
+          "max": 4
+        }
+      },
+      "spellcastingAbility": "cha",
+      "spellSlots": {
+        "level1": {
+          "current": 4,
+          "max": 4
+        },
+        "level2": {
+          "current": 3,
+          "max": 3
+        },
+        "level3": {
+          "current": 3,
+          "max": 3
+        },
+        "level4": {
+          "current": 1,
+          "max": 1
+        }
+      },
+      "knownSpells": [
+        "vicious-mockery",
+        "minor-illusion",
+        "light",
+        "charm-person",
+        "healing-word",
+        "cure-wounds",
+        "thunderwave",
+        "disguise-self",
+        "speak-with-animals",
+        "comprehend-languages",
+        "shatter",
+        "tongues",
+        "speak-with-dead",
+        "dimension-door",
+        "counterspell",
+        "fireball"
+      ]
+    },
+    "monsters": {
+      "bandit_1794160559886_0": {
+        "type": "bandit",
+        "hp": {
+          "current": 11,
+          "max": 11
+        },
+        "ac": 12,
+        "stats": {
+          "str": 11,
+          "dex": 12,
+          "con": 12,
+          "int": 10,
+          "wis": 10,
+          "cha": 10
+        },
+        "conditions": [],
+        "xpValue": 25,
+        "attackBonus": 3,
+        "damageDice": "1d6+1",
+        "speed": 30,
+        "attackName": "Scimitar",
+        "attackRangeCells": 1,
+        "damageType": "slashing",
+        "movementModes": {
+          "walk": 30
+        },
+        "id": "bandit_1794160559886_0",
+        "name": "Témoin réel du vieux jet",
+        "position": {
+          "x": 4,
+          "y": 8
+        },
+        "srd": {
+          "index": "bandit",
+          "ruleset": "2014",
+          "url": "https://www.dnd5eapi.co/api/2014/monsters/bandit"
+        },
+        "isAlive": true
+      }
+    },
+    "npcs": {
+      "sarah": {
+        "type": "ghost",
+        "hp": {
+          "current": 45,
+          "max": 45
+        },
+        "ac": 11,
+        "stats": {
+          "str": 7,
+          "dex": 13,
+          "con": 10,
+          "int": 10,
+          "wis": 12,
+          "cha": 17
+        },
+        "conditions": [],
+        "xpValue": 1100,
+        "attackBonus": 5,
+        "damageDice": "4d6+3",
+        "speed": 0,
+        "attackName": "Withering Touch",
+        "attackRangeCells": 1,
+        "damageType": "necrotic",
+        "movementModes": {
+          "walk": 0,
+          "fly": 40,
+          "hover": true
+        },
+        "id": "sarah",
+        "name": "Sarah",
+        "kind": "ghost",
+        "position": {
+          "x": 6,
+          "y": 7
+        },
+        "roomId": "1",
+        "mapId": "candlekeep",
+        "disposition": "neutral",
+        "visible": false,
+        "description": "Fantôme muet lié au journal ; elle apparaît au fond de la salle après sa lecture, montre les passages et ne combat jamais.",
+        "isAlive": true,
+        "hostile": false,
+        "srd": {
+          "index": "ghost",
+          "ruleset": "2014",
+          "url": "https://www.dnd5eapi.co/api/2014/monsters/ghost"
+        },
+        "statBlock": {
+          "type": "ghost",
+          "name": "Ghost",
+          "ruleset": "2014",
+          "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/ghost",
+          "sourceSha256": "32c6f528707440c9da15aa5c9ae0ae19fcb703231b5762608dd0b3e646fda234",
+          "published": {
+            "index": "ghost",
+            "name": "Ghost",
+            "size": "Medium",
+            "type": "undead",
+            "alignment": "any alignment",
+            "armor_class": [
+              {
+                "type": "dex",
+                "value": 11
+              }
+            ],
+            "hit_points": 45,
+            "hit_dice": "10d8",
+            "hit_points_roll": "10d8",
+            "speed": {
+              "walk": "0 ft.",
+              "fly": "40 ft.",
+              "hover": true
+            },
+            "strength": 7,
+            "dexterity": 13,
+            "constitution": 10,
+            "intelligence": 10,
+            "wisdom": 12,
+            "charisma": 17,
+            "proficiencies": [],
+            "damage_vulnerabilities": [],
+            "damage_resistances": [
+              "acid",
+              "fire",
+              "lightning",
+              "thunder",
+              "bludgeoning, piercing, and slashing from nonmagical weapons"
+            ],
+            "damage_immunities": [
+              "cold",
+              "necrotic",
+              "poison"
+            ],
+            "condition_immunities": [
+              {
+                "index": "charmed",
+                "name": "Charmed",
+                "url": "/api/2014/conditions/charmed"
+              },
+              {
+                "index": "exhaustion",
+                "name": "Exhaustion",
+                "url": "/api/2014/conditions/exhaustion"
+              },
+              {
+                "index": "frightened",
+                "name": "Frightened",
+                "url": "/api/2014/conditions/frightened"
+              },
+              {
+                "index": "grappled",
+                "name": "Grappled",
+                "url": "/api/2014/conditions/grappled"
+              },
+              {
+                "index": "paralyzed",
+                "name": "Paralyzed",
+                "url": "/api/2014/conditions/paralyzed"
+              },
+              {
+                "index": "petrified",
+                "name": "Petrified",
+                "url": "/api/2014/conditions/petrified"
+              },
+              {
+                "index": "poisoned",
+                "name": "Poisoned",
+                "url": "/api/2014/conditions/poisoned"
+              },
+              {
+                "index": "prone",
+                "name": "Prone",
+                "url": "/api/2014/conditions/prone"
+              },
+              {
+                "index": "restrained",
+                "name": "Restrained",
+                "url": "/api/2014/conditions/restrained"
+              }
+            ],
+            "senses": {
+              "darkvision": "60 ft.",
+              "passive_perception": 11
+            },
+            "languages": "any languages it knew in life",
+            "challenge_rating": 4,
+            "proficiency_bonus": 2,
+            "xp": 1100,
+            "special_abilities": [
+              {
+                "name": "Ethereal Sight",
+                "desc": "The ghost can see 60 ft. into the Ethereal Plane when it is on the Material Plane, and vice versa.",
+                "damage": []
+              },
+              {
+                "name": "Incorporeal Movement",
+                "desc": "The ghost can move through other creatures and objects as if they were difficult terrain. It takes 5 (1d10) force damage if it ends its turn inside an object.",
+                "damage": []
+              }
+            ],
+            "actions": [
+              {
+                "name": "Withering Touch",
+                "desc": "Melee Weapon Attack: +5 to hit, reach 5 ft., one target. Hit: 17 (4d6 + 3) necrotic damage.",
+                "attack_bonus": 5,
+                "damage": [
+                  {
+                    "damage_type": {
+                      "index": "necrotic",
+                      "name": "Necrotic",
+                      "url": "/api/2014/damage-types/necrotic"
+                    },
+                    "damage_dice": "4d6+3"
+                  }
+                ],
+                "actions": []
+              },
+              {
+                "damage": [],
+                "name": "Etherealness",
+                "desc": "The ghost enters the Ethereal Plane from the Material Plane, or vice versa. It is visible on the Material Plane while it is in the Border Ethereal, and vice versa, yet it can't affect or be affected by anything on the other plane.",
+                "actions": []
+              },
+              {
+                "damage": [],
+                "name": "Horrifying Visage",
+                "desc": "Each non-undead creature within 60 ft. of the ghost that can see it must succeed on a DC 13 Wisdom saving throw or be frightened for 1 minute. If the save fails by 5 or more, the target also ages 1d4 × 10 years. A frightened target can repeat the saving throw at the end of each of its turns, ending the frightened condition on itself on a success. If a target's saving throw is successful or the effect ends for it, the target is immune to this ghost's Horrifying Visage for the next 24 hours. The aging effect can be reversed with a greater restoration spell, but only within 24 hours of it occurring.",
+                "dc": {
+                  "dc_type": {
+                    "index": "wis",
+                    "name": "WIS",
+                    "url": "/api/2014/ability-scores/wis"
+                  },
+                  "dc_value": 13,
+                  "success_type": "none"
+                },
+                "actions": []
+              },
+              {
+                "damage": [],
+                "name": "Possession",
+                "desc": "One humanoid that the ghost can see within 5 ft. of it must succeed on a DC 13 Charisma saving throw or be possessed by the ghost; the ghost then disappears, and the target is incapacitated and loses control of its body. The ghost now controls the body but doesn't deprive the target of awareness. The ghost can't be targeted by any attack, spell, or other effect, except ones that turn undead, and it retains its alignment, Intelligence, Wisdom, Charisma, and immunity to being charmed and frightened. It otherwise uses the possessed target's statistics, but doesn't gain access to the target's knowledge, class features, or proficiencies.\nThe possession lasts until the body drops to 0 hit points, the ghost ends it as a bonus action, or the ghost is turned or forced out by an effect like the dispel evil and good spell. When the possession ends, the ghost reappears in an unoccupied space within 5 ft. of the body. The target is immune to this ghost's Possession for 24 hours after succeeding on the saving throw or after the possession ends.",
+                "usage": {
+                  "type": "recharge on roll",
+                  "dice": "1d6",
+                  "min_value": 6
+                },
+                "dc": {
+                  "dc_type": {
+                    "index": "cha",
+                    "name": "CHA",
+                    "url": "/api/2014/ability-scores/cha"
+                  },
+                  "dc_value": 13,
+                  "success_type": "none"
+                },
+                "actions": []
+              }
+            ],
+            "image": "/api/images/monsters/ghost.png",
+            "url": "/api/2014/monsters/ghost",
+            "updated_at": "2026-04-01T20:35:38.254Z",
+            "forms": [],
+            "legendary_actions": [],
+            "reactions": []
+          }
+        }
+      },
+      "avowed": {
+        "type": "commoner",
+        "hp": {
+          "current": 4,
+          "max": 4
+        },
+        "ac": 10,
+        "stats": {
+          "str": 10,
+          "dex": 10,
+          "con": 10,
+          "int": 10,
+          "wis": 10,
+          "cha": 10
+        },
+        "conditions": [],
+        "xpValue": 10,
+        "attackBonus": 2,
+        "damageDice": "1d4",
+        "speed": 30,
+        "attackName": "Club",
+        "attackRangeCells": 1,
+        "damageType": "bludgeoning",
+        "movementModes": {
+          "walk": 30
+        },
+        "id": "avowed",
+        "name": "L’archiviste des Avoués",
+        "kind": "scholar",
+        "position": {
+          "x": 16,
+          "y": 2
+        },
+        "roomId": "2",
+        "mapId": "candlekeep",
+        "disposition": "neutral",
+        "visible": false,
+        "description": "Aide à identifier le sceau et le tome ; aucun indice indispensable ne dépend d’un jet.",
+        "isAlive": true,
+        "hostile": false,
+        "srd": {
+          "index": "commoner",
+          "ruleset": "2014",
+          "url": "https://www.dnd5eapi.co/api/2014/monsters/commoner"
+        },
+        "statBlock": {
+          "type": "commoner",
+          "name": "Commoner",
+          "ruleset": "2014",
+          "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/commoner",
+          "sourceSha256": "534451fc4f991c7957ab93a702adc3a2249e2b34a98825e64ad07d73e9be7074",
+          "published": {
+            "index": "commoner",
+            "name": "Commoner",
+            "desc": "Commoners include peasants, serfs, slaves, servants, pilgrims, merchants, artisans, and hermits.",
+            "size": "Medium",
+            "type": "humanoid",
+            "subtype": "any race",
+            "alignment": "any alignment",
+            "armor_class": [
+              {
+                "type": "dex",
+                "value": 10
+              }
+            ],
+            "hit_points": 4,
+            "hit_dice": "1d8",
+            "hit_points_roll": "1d8",
+            "speed": {
+              "walk": "30 ft."
+            },
+            "strength": 10,
+            "dexterity": 10,
+            "constitution": 10,
+            "intelligence": 10,
+            "wisdom": 10,
+            "charisma": 10,
+            "proficiencies": [],
+            "damage_vulnerabilities": [],
+            "damage_resistances": [],
+            "damage_immunities": [],
+            "condition_immunities": [],
+            "senses": {
+              "passive_perception": 10
+            },
+            "languages": "any one language (usually Common)",
+            "challenge_rating": 0,
+            "proficiency_bonus": 2,
+            "xp": 10,
+            "actions": [
+              {
+                "name": "Club",
+                "desc": "Melee Weapon Attack: +2 to hit, reach 5 ft., one target. Hit: 2 (1d4) bludgeoning damage.",
+                "attack_bonus": 2,
+                "damage": [
+                  {
+                    "damage_type": {
+                      "index": "bludgeoning",
+                      "name": "Bludgeoning",
+                      "url": "/api/2014/damage-types/bludgeoning"
+                    },
+                    "damage_dice": "1d4"
+                  }
+                ],
+                "actions": []
+              }
+            ],
+            "image": "/api/images/monsters/commoner.png",
+            "url": "/api/2014/monsters/commoner",
+            "updated_at": "2026-04-01T20:35:38.253Z",
+            "forms": [],
+            "legendary_actions": [],
+            "reactions": [],
+            "special_abilities": []
+          }
+        }
+      },
+      "arnulf": {
+        "type": "commoner",
+        "hp": {
+          "current": 4,
+          "max": 4
+        },
+        "ac": 10,
+        "stats": {
+          "str": 10,
+          "dex": 10,
+          "con": 10,
+          "int": 10,
+          "wis": 10,
+          "cha": 10
+        },
+        "conditions": [],
+        "xpValue": 10,
+        "attackBonus": 2,
+        "damageDice": "1d4",
+        "speed": 30,
+        "attackName": "Club",
+        "attackRangeCells": 1,
+        "damageType": "bludgeoning",
+        "movementModes": {
+          "walk": 30
+        },
+        "id": "arnulf",
+        "name": "Arnulf",
+        "kind": "butler",
+        "position": {
+          "x": 10,
+          "y": 4
+        },
+        "roomId": "5",
+        "mapId": "waterdeep",
+        "disposition": "neutral",
+        "visible": false,
+        "description": "Majordome des Falgarst ; accueillant si la famille actuelle est respectée.",
+        "isAlive": true,
+        "hostile": false,
+        "srd": {
+          "index": "commoner",
+          "ruleset": "2014",
+          "url": "https://www.dnd5eapi.co/api/2014/monsters/commoner"
+        },
+        "statBlock": {
+          "type": "commoner",
+          "name": "Commoner",
+          "ruleset": "2014",
+          "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/commoner",
+          "sourceSha256": "534451fc4f991c7957ab93a702adc3a2249e2b34a98825e64ad07d73e9be7074",
+          "published": {
+            "index": "commoner",
+            "name": "Commoner",
+            "desc": "Commoners include peasants, serfs, slaves, servants, pilgrims, merchants, artisans, and hermits.",
+            "size": "Medium",
+            "type": "humanoid",
+            "subtype": "any race",
+            "alignment": "any alignment",
+            "armor_class": [
+              {
+                "type": "dex",
+                "value": 10
+              }
+            ],
+            "hit_points": 4,
+            "hit_dice": "1d8",
+            "hit_points_roll": "1d8",
+            "speed": {
+              "walk": "30 ft."
+            },
+            "strength": 10,
+            "dexterity": 10,
+            "constitution": 10,
+            "intelligence": 10,
+            "wisdom": 10,
+            "charisma": 10,
+            "proficiencies": [],
+            "damage_vulnerabilities": [],
+            "damage_resistances": [],
+            "damage_immunities": [],
+            "condition_immunities": [],
+            "senses": {
+              "passive_perception": 10
+            },
+            "languages": "any one language (usually Common)",
+            "challenge_rating": 0,
+            "proficiency_bonus": 2,
+            "xp": 10,
+            "actions": [
+              {
+                "name": "Club",
+                "desc": "Melee Weapon Attack: +2 to hit, reach 5 ft., one target. Hit: 2 (1d4) bludgeoning damage.",
+                "attack_bonus": 2,
+                "damage": [
+                  {
+                    "damage_type": {
+                      "index": "bludgeoning",
+                      "name": "Bludgeoning",
+                      "url": "/api/2014/damage-types/bludgeoning"
+                    },
+                    "damage_dice": "1d4"
+                  }
+                ],
+                "actions": []
+              }
+            ],
+            "image": "/api/images/monsters/commoner.png",
+            "url": "/api/2014/monsters/commoner",
+            "updated_at": "2026-04-01T20:35:38.253Z",
+            "forms": [],
+            "legendary_actions": [],
+            "reactions": [],
+            "special_abilities": []
+          }
+        }
+      },
+      "vecken": {
+        "type": "knight",
+        "hp": {
+          "current": 52,
+          "max": 52
+        },
+        "ac": 18,
+        "stats": {
+          "str": 16,
+          "dex": 11,
+          "con": 14,
+          "int": 11,
+          "wis": 11,
+          "cha": 15
+        },
+        "conditions": [],
+        "xpValue": 700,
+        "attackBonus": 5,
+        "damageDice": "2d6+3",
+        "speed": 30,
+        "attackName": "Greatsword",
+        "attackRangeCells": 1,
+        "damageType": "slashing",
+        "movementModes": {
+          "walk": 30
+        },
+        "id": "vecken",
+        "name": "Sir Vecken de la Corne brisée",
+        "kind": "knight",
+        "position": {
+          "x": 20,
+          "y": 4
+        },
+        "roomId": "6",
+        "mapId": "waterdeep",
+        "disposition": "neutral",
+        "visible": false,
+        "description": "Ancien amant de Sarah ; veille sur son père Yacken.",
+        "isAlive": true,
+        "hostile": false,
+        "srd": {
+          "index": "knight",
+          "ruleset": "2014",
+          "url": "https://www.dnd5eapi.co/api/2014/monsters/knight"
+        },
+        "statBlock": {
+          "type": "knight",
+          "name": "Knight",
+          "ruleset": "2014",
+          "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/knight",
+          "sourceSha256": "d3aa70e443c5cefc21fccabfc09cd855b4ebc552ac72f5ca28dd0d9e617464a9",
+          "published": {
+            "index": "knight",
+            "name": "Knight",
+            "desc": "Knights are warriors who pledge service to rulers, religious orders, and noble causes. A knight’s alignment determines the extent to which a pledge is honored. Whether undertaking a quest or patrolling a realm, a knight often travels with an entourage that includes squires and hirelings who are commoners.",
+            "size": "Medium",
+            "type": "humanoid",
+            "subtype": "any race",
+            "alignment": "any alignment",
+            "armor_class": [
+              {
+                "type": "armor",
+                "value": 18,
+                "armor": [
+                  {
+                    "index": "plate-armor",
+                    "name": "Plate Armor",
+                    "url": "/api/2014/equipment/plate-armor"
+                  }
+                ]
+              }
+            ],
+            "hit_points": 52,
+            "hit_dice": "8d8",
+            "hit_points_roll": "8d8+16",
+            "speed": {
+              "walk": "30 ft."
+            },
+            "strength": 16,
+            "dexterity": 11,
+            "constitution": 14,
+            "intelligence": 11,
+            "wisdom": 11,
+            "charisma": 15,
+            "proficiencies": [
+              {
+                "value": 4,
+                "proficiency": {
+                  "index": "saving-throw-con",
+                  "name": "Saving Throw: CON",
+                  "url": "/api/2014/proficiencies/saving-throw-con"
+                }
+              },
+              {
+                "value": 2,
+                "proficiency": {
+                  "index": "saving-throw-wis",
+                  "name": "Saving Throw: WIS",
+                  "url": "/api/2014/proficiencies/saving-throw-wis"
+                }
+              }
+            ],
+            "damage_vulnerabilities": [],
+            "damage_resistances": [],
+            "damage_immunities": [],
+            "condition_immunities": [],
+            "senses": {
+              "passive_perception": 10
+            },
+            "languages": "any one language (usually Common)",
+            "challenge_rating": 3,
+            "proficiency_bonus": 2,
+            "xp": 700,
+            "special_abilities": [
+              {
+                "name": "Brave",
+                "desc": "The knight has advantage on saving throws against being frightened.",
+                "damage": []
+              }
+            ],
+            "actions": [
+              {
+                "damage": [],
+                "name": "Multiattack",
+                "multiattack_type": "actions",
+                "desc": "The knight makes two melee attacks.",
+                "actions": [
+                  {
+                    "action_name": "Greatsword",
+                    "count": "2",
+                    "type": "melee"
+                  }
+                ]
+              },
+              {
+                "name": "Greatsword",
+                "desc": "Melee Weapon Attack: +5 to hit, reach 5 ft., one target. Hit: 10 (2d6 + 3) slashing damage.",
+                "attack_bonus": 5,
+                "damage": [
+                  {
+                    "damage_type": {
+                      "index": "slashing",
+                      "name": "Slashing",
+                      "url": "/api/2014/damage-types/slashing"
+                    },
+                    "damage_dice": "2d6+3"
+                  }
+                ],
+                "actions": []
+              },
+              {
+                "name": "Heavy Crossbow",
+                "desc": "Ranged Weapon Attack: +2 to hit, range 100/400 ft., one target. Hit: 5 (1d10) piercing damage.",
+                "attack_bonus": 2,
+                "damage": [
+                  {
+                    "damage_type": {
+                      "index": "piercing",
+                      "name": "Piercing",
+                      "url": "/api/2014/damage-types/piercing"
+                    },
+                    "damage_dice": "1d10"
+                  }
+                ],
+                "actions": []
+              },
+              {
+                "damage": [],
+                "name": "Leadership",
+                "desc": "For 1 minute, the knight can utter a special command or warning whenever a nonhostile creature that it can see within 30 ft. of it makes an attack roll or a saving throw. The creature can add a d4 to its roll provided it can hear and understand the knight. A creature can benefit from only one Leadership die at a time. This effect ends if the knight is incapacitated.",
+                "usage": {
+                  "type": "recharge after rest",
+                  "rest_types": [
+                    "short",
+                    "long"
+                  ]
+                },
+                "actions": []
+              }
+            ],
+            "reactions": [
+              {
+                "name": "Parry",
+                "desc": "The knight adds 2 to its AC against one melee attack that would hit it. To do so, the knight must see the attacker and be wielding a melee weapon."
+              }
+            ],
+            "image": "/api/images/monsters/knight.png",
+            "url": "/api/2014/monsters/knight",
+            "updated_at": "2026-04-01T20:35:38.254Z",
+            "forms": [],
+            "legendary_actions": []
+          }
+        }
+      },
+      "cobbler": {
+        "type": "commoner",
+        "hp": {
+          "current": 4,
+          "max": 4
+        },
+        "ac": 10,
+        "stats": {
+          "str": 10,
+          "dex": 10,
+          "con": 10,
+          "int": 10,
+          "wis": 10,
+          "cha": 10
+        },
+        "conditions": [],
+        "xpValue": 10,
+        "attackBonus": 2,
+        "damageDice": "1d4",
+        "speed": 30,
+        "attackName": "Club",
+        "attackRangeCells": 1,
+        "damageType": "bludgeoning",
+        "movementModes": {
+          "walk": 30
+        },
+        "id": "cobbler",
+        "name": "Le cordonnier des Yellowcrest",
+        "kind": "artisan",
+        "position": {
+          "x": 10,
+          "y": 16
+        },
+        "roomId": "7",
+        "mapId": "waterdeep",
+        "disposition": "neutral",
+        "visible": false,
+        "description": "Connaît l’adresse de Faerl à Greenfast ; donne la piste même si la négociation échoue.",
+        "isAlive": true,
+        "hostile": false,
+        "srd": {
+          "index": "commoner",
+          "ruleset": "2014",
+          "url": "https://www.dnd5eapi.co/api/2014/monsters/commoner"
+        },
+        "statBlock": {
+          "type": "commoner",
+          "name": "Commoner",
+          "ruleset": "2014",
+          "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/commoner",
+          "sourceSha256": "534451fc4f991c7957ab93a702adc3a2249e2b34a98825e64ad07d73e9be7074",
+          "published": {
+            "index": "commoner",
+            "name": "Commoner",
+            "desc": "Commoners include peasants, serfs, slaves, servants, pilgrims, merchants, artisans, and hermits.",
+            "size": "Medium",
+            "type": "humanoid",
+            "subtype": "any race",
+            "alignment": "any alignment",
+            "armor_class": [
+              {
+                "type": "dex",
+                "value": 10
+              }
+            ],
+            "hit_points": 4,
+            "hit_dice": "1d8",
+            "hit_points_roll": "1d8",
+            "speed": {
+              "walk": "30 ft."
+            },
+            "strength": 10,
+            "dexterity": 10,
+            "constitution": 10,
+            "intelligence": 10,
+            "wisdom": 10,
+            "charisma": 10,
+            "proficiencies": [],
+            "damage_vulnerabilities": [],
+            "damage_resistances": [],
+            "damage_immunities": [],
+            "condition_immunities": [],
+            "senses": {
+              "passive_perception": 10
+            },
+            "languages": "any one language (usually Common)",
+            "challenge_rating": 0,
+            "proficiency_bonus": 2,
+            "xp": 10,
+            "actions": [
+              {
+                "name": "Club",
+                "desc": "Melee Weapon Attack: +2 to hit, reach 5 ft., one target. Hit: 2 (1d4) bludgeoning damage.",
+                "attack_bonus": 2,
+                "damage": [
+                  {
+                    "damage_type": {
+                      "index": "bludgeoning",
+                      "name": "Bludgeoning",
+                      "url": "/api/2014/damage-types/bludgeoning"
+                    },
+                    "damage_dice": "1d4"
+                  }
+                ],
+                "actions": []
+              }
+            ],
+            "image": "/api/images/monsters/commoner.png",
+            "url": "/api/2014/monsters/commoner",
+            "updated_at": "2026-04-01T20:35:38.253Z",
+            "forms": [],
+            "legendary_actions": [],
+            "reactions": [],
+            "special_abilities": []
+          }
+        }
+      },
+      "faerl_city": {
+        "type": "noble",
+        "hp": {
+          "current": 9,
+          "max": 9
+        },
+        "ac": 15,
+        "stats": {
+          "str": 11,
+          "dex": 12,
+          "con": 11,
+          "int": 12,
+          "wis": 14,
+          "cha": 16
+        },
+        "conditions": [],
+        "xpValue": 25,
+        "attackBonus": 3,
+        "damageDice": "1d8+1",
+        "speed": 30,
+        "attackName": "Rapier",
+        "attackRangeCells": 1,
+        "damageType": "piercing",
+        "movementModes": {
+          "walk": 30
+        },
+        "id": "faerl_city",
+        "name": "Faerl",
+        "kind": "overseer",
+        "socialIdentity": "faerl",
+        "position": {
+          "x": 23,
+          "y": 15
+        },
+        "roomId": "8",
+        "mapId": "waterdeep",
+        "disposition": "neutral",
+        "visible": false,
+        "description": "Intendant elfe loyal au culte ; fuit dans le coche, aucune corruption ne lui fait trahir Viallis.",
+        "isAlive": true,
+        "hostile": false,
+        "srd": {
+          "index": "noble",
+          "ruleset": "2014",
+          "url": "https://www.dnd5eapi.co/api/2014/monsters/noble"
+        },
+        "statBlock": {
+          "type": "noble",
+          "name": "Noble",
+          "ruleset": "2014",
+          "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/noble",
+          "sourceSha256": "74c227943b01184d93c1167a63a5881afe6c1148042370477bff5a466b3a30cc",
+          "published": {
+            "index": "noble",
+            "name": "Noble",
+            "desc": "**Nobles** wield great authority and influence as members of the upper class, possessing wealth and connections that can make them as powerful as monarchs and generals. A noble often travels in the company of guards, as well as servants who are commoners.\n\nThe noble’s statistics can also be used to represent **courtiers** who aren’t of noble birth.",
+            "size": "Medium",
+            "type": "humanoid",
+            "subtype": "any race",
+            "alignment": "any alignment",
+            "armor_class": [
+              {
+                "type": "armor",
+                "value": 15,
+                "armor": [
+                  {
+                    "index": "breastplate",
+                    "name": "Breastplate",
+                    "url": "/api/2014/equipment/breastplate"
+                  }
+                ]
+              }
+            ],
+            "hit_points": 9,
+            "hit_dice": "2d8",
+            "hit_points_roll": "2d8",
+            "speed": {
+              "walk": "30 ft."
+            },
+            "strength": 11,
+            "dexterity": 12,
+            "constitution": 11,
+            "intelligence": 12,
+            "wisdom": 14,
+            "charisma": 16,
+            "proficiencies": [
+              {
+                "value": 5,
+                "proficiency": {
+                  "index": "skill-deception",
+                  "name": "Skill: Deception",
+                  "url": "/api/2014/proficiencies/skill-deception"
+                }
+              },
+              {
+                "value": 4,
+                "proficiency": {
+                  "index": "skill-insight",
+                  "name": "Skill: Insight",
+                  "url": "/api/2014/proficiencies/skill-insight"
+                }
+              },
+              {
+                "value": 5,
+                "proficiency": {
+                  "index": "skill-persuasion",
+                  "name": "Skill: Persuasion",
+                  "url": "/api/2014/proficiencies/skill-persuasion"
+                }
+              }
+            ],
+            "damage_vulnerabilities": [],
+            "damage_resistances": [],
+            "damage_immunities": [],
+            "condition_immunities": [],
+            "senses": {
+              "passive_perception": 12
+            },
+            "languages": "any two languages",
+            "challenge_rating": 0.125,
+            "proficiency_bonus": 2,
+            "xp": 25,
+            "actions": [
+              {
+                "name": "Rapier",
+                "desc": "Melee Weapon Attack: +3 to hit, reach 5 ft., one target. Hit: 5 (1d8 + 1) piercing damage.",
+                "attack_bonus": 3,
+                "damage": [
+                  {
+                    "damage_type": {
+                      "index": "piercing",
+                      "name": "Piercing",
+                      "url": "/api/2014/damage-types/piercing"
+                    },
+                    "damage_dice": "1d8+1"
+                  }
+                ],
+                "actions": []
+              }
+            ],
+            "reactions": [
+              {
+                "name": "Parry",
+                "desc": "The noble adds 2 to its AC against one melee attack that would hit it. To do so, the noble must see the attacker and be wielding a melee weapon."
+              }
+            ],
+            "image": "/api/images/monsters/noble.png",
+            "url": "/api/2014/monsters/noble",
+            "updated_at": "2026-06-02T19:33:15.988Z",
+            "forms": [],
+            "legendary_actions": [],
+            "special_abilities": []
+          }
+        }
+      },
+      "kara": {
+        "type": "commoner",
+        "hp": {
+          "current": 4,
+          "max": 4
+        },
+        "ac": 10,
+        "stats": {
+          "str": 10,
+          "dex": 10,
+          "con": 10,
+          "int": 10,
+          "wis": 10,
+          "cha": 10
+        },
+        "conditions": [],
+        "xpValue": 10,
+        "attackBonus": 2,
+        "damageDice": "1d4",
+        "speed": 30,
+        "attackName": "Club",
+        "attackRangeCells": 1,
+        "damageType": "bludgeoning",
+        "movementModes": {
+          "walk": 30
+        },
+        "id": "kara",
+        "name": "Kara Firenni",
+        "kind": "mayor",
+        "position": {
+          "x": 8,
+          "y": 3
+        },
+        "roomId": "11",
+        "mapId": "greenfast",
+        "disposition": "neutral",
+        "visible": false,
+        "description": "Mairesse inquiète pour sa sœur Yaeda, partie à la propriété de Viallis.",
+        "isAlive": true,
+        "hostile": false,
+        "srd": {
+          "index": "commoner",
+          "ruleset": "2014",
+          "url": "https://www.dnd5eapi.co/api/2014/monsters/commoner"
+        },
+        "statBlock": {
+          "type": "commoner",
+          "name": "Commoner",
+          "ruleset": "2014",
+          "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/commoner",
+          "sourceSha256": "534451fc4f991c7957ab93a702adc3a2249e2b34a98825e64ad07d73e9be7074",
+          "published": {
+            "index": "commoner",
+            "name": "Commoner",
+            "desc": "Commoners include peasants, serfs, slaves, servants, pilgrims, merchants, artisans, and hermits.",
+            "size": "Medium",
+            "type": "humanoid",
+            "subtype": "any race",
+            "alignment": "any alignment",
+            "armor_class": [
+              {
+                "type": "dex",
+                "value": 10
+              }
+            ],
+            "hit_points": 4,
+            "hit_dice": "1d8",
+            "hit_points_roll": "1d8",
+            "speed": {
+              "walk": "30 ft."
+            },
+            "strength": 10,
+            "dexterity": 10,
+            "constitution": 10,
+            "intelligence": 10,
+            "wisdom": 10,
+            "charisma": 10,
+            "proficiencies": [],
+            "damage_vulnerabilities": [],
+            "damage_resistances": [],
+            "damage_immunities": [],
+            "condition_immunities": [],
+            "senses": {
+              "passive_perception": 10
+            },
+            "languages": "any one language (usually Common)",
+            "challenge_rating": 0,
+            "proficiency_bonus": 2,
+            "xp": 10,
+            "actions": [
+              {
+                "name": "Club",
+                "desc": "Melee Weapon Attack: +2 to hit, reach 5 ft., one target. Hit: 2 (1d4) bludgeoning damage.",
+                "attack_bonus": 2,
+                "damage": [
+                  {
+                    "damage_type": {
+                      "index": "bludgeoning",
+                      "name": "Bludgeoning",
+                      "url": "/api/2014/damage-types/bludgeoning"
+                    },
+                    "damage_dice": "1d4"
+                  }
+                ],
+                "actions": []
+              }
+            ],
+            "image": "/api/images/monsters/commoner.png",
+            "url": "/api/2014/monsters/commoner",
+            "updated_at": "2026-04-01T20:35:38.253Z",
+            "forms": [],
+            "legendary_actions": [],
+            "reactions": [],
+            "special_abilities": []
+          }
+        }
+      },
+      "old_fargo": {
+        "type": "commoner",
+        "hp": {
+          "current": 4,
+          "max": 4
+        },
+        "ac": 10,
+        "stats": {
+          "str": 10,
+          "dex": 10,
+          "con": 10,
+          "int": 10,
+          "wis": 10,
+          "cha": 10
+        },
+        "conditions": [],
+        "xpValue": 10,
+        "attackBonus": 2,
+        "damageDice": "1d4",
+        "speed": 30,
+        "attackName": "Club",
+        "attackRangeCells": 1,
+        "damageType": "bludgeoning",
+        "movementModes": {
+          "walk": 30
+        },
+        "id": "old_fargo",
+        "name": "Le vieux Fargo",
+        "kind": "innkeeper",
+        "position": {
+          "x": 16,
+          "y": 4
+        },
+        "roomId": "12",
+        "mapId": "greenfast",
+        "disposition": "neutral",
+        "visible": false,
+        "description": "Vieil aubergiste du Chaudron ventru, derrière son comptoir avec son chapeau élimé.",
+        "isAlive": true,
+        "hostile": false,
+        "srd": {
+          "index": "commoner",
+          "ruleset": "2014",
+          "url": "https://www.dnd5eapi.co/api/2014/monsters/commoner"
+        },
+        "statBlock": {
+          "type": "commoner",
+          "name": "Commoner",
+          "ruleset": "2014",
+          "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/commoner",
+          "sourceSha256": "534451fc4f991c7957ab93a702adc3a2249e2b34a98825e64ad07d73e9be7074",
+          "published": {
+            "index": "commoner",
+            "name": "Commoner",
+            "desc": "Commoners include peasants, serfs, slaves, servants, pilgrims, merchants, artisans, and hermits.",
+            "size": "Medium",
+            "type": "humanoid",
+            "subtype": "any race",
+            "alignment": "any alignment",
+            "armor_class": [
+              {
+                "type": "dex",
+                "value": 10
+              }
+            ],
+            "hit_points": 4,
+            "hit_dice": "1d8",
+            "hit_points_roll": "1d8",
+            "speed": {
+              "walk": "30 ft."
+            },
+            "strength": 10,
+            "dexterity": 10,
+            "constitution": 10,
+            "intelligence": 10,
+            "wisdom": 10,
+            "charisma": 10,
+            "proficiencies": [],
+            "damage_vulnerabilities": [],
+            "damage_resistances": [],
+            "damage_immunities": [],
+            "condition_immunities": [],
+            "senses": {
+              "passive_perception": 10
+            },
+            "languages": "any one language (usually Common)",
+            "challenge_rating": 0,
+            "proficiency_bonus": 2,
+            "xp": 10,
+            "actions": [
+              {
+                "name": "Club",
+                "desc": "Melee Weapon Attack: +2 to hit, reach 5 ft., one target. Hit: 2 (1d4) bludgeoning damage.",
+                "attack_bonus": 2,
+                "damage": [
+                  {
+                    "damage_type": {
+                      "index": "bludgeoning",
+                      "name": "Bludgeoning",
+                      "url": "/api/2014/damage-types/bludgeoning"
+                    },
+                    "damage_dice": "1d4"
+                  }
+                ],
+                "actions": []
+              }
+            ],
+            "image": "/api/images/monsters/commoner.png",
+            "url": "/api/2014/monsters/commoner",
+            "updated_at": "2026-04-01T20:35:38.253Z",
+            "forms": [],
+            "legendary_actions": [],
+            "reactions": [],
+            "special_abilities": []
+          }
+        }
+      },
+      "faerl_village": {
+        "type": "noble",
+        "hp": {
+          "current": 9,
+          "max": 9
+        },
+        "ac": 15,
+        "stats": {
+          "str": 11,
+          "dex": 12,
+          "con": 11,
+          "int": 12,
+          "wis": 14,
+          "cha": 16
+        },
+        "conditions": [],
+        "xpValue": 25,
+        "attackBonus": 3,
+        "damageDice": "1d8+1",
+        "speed": 30,
+        "attackName": "Rapier",
+        "attackRangeCells": 1,
+        "damageType": "piercing",
+        "movementModes": {
+          "walk": 30
+        },
+        "id": "faerl_village",
+        "name": "Faerl — au village",
+        "kind": "overseer",
+        "socialIdentity": "faerl",
+        "position": {
+          "x": 9,
+          "y": 17
+        },
+        "roomId": "14",
+        "mapId": "greenfast",
+        "disposition": "neutral",
+        "visible": false,
+        "description": "Utiliser seulement si Faerl n’a pas été capturé à Waterdeep ; ne jamais dupliquer sa présence.",
+        "isAlive": true,
+        "hostile": false,
+        "srd": {
+          "index": "noble",
+          "ruleset": "2014",
+          "url": "https://www.dnd5eapi.co/api/2014/monsters/noble"
+        },
+        "statBlock": {
+          "type": "noble",
+          "name": "Noble",
+          "ruleset": "2014",
+          "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/noble",
+          "sourceSha256": "74c227943b01184d93c1167a63a5881afe6c1148042370477bff5a466b3a30cc",
+          "published": {
+            "index": "noble",
+            "name": "Noble",
+            "desc": "**Nobles** wield great authority and influence as members of the upper class, possessing wealth and connections that can make them as powerful as monarchs and generals. A noble often travels in the company of guards, as well as servants who are commoners.\n\nThe noble’s statistics can also be used to represent **courtiers** who aren’t of noble birth.",
+            "size": "Medium",
+            "type": "humanoid",
+            "subtype": "any race",
+            "alignment": "any alignment",
+            "armor_class": [
+              {
+                "type": "armor",
+                "value": 15,
+                "armor": [
+                  {
+                    "index": "breastplate",
+                    "name": "Breastplate",
+                    "url": "/api/2014/equipment/breastplate"
+                  }
+                ]
+              }
+            ],
+            "hit_points": 9,
+            "hit_dice": "2d8",
+            "hit_points_roll": "2d8",
+            "speed": {
+              "walk": "30 ft."
+            },
+            "strength": 11,
+            "dexterity": 12,
+            "constitution": 11,
+            "intelligence": 12,
+            "wisdom": 14,
+            "charisma": 16,
+            "proficiencies": [
+              {
+                "value": 5,
+                "proficiency": {
+                  "index": "skill-deception",
+                  "name": "Skill: Deception",
+                  "url": "/api/2014/proficiencies/skill-deception"
+                }
+              },
+              {
+                "value": 4,
+                "proficiency": {
+                  "index": "skill-insight",
+                  "name": "Skill: Insight",
+                  "url": "/api/2014/proficiencies/skill-insight"
+                }
+              },
+              {
+                "value": 5,
+                "proficiency": {
+                  "index": "skill-persuasion",
+                  "name": "Skill: Persuasion",
+                  "url": "/api/2014/proficiencies/skill-persuasion"
+                }
+              }
+            ],
+            "damage_vulnerabilities": [],
+            "damage_resistances": [],
+            "damage_immunities": [],
+            "condition_immunities": [],
+            "senses": {
+              "passive_perception": 12
+            },
+            "languages": "any two languages",
+            "challenge_rating": 0.125,
+            "proficiency_bonus": 2,
+            "xp": 25,
+            "actions": [
+              {
+                "name": "Rapier",
+                "desc": "Melee Weapon Attack: +3 to hit, reach 5 ft., one target. Hit: 5 (1d8 + 1) piercing damage.",
+                "attack_bonus": 3,
+                "damage": [
+                  {
+                    "damage_type": {
+                      "index": "piercing",
+                      "name": "Piercing",
+                      "url": "/api/2014/damage-types/piercing"
+                    },
+                    "damage_dice": "1d8+1"
+                  }
+                ],
+                "actions": []
+              }
+            ],
+            "reactions": [
+              {
+                "name": "Parry",
+                "desc": "The noble adds 2 to its AC against one melee attack that would hit it. To do so, the noble must see the attacker and be wielding a melee weapon."
+              }
+            ],
+            "image": "/api/images/monsters/noble.png",
+            "url": "/api/2014/monsters/noble",
+            "updated_at": "2026-06-02T19:33:15.988Z",
+            "forms": [],
+            "legendary_actions": [],
+            "special_abilities": []
+          }
+        }
+      },
+      "yaeda": {
+        "type": "commoner",
+        "hp": {
+          "current": 20,
+          "max": 20
+        },
+        "ac": 10,
+        "stats": {
+          "str": 10,
+          "dex": 10,
+          "con": 10,
+          "int": 10,
+          "wis": 10,
+          "cha": 10
+        },
+        "conditions": [],
+        "xpValue": 10,
+        "attackBonus": 2,
+        "damageDice": "5d4",
+        "speed": 30,
+        "attackName": "Club",
+        "attackRangeCells": 1,
+        "damageType": "bludgeoning",
+        "movementModes": {
+          "walk": 30
+        },
+        "id": "yaeda",
+        "name": "Yaeda Firenni et les captifs",
+        "kind": "prisoners",
+        "position": {
+          "x": 21,
+          "y": 13
+        },
+        "roomId": "30",
+        "mapId": "cellar",
+        "disposition": "neutral",
+        "visible": false,
+        "description": "Yaeda, Jalrax, Durz, Seffra et Ashlan attendent derrière la grille de la cellule sud, sous la menace du culte.",
+        "isAlive": true,
+        "hostile": false,
+        "srd": {
+          "index": "commoner",
+          "ruleset": "2014",
+          "url": "https://www.dnd5eapi.co/api/2014/monsters/commoner"
+        },
+        "statBlock": {
+          "type": "commoner",
+          "name": "Groupe des captifs de la cellule sud",
+          "ruleset": "2014",
+          "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/commoner",
+          "sourceSha256": "534451fc4f991c7957ab93a702adc3a2249e2b34a98825e64ad07d73e9be7074",
+          "published": {
+            "index": "commoner",
+            "name": "Commoner",
+            "desc": "Commoners include peasants, serfs, slaves, servants, pilgrims, merchants, artisans, and hermits.",
+            "size": "Medium",
+            "type": "humanoid",
+            "subtype": "any race",
+            "alignment": "any alignment",
+            "armor_class": [
+              {
+                "type": "dex",
+                "value": 10
+              }
+            ],
+            "hit_points": 4,
+            "hit_dice": "1d8",
+            "hit_points_roll": "1d8",
+            "speed": {
+              "walk": "30 ft."
+            },
+            "strength": 10,
+            "dexterity": 10,
+            "constitution": 10,
+            "intelligence": 10,
+            "wisdom": 10,
+            "charisma": 10,
+            "proficiencies": [],
+            "damage_vulnerabilities": [],
+            "damage_resistances": [],
+            "damage_immunities": [],
+            "condition_immunities": [],
+            "senses": {
+              "passive_perception": 10
+            },
+            "languages": "any one language (usually Common)",
+            "challenge_rating": 0,
+            "proficiency_bonus": 2,
+            "xp": 10,
+            "actions": [
+              {
+                "name": "Club",
+                "desc": "Melee Weapon Attack: +2 to hit, reach 5 ft., one target. Hit: 2 (1d4) bludgeoning damage.",
+                "attack_bonus": 2,
+                "damage": [
+                  {
+                    "damage_type": {
+                      "index": "bludgeoning",
+                      "name": "Bludgeoning",
+                      "url": "/api/2014/damage-types/bludgeoning"
+                    },
+                    "damage_dice": "1d4"
+                  }
+                ],
+                "actions": []
+              }
+            ],
+            "image": "/api/images/monsters/commoner.png",
+            "url": "/api/2014/monsters/commoner",
+            "updated_at": "2026-04-01T20:35:38.253Z",
+            "forms": [],
+            "legendary_actions": [],
+            "reactions": [],
+            "special_abilities": []
+          },
+          "homebrew": "Shared HP group: one member removed per full individual HP lost; attacks scale with remaining members. No healing or temporary HP. Losses do not choose named victims or assert their death."
+        },
+        "group": {
+          "rule": "shared-hp-attrition-v1",
+          "name": "Groupe des captifs de la cellule sud",
+          "members": [
+            {
+              "id": "yaeda",
+              "name": "Yaeda Firenni"
+            },
+            {
+              "id": "jalrax",
+              "name": "Jalrax"
+            },
+            {
+              "id": "durz",
+              "name": "Durz"
+            },
+            {
+              "id": "seffra",
+              "name": "Seffra"
+            },
+            {
+              "id": "ashlan",
+              "name": "Ashlan"
+            }
+          ],
+          "initialCount": 5,
+          "remainingCount": 5,
+          "memberMaxHp": 4,
+          "incapacitatedCount": 0,
+          "cannotRegainHp": true,
+          "cannotGainTemporaryHp": true
+        }
+      },
+      "vecken_rescued": {
+        "type": "knight",
+        "hp": {
+          "current": 25,
+          "max": 52
+        },
+        "ac": 18,
+        "stats": {
+          "str": 16,
+          "dex": 11,
+          "con": 14,
+          "int": 11,
+          "wis": 11,
+          "cha": 15
+        },
+        "conditions": [],
+        "xpValue": 700,
+        "attackBonus": 5,
+        "damageDice": "2d6+3",
+        "speed": 30,
+        "attackName": "Greatsword",
+        "attackRangeCells": 1,
+        "damageType": "slashing",
+        "movementModes": {
+          "walk": 30
+        },
+        "id": "vecken_rescued",
+        "name": "Vecken — blessé",
+        "kind": "knight",
+        "socialIdentity": "vecken",
+        "position": {
+          "x": 18,
+          "y": 13
+        },
+        "roomId": "30",
+        "mapId": "cellar",
+        "disposition": "neutral",
+        "visible": false,
+        "description": "Vecken capturé seulement si la visite de Waterdeep l’a envoyé sur la route ; sinon représente son arrivée tardive en soutien.",
+        "isAlive": true,
+        "hostile": false,
+        "srd": {
+          "index": "knight",
+          "ruleset": "2014",
+          "url": "https://www.dnd5eapi.co/api/2014/monsters/knight"
+        },
+        "statBlock": {
+          "type": "knight",
+          "name": "Knight",
+          "ruleset": "2014",
+          "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/knight",
+          "sourceSha256": "d3aa70e443c5cefc21fccabfc09cd855b4ebc552ac72f5ca28dd0d9e617464a9",
+          "published": {
+            "index": "knight",
+            "name": "Knight",
+            "desc": "Knights are warriors who pledge service to rulers, religious orders, and noble causes. A knight’s alignment determines the extent to which a pledge is honored. Whether undertaking a quest or patrolling a realm, a knight often travels with an entourage that includes squires and hirelings who are commoners.",
+            "size": "Medium",
+            "type": "humanoid",
+            "subtype": "any race",
+            "alignment": "any alignment",
+            "armor_class": [
+              {
+                "type": "armor",
+                "value": 18,
+                "armor": [
+                  {
+                    "index": "plate-armor",
+                    "name": "Plate Armor",
+                    "url": "/api/2014/equipment/plate-armor"
+                  }
+                ]
+              }
+            ],
+            "hit_points": 52,
+            "hit_dice": "8d8",
+            "hit_points_roll": "8d8+16",
+            "speed": {
+              "walk": "30 ft."
+            },
+            "strength": 16,
+            "dexterity": 11,
+            "constitution": 14,
+            "intelligence": 11,
+            "wisdom": 11,
+            "charisma": 15,
+            "proficiencies": [
+              {
+                "value": 4,
+                "proficiency": {
+                  "index": "saving-throw-con",
+                  "name": "Saving Throw: CON",
+                  "url": "/api/2014/proficiencies/saving-throw-con"
+                }
+              },
+              {
+                "value": 2,
+                "proficiency": {
+                  "index": "saving-throw-wis",
+                  "name": "Saving Throw: WIS",
+                  "url": "/api/2014/proficiencies/saving-throw-wis"
+                }
+              }
+            ],
+            "damage_vulnerabilities": [],
+            "damage_resistances": [],
+            "damage_immunities": [],
+            "condition_immunities": [],
+            "senses": {
+              "passive_perception": 10
+            },
+            "languages": "any one language (usually Common)",
+            "challenge_rating": 3,
+            "proficiency_bonus": 2,
+            "xp": 700,
+            "special_abilities": [
+              {
+                "name": "Brave",
+                "desc": "The knight has advantage on saving throws against being frightened.",
+                "damage": []
+              }
+            ],
+            "actions": [
+              {
+                "damage": [],
+                "name": "Multiattack",
+                "multiattack_type": "actions",
+                "desc": "The knight makes two melee attacks.",
+                "actions": [
+                  {
+                    "action_name": "Greatsword",
+                    "count": "2",
+                    "type": "melee"
+                  }
+                ]
+              },
+              {
+                "name": "Greatsword",
+                "desc": "Melee Weapon Attack: +5 to hit, reach 5 ft., one target. Hit: 10 (2d6 + 3) slashing damage.",
+                "attack_bonus": 5,
+                "damage": [
+                  {
+                    "damage_type": {
+                      "index": "slashing",
+                      "name": "Slashing",
+                      "url": "/api/2014/damage-types/slashing"
+                    },
+                    "damage_dice": "2d6+3"
+                  }
+                ],
+                "actions": []
+              },
+              {
+                "name": "Heavy Crossbow",
+                "desc": "Ranged Weapon Attack: +2 to hit, range 100/400 ft., one target. Hit: 5 (1d10) piercing damage.",
+                "attack_bonus": 2,
+                "damage": [
+                  {
+                    "damage_type": {
+                      "index": "piercing",
+                      "name": "Piercing",
+                      "url": "/api/2014/damage-types/piercing"
+                    },
+                    "damage_dice": "1d10"
+                  }
+                ],
+                "actions": []
+              },
+              {
+                "damage": [],
+                "name": "Leadership",
+                "desc": "For 1 minute, the knight can utter a special command or warning whenever a nonhostile creature that it can see within 30 ft. of it makes an attack roll or a saving throw. The creature can add a d4 to its roll provided it can hear and understand the knight. A creature can benefit from only one Leadership die at a time. This effect ends if the knight is incapacitated.",
+                "usage": {
+                  "type": "recharge after rest",
+                  "rest_types": [
+                    "short",
+                    "long"
+                  ]
+                },
+                "actions": []
+              }
+            ],
+            "reactions": [
+              {
+                "name": "Parry",
+                "desc": "The knight adds 2 to its AC against one melee attack that would hit it. To do so, the knight must see the attacker and be wielding a melee weapon."
+              }
+            ],
+            "image": "/api/images/monsters/knight.png",
+            "url": "/api/2014/monsters/knight",
+            "updated_at": "2026-04-01T20:35:38.254Z",
+            "forms": [],
+            "legendary_actions": []
+          }
+        }
+      },
+      "young_fargo": {
+        "type": "cultist",
+        "hp": {
+          "current": 9,
+          "max": 9
+        },
+        "ac": 12,
+        "stats": {
+          "str": 11,
+          "dex": 12,
+          "con": 10,
+          "int": 10,
+          "wis": 11,
+          "cha": 10
+        },
+        "conditions": [],
+        "xpValue": 25,
+        "attackBonus": 3,
+        "damageDice": "1d6+1",
+        "speed": 30,
+        "attackName": "Scimitar",
+        "attackRangeCells": 1,
+        "damageType": "slashing",
+        "movementModes": {
+          "walk": 30
+        },
+        "id": "young_fargo",
+        "name": "Le jeune Fargo",
+        "kind": "novice",
+        "position": {
+          "x": 25,
+          "y": 13
+        },
+        "roomId": "31",
+        "mapId": "cellar",
+        "disposition": "neutral",
+        "visible": false,
+        "description": "Recrue manipulée : peut être convaincue ou épargnée sans être tuée.",
+        "isAlive": true,
+        "hostile": false,
+        "srd": {
+          "index": "cultist",
+          "ruleset": "2014",
+          "url": "https://www.dnd5eapi.co/api/2014/monsters/cultist"
+        },
+        "statBlock": {
+          "type": "cultist",
+          "name": "Cultist",
+          "ruleset": "2014",
+          "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/cultist",
+          "sourceSha256": "afae4e230c718d77ce7c3207ac561884e688fa86942d9d406b0d3b9b70b97368",
+          "published": {
+            "index": "cultist",
+            "name": "Cultist",
+            "desc": "Cultists swear allegiance to dark powers such as elemental princes, demon lords, or archdevils. Most conceal their loyalties to avoid being ostracized, imprisoned, or executed for their beliefs. Unlike evil acolytes, cultists often show signs of insanity in their beliefs and practices.",
+            "size": "Medium",
+            "type": "humanoid",
+            "subtype": "any race",
+            "alignment": "any non-good alignment",
+            "armor_class": [
+              {
+                "type": "armor",
+                "value": 12,
+                "armor": [
+                  {
+                    "index": "leather-armor",
+                    "name": "Leather Armor",
+                    "url": "/api/2014/equipment/leather-armor"
+                  }
+                ]
+              }
+            ],
+            "hit_points": 9,
+            "hit_dice": "2d8",
+            "hit_points_roll": "2d8",
+            "speed": {
+              "walk": "30 ft."
+            },
+            "strength": 11,
+            "dexterity": 12,
+            "constitution": 10,
+            "intelligence": 10,
+            "wisdom": 11,
+            "charisma": 10,
+            "proficiencies": [
+              {
+                "value": 2,
+                "proficiency": {
+                  "index": "skill-deception",
+                  "name": "Skill: Deception",
+                  "url": "/api/2014/proficiencies/skill-deception"
+                }
+              },
+              {
+                "value": 2,
+                "proficiency": {
+                  "index": "skill-religion",
+                  "name": "Skill: Religion",
+                  "url": "/api/2014/proficiencies/skill-religion"
+                }
+              }
+            ],
+            "damage_vulnerabilities": [],
+            "damage_resistances": [],
+            "damage_immunities": [],
+            "condition_immunities": [],
+            "senses": {
+              "passive_perception": 10
+            },
+            "languages": "any one language (usually Common)",
+            "challenge_rating": 0.125,
+            "proficiency_bonus": 2,
+            "xp": 25,
+            "special_abilities": [
+              {
+                "name": "Dark Devotion",
+                "desc": "The cultist has advantage on saving throws against being charmed or frightened.",
+                "damage": []
+              }
+            ],
+            "actions": [
+              {
+                "name": "Scimitar",
+                "desc": "Melee Weapon Attack: +3 to hit, reach 5 ft., one creature. Hit: 4 (1d6 + 1) slashing damage.",
+                "attack_bonus": 3,
+                "damage": [
+                  {
+                    "damage_type": {
+                      "index": "slashing",
+                      "name": "Slashing",
+                      "url": "/api/2014/damage-types/slashing"
+                    },
+                    "damage_dice": "1d6+1"
+                  }
+                ],
+                "actions": []
+              }
+            ],
+            "image": "/api/images/monsters/cultist.png",
+            "url": "/api/2014/monsters/cultist",
+            "updated_at": "2026-04-01T20:35:38.253Z",
+            "forms": [],
+            "legendary_actions": [],
+            "reactions": []
+          }
+        }
+      },
+      "cemetery_keeper": {
+        "type": "commoner",
+        "hp": {
+          "current": 4,
+          "max": 4
+        },
+        "ac": 10,
+        "stats": {
+          "str": 10,
+          "dex": 10,
+          "con": 10,
+          "int": 10,
+          "wis": 10,
+          "cha": 10
+        },
+        "conditions": [],
+        "xpValue": 10,
+        "attackBonus": 2,
+        "damageDice": "1d4",
+        "speed": 30,
+        "attackName": "Club",
+        "attackRangeCells": 1,
+        "damageType": "bludgeoning",
+        "movementModes": {
+          "walk": 30
+        },
+        "id": "cemetery_keeper",
+        "name": "La gardienne des sépultures",
+        "kind": "caretaker",
+        "position": {
+          "x": 7,
+          "y": 10
+        },
+        "roomId": "33",
+        "mapId": "rest",
+        "disposition": "neutral",
+        "visible": false,
+        "description": "Indique le mausolée consacré et reçoit les preuves pour la justice.",
+        "isAlive": true,
+        "hostile": false,
+        "srd": {
+          "index": "commoner",
+          "ruleset": "2014",
+          "url": "https://www.dnd5eapi.co/api/2014/monsters/commoner"
+        },
+        "statBlock": {
+          "type": "commoner",
+          "name": "Commoner",
+          "ruleset": "2014",
+          "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/commoner",
+          "sourceSha256": "534451fc4f991c7957ab93a702adc3a2249e2b34a98825e64ad07d73e9be7074",
+          "published": {
+            "index": "commoner",
+            "name": "Commoner",
+            "desc": "Commoners include peasants, serfs, slaves, servants, pilgrims, merchants, artisans, and hermits.",
+            "size": "Medium",
+            "type": "humanoid",
+            "subtype": "any race",
+            "alignment": "any alignment",
+            "armor_class": [
+              {
+                "type": "dex",
+                "value": 10
+              }
+            ],
+            "hit_points": 4,
+            "hit_dice": "1d8",
+            "hit_points_roll": "1d8",
+            "speed": {
+              "walk": "30 ft."
+            },
+            "strength": 10,
+            "dexterity": 10,
+            "constitution": 10,
+            "intelligence": 10,
+            "wisdom": 10,
+            "charisma": 10,
+            "proficiencies": [],
+            "damage_vulnerabilities": [],
+            "damage_resistances": [],
+            "damage_immunities": [],
+            "condition_immunities": [],
+            "senses": {
+              "passive_perception": 10
+            },
+            "languages": "any one language (usually Common)",
+            "challenge_rating": 0,
+            "proficiency_bonus": 2,
+            "xp": 10,
+            "actions": [
+              {
+                "name": "Club",
+                "desc": "Melee Weapon Attack: +2 to hit, reach 5 ft., one target. Hit: 2 (1d4) bludgeoning damage.",
+                "attack_bonus": 2,
+                "damage": [
+                  {
+                    "damage_type": {
+                      "index": "bludgeoning",
+                      "name": "Bludgeoning",
+                      "url": "/api/2014/damage-types/bludgeoning"
+                    },
+                    "damage_dice": "1d4"
+                  }
+                ],
+                "actions": []
+              }
+            ],
+            "image": "/api/images/monsters/commoner.png",
+            "url": "/api/2014/monsters/commoner",
+            "updated_at": "2026-04-01T20:35:38.253Z",
+            "forms": [],
+            "legendary_actions": [],
+            "reactions": [],
+            "special_abilities": []
+          }
+        }
+      },
+      "sarah_at_rest": {
+        "type": "ghost",
+        "hp": {
+          "current": 225,
+          "max": 225
+        },
+        "ac": 11,
+        "stats": {
+          "str": 7,
+          "dex": 13,
+          "con": 10,
+          "int": 10,
+          "wis": 12,
+          "cha": 17
+        },
+        "conditions": [],
+        "xpValue": 1100,
+        "attackBonus": 5,
+        "damageDice": "20d6+15",
+        "speed": 0,
+        "attackName": "Withering Touch",
+        "attackRangeCells": 1,
+        "damageType": "necrotic",
+        "movementModes": {
+          "walk": 0,
+          "fly": 40,
+          "hover": true
+        },
+        "id": "sarah_at_rest",
+        "name": "Sarah et les quatre esprits Yellowcrest",
+        "kind": "ghost",
+        "socialIdentity": "sarah",
+        "position": {
+          "x": 16,
+          "y": 3
+        },
+        "roomId": "35",
+        "mapId": "rest",
+        "disposition": "neutral",
+        "visible": false,
+        "description": "Apparaissent uniquement après l’inhumation effective de l’urne et l’adieu voulu par le joueur.",
+        "isAlive": true,
+        "hostile": false,
+        "srd": {
+          "index": "ghost",
+          "ruleset": "2014",
+          "url": "https://www.dnd5eapi.co/api/2014/monsters/ghost"
+        },
+        "statBlock": {
+          "type": "ghost",
+          "name": "Groupe des esprits libérés",
+          "ruleset": "2014",
+          "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/ghost",
+          "sourceSha256": "32c6f528707440c9da15aa5c9ae0ae19fcb703231b5762608dd0b3e646fda234",
+          "published": {
+            "index": "ghost",
+            "name": "Ghost",
+            "size": "Medium",
+            "type": "undead",
+            "alignment": "any alignment",
+            "armor_class": [
+              {
+                "type": "dex",
+                "value": 11
+              }
+            ],
+            "hit_points": 45,
+            "hit_dice": "10d8",
+            "hit_points_roll": "10d8",
+            "speed": {
+              "walk": "0 ft.",
+              "fly": "40 ft.",
+              "hover": true
+            },
+            "strength": 7,
+            "dexterity": 13,
+            "constitution": 10,
+            "intelligence": 10,
+            "wisdom": 12,
+            "charisma": 17,
+            "proficiencies": [],
+            "damage_vulnerabilities": [],
+            "damage_resistances": [
+              "acid",
+              "fire",
+              "lightning",
+              "thunder",
+              "bludgeoning, piercing, and slashing from nonmagical weapons"
+            ],
+            "damage_immunities": [
+              "cold",
+              "necrotic",
+              "poison"
+            ],
+            "condition_immunities": [
+              {
+                "index": "charmed",
+                "name": "Charmed",
+                "url": "/api/2014/conditions/charmed"
+              },
+              {
+                "index": "exhaustion",
+                "name": "Exhaustion",
+                "url": "/api/2014/conditions/exhaustion"
+              },
+              {
+                "index": "frightened",
+                "name": "Frightened",
+                "url": "/api/2014/conditions/frightened"
+              },
+              {
+                "index": "grappled",
+                "name": "Grappled",
+                "url": "/api/2014/conditions/grappled"
+              },
+              {
+                "index": "paralyzed",
+                "name": "Paralyzed",
+                "url": "/api/2014/conditions/paralyzed"
+              },
+              {
+                "index": "petrified",
+                "name": "Petrified",
+                "url": "/api/2014/conditions/petrified"
+              },
+              {
+                "index": "poisoned",
+                "name": "Poisoned",
+                "url": "/api/2014/conditions/poisoned"
+              },
+              {
+                "index": "prone",
+                "name": "Prone",
+                "url": "/api/2014/conditions/prone"
+              },
+              {
+                "index": "restrained",
+                "name": "Restrained",
+                "url": "/api/2014/conditions/restrained"
+              }
+            ],
+            "senses": {
+              "darkvision": "60 ft.",
+              "passive_perception": 11
+            },
+            "languages": "any languages it knew in life",
+            "challenge_rating": 4,
+            "proficiency_bonus": 2,
+            "xp": 1100,
+            "special_abilities": [
+              {
+                "name": "Ethereal Sight",
+                "desc": "The ghost can see 60 ft. into the Ethereal Plane when it is on the Material Plane, and vice versa.",
+                "damage": []
+              },
+              {
+                "name": "Incorporeal Movement",
+                "desc": "The ghost can move through other creatures and objects as if they were difficult terrain. It takes 5 (1d10) force damage if it ends its turn inside an object.",
+                "damage": []
+              }
+            ],
+            "actions": [
+              {
+                "name": "Withering Touch",
+                "desc": "Melee Weapon Attack: +5 to hit, reach 5 ft., one target. Hit: 17 (4d6 + 3) necrotic damage.",
+                "attack_bonus": 5,
+                "damage": [
+                  {
+                    "damage_type": {
+                      "index": "necrotic",
+                      "name": "Necrotic",
+                      "url": "/api/2014/damage-types/necrotic"
+                    },
+                    "damage_dice": "4d6+3"
+                  }
+                ],
+                "actions": []
+              },
+              {
+                "damage": [],
+                "name": "Etherealness",
+                "desc": "The ghost enters the Ethereal Plane from the Material Plane, or vice versa. It is visible on the Material Plane while it is in the Border Ethereal, and vice versa, yet it can't affect or be affected by anything on the other plane.",
+                "actions": []
+              },
+              {
+                "damage": [],
+                "name": "Horrifying Visage",
+                "desc": "Each non-undead creature within 60 ft. of the ghost that can see it must succeed on a DC 13 Wisdom saving throw or be frightened for 1 minute. If the save fails by 5 or more, the target also ages 1d4 × 10 years. A frightened target can repeat the saving throw at the end of each of its turns, ending the frightened condition on itself on a success. If a target's saving throw is successful or the effect ends for it, the target is immune to this ghost's Horrifying Visage for the next 24 hours. The aging effect can be reversed with a greater restoration spell, but only within 24 hours of it occurring.",
+                "dc": {
+                  "dc_type": {
+                    "index": "wis",
+                    "name": "WIS",
+                    "url": "/api/2014/ability-scores/wis"
+                  },
+                  "dc_value": 13,
+                  "success_type": "none"
+                },
+                "actions": []
+              },
+              {
+                "damage": [],
+                "name": "Possession",
+                "desc": "One humanoid that the ghost can see within 5 ft. of it must succeed on a DC 13 Charisma saving throw or be possessed by the ghost; the ghost then disappears, and the target is incapacitated and loses control of its body. The ghost now controls the body but doesn't deprive the target of awareness. The ghost can't be targeted by any attack, spell, or other effect, except ones that turn undead, and it retains its alignment, Intelligence, Wisdom, Charisma, and immunity to being charmed and frightened. It otherwise uses the possessed target's statistics, but doesn't gain access to the target's knowledge, class features, or proficiencies.\nThe possession lasts until the body drops to 0 hit points, the ghost ends it as a bonus action, or the ghost is turned or forced out by an effect like the dispel evil and good spell. When the possession ends, the ghost reappears in an unoccupied space within 5 ft. of the body. The target is immune to this ghost's Possession for 24 hours after succeeding on the saving throw or after the possession ends.",
+                "usage": {
+                  "type": "recharge on roll",
+                  "dice": "1d6",
+                  "min_value": 6
+                },
+                "dc": {
+                  "dc_type": {
+                    "index": "cha",
+                    "name": "CHA",
+                    "url": "/api/2014/ability-scores/cha"
+                  },
+                  "dc_value": 13,
+                  "success_type": "none"
+                },
+                "actions": []
+              }
+            ],
+            "image": "/api/images/monsters/ghost.png",
+            "url": "/api/2014/monsters/ghost",
+            "updated_at": "2026-04-01T20:35:38.254Z",
+            "forms": [],
+            "legendary_actions": [],
+            "reactions": []
+          },
+          "homebrew": "Shared HP group: one member removed per full individual HP lost; attacks scale with remaining members. No healing or temporary HP. Losses do not choose named victims or assert their death."
+        },
+        "group": {
+          "rule": "shared-hp-attrition-v1",
+          "name": "Groupe des esprits libérés",
+          "members": [
+            {
+              "id": "sarah",
+              "name": "Sarah"
+            },
+            {
+              "id": "maria",
+              "name": "Maria Yellowcrest"
+            },
+            {
+              "id": "malik",
+              "name": "Malik Yellowcrest"
+            },
+            {
+              "id": "janus",
+              "name": "Janus Yellowcrest"
+            },
+            {
+              "id": "tianna",
+              "name": "Tianna Yellowcrest"
+            }
+          ],
+          "initialCount": 5,
+          "remainingCount": 5,
+          "memberMaxHp": 45,
+          "incapacitatedCount": 0,
+          "cannotRegainHp": true,
+          "cannotGainTemporaryHp": true
+        }
+      }
+    },
+    "initiativeOrder": [],
+    "currentTurn": null,
+    "round": 0,
+    "movementUsed": {},
+    "diagonalMovementUsed": {},
+    "actionUsed": {},
+    "bonusActionUsed": {},
+    "combatLog": [
+      {
+        "round": 0,
+        "turn": "player",
+        "action": "player se deplace",
+        "mechanicalDetail": "Deplacement (4,8) -> (5,9) | salle 1 -> 1 | trajet [{\"x\":4,\"y\":8},{\"x\":5,\"y\":9}] | coût 1 cases | goal_reached",
+        "id": "log-1794160559881-as4x1",
+        "timestamp": 1794160559881
+      }
+    ],
+    "roomsVisited": [
+      "1"
+    ],
+    "currentRoomId": "1",
+    "currentMapId": "candlekeep",
+    "mapOutcomes": {},
+    "encountersTriggered": [],
+    "worldFacts": [
+      {
+        "text": "Qualification actuelle explicite du canevas, du fond dix pieds plus bas, du bord et de la véritable face solide ; aucune position passée reconstruite.",
+        "source": "record_scene_fact",
+        "mapId": "candlekeep",
+        "roomId": "1",
+        "expires": "never",
+        "narrativeEffect": {
+          "description": "Qualification actuelle explicite du canevas, du fond dix pieds plus bas, du bord et de la véritable face solide ; aucune position passée reconstruite.",
+          "cell": {
+            "x": 4,
+            "y": 8
+          }
+        },
+        "basis": "ai_interpretation",
+        "id": "wf-1794160559836-aepj5"
+      }
+    ],
+    "droppedItems": {
+      "sarah_diary_copy": {
+        "item": {
+          "id": "sarah_diary_copy",
+          "name": "Copie du journal de Sarah",
+          "type": "misc",
+          "description": "Copie autorisée des dernières pages et des croquis. Le journal original et Sarah restent à Candlekeep."
+        },
+        "mapId": "candlekeep",
+        "roomId": "1",
+        "position": {
+          "x": 5,
+          "y": 8
+        }
+      },
+      "retribution_tome": {
+        "item": {
+          "id": "retribution_tome",
+          "name": "La Rétribution des Anciens",
+          "type": "misc",
+          "spellIds": [
+            "counterspell",
+            "fireball",
+            "detect-magic",
+            "mage-armor",
+            "shield",
+            "misty-step",
+            "greater-invisibility"
+          ],
+          "description": "Tome du rituel de Gaernoo ; preuve à remettre aux Avoués, sans sorts supplémentaires automatisés."
+        },
+        "mapId": "temple",
+        "roomId": "19",
+        "position": {
+          "x": 3,
+          "y": 9
+        }
+      },
+      "yellowcrest_urn": {
+        "item": {
+          "id": "yellowcrest_urn",
+          "name": "Urne des cendres Yellowcrest",
+          "type": "misc",
+          "description": "Urne d’or gravée contenant les cendres de Maria, Malik, Janus et Tianna. À inhumer en terre consacrée."
+        },
+        "mapId": "temple",
+        "roomId": "26",
+        "position": {
+          "x": 35,
+          "y": 21
+        }
+      }
+    },
+    "sceneMemory": {
+      "layoutMigrations": [
+        "split-manor-floors-v1"
+      ]
+    },
+    "socialProfileSeed": "58e3d811-762e-4c75-9e56-e63815def20f",
+    "socialPersonalities": {
+      "sarah": {
+        "ideals": [
+          "Une promesse mérite d’être tenue."
+        ],
+        "bonds": [
+          "Le souvenir d’une aide discrète."
+        ],
+        "traits": [
+          "Observe longtemps avant de réagir."
+        ],
+        "likedTopics": [
+          "Dessins de jardins"
+        ],
+        "tabooTopics": [
+          "Familiarité imposée"
+        ]
+      },
+      "avowed": {
+        "ideals": [
+          "Les gestes comptent autant que les paroles."
+        ],
+        "bonds": [
+          "Une habitude familière et rassurante."
+        ],
+        "traits": [
+          "Prend un instant pour mesurer sa réponse."
+        ],
+        "likedTopics": [
+          "Voyages documentés"
+        ],
+        "tabooTopics": [
+          "Promesses faites à la légère"
+        ]
+      },
+      "arnulf": {
+        "ideals": [
+          "La patience aide à comprendre."
+        ],
+        "bonds": [
+          "Une habitude familière et rassurante."
+        ],
+        "traits": [
+          "Observe longtemps avant de réagir."
+        ],
+        "likedTopics": [
+          "Art de recevoir"
+        ],
+        "tabooTopics": [
+          "Promesses faites à la légère"
+        ]
+      },
+      "vecken": {
+        "ideals": [
+          "Les gestes comptent autant que les paroles."
+        ],
+        "bonds": [
+          "Une habitude familière et rassurante."
+        ],
+        "traits": [
+          "Exprime son accord par un signe de tête."
+        ],
+        "likedTopics": [
+          "Devoir envers les proches"
+        ],
+        "tabooTopics": [
+          "Promesses faites à la légère"
+        ]
+      },
+      "cobbler": {
+        "ideals": [
+          "La patience aide à comprendre."
+        ],
+        "bonds": [
+          "Le souvenir d’un moment paisible."
+        ],
+        "traits": [
+          "Remarque les gestes de respect."
+        ],
+        "likedTopics": [
+          "Chaussures de voyage"
+        ],
+        "tabooTopics": [
+          "Impatience devant une hésitation"
+        ]
+      },
+      "faerl": {
+        "traits": [
+          "Répète un geste rituel discret avant de répondre."
+        ],
+        "likedTopics": [
+          "Étoffes luxueuses"
+        ],
+        "tabooTopics": [
+          "Imprécision dans le cérémonial"
+        ]
+      },
+      "kara": {
+        "ideals": [
+          "Une promesse mérite d’être tenue."
+        ],
+        "bonds": [
+          "Une habitude familière et rassurante."
+        ],
+        "traits": [
+          "Observe longtemps avant de réagir."
+        ],
+        "likedTopics": [
+          "Récoltes du village"
+        ],
+        "tabooTopics": [
+          "Familiarité imposée"
+        ]
+      },
+      "old_fargo": {
+        "ideals": [
+          "Les gestes comptent autant que les paroles."
+        ],
+        "bonds": [
+          "Le souvenir d’une aide discrète."
+        ],
+        "traits": [
+          "Exprime son accord par un signe de tête."
+        ],
+        "likedTopics": [
+          "Entretien d’un foyer accueillant"
+        ],
+        "tabooTopics": [
+          "Promesses faites à la légère"
+        ]
+      },
+      "yaeda": {
+        "ideals": [
+          "Une promesse mérite d’être tenue."
+        ],
+        "bonds": [
+          "Le souvenir d’un moment paisible."
+        ],
+        "traits": [
+          "Remarque les gestes de respect."
+        ],
+        "likedTopics": [
+          "Aide concrète aux plus faibles"
+        ],
+        "tabooTopics": [
+          "Promesses faites à la légère"
+        ]
+      },
+      "young_fargo": {
+        "ideals": [
+          "Les petits témoignages de respect ont de la valeur."
+        ],
+        "bonds": [
+          "Les marques de respect reçues dans les moments difficiles."
+        ],
+        "traits": [
+          "Observe longtemps avant de réagir."
+        ],
+        "likedTopics": [
+          "Reconnaissance d’un effort sincère"
+        ],
+        "tabooTopics": [
+          "Familiarité imposée"
+        ]
+      },
+      "cemetery_keeper": {
+        "ideals": [
+          "Les petits témoignages de respect ont de la valeur."
+        ],
+        "bonds": [
+          "Les marques de respect reçues dans les moments difficiles."
+        ],
+        "traits": [
+          "Observe longtemps avant de réagir."
+        ],
+        "likedTopics": [
+          "Gestes de recueillement"
+        ],
+        "tabooTopics": [
+          "Promesses faites à la légère"
+        ]
+      },
+      "encounter:faerl_bodyguards:0": {
+        "ideals": [
+          "La patience aide à comprendre."
+        ],
+        "bonds": [
+          "Le souvenir d’un moment paisible."
+        ],
+        "traits": [
+          "Prend un instant pour mesurer sa réponse."
+        ],
+        "likedTopics": [
+          "Équipement solide"
+        ],
+        "tabooTopics": [
+          "Engagements imprécis"
+        ]
+      },
+      "encounter:faerl_bodyguards:1": {
+        "traits": [
+          "Observe les mains de son interlocuteur."
+        ],
+        "likedTopics": [
+          "Cérémonial ordonné"
+        ],
+        "tabooTopics": [
+          "Interruption des formules"
+        ]
+      },
+      "encounter:barn_watch:0": {
+        "traits": [
+          "Garde une immobilité étudiée."
+        ],
+        "likedTopics": [
+          "Cérémonial ordonné"
+        ],
+        "tabooTopics": [
+          "Imprécision dans le cérémonial"
+        ]
+      },
+      "encounter:barn_watch:1": {
+        "traits": [
+          "Garde une immobilité étudiée."
+        ],
+        "likedTopics": [
+          "Récitation exacte des formules"
+        ],
+        "tabooTopics": [
+          "Désordre dans les préparatifs"
+        ]
+      },
+      "encounter:temple_guard:0": {
+        "traits": [
+          "Répète un geste rituel discret avant de répondre."
+        ],
+        "likedTopics": [
+          "Discipline des officiants"
+        ],
+        "tabooTopics": [
+          "Imprécision dans le cérémonial"
+        ]
+      },
+      "encounter:temple_guard:1": {
+        "traits": [
+          "Garde une immobilité étudiée."
+        ],
+        "likedTopics": [
+          "Récitation exacte des formules"
+        ],
+        "tabooTopics": [
+          "Désordre dans les préparatifs"
+        ]
+      },
+      "encounter:stair_watch:0": {
+        "traits": [
+          "Garde une immobilité étudiée."
+        ],
+        "likedTopics": [
+          "Récitation exacte des formules"
+        ],
+        "tabooTopics": [
+          "Désordre dans les préparatifs"
+        ]
+      },
+      "encounter:vault_grick:0": {
+        "traits": [
+          "Tourne autour d’une odeur nouvelle."
+        ],
+        "likedTopics": [
+          "Nourriture déposée à distance"
+        ],
+        "tabooTopics": [
+          "Bruits métalliques répétés"
+        ]
+      },
+      "encounter:acolyte_training:0": {
+        "traits": [
+          "Observe les mains de son interlocuteur."
+        ],
+        "likedTopics": [
+          "Récitation exacte des formules"
+        ],
+        "tabooTopics": [
+          "Interruption des formules"
+        ]
+      },
+      "encounter:acolyte_training:1": {
+        "traits": [
+          "Garde une immobilité étudiée."
+        ],
+        "likedTopics": [
+          "Cérémonial ordonné"
+        ],
+        "tabooTopics": [
+          "Interruption des formules"
+        ]
+      },
+      "encounter:viallis_ritual:0": {
+        "traits": [
+          "Marque un silence pesant avant de réagir."
+        ],
+        "likedTopics": [
+          "Calligraphie des formules"
+        ],
+        "tabooTopics": [
+          "Désordre dans les préparatifs"
+        ]
+      },
+      "encounter:viallis_ritual:1": {
+        "traits": [
+          "Garde une immobilité étudiée."
+        ],
+        "likedTopics": [
+          "Symboles rituels soigneusement tracés"
+        ],
+        "tabooTopics": [
+          "Interruption des formules"
+        ]
+      }
+    }
+  },
+  "migration": {
+    "pendingId": "reaction-1794160559921-4aaccftgk06",
+    "qualification": {
+      "eventId": "w37-held-current-migration",
+      "trapId": "w37-held-current",
+      "coverSurfaceId": "w37-held-current-canvas",
+      "bottomSurfaceId": "w37-held-current-floor",
+      "escapeSurfaceId": "w37-held-current-rim",
+      "climbMediumId": "w37-held-current-climb",
+      "factId": "wf-1794160559836-aepj5",
+      "actualPitGeometryConfirmed": true,
+      "source": "Qualification actuelle explicite du canevas, du fond dix pieds plus bas, du bord et de la véritable face solide ; aucune position passée reconstruite."
+    },
+    "successCell": {
+      "x": 5,
+      "y": 8
+    },
+    "actualCurrentGeometryOnlyConfirmed": true,
+    "observations": {
+      "surfaces": [
+        {
+          "mapId": "candlekeep",
+          "roomId": "1",
+          "actualGeometryConfirmed": true,
+          "source": "Qualification actuelle explicite du canevas, du fond dix pieds plus bas, du bord et de la véritable face solide ; aucune position passée reconstruite.",
+          "eventId": "w37-held-current-canvas-now",
+          "surfaceId": "w37-held-current-canvas",
+          "cells": [
+            {
+              "x": 4,
+              "y": 8
+            }
+          ],
+          "kind": "support",
+          "elevationFeet": 0
+        },
+        {
+          "mapId": "candlekeep",
+          "roomId": "1",
+          "actualGeometryConfirmed": true,
+          "source": "Qualification actuelle explicite du canevas, du fond dix pieds plus bas, du bord et de la véritable face solide ; aucune position passée reconstruite.",
+          "eventId": "w37-held-current-floor-now",
+          "surfaceId": "w37-held-current-floor",
+          "cells": [
+            {
+              "x": 4,
+              "y": 8
+            }
+          ],
+          "kind": "support",
+          "elevationFeet": -10
+        },
+        {
+          "mapId": "candlekeep",
+          "roomId": "1",
+          "actualGeometryConfirmed": true,
+          "source": "Qualification actuelle explicite du canevas, du fond dix pieds plus bas, du bord et de la véritable face solide ; aucune position passée reconstruite.",
+          "eventId": "w37-held-current-rim-now",
+          "surfaceId": "w37-held-current-rim",
+          "cells": [
+            {
+              "x": 5,
+              "y": 8
+            }
+          ],
+          "kind": "support",
+          "elevationFeet": 0
+        }
+      ],
+      "body": {
+        "eventId": "w37-held-current-body-now",
+        "entityId": "bandit_1794160559886_0",
+        "heightFeet": 6,
+        "actualMeasuredBodyConfirmed": true,
+        "source": "Qualification actuelle explicite du canevas, du fond dix pieds plus bas, du bord et de la véritable face solide ; aucune position passée reconstruite."
+      },
+      "standing": {
+        "eventId": "w37-held-current-support-now",
+        "entityId": "bandit_1794160559886_0",
+        "surfaceId": "w37-held-current-canvas",
+        "actualCurrentSupportConfirmed": true,
+        "source": "Qualification actuelle explicite du canevas, du fond dix pieds plus bas, du bord et de la véritable face solide ; aucune position passée reconstruite."
+      },
+      "barrier": {
+        "eventId": "w37-held-current-face-now",
+        "barrierId": "w37-held-current-face",
+        "mapId": "candlekeep",
+        "reference": {
+          "kind": "object",
+          "objectId": "w37-held-current-wall",
+          "footprint": {
+            "minXFeet": 17.5,
+            "maxXFeet": 27.5,
+            "minYFeet": 27.5,
+            "maxYFeet": 37.5
+          }
+        },
+        "bottomZFeet": -10,
+        "topZFeet": 0,
+        "actualMeasuredBarrierConfirmed": true,
+        "source": "Qualification actuelle explicite du canevas, du fond dix pieds plus bas, du bord et de la véritable face solide ; aucune position passée reconstruite."
+      },
+      "medium": {
+        "eventId": "w37-held-current-medium-now",
+        "mediumId": "w37-held-current-climb",
+        "mapId": "candlekeep",
+        "roomId": "1",
+        "mode": "climb",
+        "cells": [
+          {
+            "x": 4,
+            "y": 8
+          },
+          {
+            "x": 5,
+            "y": 8
+          }
+        ],
+        "bottomZFeet": -10,
+        "topZFeet": 0,
+        "barrierId": "w37-held-current-face",
+        "factId": "wf-1794160559836-aepj5",
+        "actualPhysicalMediumConfirmed": true,
+        "handsRequired": 1,
+        "difficult": false,
+        "source": "Qualification actuelle explicite du canevas, du fond dix pieds plus bas, du bord et de la véritable face solide ; aucune position passée reconstruite."
+      }
+    }
+  },
+  "targetId": "bandit_1794160559886_0"
+}

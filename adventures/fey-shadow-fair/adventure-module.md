@@ -37,19 +37,19 @@ Aux nuits de lune-miel, la Foire aux Chandelles s'installe au pré communal — 
 
 | Créature du module | Type moteur | Notes |
 |---|---|---|
-| Tire-gousset gobelin | goblin_minion | 3 PV, fuit si l'autre tombe |
+| Tire-gousset gobelin | goblin | 7 PV, fuit si l'autre tombe |
 | Croupier gobelin / Péagiste zélé | goblin | défend sa baraque (ou son pont) |
 | Videur satyre | satyr | menace en vers de mirliton |
-| Brigand à mirliton | goblin_minion | 3 PV, plus de fanfare que de mordant |
+| Brigand à mirliton | goblin | 7 PV, plus de fanfare que de mordant |
 | Loup savant échappé | wolf | veut un cerceau, pas un mollet |
-| Le Grand Flan | zombie (16 PV) | lent, digne, profondément vexé |
+| Le Grand Flan | zombie (22 PV) | apparence de dessert, profil mécanique zombie intact |
 | Reflet désobligeant | bandit | copie les gestes du héros, en pire |
 | Champignon moqueur | violet_fungus | ricane, très lent |
 | Grenouille de bal | giant_frog | offensée, pas maligne |
 | Chien-clin | blink_dog | joue, ne tue jamais |
 | Ombre-cotillon | sprite | 2 PV, danse en attaquant |
 | Lutin duelliste | sprite | 2 PV, très théâtral |
-| Feu follet majordome | will_o_wisp (18 PV) | annonce les coups qu'il porte |
+| Feu follet majordome | will_o_wisp (22 PV) | annonce les coups qu'il porte |
 
 ---
 
@@ -86,6 +86,8 @@ L'herbe est constellée de lanternes plantées comme des salades lumineuses. Ça
 **Nicodème Minuit** (billettiste gobelin, non hostile) :
 - Position : (7, 14) — guérite étoilée surmontée d'une fée d'argent
 - Vérifie le billet du héros (il l'a déjà : huit poinçons) avec une lenteur de cérémonie, longue-vue vissée à l'œil. La longue-vue et le cornet acoustique détectent les mensonges — il joue au vieillard sourd, il ne l'est pas du tout.
+- **Profil social validé** : But fixe : contrôler les entrées et faire respecter les usages de la foire. Idéal fixe : « Tout le monde peut s’amuser, à condition de jouer le jeu. » Attache fixe : la foire et son poste de billettiste. Traits fixes : fausse surdité, lenteur cérémonieuse et humour pince-sans-rire.
+- À chaque nouvelle partie, le moteur tire un sujet apprécié et un sujet sensible dans les tables maison de `social.ts`, puis les sauvegarde. Utiliser les valeurs des profils sociaux locaux ; ne jamais les relancer pendant la partie ou au chargement d’une sauvegarde. Ces goûts ne désactivent jamais ses instruments détecteurs de mensonges : un échange agréable ne les neutralise pas.
 - DD 12 CHA → il souffle : « C'est Madame Bougie qui décide de qui passe le portail, mon brave. Et elle n'aime que les gens serviables. »
 - Billet épuisé plus tard ? Nicodème renégocie contre un gage féerique (saluer les arbres, complimenter tout le monde…).
 - **Ses propres talons** : DD 11 Perception → confirmation publique et embarrassante de l'absence d'ombre.
@@ -99,6 +101,8 @@ L'herbe est constellée de lanternes plantées comme des salades lumineuses. Ça
 ### Contenu
 **Madame Bougie** (tenancière, non hostile) :
 - Position : (8, 8) — derrière son étal de chandelles-souvenirs qui chuchotent
+- **Profil social validé** : But fixe : préserver la foire et aider les visiteurs bienveillants. Idéal fixe : « La bonté se prouve par des actes. » Attache fixe : la foire, ses forains et ses chandelles-souvenirs. Traits fixes : chaleureuse, maternelle, perspicace, avec une répartie piquante. « Je veux voir ce que tu fais pour les autres, mon petit. Les belles paroles, ça fond vite. »
+- Un sujet apprécié est tiré à chaque nouvelle partie parmi les souvenirs heureux, l’artisanat, les histoires de voyage et les petites attentions, puis sauvegardé pour toute la partie. La flagornerie grossière et le désordre violent restent des sujets sensibles fixes. Les goûts du profil social local ne remplacent pas les conditions d’ouverture du portail ci-dessous : un échange agréable ne vaut pas à lui seul l’accord de Madame Bougie.
 - OBJECTIF REQUIS (charm_bougie) : DD 13 Persuasion OU un vrai service rendu (tire-goussets réglés, course honnête, bouton donné à Ernestine dont elle entend parler) → elle devient helpful (`reveal_npc` avec disposition) et promet d'ouvrir le portail : « Revenez me voir quand vous partez, mon petit. Et ne revenez pas, c'est le principe. »
 - Flagornerie grossière → elle devient offended pour une scène (« Mes chandelles détectent le suif, jeune homme. »)
 
@@ -121,6 +125,8 @@ Le carrousel tourne à dos de limaces géantes — un demi-tour par chanson, len
 
 **Barnabé** (arbuste éveillé en pot, neutral tant qu'on ne l'a pas abordé) :
 - Position : (19, 10) — il fait la file du carrousel depuis trois lunes, personne ne le laisse monter (« pas de racines sur les limaces »)
+- **Profil social validé** : But fixe : découvrir le Bois-Ricanant avec un compagnon de voyage. Idéal fixe : « Avoir des racines n’oblige pas à rester immobile. » Attache fixe : son pot, sa petite maison, et ceux qui le considèrent comme un compagnon. Traits fixes : curieux, enthousiaste, naïf, bavard ; s’émerveille facilement. « Je veux voir une forêt pour de vrai ! Vous m’emmenez ? Je promets de ne pas prendre trop de racines. »
+- À chaque nouvelle partie, un sujet apprécié est tiré parmi les grandes forêts, les voyages, les animaux étranges et les récits d’aventure, puis sauvegardé. L’abandon et le fait d’être traité comme un objet restent des sujets sensibles fixes. Sa bienveillance ne vaut pas accord du joueur pour l’emmener : il ne traverse qu’après un échange qui le rend helpful et le choix explicite de partir. Accepter simplement de l’emmener peut suffire à gagner sa confiance, sans jet obligatoire.
 - DD 10 CHA OU accepter simplement de l'emmener → `reveal_npc({ npcId: "barnabe", disposition: "helpful" })` : il supplie qu'on l'emmène au Bois-Ricanant : « Je suis un BUISSON, monsieur. Un buisson qui n'a jamais vu de forêt. » Devenu helpful, il TRAVERSE le portail avec le joueur (compagnon). Sans cet accord, il reste à la foire.
 - Entrer dans la salle remplit l'objectif optionnel ride_carousel.
 
@@ -137,6 +143,7 @@ La tente rayée de Maître Filou, cartes encore tièdes sur la table. OBJECTIF R
 
 **Pipotin** (gobelin bonimenteur, wary) :
 - Position : (3, 2) — il garde la baraque et l'honneur douteux de la maison
+- **Profil social** : Vantard, théâtral, rusé et susceptible ; cherche reconnaissance et récompenses pour son talent. Attaché à la baraque et à son statut d’apprenti, il estime qu’un talent mérite d’être reconnu. Son sujet préféré est tiré à chaque nouvelle partie et sauvegardé ; humiliation publique et menaces restent sensibles. « Je connais du monde, moi. Une pièce ou un joli compliment, et je me souviens beaucoup mieux. » La piste indispensable reste spontanée et gratuite ; seuls les conseils supplémentaires se négocient.
 - Spontané : « Le patron ? Parti hier, par le Portail. Avec votre ombre. Elle a pas dit au revoir. »
 - DD 12 Persuasion (ou 1 po) → le conseil en or : « Le Prince rend tout à qui le fait rire. TOUT. Même les ombres. Même la dignité, c'est dire. »
 - La table : DD 12 Investigation → un jeu de cartes oublié, TOUTES l'as de trèfle (preuve de triche, précieuse salle 16)
@@ -163,6 +170,7 @@ Trois pointes dorées qui tournent, des panneaux peints qui bougent tout seuls. 
 
 **Ernestine** (guenon à la vielle, non hostile) :
 - Position : (1, 6) — cape couverte de boutons dépareillés, pancarte rimée : « Un bouton s'il vous plaît, je le coudrai à côté ; je n'offre rien à la place, qu'un sourire sur ma face. »
+- **Profil social** : Chaleureuse, attachée aux artistes et à sa cape, elle enrichit sa collection avec une gravité comique. Elle joue faux volontairement, selon la tradition. Son sujet préféré est tiré une fois par partie ; mépriser sa musique ou arracher ses boutons la blesse. « Je garde les boutons et les bons souvenirs ; pour le sourire, c’est moi qui vous l’offre. » Aucun cadeau ni pouvoir supplémentaire n’est dû pour un simple échange agréable.
 - Donner un bouton → elle devient helpful (`reveal_npc`) : plus tard dans le module, sa vielle couvrira une gaffe du héros au moment le plus opportun (avantage narratif, une fois). Madame Bougie en entend parler (compte comme « service rendu »).
 
 **Les loups savants** : chahuter le spectacle, ou lancer un NEUVIÈME objet à la jongleuse → le numéro déraille, deux loups s'échappent : `start_encounter("circus_wolves")`. Combat évitable : DD 12 SAG (Dressage) ou leur tendre un cerceau — ils sautent au travers et saluent.
@@ -176,6 +184,7 @@ Une théière haute comme une maison, peinte de dragons qui soufflent des bulles
 
 **Théophile** (gobelin tisanier, helpful) :
 - Position : (20, 12) — ceinturon de petites cuillères, ne parle qu'en rimes approximatives (« bramble-billet », « théière-sorcière »)
+- **Profil social** : Généreux et enthousiaste, attaché à sa théière et à ses cuillères ; il veut partager thé et rimes. Il parle toujours en rimes approximatives et souhaite qu’on lui réponde pareil, quel que soit son sujet préféré tiré pour la partie. Le mépris de ses rimes reste sensible. « Je vous sers du thé et de la gaieté ! » Le thé d’aplomb demande toujours la résolution prévue ci-dessous.
 - Lui répondre en rimes : DD 12 CHA → il offre un sachet de **thé d'aplomb** : le boire donne de l'aplomb pour UNE scène sociale (avantage narratif à faire valoir — idéalement à la Cour).
 
 **Tour de bulle** (1 poinçon) :
@@ -191,6 +200,7 @@ Tables de banquet sous les poiriers, échassiers qui cueillent les fruits en mar
 
 **Mirabelle** (ménestrelle gnome, non hostile) :
 - Position : (14, 12) — sur une balançoire accrochée à un poirier, luth sur les genoux
+- **Profil social** : Bienveillante et énigmatique, attachée à son luth, sa balançoire et aux récits des voyageurs, elle guide par ses chansons. Son sujet préféré varie par partie ; le cynisme méprisant reste sensible. « Je connais une chanson pour ce chagrin ; racontez-moi d’abord votre refrain. » Son air omniscient ne divulgue jamais une confidence ou un indice avant sa découverte et le jet requis.
 - Sait déjà tout, sourit trop : « Vous êtes exactement là où vous devez être. » Personne ne l'a jamais vue payer son billet.
 - Raconter honnêtement sa mésaventure (DD 12 CHA) → elle offre un **couplet porte-bonheur** : « Le Prince rend tout à qui le fait rire » (recoupe Pipotin) et souffle qu'un mime de la foire a perdu PLUS qu'une ombre (piste vers Miroslav, salle 9).
 
@@ -208,6 +218,7 @@ Des glaces qui rajeunissent ou vieillissent qui s'y regarde — et TOUTES montre
 
 **Miroslav** (mime, wary) :
 - Position : (8, 1) — béret, marinière, silence intégral
+- **Profil social** : Expressif et mélancolique, attaché à son art et à son reflet perdu, il veut être reconnu comme une personne. Son sujet préféré est tiré une fois par partie ; moquer son absence de reflet ou lui imposer de parler reste sensible. **Il ne prononce aucune réplique** : décrire ses mimes ; l’écriture n’est possible que si on lui fournit de quoi écrire. La préférence générale pour le discours direct ne le fait pas parler.
 - Son REFLET a été gagé au bonneteau contre Maître Filou, la même nuit que l'ombre du héros. Il ne se voit plus dans aucune glace.
 - Comprendre son mime : DD 12 SAG (ou lui prêter de quoi écrire) → il « raconte » : Filou triche TOUJOURS avec des as de trèfle ; son reflet est parti dans la même sacoche que l'ombre.
 - OBJECTIF optionnel (console_mime) : le consoler ou promettre de ramener son reflet (DD 12 CHA) → helpful (`reveal_npc`). Il offre son **béret porte-bonheur** et mime une standing ovation.
@@ -217,6 +228,16 @@ Des glaces qui rajeunissent ou vieillissent qui s'y regarde — et TOUTES montre
 ---
 
 # Carte wood — Le Bois-Ricanant
+
+## Profils sociaux du Bois-Ricanant — référence confidentielle du MJ
+
+Les PNJ nommés gardent leurs buts, idéaux, attaches, traits imposés et sujets sensibles fixes ; leur sujet préféré est tiré par partie. Barnabé conserve son profil en passant le portail.
+
+Les six rencontres du bois ont aussi un profil propre : champignons moqueurs, brigands du péage, grenouilles de bal, chiens-clins, ombres-cotillons et serviteurs de la Grande Farce. Leurs buts et traits de rôle restent fixes. Chaque créature reçoit un idéal secondaire, une attache secondaire, une manière de réagir, un goût et un sujet sensible supplémentaires tirés à la création de la partie, puis sauvegardés. Ces détails **s’ajoutent** au caractère imposé ; ils ne remplacent jamais une règle de scène, une condition de quête ou une réaction déjà résolue. Les profils locaux du moteur donnent les valeurs effectives.
+
+Les champignons moqueurs de cette rencontre comprennent les échanges et peuvent être amadoués, contrairement aux champignons ordinaires d’autres modules. Les chiens-clins restent joueurs et ne cherchent jamais à tuer ; les grenouilles protègent leur bal ; les ombres défendent leur numéro ; les brigands suivent les règles du péage ; la cour sert le Prince. Ombres-cotillons et lutins du Prince ont des profils distincts malgré leurs statistiques SRD communes.
+
+Ces données sont confidentielles. Aucun tirage ne déclenche une rencontre, une reddition, une restitution d’objet, une escorte, une révélation ou une fin de quête : le modèle choisit toujours les outils explicites adaptés après l’action réellement établie.
 
 Seconde et dernière carte (grille 16×24, cases x:0-15 / y:0-23 — carte en hauteur : on progresse du sud vers le nord, le viewport suit). Le domaine du Prince des Farces : une forêt qui glousse, des sentiers qui font des jeux de mots, une étiquette sociale absurde et impitoyable. **Quête de la carte** : atteindre la Cour (salle 16) et convaincre le Prince de faire rendre l'ombre. Deux routes parallèles y mènent depuis le Carrefour (salle 11) : à l'ouest le Péage (12) puis le Sentier des Chiens-Clins (14) ; à l'est la Mare (13) puis le Bal des Ombres (15). Il n'y a PAS de sortie — le module se conclut ici.
 
@@ -254,6 +275,7 @@ Trois têtes de pierre moussues empilées au croisement des routes, qui donnent 
 
 **Les Têtes Jacassantes** (oracle de pierre, non hostile) :
 - Position : (7, 15)
+- **Profil social commun** : Attachées au carrefour et à leur rivalité, elles veulent être écoutées et débattre. Elles s’interrompent, se notent et adorent réciter en canon. Un sujet préféré est tiré pour le trio à chaque nouvelle partie ; les faire taire ou dénigrer leur intelligence reste sensible. « Moi, je vous le dis : les autres s’égarent ! » Leur goût ne modifie ni la géographie, ni le fait qu’une seule tête dit vrai à la fois, jamais toujours la même.
 - DD 12 INT (recouper leurs indications) OU DD 12 CHA (les faire réciter en canon — elles ADORENT) → la vraie géographie : le péage à l'ouest (salle 12) puis le sentier (14), OU la mare à l'est (13) puis le bal (15). Les deux routes mènent à la Cour.
 - Bonus si elles sont contentes : « Ne JAMAIS s'incliner en premier devant le Prince. » (recoupe la Baronne)
 
@@ -269,6 +291,7 @@ Un pont de rondins sur un ruisseau qui glousse, une barrière en branche de coud
 
 **Le Capitaine Mirliton** (chef-brigand, wary) :
 - Position : (2, 10) — tricorne trop grand, moustache dessinée au charbon
+- **Profil social** : Théâtral et susceptible, attaché à sa bande et au péage, il préfère l’esprit et la sincérité à l’or. Il joue faux avec un aplomb militaire. Son sujet préféré varie par partie ; mépris du péage et humiliation de sa bande restent sensibles. « Je prélève du rire, du panache et, les mauvais jours, des pièces. » Les trois monnaies du péage restent valides, indépendamment de son sujet préféré.
 - Le péage n'accepte que trois monnaies : une blague INÉDITE, un secret honteux, ou 10 po. « Personne n'a jamais payé en or. Ça me vexerait presque. »
 - OBJECTIF optionnel (pass_toll) : blague inédite ou secret honteux sincère (DD 12 CHA) → helpful (`reveal_npc`) : toute la bande salue au mirliton (faux, évidemment) et il offre un raccourci commenté vers le Sentier.
 - Payer les 10 po fonctionne mais le VEXE (« C'est d'un banal... ») — il le raconte à tout le bois, ambiance jusqu'à la Cour.
@@ -284,6 +307,7 @@ Un bal permanent sur nénuphars dallés. Les demoiselles grenouilles répètent 
 
 **La Baronne Grenouille** (neutre, à cheval sur l'étiquette) :
 - Position : (13, 10) — collerette de nénuphar, face-à-main en rosée
+- **Profil social** : Digne, attachée au bal et à son orchestre, elle considère que les bonnes manières donnent sa place à chacun. Elle coasse avec emphase et apprécie les excuses bien dansées. Son sujet préféré est tiré une fois par partie ; grossièreté et moqueries sur son apparence restent sensibles. « Je vous accorde volontiers cette danse, si vous m’accordez le bon pied. » Son protocole secret demande toujours l’interaction résolue ci-dessous.
 - OBJECTIF optionnel (befriend_baroness) : DD 12 Persuasion OU accepter une danse (DD 11 DEX) → helpful, et elle livre LE protocole : « Ne JAMAIS s'incliner en premier devant le Prince. Le faire RIRE d'abord. L'inverse est un faux pas... définitif. »
 - Marcher sur un nénuphar réservé ou refuser la danse avec morgue → `start_encounter("frog_gavotte")`. Combat évitable : DD 12 CHA, excuse dansée sur trois temps.
 
@@ -306,6 +330,7 @@ Une estrade de clair de lune tendue entre les arbres : les ombres gagées au fil
 
 **L'Ombre Soliste** (vedette du bal, neutre) :
 - Position : (13, 6) — ombre d'une danseuse étoile, gagée au bonneteau il y a cent ans
+- **Profil social** : Attachée au ballet et aux souvenirs de sa danseuse, elle veut retrouver le plaisir de danser et être reconnue comme une artiste. Gracieuse, elle boude théâtralement et s’exprime surtout par le mouvement, avec quelques mots possibles. Son sujet préféré varie par partie ; interrompre son numéro ou moquer sa captivité reste sensible. « Je vous laisse le premier pas ; tâchez de lui donner une suite. » Son pas spécial ne s’apprend pas par un simple échange agréable.
 - OBJECTIF optionnel (dance_shadows) : l'inviter à danser (DD 11 DEX OU DD 12 CHA) → helpful (`reveal_npc`). Elle apprend au héros **LE pas** qui fait rire le Prince à tous les coups (avantage à la Cour) et glisse, du bout des doigts : « La tienne parle de toi, tu sais. En bien. Surtout. »
 - Traverser la scène pendant le numéro ou marcher sur une ombre → `start_encounter("shadow_cotillon")` : trois ombres-cotillons offensées. Combat évitable : DD 12 CHA, révérence dansée (jamais s'incliner... sauf ici : c'est un PAS, elles savourent l'ironie).
 
@@ -315,6 +340,9 @@ Une estrade de clair de lune tendue entre les arbres : les ombres gagées au fil
 
 ### Contenu
 SALLE FINALE. Un trône de guingois sous un rideau de feuilles dorées qui applaudissent. **Maître Filou** (5, 1) transpire à grosses gouttes — l'ombre volée dépasse de sa sacoche et fait de grands signes au héros (le reflet de Miroslav aussi, s'il faut un gag de plus). Le **Prince des Farces** est là, INVISIBLE (token caché) : on n'entend que son fauteuil grincer d'impatience.
+
+- **Maître Filou — profil social** : Mielleux et fuyant, il veut conserver ses gains et sauver la face. Attaché à sa sacoche et à son statut, il vante la ruse et craint d’être démasqué devant le Prince. Son sujet préféré est tiré pour la partie ; dénoncer sa triche ou l’humilier devant le Prince reste sensible. « Je vous assure que tout cela tient à un heureux hasard… particulièrement bien préparé. » Une conversation agréable ne restitue pas automatiquement l’ombre ou le reflet et ne remplit pas l’objectif final.
+- **Prince des Farces — profil social** : Capricieux et théâtral, attaché à sa cour, ses spectacles et sa collection, il veut un divertissement digne de lui et respecte l’esprit et le jeu loyal. Son sujet préféré varie par partie ; ennui, flagornerie et exigences autoritaires restent sensibles. « Je vous écoute : étonnez-moi, et tâchez de m’étonner agréablement. » **Il reste invisible tant qu’il n’a pas ri** : ni le tirage du profil ni un échange agréable ne le révèlent. La résolution finale et ses outils restent nécessaires.
 
 - VOIE ROYALE (recover_shadow) : faire RIRE le Prince — farce, autodérision (« j'ai perdu mon ombre comme un idiot »), numéro de Barnabé, LE pas de l'Ombre Soliste, ou dénoncer la triche PREUVE à l'appui (cartes as-de-trèfle, DD 12 INT) → DD 13 CHA (avantage si « l'Invité Qui Joue », le pas de la Soliste, le thé d'aplomb ou le couplet de Mirabelle s'appliquent) → `reveal_npc({ npcId: "prince_farces", disposition: "helpful" })` : il se matérialise en pleurant de rire et ordonne à Filou de rendre l'ombre (et le reflet).
 - FAUX PAS : s'incliner en premier, exiger, menacer → la Grande Farce : `start_encounter("princes_jest")` (feu follet majordome + lutins duellistes, le Prince commente les coups comme un match). Combat évitable même engagé : DD 13 CHA en riant de soi-même.

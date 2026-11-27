@@ -1,0 +1,5008 @@
+{
+  "ruleset": "2014",
+  "apiBase": "https://www.dnd5eapi.co/api/2014/monsters",
+  "retrievedAt": "2026-10-30T22:37:34.722Z",
+  "attribution": "D&D 5e SRD 2014; source data supplied by the community-maintained 5e-bits D&D 5e SRD API. API documentation: https://docs.dnd5eapi.co/faq",
+  "monsters": {
+    "goblin": {
+      "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/goblin",
+      "sourceSha256": "ca97cd55a05e42c0ddf1368e5274c164e1932f0dc0783861c47b19472edff84e",
+      "source": {
+        "index": "goblin",
+        "name": "Goblin",
+        "size": "Small",
+        "type": "humanoid",
+        "subtype": "goblinoid",
+        "alignment": "neutral evil",
+        "armor_class": [
+          {
+            "type": "armor",
+            "value": 15,
+            "armor": [
+              {
+                "index": "leather-armor",
+                "name": "Leather Armor",
+                "url": "/api/2014/equipment/leather-armor"
+              },
+              {
+                "index": "shield",
+                "name": "Shield",
+                "url": "/api/2014/equipment/shield"
+              }
+            ]
+          }
+        ],
+        "hit_points": 7,
+        "hit_dice": "2d6",
+        "hit_points_roll": "2d6",
+        "speed": {
+          "walk": "30 ft."
+        },
+        "strength": 8,
+        "dexterity": 14,
+        "constitution": 10,
+        "intelligence": 10,
+        "wisdom": 8,
+        "charisma": 8,
+        "proficiencies": [
+          {
+            "value": 6,
+            "proficiency": {
+              "index": "skill-stealth",
+              "name": "Skill: Stealth",
+              "url": "/api/2014/proficiencies/skill-stealth"
+            }
+          }
+        ],
+        "damage_vulnerabilities": [],
+        "damage_resistances": [],
+        "damage_immunities": [],
+        "condition_immunities": [],
+        "senses": {
+          "darkvision": "60 ft.",
+          "passive_perception": 9
+        },
+        "languages": "Common, Goblin",
+        "challenge_rating": 0.25,
+        "proficiency_bonus": 2,
+        "xp": 50,
+        "special_abilities": [
+          {
+            "name": "Nimble Escape",
+            "desc": "The goblin can take the Disengage or Hide action as a bonus action on each of its turns.",
+            "damage": []
+          }
+        ],
+        "actions": [
+          {
+            "name": "Scimitar",
+            "desc": "Melee Weapon Attack: +4 to hit, reach 5 ft., one target. Hit: 5 (1d6 + 2) slashing damage.",
+            "attack_bonus": 4,
+            "damage": [
+              {
+                "damage_type": {
+                  "index": "slashing",
+                  "name": "Slashing",
+                  "url": "/api/2014/damage-types/slashing"
+                },
+                "damage_dice": "1d6+2"
+              }
+            ],
+            "actions": []
+          },
+          {
+            "name": "Shortbow",
+            "desc": "Ranged Weapon Attack: +4 to hit, range 80/320 ft., one target. Hit: 5 (1d6 + 2) piercing damage.",
+            "attack_bonus": 4,
+            "damage": [
+              {
+                "damage_type": {
+                  "index": "piercing",
+                  "name": "Piercing",
+                  "url": "/api/2014/damage-types/piercing"
+                },
+                "damage_dice": "1d6+2"
+              }
+            ],
+            "actions": []
+          }
+        ],
+        "image": "/api/images/monsters/goblin.png",
+        "url": "/api/2014/monsters/goblin",
+        "updated_at": "2026-04-01T20:35:38.254Z",
+        "forms": [],
+        "legendary_actions": [],
+        "reactions": []
+      },
+      "engine": {
+        "type": "goblin",
+        "hp": {
+          "current": 7,
+          "max": 7
+        },
+        "ac": 15,
+        "stats": {
+          "str": 8,
+          "dex": 14,
+          "con": 10,
+          "int": 10,
+          "wis": 8,
+          "cha": 8
+        },
+        "conditions": [],
+        "xpValue": 50,
+        "attackBonus": 4,
+        "damageDice": "1d6+2",
+        "speed": 30,
+        "attackName": "Scimitar",
+        "attackRangeCells": 1,
+        "damageType": "slashing",
+        "movementModes": {
+          "walk": 30
+        }
+      }
+    },
+    "hobgoblin": {
+      "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/hobgoblin",
+      "sourceSha256": "fe28ca4348ab0df0fa06d3845cbac8bc6b1ef99101da6a5b1d0040f8272a745c",
+      "source": {
+        "index": "hobgoblin",
+        "name": "Hobgoblin",
+        "size": "Medium",
+        "type": "humanoid",
+        "subtype": "goblinoid",
+        "alignment": "lawful evil",
+        "armor_class": [
+          {
+            "type": "armor",
+            "value": 18,
+            "armor": [
+              {
+                "index": "chain-mail",
+                "name": "Chain Mail",
+                "url": "/api/2014/equipment/chain-mail"
+              },
+              {
+                "index": "shield",
+                "name": "Shield",
+                "url": "/api/2014/equipment/shield"
+              }
+            ]
+          }
+        ],
+        "hit_points": 11,
+        "hit_dice": "2d8",
+        "hit_points_roll": "2d8+2",
+        "speed": {
+          "walk": "30 ft."
+        },
+        "strength": 13,
+        "dexterity": 12,
+        "constitution": 12,
+        "intelligence": 10,
+        "wisdom": 10,
+        "charisma": 9,
+        "proficiencies": [],
+        "damage_vulnerabilities": [],
+        "damage_resistances": [],
+        "damage_immunities": [],
+        "condition_immunities": [],
+        "senses": {
+          "darkvision": "60 ft.",
+          "passive_perception": 10
+        },
+        "languages": "Common, Goblin",
+        "challenge_rating": 0.5,
+        "proficiency_bonus": 2,
+        "xp": 100,
+        "special_abilities": [
+          {
+            "name": "Martial Advantage",
+            "desc": "Once per turn, the hobgoblin can deal an extra 7 (2d6) damage to a creature it hits with a weapon attack if that creature is within 5 ft. of an ally of the hobgoblin that isn't incapacitated.",
+            "damage": []
+          }
+        ],
+        "actions": [
+          {
+            "name": "Longsword",
+            "desc": "Melee Weapon Attack: +3 to hit, reach 5 ft., one target. Hit: 5 (1d8 + 1) slashing damage, or 6 (1d10 + 1) slashing damage if used with two hands.",
+            "attack_bonus": 3,
+            "damage": [
+              {
+                "choose": 1,
+                "type": "damage",
+                "from": {
+                  "option_set_type": "options_array",
+                  "options": [
+                    {
+                      "option_type": "damage",
+                      "notes": "One handed",
+                      "damage_type": {
+                        "index": "slashing",
+                        "name": "Slashing",
+                        "url": "/api/2014/damage-types/slashing"
+                      },
+                      "damage_dice": "1d8+1"
+                    },
+                    {
+                      "option_type": "damage",
+                      "notes": "Two handed",
+                      "damage_type": {
+                        "index": "slashing",
+                        "name": "Slashing",
+                        "url": "/api/2014/damage-types/slashing"
+                      },
+                      "damage_dice": "1d10+1"
+                    }
+                  ]
+                }
+              }
+            ],
+            "actions": []
+          },
+          {
+            "name": "Longbow",
+            "desc": "Ranged Weapon Attack: +3 to hit, range 150/600 ft., one target. Hit: 5 (1d8 + 1) piercing damage.",
+            "attack_bonus": 3,
+            "damage": [
+              {
+                "damage_type": {
+                  "index": "piercing",
+                  "name": "Piercing",
+                  "url": "/api/2014/damage-types/piercing"
+                },
+                "damage_dice": "1d8+1"
+              }
+            ],
+            "actions": []
+          }
+        ],
+        "image": "/api/images/monsters/hobgoblin.png",
+        "url": "/api/2014/monsters/hobgoblin",
+        "updated_at": "2026-04-01T20:35:38.254Z",
+        "forms": [],
+        "legendary_actions": [],
+        "reactions": []
+      },
+      "engine": {
+        "type": "hobgoblin",
+        "hp": {
+          "current": 11,
+          "max": 11
+        },
+        "ac": 18,
+        "stats": {
+          "str": 13,
+          "dex": 12,
+          "con": 12,
+          "int": 10,
+          "wis": 10,
+          "cha": 9
+        },
+        "conditions": [],
+        "xpValue": 100,
+        "attackBonus": 3,
+        "damageDice": "1d8+1",
+        "speed": 30,
+        "attackName": "Longsword",
+        "attackRangeCells": 1,
+        "damageType": "slashing",
+        "movementModes": {
+          "walk": 30
+        }
+      }
+    },
+    "skeleton": {
+      "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/skeleton",
+      "sourceSha256": "d9b28e960038d70f95a9dbc143e5c49153f620a6d924cf657e7e5aaa01d191c1",
+      "source": {
+        "index": "skeleton",
+        "name": "Skeleton",
+        "size": "Medium",
+        "type": "undead",
+        "alignment": "lawful evil",
+        "armor_class": [
+          {
+            "type": "armor",
+            "value": 13,
+            "desc": "armor scraps"
+          }
+        ],
+        "hit_points": 13,
+        "hit_dice": "2d8",
+        "hit_points_roll": "2d8+4",
+        "speed": {
+          "walk": "30 ft."
+        },
+        "strength": 10,
+        "dexterity": 14,
+        "constitution": 15,
+        "intelligence": 6,
+        "wisdom": 8,
+        "charisma": 5,
+        "proficiencies": [],
+        "damage_vulnerabilities": [
+          "bludgeoning"
+        ],
+        "damage_resistances": [],
+        "damage_immunities": [
+          "poison"
+        ],
+        "condition_immunities": [
+          {
+            "index": "poisoned",
+            "name": "Poisoned",
+            "url": "/api/2014/conditions/poisoned"
+          },
+          {
+            "index": "exhaustion",
+            "name": "Exhaustion",
+            "url": "/api/2014/conditions/exhaustion"
+          }
+        ],
+        "senses": {
+          "darkvision": "60 ft.",
+          "passive_perception": 9
+        },
+        "languages": "understands all languages it spoke in life but can't speak",
+        "challenge_rating": 0.25,
+        "proficiency_bonus": 2,
+        "xp": 50,
+        "actions": [
+          {
+            "name": "Shortsword",
+            "desc": "Melee Weapon Attack: +4 to hit, reach 5 ft., one target. Hit: 5 (1d6 + 2) piercing damage.",
+            "attack_bonus": 4,
+            "damage": [
+              {
+                "damage_type": {
+                  "index": "piercing",
+                  "name": "Piercing",
+                  "url": "/api/2014/damage-types/piercing"
+                },
+                "damage_dice": "1d6+2"
+              }
+            ],
+            "actions": []
+          },
+          {
+            "name": "Shortbow",
+            "desc": "Ranged Weapon Attack: +4 to hit, range 80/320 ft., one target. Hit: 5 (1d6 + 2) piercing damage.",
+            "attack_bonus": 4,
+            "damage": [
+              {
+                "damage_type": {
+                  "index": "piercing",
+                  "name": "Piercing",
+                  "url": "/api/2014/damage-types/piercing"
+                },
+                "damage_dice": "1d6+2"
+              }
+            ],
+            "actions": []
+          }
+        ],
+        "image": "/api/images/monsters/skeleton.png",
+        "url": "/api/2014/monsters/skeleton",
+        "updated_at": "2026-04-01T20:35:38.254Z",
+        "forms": [],
+        "legendary_actions": [],
+        "reactions": [],
+        "special_abilities": []
+      },
+      "engine": {
+        "type": "skeleton",
+        "hp": {
+          "current": 13,
+          "max": 13
+        },
+        "ac": 13,
+        "stats": {
+          "str": 10,
+          "dex": 14,
+          "con": 15,
+          "int": 6,
+          "wis": 8,
+          "cha": 5
+        },
+        "conditions": [],
+        "xpValue": 50,
+        "attackBonus": 4,
+        "damageDice": "1d6+2",
+        "speed": 30,
+        "attackName": "Shortsword",
+        "attackRangeCells": 1,
+        "damageType": "piercing",
+        "movementModes": {
+          "walk": 30
+        }
+      }
+    },
+    "zombie": {
+      "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/zombie",
+      "sourceSha256": "8356cd29ebd20672b461a5f5ff1952eee801dada52e54f39aa4146aeea9fd6df",
+      "source": {
+        "index": "zombie",
+        "name": "Zombie",
+        "size": "Medium",
+        "type": "undead",
+        "alignment": "neutral evil",
+        "armor_class": [
+          {
+            "type": "dex",
+            "value": 8
+          }
+        ],
+        "hit_points": 22,
+        "hit_dice": "3d8",
+        "hit_points_roll": "3d8+9",
+        "speed": {
+          "walk": "20 ft."
+        },
+        "strength": 13,
+        "dexterity": 6,
+        "constitution": 16,
+        "intelligence": 3,
+        "wisdom": 6,
+        "charisma": 5,
+        "proficiencies": [
+          {
+            "value": 0,
+            "proficiency": {
+              "index": "saving-throw-wis",
+              "name": "Saving Throw: WIS",
+              "url": "/api/2014/proficiencies/saving-throw-wis"
+            }
+          }
+        ],
+        "damage_vulnerabilities": [],
+        "damage_resistances": [],
+        "damage_immunities": [
+          "poison"
+        ],
+        "condition_immunities": [
+          {
+            "index": "poisoned",
+            "name": "Poisoned",
+            "url": "/api/2014/conditions/poisoned"
+          }
+        ],
+        "senses": {
+          "darkvision": "60 ft.",
+          "passive_perception": 8
+        },
+        "languages": "understands all languages it spoke in life but can't speak",
+        "challenge_rating": 0.25,
+        "proficiency_bonus": 2,
+        "xp": 50,
+        "special_abilities": [
+          {
+            "name": "Undead Fortitude",
+            "desc": "If damage reduces the zombie to 0 hit points, it must make a Constitution saving throw with a DC of 5+the damage taken, unless the damage is radiant or from a critical hit. On a success, the zombie drops to 1 hit point instead.",
+            "damage": []
+          }
+        ],
+        "actions": [
+          {
+            "name": "Slam",
+            "desc": "Melee Weapon Attack: +3 to hit, reach 5 ft., one target. Hit: 4 (1d6 + 1) bludgeoning damage.",
+            "attack_bonus": 3,
+            "damage": [
+              {
+                "damage_type": {
+                  "index": "bludgeoning",
+                  "name": "Bludgeoning",
+                  "url": "/api/2014/damage-types/bludgeoning"
+                },
+                "damage_dice": "1d6+1"
+              }
+            ],
+            "actions": []
+          }
+        ],
+        "image": "/api/images/monsters/zombie.png",
+        "url": "/api/2014/monsters/zombie",
+        "updated_at": "2026-04-01T20:35:38.254Z",
+        "forms": [],
+        "legendary_actions": [],
+        "reactions": []
+      },
+      "engine": {
+        "type": "zombie",
+        "hp": {
+          "current": 22,
+          "max": 22
+        },
+        "ac": 8,
+        "stats": {
+          "str": 13,
+          "dex": 6,
+          "con": 16,
+          "int": 3,
+          "wis": 6,
+          "cha": 5
+        },
+        "conditions": [],
+        "xpValue": 50,
+        "attackBonus": 3,
+        "damageDice": "1d6+1",
+        "speed": 20,
+        "attackName": "Slam",
+        "attackRangeCells": 1,
+        "damageType": "bludgeoning",
+        "movementModes": {
+          "walk": 20
+        }
+      }
+    },
+    "violet_fungus": {
+      "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/violet-fungus",
+      "sourceSha256": "1d78448f75ce250b6bc23df23c5d3fd0e7cd63b2751feb79512f5ec8788dbabe",
+      "source": {
+        "index": "violet-fungus",
+        "name": "Violet Fungus",
+        "size": "Medium",
+        "type": "plant",
+        "alignment": "unaligned",
+        "armor_class": [
+          {
+            "type": "dex",
+            "value": 5
+          }
+        ],
+        "hit_points": 18,
+        "hit_dice": "4d8",
+        "hit_points_roll": "4d8",
+        "speed": {
+          "walk": "5 ft."
+        },
+        "strength": 3,
+        "dexterity": 1,
+        "constitution": 10,
+        "intelligence": 1,
+        "wisdom": 3,
+        "charisma": 1,
+        "proficiencies": [],
+        "damage_vulnerabilities": [],
+        "damage_resistances": [],
+        "damage_immunities": [],
+        "condition_immunities": [
+          {
+            "index": "blinded",
+            "name": "Blinded",
+            "url": "/api/2014/conditions/blinded"
+          },
+          {
+            "index": "blinded",
+            "name": "Blinded",
+            "url": "/api/2014/conditions/blinded"
+          },
+          {
+            "index": "frightened",
+            "name": "Frightened",
+            "url": "/api/2014/conditions/frightened"
+          }
+        ],
+        "senses": {
+          "blindsight": "30 ft. (blind beyond this radius)",
+          "passive_perception": 6
+        },
+        "languages": "",
+        "challenge_rating": 0.25,
+        "proficiency_bonus": 2,
+        "xp": 50,
+        "special_abilities": [
+          {
+            "name": "False Appearance",
+            "desc": "While the violet fungus remains motionless, it is indistinguishable from an ordinary fungus.",
+            "damage": []
+          }
+        ],
+        "actions": [
+          {
+            "damage": [],
+            "name": "Multiattack",
+            "multiattack_type": "actions",
+            "desc": "The fungus makes 1d4 Rotting Touch attacks.",
+            "actions": [
+              {
+                "action_name": "Rotting Touch",
+                "count": "1d4",
+                "type": "melee"
+              }
+            ]
+          },
+          {
+            "name": "Rotting Touch",
+            "desc": "Melee Weapon Attack: +2 to hit, reach 10 ft., one creature. Hit: 4 (1d8) necrotic damage.",
+            "attack_bonus": 2,
+            "damage": [
+              {
+                "damage_type": {
+                  "index": "necrotic",
+                  "name": "Necrotic",
+                  "url": "/api/2014/damage-types/necrotic"
+                },
+                "damage_dice": "1d8"
+              }
+            ],
+            "actions": []
+          }
+        ],
+        "image": "/api/images/monsters/violet-fungus.png",
+        "url": "/api/2014/monsters/violet-fungus",
+        "updated_at": "2026-04-01T20:35:38.254Z",
+        "forms": [],
+        "legendary_actions": [],
+        "reactions": []
+      },
+      "engine": {
+        "type": "violet_fungus",
+        "hp": {
+          "current": 18,
+          "max": 18
+        },
+        "ac": 5,
+        "stats": {
+          "str": 3,
+          "dex": 1,
+          "con": 10,
+          "int": 1,
+          "wis": 3,
+          "cha": 1
+        },
+        "conditions": [],
+        "xpValue": 50,
+        "attackBonus": 2,
+        "damageDice": "1d8",
+        "speed": 5,
+        "attackName": "Rotting Touch",
+        "attackRangeCells": 2,
+        "damageType": "necrotic",
+        "movementModes": {
+          "walk": 5
+        }
+      },
+      "reference": {
+        "index": "violet-fungus",
+        "name": "Violet Fungus",
+        "size": "Medium",
+        "type": "plant",
+        "alignment": "unaligned",
+        "armor_class": [
+          {
+            "type": "dex",
+            "value": 5
+          }
+        ],
+        "hit_points": 18,
+        "hit_dice": "4d8",
+        "hit_points_roll": "4d8",
+        "speed": {
+          "walk": "5 ft."
+        },
+        "strength": 3,
+        "dexterity": 1,
+        "constitution": 10,
+        "intelligence": 1,
+        "wisdom": 3,
+        "charisma": 1,
+        "proficiencies": [],
+        "damage_vulnerabilities": [],
+        "damage_resistances": [],
+        "damage_immunities": [],
+        "condition_immunities": [
+          {
+            "index": "blinded",
+            "name": "Blinded",
+            "url": "/api/2014/conditions/blinded"
+          },
+          {
+            "index": "deafened",
+            "name": "Deafened",
+            "url": "/api/2014/conditions/deafened"
+          },
+          {
+            "index": "frightened",
+            "name": "Frightened",
+            "url": "/api/2014/conditions/frightened"
+          }
+        ],
+        "senses": {
+          "blindsight": "30 ft. (blind beyond this radius)",
+          "passive_perception": 6
+        },
+        "languages": "",
+        "challenge_rating": 0.25,
+        "proficiency_bonus": 2,
+        "xp": 50,
+        "special_abilities": [
+          {
+            "name": "False Appearance",
+            "desc": "While the violet fungus remains motionless, it is indistinguishable from an ordinary fungus.",
+            "damage": []
+          }
+        ],
+        "actions": [
+          {
+            "damage": [],
+            "name": "Multiattack",
+            "multiattack_type": "actions",
+            "desc": "The fungus makes 1d4 Rotting Touch attacks.",
+            "actions": [
+              {
+                "action_name": "Rotting Touch",
+                "count": "1d4",
+                "type": "melee"
+              }
+            ]
+          },
+          {
+            "name": "Rotting Touch",
+            "desc": "Melee Weapon Attack: +2 to hit, reach 10 ft., one creature. Hit: 4 (1d8) necrotic damage.",
+            "attack_bonus": 2,
+            "damage": [
+              {
+                "damage_type": {
+                  "index": "necrotic",
+                  "name": "Necrotic",
+                  "url": "/api/2014/damage-types/necrotic"
+                },
+                "damage_dice": "1d8"
+              }
+            ],
+            "actions": []
+          }
+        ],
+        "image": "/api/images/monsters/violet-fungus.png",
+        "url": "/api/2014/monsters/violet-fungus",
+        "updated_at": "2026-04-01T20:35:38.254Z",
+        "forms": [],
+        "legendary_actions": [],
+        "reactions": []
+      },
+      "errata": [
+        {
+          "field": "condition_immunities",
+          "reason": "The API duplicates blinded; the official SRD lists blinded, deafened, frightened.",
+          "sourceUrl": "https://media.wizards.com/2023/downloads/dnd/SRD_CC_v5.1.pdf#page=309"
+        }
+      ]
+    },
+    "wolf": {
+      "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/wolf",
+      "sourceSha256": "c23d4169de443920b42735c3ad4338b15bf9c46cf58b84b06b751b6cbc3da237",
+      "source": {
+        "index": "wolf",
+        "name": "Wolf",
+        "size": "Medium",
+        "type": "beast",
+        "alignment": "unaligned",
+        "armor_class": [
+          {
+            "type": "natural",
+            "value": 13
+          }
+        ],
+        "hit_points": 11,
+        "hit_dice": "2d8",
+        "hit_points_roll": "2d8+2",
+        "speed": {
+          "walk": "40 ft."
+        },
+        "strength": 12,
+        "dexterity": 15,
+        "constitution": 12,
+        "intelligence": 3,
+        "wisdom": 12,
+        "charisma": 6,
+        "proficiencies": [
+          {
+            "value": 3,
+            "proficiency": {
+              "index": "skill-perception",
+              "name": "Skill: Perception",
+              "url": "/api/2014/proficiencies/skill-perception"
+            }
+          },
+          {
+            "value": 4,
+            "proficiency": {
+              "index": "skill-stealth",
+              "name": "Skill: Stealth",
+              "url": "/api/2014/proficiencies/skill-stealth"
+            }
+          }
+        ],
+        "damage_vulnerabilities": [],
+        "damage_resistances": [],
+        "damage_immunities": [],
+        "condition_immunities": [],
+        "senses": {
+          "passive_perception": 13
+        },
+        "languages": "",
+        "challenge_rating": 0.25,
+        "proficiency_bonus": 2,
+        "xp": 50,
+        "special_abilities": [
+          {
+            "name": "Keen Hearing and Smell",
+            "desc": "The wolf has advantage on Wisdom (Perception) checks that rely on hearing or smell.",
+            "damage": []
+          },
+          {
+            "name": "Pack Tactics",
+            "desc": "The wolf has advantage on an attack roll against a creature if at least one of the wolf's allies is within 5 ft. of the creature and the ally isn't incapacitated.",
+            "damage": []
+          }
+        ],
+        "actions": [
+          {
+            "name": "Bite",
+            "desc": "Melee Weapon Attack: +4 to hit, reach 5 ft., one target. Hit: 7 (2d4 + 2) piercing damage. If the target is a creature, it must succeed on a DC 11 Strength saving throw or be knocked prone.",
+            "attack_bonus": 4,
+            "damage": [
+              {
+                "damage_type": {
+                  "index": "piercing",
+                  "name": "Piercing",
+                  "url": "/api/2014/damage-types/piercing"
+                },
+                "damage_dice": "2d4+2"
+              }
+            ],
+            "actions": []
+          }
+        ],
+        "image": "/api/images/monsters/wolf.png",
+        "url": "/api/2014/monsters/wolf",
+        "updated_at": "2026-04-01T20:35:38.254Z",
+        "forms": [],
+        "legendary_actions": [],
+        "reactions": []
+      },
+      "engine": {
+        "type": "wolf",
+        "hp": {
+          "current": 11,
+          "max": 11
+        },
+        "ac": 13,
+        "stats": {
+          "str": 12,
+          "dex": 15,
+          "con": 12,
+          "int": 3,
+          "wis": 12,
+          "cha": 6
+        },
+        "conditions": [],
+        "xpValue": 50,
+        "attackBonus": 4,
+        "damageDice": "2d4+2",
+        "speed": 40,
+        "attackName": "Bite",
+        "attackRangeCells": 1,
+        "damageType": "piercing",
+        "movementModes": {
+          "walk": 40
+        }
+      }
+    },
+    "bandit": {
+      "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/bandit",
+      "sourceSha256": "8831d13ddc1b543f4cc379f7778d7e81251fe3bd83cb67388dd5e54e1e359593",
+      "source": {
+        "index": "bandit",
+        "name": "Bandit",
+        "desc": "**Bandits** rove in gangs and are sometimes led by thugs, veterans, or spellcasters. Not all bandits are evil. Oppression, drought, disease, or famine can often drive otherwise honest folk to a life of banditry.\n\n**Pirates** are bandits of the high seas. They might be freebooters interested only in treasure and murder, or they might be privateers sanctioned by the crown to attack and plunder an enemy nation’s vessels.",
+        "size": "Medium",
+        "type": "humanoid",
+        "subtype": "any race",
+        "alignment": "any non-lawful alignment",
+        "armor_class": [
+          {
+            "type": "armor",
+            "value": 12,
+            "armor": [
+              {
+                "index": "leather-armor",
+                "name": "Leather Armor",
+                "url": "/api/2014/equipment/leather-armor"
+              }
+            ]
+          }
+        ],
+        "hit_points": 11,
+        "hit_dice": "2d8",
+        "hit_points_roll": "2d8+2",
+        "speed": {
+          "walk": "30 ft."
+        },
+        "strength": 11,
+        "dexterity": 12,
+        "constitution": 12,
+        "intelligence": 10,
+        "wisdom": 10,
+        "charisma": 10,
+        "proficiencies": [],
+        "damage_vulnerabilities": [],
+        "damage_resistances": [],
+        "damage_immunities": [],
+        "condition_immunities": [],
+        "senses": {
+          "passive_perception": 10
+        },
+        "languages": "any one language (usually Common)",
+        "challenge_rating": 0.125,
+        "proficiency_bonus": 2,
+        "xp": 25,
+        "actions": [
+          {
+            "name": "Scimitar",
+            "desc": "Melee Weapon Attack: +3 to hit, reach 5 ft., one target. Hit: 4 (1d6 + 1) slashing damage.",
+            "attack_bonus": 3,
+            "damage": [
+              {
+                "damage_type": {
+                  "index": "slashing",
+                  "name": "Slashing",
+                  "url": "/api/2014/damage-types/slashing"
+                },
+                "damage_dice": "1d6+1"
+              }
+            ],
+            "actions": []
+          },
+          {
+            "name": "Light Crossbow",
+            "desc": "Ranged Weapon Attack: +3 to hit, range 80/320 ft., one target. Hit: 5 (1d8 + 1) piercing damage.",
+            "attack_bonus": 3,
+            "damage": [
+              {
+                "damage_type": {
+                  "index": "piercing",
+                  "name": "Piercing",
+                  "url": "/api/2014/damage-types/piercing"
+                },
+                "damage_dice": "1d8+1"
+              }
+            ],
+            "actions": []
+          }
+        ],
+        "image": "/api/images/monsters/bandit.png",
+        "url": "/api/2014/monsters/bandit",
+        "updated_at": "2026-04-25T18:44:21.126Z",
+        "forms": [],
+        "legendary_actions": [],
+        "reactions": [],
+        "special_abilities": []
+      },
+      "engine": {
+        "type": "bandit",
+        "hp": {
+          "current": 11,
+          "max": 11
+        },
+        "ac": 12,
+        "stats": {
+          "str": 11,
+          "dex": 12,
+          "con": 12,
+          "int": 10,
+          "wis": 10,
+          "cha": 10
+        },
+        "conditions": [],
+        "xpValue": 25,
+        "attackBonus": 3,
+        "damageDice": "1d6+1",
+        "speed": 30,
+        "attackName": "Scimitar",
+        "attackRangeCells": 1,
+        "damageType": "slashing",
+        "movementModes": {
+          "walk": 30
+        }
+      }
+    },
+    "dryad": {
+      "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/dryad",
+      "sourceSha256": "dabf0d6f9a0f5f72394b29d118ea6e1e4c47955200830b078fb73192684e80f8",
+      "source": {
+        "index": "dryad",
+        "name": "Dryad",
+        "size": "Medium",
+        "type": "fey",
+        "alignment": "neutral",
+        "armor_class": [
+          {
+            "type": "dex",
+            "value": 11
+          },
+          {
+            "type": "spell",
+            "value": 16,
+            "spell": {
+              "index": "barkskin",
+              "name": "Barkskin",
+              "url": "/api/2014/spells/barkskin"
+            }
+          }
+        ],
+        "hit_points": 22,
+        "hit_dice": "5d8",
+        "hit_points_roll": "5d8",
+        "speed": {
+          "walk": "30 ft."
+        },
+        "strength": 10,
+        "dexterity": 12,
+        "constitution": 11,
+        "intelligence": 14,
+        "wisdom": 15,
+        "charisma": 18,
+        "proficiencies": [
+          {
+            "value": 4,
+            "proficiency": {
+              "index": "skill-perception",
+              "name": "Skill: Perception",
+              "url": "/api/2014/proficiencies/skill-perception"
+            }
+          },
+          {
+            "value": 5,
+            "proficiency": {
+              "index": "skill-stealth",
+              "name": "Skill: Stealth",
+              "url": "/api/2014/proficiencies/skill-stealth"
+            }
+          }
+        ],
+        "damage_vulnerabilities": [],
+        "damage_resistances": [],
+        "damage_immunities": [],
+        "condition_immunities": [],
+        "senses": {
+          "darkvision": "60 ft.",
+          "passive_perception": 14
+        },
+        "languages": "Elvish, Sylvan",
+        "challenge_rating": 1,
+        "proficiency_bonus": 2,
+        "xp": 200,
+        "special_abilities": [
+          {
+            "name": "Innate Spellcasting",
+            "desc": "The dryad's innate spellcasting ability is Charisma (spell save DC 14). The dryad can innately cast the following spells, requiring no material components:\n\nAt will: druidcraft\n3/day each: entangle, goodberry\n1/day each: barkskin, pass without trace, shillelagh",
+            "spellcasting": {
+              "ability": {
+                "index": "cha",
+                "name": "CHA",
+                "url": "/api/2014/ability-scores/cha"
+              },
+              "dc": 14,
+              "components_required": [
+                "V",
+                "S"
+              ],
+              "spells": [
+                {
+                  "name": "Druidcraft",
+                  "level": 0,
+                  "url": "/api/2014/spells/druidcraft",
+                  "usage": {
+                    "type": "at will",
+                    "rest_types": []
+                  }
+                },
+                {
+                  "name": "Entangle",
+                  "level": 1,
+                  "url": "/api/2014/spells/entangle",
+                  "usage": {
+                    "type": "per day",
+                    "times": 3,
+                    "rest_types": []
+                  }
+                },
+                {
+                  "name": "Goodberry",
+                  "level": 1,
+                  "url": "/api/2014/spells/goodberry",
+                  "usage": {
+                    "type": "per day",
+                    "times": 3,
+                    "rest_types": []
+                  }
+                },
+                {
+                  "name": "Barkskin",
+                  "level": 2,
+                  "url": "/api/2014/spells/barkskin",
+                  "usage": {
+                    "type": "per day",
+                    "times": 1,
+                    "rest_types": []
+                  }
+                },
+                {
+                  "name": "Pass Without Trace",
+                  "level": 2,
+                  "url": "/api/2014/spells/pass-without-trace",
+                  "usage": {
+                    "type": "per day",
+                    "times": 1,
+                    "rest_types": []
+                  }
+                },
+                {
+                  "name": "Shillelagh",
+                  "level": 0,
+                  "url": "/api/2014/spells/shillelagh",
+                  "usage": {
+                    "type": "per day",
+                    "times": 1,
+                    "rest_types": []
+                  }
+                }
+              ]
+            },
+            "damage": []
+          },
+          {
+            "name": "Magic Resistance",
+            "desc": "The dryad has advantage on saving throws against spells and other magical effects.",
+            "damage": []
+          },
+          {
+            "name": "Speak with Beasts and Plants",
+            "desc": "The dryad can communicate with beasts and plants as if they shared a language.",
+            "damage": []
+          },
+          {
+            "name": "Tree Stride",
+            "desc": "Once on her turn, the dryad can use 10 ft. of her movement to step magically into one living tree within her reach and emerge from a second living tree within 60 ft. of the first tree, appearing in an unoccupied space within 5 ft. of the second tree. Both trees must be large or bigger.",
+            "damage": []
+          }
+        ],
+        "actions": [
+          {
+            "name": "Club",
+            "desc": "Melee Weapon Attack: +2 to hit (+6 to hit with shillelagh), reach 5 ft., one target. Hit: 2 (1d4) bludgeoning damage, or 8 (1d8 + 4) bludgeoning damage with shillelagh.",
+            "attack_bonus": 2,
+            "damage": [
+              {
+                "damage_type": {
+                  "index": "bludgeoning",
+                  "name": "Bludgeoning",
+                  "url": "/api/2014/damage-types/bludgeoning"
+                },
+                "damage_dice": "1d4"
+              }
+            ],
+            "actions": []
+          },
+          {
+            "damage": [],
+            "name": "Fey Charm",
+            "desc": "The dryad targets one humanoid or beast that she can see within 30 feet of her. If the target can see the dryad, it must succeed on a DC 14 Wisdom saving throw or be magically charmed. The charmed creature regards the dryad as a trusted friend to be heeded and protected. Although the target isn't under the dryad's control, it takes the dryad's requests or actions in the most favorable way it can.\nEach time the dryad or its allies do anything harmful to the target, it can repeat the saving throw, ending the effect on itself on a success. Otherwise, the effect lasts 24 hours or until the dryad dies, is on a different plane of existence from the target, or ends the effect as a bonus action. If a target's saving throw is successful, the target is immune to the dryad's Fey Charm for the next 24 hours.\nThe dryad can have no more than one humanoid and up to three beasts charmed at a time.",
+            "dc": {
+              "dc_type": {
+                "index": "wis",
+                "name": "WIS",
+                "url": "/api/2014/ability-scores/wis"
+              },
+              "dc_value": 14,
+              "success_type": "none"
+            },
+            "actions": []
+          }
+        ],
+        "image": "/api/images/monsters/dryad.png",
+        "url": "/api/2014/monsters/dryad",
+        "updated_at": "2026-06-02T19:33:15.979Z",
+        "forms": [],
+        "legendary_actions": [],
+        "reactions": []
+      },
+      "engine": {
+        "type": "dryad",
+        "hp": {
+          "current": 22,
+          "max": 22
+        },
+        "ac": 11,
+        "stats": {
+          "str": 10,
+          "dex": 12,
+          "con": 11,
+          "int": 14,
+          "wis": 15,
+          "cha": 18
+        },
+        "conditions": [],
+        "xpValue": 200,
+        "attackBonus": 2,
+        "damageDice": "1d4",
+        "speed": 30,
+        "attackName": "Club",
+        "attackRangeCells": 1,
+        "damageType": "bludgeoning",
+        "movementModes": {
+          "walk": 30
+        }
+      }
+    },
+    "awakened_tree": {
+      "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/awakened-tree",
+      "sourceSha256": "b2d5bb76c4c51c99ebd3eeb6642e3bde7b780ee7cfcc873f8ed4eaaa12f22035",
+      "source": {
+        "index": "awakened-tree",
+        "name": "Awakened Tree",
+        "desc": "An awakened tree is an ordinary tree given sentience and mobility by the awaken spell or similar magic.",
+        "size": "Huge",
+        "type": "plant",
+        "alignment": "unaligned",
+        "armor_class": [
+          {
+            "type": "natural",
+            "value": 13
+          }
+        ],
+        "hit_points": 59,
+        "hit_dice": "7d12",
+        "hit_points_roll": "7d12+14",
+        "speed": {
+          "walk": "20 ft."
+        },
+        "strength": 19,
+        "dexterity": 6,
+        "constitution": 15,
+        "intelligence": 10,
+        "wisdom": 10,
+        "charisma": 7,
+        "proficiencies": [],
+        "damage_vulnerabilities": [
+          "fire"
+        ],
+        "damage_resistances": [
+          "bludgeoning",
+          "piercing"
+        ],
+        "damage_immunities": [],
+        "condition_immunities": [],
+        "senses": {
+          "passive_perception": 10
+        },
+        "languages": "one language known by its creator",
+        "challenge_rating": 2,
+        "proficiency_bonus": 2,
+        "xp": 450,
+        "special_abilities": [
+          {
+            "name": "False Appearance",
+            "desc": "While the tree remains motionless, it is indistinguishable from a normal tree.",
+            "damage": []
+          }
+        ],
+        "actions": [
+          {
+            "name": "Slam",
+            "desc": "Melee Weapon Attack: +6 to hit, reach 10 ft., one target. Hit: 14 (3d6 + 4) bludgeoning damage.",
+            "attack_bonus": 6,
+            "damage": [
+              {
+                "damage_type": {
+                  "index": "bludgeoning",
+                  "name": "Bludgeoning",
+                  "url": "/api/2014/damage-types/bludgeoning"
+                },
+                "damage_dice": "3d6+4"
+              }
+            ],
+            "actions": []
+          }
+        ],
+        "image": "/api/images/monsters/awakened-tree.png",
+        "url": "/api/2014/monsters/awakened-tree",
+        "updated_at": "2026-04-01T20:35:38.253Z",
+        "forms": [],
+        "legendary_actions": [],
+        "reactions": []
+      },
+      "engine": {
+        "type": "awakened_tree",
+        "hp": {
+          "current": 59,
+          "max": 59
+        },
+        "ac": 13,
+        "stats": {
+          "str": 19,
+          "dex": 6,
+          "con": 15,
+          "int": 10,
+          "wis": 10,
+          "cha": 7
+        },
+        "conditions": [],
+        "xpValue": 450,
+        "attackBonus": 6,
+        "damageDice": "3d6+4",
+        "speed": 20,
+        "attackName": "Slam",
+        "attackRangeCells": 2,
+        "damageType": "bludgeoning",
+        "movementModes": {
+          "walk": 20
+        }
+      }
+    },
+    "sprite": {
+      "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/sprite",
+      "sourceSha256": "a9251227b659c8ff6ee779e49f5418da219d0e21b773a505a072b977cb0374d4",
+      "source": {
+        "index": "sprite",
+        "name": "Sprite",
+        "size": "Tiny",
+        "type": "fey",
+        "alignment": "neutral good",
+        "armor_class": [
+          {
+            "type": "armor",
+            "value": 15,
+            "armor": [
+              {
+                "index": "leather-armor",
+                "name": "Leather Armor",
+                "url": "/api/2014/equipment/leather-armor"
+              }
+            ]
+          }
+        ],
+        "hit_points": 2,
+        "hit_dice": "1d4",
+        "hit_points_roll": "1d4",
+        "speed": {
+          "walk": "10 ft.",
+          "fly": "40 ft."
+        },
+        "strength": 3,
+        "dexterity": 18,
+        "constitution": 10,
+        "intelligence": 14,
+        "wisdom": 13,
+        "charisma": 11,
+        "proficiencies": [
+          {
+            "value": 3,
+            "proficiency": {
+              "index": "skill-perception",
+              "name": "Skill: Perception",
+              "url": "/api/2014/proficiencies/skill-perception"
+            }
+          },
+          {
+            "value": 8,
+            "proficiency": {
+              "index": "skill-stealth",
+              "name": "Skill: Stealth",
+              "url": "/api/2014/proficiencies/skill-stealth"
+            }
+          }
+        ],
+        "damage_vulnerabilities": [],
+        "damage_resistances": [],
+        "damage_immunities": [],
+        "condition_immunities": [],
+        "senses": {
+          "passive_perception": 13
+        },
+        "languages": "Common, Elvish, Sylvan",
+        "challenge_rating": 0.25,
+        "proficiency_bonus": 2,
+        "xp": 50,
+        "actions": [
+          {
+            "name": "Longsword",
+            "desc": "Melee Weapon Attack: +2 to hit, reach 5 ft., one target. Hit: 1 slashing damage.",
+            "attack_bonus": 2,
+            "damage": [
+              {
+                "damage_type": {
+                  "index": "slashing",
+                  "name": "Slashing",
+                  "url": "/api/2014/damage-types/slashing"
+                },
+                "damage_dice": "1"
+              }
+            ],
+            "actions": []
+          },
+          {
+            "name": "Shortbow",
+            "desc": "Ranged Weapon Attack: +6 to hit, range 40/160 ft., one target. Hit: 1 piercing damage, and the target must succeed on a DC 10 Constitution saving throw or become poisoned for 1 minute. If its saving throw result is 5 or lower, the poisoned target falls unconscious for the same duration, or until it takes damage or another creature takes an action to shake it awake.",
+            "attack_bonus": 6,
+            "damage": [
+              {
+                "damage_type": {
+                  "index": "piercing",
+                  "name": "Piercing",
+                  "url": "/api/2014/damage-types/piercing"
+                },
+                "damage_dice": "1"
+              }
+            ],
+            "actions": []
+          },
+          {
+            "damage": [],
+            "name": "Heart Sight",
+            "desc": "The sprite touches a creature and magically knows the creature's current emotional state. If the target fails a DC 10 Charisma saving throw, the sprite also knows the creature's alignment. Celestials, fiends, and undead automatically fail the saving throw.",
+            "dc": {
+              "dc_type": {
+                "index": "cha",
+                "name": "CHA",
+                "url": "/api/2014/ability-scores/cha"
+              },
+              "dc_value": 10,
+              "success_type": "none"
+            },
+            "actions": []
+          },
+          {
+            "damage": [],
+            "name": "Invisibility",
+            "desc": "The sprite magically turns invisible until it attacks or casts a spell, or until its concentration ends (as if concentrating on a spell). Any equipment the sprite wears or carries is invisible with it.",
+            "actions": []
+          }
+        ],
+        "image": "/api/images/monsters/sprite.png",
+        "url": "/api/2014/monsters/sprite",
+        "updated_at": "2026-04-01T20:35:38.254Z",
+        "forms": [],
+        "legendary_actions": [],
+        "reactions": [],
+        "special_abilities": []
+      },
+      "engine": {
+        "type": "sprite",
+        "hp": {
+          "current": 2,
+          "max": 2
+        },
+        "ac": 15,
+        "stats": {
+          "str": 3,
+          "dex": 18,
+          "con": 10,
+          "int": 14,
+          "wis": 13,
+          "cha": 11
+        },
+        "conditions": [],
+        "xpValue": 50,
+        "attackBonus": 2,
+        "damageDice": "1",
+        "speed": 10,
+        "attackName": "Longsword",
+        "attackRangeCells": 1,
+        "damageType": "slashing",
+        "movementModes": {
+          "walk": 10,
+          "fly": 40
+        }
+      }
+    },
+    "satyr": {
+      "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/satyr",
+      "sourceSha256": "1559aa20095620b1699dfa4932511d786f8bf1b00800e716b2ac7cc365b3e189",
+      "source": {
+        "index": "satyr",
+        "name": "Satyr",
+        "size": "Medium",
+        "type": "fey",
+        "alignment": "chaotic neutral",
+        "armor_class": [
+          {
+            "type": "armor",
+            "value": 14,
+            "armor": [
+              {
+                "index": "leather-armor",
+                "name": "Leather Armor",
+                "url": "/api/2014/equipment/leather-armor"
+              }
+            ]
+          }
+        ],
+        "hit_points": 31,
+        "hit_dice": "7d8",
+        "hit_points_roll": "7d8",
+        "speed": {
+          "walk": "40 ft."
+        },
+        "strength": 12,
+        "dexterity": 16,
+        "constitution": 11,
+        "intelligence": 12,
+        "wisdom": 10,
+        "charisma": 14,
+        "proficiencies": [
+          {
+            "value": 2,
+            "proficiency": {
+              "index": "skill-perception",
+              "name": "Skill: Perception",
+              "url": "/api/2014/proficiencies/skill-perception"
+            }
+          },
+          {
+            "value": 6,
+            "proficiency": {
+              "index": "skill-performance",
+              "name": "Skill: Performance",
+              "url": "/api/2014/proficiencies/skill-performance"
+            }
+          },
+          {
+            "value": 5,
+            "proficiency": {
+              "index": "skill-stealth",
+              "name": "Skill: Stealth",
+              "url": "/api/2014/proficiencies/skill-stealth"
+            }
+          }
+        ],
+        "damage_vulnerabilities": [],
+        "damage_resistances": [],
+        "damage_immunities": [],
+        "condition_immunities": [],
+        "senses": {
+          "passive_perception": 12
+        },
+        "languages": "Common, Elvish, Sylvan",
+        "challenge_rating": 0.5,
+        "proficiency_bonus": 2,
+        "xp": 100,
+        "special_abilities": [
+          {
+            "name": "Magic Resistance",
+            "desc": "The satyr has advantage on saving throws against spells and other magical effects.",
+            "damage": []
+          }
+        ],
+        "actions": [
+          {
+            "name": "Ram",
+            "desc": "Melee Weapon Attack: +3 to hit, reach 5 ft., one target. Hit: 6 (2d4 + 1) bludgeoning damage.",
+            "attack_bonus": 3,
+            "damage": [
+              {
+                "damage_type": {
+                  "index": "bludgeoning",
+                  "name": "Bludgeoning",
+                  "url": "/api/2014/damage-types/bludgeoning"
+                },
+                "damage_dice": "2d4+1"
+              }
+            ],
+            "actions": []
+          },
+          {
+            "name": "Shortsword",
+            "desc": "Melee Weapon Attack: +5 to hit, reach 5 ft., one target. Hit: 6 (1d6 + 3) piercing damage.",
+            "attack_bonus": 5,
+            "damage": [
+              {
+                "damage_type": {
+                  "index": "piercing",
+                  "name": "Piercing",
+                  "url": "/api/2014/damage-types/piercing"
+                },
+                "damage_dice": "1d6+3"
+              }
+            ],
+            "actions": []
+          },
+          {
+            "name": "Shortbow",
+            "desc": "Ranged Weapon Attack: +5 to hit, range 80/320 ft., one target. Hit: 6 (1d6 + 3) piercing damage.",
+            "attack_bonus": 5,
+            "damage": [
+              {
+                "damage_type": {
+                  "index": "piercing",
+                  "name": "Piercing",
+                  "url": "/api/2014/damage-types/piercing"
+                },
+                "damage_dice": "1d6+3"
+              }
+            ],
+            "actions": []
+          }
+        ],
+        "image": "/api/images/monsters/satyr.png",
+        "url": "/api/2014/monsters/satyr",
+        "updated_at": "2026-06-02T19:33:15.990Z",
+        "forms": [],
+        "legendary_actions": [],
+        "reactions": []
+      },
+      "engine": {
+        "type": "satyr",
+        "hp": {
+          "current": 31,
+          "max": 31
+        },
+        "ac": 14,
+        "stats": {
+          "str": 12,
+          "dex": 16,
+          "con": 11,
+          "int": 12,
+          "wis": 10,
+          "cha": 14
+        },
+        "conditions": [],
+        "xpValue": 100,
+        "attackBonus": 5,
+        "damageDice": "1d6+3",
+        "speed": 40,
+        "attackName": "Shortsword",
+        "attackRangeCells": 1,
+        "damageType": "piercing",
+        "movementModes": {
+          "walk": 40
+        }
+      }
+    },
+    "blink_dog": {
+      "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/blink-dog",
+      "sourceSha256": "4f12840003ba61f3a4f8fad24a54421cc913513704cbd7acf58472e09bcb5be8",
+      "source": {
+        "index": "blink-dog",
+        "name": "Blink Dog",
+        "desc": "A blink dog takes its name from its ability to blink in and out of existence, a talent it uses to aid its attacks and to avoid harm.",
+        "size": "Medium",
+        "type": "fey",
+        "alignment": "lawful good",
+        "armor_class": [
+          {
+            "type": "dex",
+            "value": 13
+          }
+        ],
+        "hit_points": 22,
+        "hit_dice": "4d8",
+        "hit_points_roll": "4d8+4",
+        "speed": {
+          "walk": "40 ft."
+        },
+        "strength": 12,
+        "dexterity": 17,
+        "constitution": 12,
+        "intelligence": 10,
+        "wisdom": 13,
+        "charisma": 11,
+        "proficiencies": [
+          {
+            "value": 3,
+            "proficiency": {
+              "index": "skill-perception",
+              "name": "Skill: Perception",
+              "url": "/api/2014/proficiencies/skill-perception"
+            }
+          },
+          {
+            "value": 5,
+            "proficiency": {
+              "index": "skill-stealth",
+              "name": "Skill: Stealth",
+              "url": "/api/2014/proficiencies/skill-stealth"
+            }
+          }
+        ],
+        "damage_vulnerabilities": [],
+        "damage_resistances": [],
+        "damage_immunities": [],
+        "condition_immunities": [],
+        "senses": {
+          "passive_perception": 10
+        },
+        "languages": "Blink Dog, understands Sylvan but can't speak it",
+        "challenge_rating": 0.25,
+        "proficiency_bonus": 2,
+        "xp": 50,
+        "special_abilities": [
+          {
+            "name": "Keen Hearing and Smell",
+            "desc": "The dog has advantage on Wisdom (Perception) checks that rely on hearing or smell.",
+            "damage": []
+          }
+        ],
+        "actions": [
+          {
+            "name": "Bite",
+            "desc": "Melee Weapon Attack: +3 to hit, reach 5 ft., one target. Hit: 4 (1d6 + 1) piercing damage.",
+            "attack_bonus": 3,
+            "damage": [
+              {
+                "damage_type": {
+                  "index": "piercing",
+                  "name": "Piercing",
+                  "url": "/api/2014/damage-types/piercing"
+                },
+                "damage_dice": "1d6+1"
+              }
+            ],
+            "actions": []
+          },
+          {
+            "damage": [],
+            "name": "Teleport",
+            "desc": "The dog magically teleports, along with any equipment it is wearing or carrying, up to 40 ft. to an unoccupied space it can see. Before or after teleporting, the dog can make one bite attack.",
+            "usage": {
+              "type": "recharge on roll",
+              "dice": "1d6",
+              "min_value": 4
+            },
+            "actions": []
+          }
+        ],
+        "image": "/api/images/monsters/blink-dog.png",
+        "url": "/api/2014/monsters/blink-dog",
+        "updated_at": "2026-04-01T20:35:38.253Z",
+        "forms": [],
+        "legendary_actions": [],
+        "reactions": []
+      },
+      "engine": {
+        "type": "blink_dog",
+        "hp": {
+          "current": 22,
+          "max": 22
+        },
+        "ac": 13,
+        "stats": {
+          "str": 12,
+          "dex": 17,
+          "con": 12,
+          "int": 10,
+          "wis": 13,
+          "cha": 11
+        },
+        "conditions": [],
+        "xpValue": 50,
+        "attackBonus": 3,
+        "damageDice": "1d6+1",
+        "speed": 40,
+        "attackName": "Bite",
+        "attackRangeCells": 1,
+        "damageType": "piercing",
+        "movementModes": {
+          "walk": 40
+        }
+      }
+    },
+    "will_o_wisp": {
+      "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/will-o-wisp",
+      "sourceSha256": "6d5740008304676be03e0fe25c4ece0f8219f041eda484c9f0ded298bd1fa010",
+      "source": {
+        "index": "will-o-wisp",
+        "name": "Will-o'-Wisp",
+        "size": "Tiny",
+        "type": "undead",
+        "alignment": "chaotic evil",
+        "armor_class": [
+          {
+            "type": "dex",
+            "value": 19
+          }
+        ],
+        "hit_points": 22,
+        "hit_dice": "9d4",
+        "hit_points_roll": "9d4",
+        "speed": {
+          "walk": "0 ft.",
+          "fly": "50 ft.",
+          "hover": true
+        },
+        "strength": 1,
+        "dexterity": 28,
+        "constitution": 10,
+        "intelligence": 13,
+        "wisdom": 14,
+        "charisma": 11,
+        "proficiencies": [],
+        "damage_vulnerabilities": [],
+        "damage_resistances": [
+          "acid",
+          "cold",
+          "fire",
+          "necrotic",
+          "thunder",
+          "bludgeoning, piercing, and slashing from nonmagical weapons"
+        ],
+        "damage_immunities": [
+          "lightning",
+          "poison"
+        ],
+        "condition_immunities": [
+          {
+            "index": "exhaustion",
+            "name": "Exhaustion",
+            "url": "/api/2014/conditions/exhaustion"
+          },
+          {
+            "index": "grappled",
+            "name": "Grappled",
+            "url": "/api/2014/conditions/grappled"
+          },
+          {
+            "index": "paralyzed",
+            "name": "Paralyzed",
+            "url": "/api/2014/conditions/paralyzed"
+          },
+          {
+            "index": "poisoned",
+            "name": "Poisoned",
+            "url": "/api/2014/conditions/poisoned"
+          },
+          {
+            "index": "prone",
+            "name": "Prone",
+            "url": "/api/2014/conditions/prone"
+          },
+          {
+            "index": "restrained",
+            "name": "Restrained",
+            "url": "/api/2014/conditions/restrained"
+          },
+          {
+            "index": "unconscious",
+            "name": "Unconscious",
+            "url": "/api/2014/conditions/unconscious"
+          }
+        ],
+        "senses": {
+          "darkvision": "120 ft.",
+          "passive_perception": 12
+        },
+        "languages": "the languages it knew in life",
+        "challenge_rating": 2,
+        "proficiency_bonus": 2,
+        "xp": 450,
+        "special_abilities": [
+          {
+            "name": "Consume Life",
+            "desc": "As a bonus action, the will-o'-wisp can target one creature it can see within 5 ft. of it that has 0 hit points and is still alive. The target must succeed on a DC 10 Constitution saving throw against this magic or die. If the target dies, the will-o'-wisp regains 10 (3d6) hit points.",
+            "dc": {
+              "dc_type": {
+                "index": "con",
+                "name": "CON",
+                "url": "/api/2014/ability-scores/con"
+              },
+              "dc_value": 10,
+              "success_type": "none"
+            },
+            "damage": []
+          },
+          {
+            "name": "Ephemeral",
+            "desc": "The will-o'-wisp can't wear or carry anything.",
+            "damage": []
+          },
+          {
+            "name": "Incorporeal Movement",
+            "desc": "The will-o'-wisp can move through other creatures and objects as if they were difficult terrain. It takes 5 (1d10) force damage if it ends its turn inside an object.",
+            "damage": []
+          },
+          {
+            "name": "Variable Illumination",
+            "desc": "The will-o'-wisp sheds bright light in a 5- to 20-foot radius and dim light for an additional number of ft. equal to the chosen radius. The will-o'-wisp can alter the radius as a bonus action.",
+            "damage": []
+          }
+        ],
+        "actions": [
+          {
+            "name": "Shock",
+            "desc": "Melee Spell Attack: +4 to hit, reach 5 ft., one creature. Hit: 9 (2d8) lightning damage.",
+            "attack_bonus": 4,
+            "damage": [
+              {
+                "damage_type": {
+                  "index": "lightning",
+                  "name": "Lightning",
+                  "url": "/api/2014/damage-types/lightning"
+                },
+                "damage_dice": "2d8"
+              }
+            ],
+            "actions": []
+          },
+          {
+            "damage": [],
+            "name": "Invisibility",
+            "desc": "The will-o'-wisp and its light magically become invisible until it attacks or uses its Consume Life, or until its concentration ends (as if concentrating on a spell).",
+            "actions": []
+          }
+        ],
+        "image": "/api/images/monsters/will-o-wisp.png",
+        "url": "/api/2014/monsters/will-o-wisp",
+        "updated_at": "2026-04-01T20:35:38.254Z",
+        "forms": [],
+        "legendary_actions": [],
+        "reactions": []
+      },
+      "engine": {
+        "type": "will_o_wisp",
+        "hp": {
+          "current": 22,
+          "max": 22
+        },
+        "ac": 19,
+        "stats": {
+          "str": 1,
+          "dex": 28,
+          "con": 10,
+          "int": 13,
+          "wis": 14,
+          "cha": 11
+        },
+        "conditions": [],
+        "xpValue": 450,
+        "attackBonus": 4,
+        "damageDice": "2d8",
+        "speed": 0,
+        "attackName": "Shock",
+        "attackRangeCells": 1,
+        "damageType": "lightning",
+        "movementModes": {
+          "walk": 0,
+          "fly": 50,
+          "hover": true
+        }
+      }
+    },
+    "awakened_shrub": {
+      "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/awakened-shrub",
+      "sourceSha256": "f50efa49c491b5dad86ef1129b27535ed68f29e2b28ccb4b317f8499744ed5f7",
+      "source": {
+        "index": "awakened-shrub",
+        "name": "Awakened Shrub",
+        "desc": "An awakened shrub is an ordinary shrub given sentience and mobility by the awaken spell or similar magic.",
+        "size": "Small",
+        "type": "plant",
+        "alignment": "unaligned",
+        "armor_class": [
+          {
+            "type": "dex",
+            "value": 9
+          }
+        ],
+        "hit_points": 10,
+        "hit_dice": "3d6",
+        "hit_points_roll": "3d6",
+        "speed": {
+          "walk": "20 ft."
+        },
+        "strength": 3,
+        "dexterity": 8,
+        "constitution": 11,
+        "intelligence": 10,
+        "wisdom": 10,
+        "charisma": 6,
+        "proficiencies": [],
+        "damage_vulnerabilities": [
+          "fire"
+        ],
+        "damage_resistances": [
+          "piercing"
+        ],
+        "damage_immunities": [],
+        "condition_immunities": [],
+        "senses": {
+          "passive_perception": 10
+        },
+        "languages": "one language known by its creator",
+        "challenge_rating": 0,
+        "proficiency_bonus": 2,
+        "xp": 10,
+        "special_abilities": [
+          {
+            "name": "False Appearance",
+            "desc": "While the shrub remains motionless, it is indistinguishable from a normal shrub.",
+            "damage": []
+          }
+        ],
+        "actions": [
+          {
+            "name": "Rake",
+            "desc": "Melee Weapon Attack: +1 to hit, reach 5 ft., one target. Hit: 1 (1d4 - 1) slashing damage.",
+            "attack_bonus": 1,
+            "damage": [
+              {
+                "damage_type": {
+                  "index": "slashing",
+                  "name": "Slashing",
+                  "url": "/api/2014/damage-types/slashing"
+                },
+                "damage_dice": "1d4-1"
+              }
+            ],
+            "actions": []
+          }
+        ],
+        "image": "/api/images/monsters/awakened-shrub.png",
+        "url": "/api/2014/monsters/awakened-shrub",
+        "updated_at": "2026-04-01T20:35:38.253Z",
+        "forms": [],
+        "legendary_actions": [],
+        "reactions": []
+      },
+      "engine": {
+        "type": "awakened_shrub",
+        "hp": {
+          "current": 10,
+          "max": 10
+        },
+        "ac": 9,
+        "stats": {
+          "str": 3,
+          "dex": 8,
+          "con": 11,
+          "int": 10,
+          "wis": 10,
+          "cha": 6
+        },
+        "conditions": [],
+        "xpValue": 10,
+        "attackBonus": 1,
+        "damageDice": "1d4-1",
+        "speed": 20,
+        "attackName": "Rake",
+        "attackRangeCells": 1,
+        "damageType": "slashing",
+        "movementModes": {
+          "walk": 20
+        }
+      }
+    },
+    "giant_frog": {
+      "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/giant-frog",
+      "sourceSha256": "d1f1ec87b95b1cd96dd1380b9d0c0c2ffa142298878d4d8231c183f18c8a37cc",
+      "source": {
+        "index": "giant-frog",
+        "name": "Giant Frog",
+        "size": "Medium",
+        "type": "beast",
+        "alignment": "unaligned",
+        "armor_class": [
+          {
+            "type": "dex",
+            "value": 11
+          }
+        ],
+        "hit_points": 18,
+        "hit_dice": "4d8",
+        "hit_points_roll": "4d8",
+        "speed": {
+          "walk": "30 ft.",
+          "swim": "30 ft."
+        },
+        "strength": 12,
+        "dexterity": 13,
+        "constitution": 11,
+        "intelligence": 2,
+        "wisdom": 10,
+        "charisma": 3,
+        "proficiencies": [
+          {
+            "value": 2,
+            "proficiency": {
+              "index": "skill-perception",
+              "name": "Skill: Perception",
+              "url": "/api/2014/proficiencies/skill-perception"
+            }
+          },
+          {
+            "value": 3,
+            "proficiency": {
+              "index": "skill-stealth",
+              "name": "Skill: Stealth",
+              "url": "/api/2014/proficiencies/skill-stealth"
+            }
+          }
+        ],
+        "damage_vulnerabilities": [],
+        "damage_resistances": [],
+        "damage_immunities": [],
+        "condition_immunities": [],
+        "senses": {
+          "darkvision": "30 ft.",
+          "passive_perception": 12
+        },
+        "languages": "",
+        "challenge_rating": 0.25,
+        "proficiency_bonus": 2,
+        "xp": 50,
+        "special_abilities": [
+          {
+            "name": "Amphibious",
+            "desc": "The frog can breathe air and water",
+            "damage": []
+          },
+          {
+            "name": "Standing Leap",
+            "desc": "The frog's long jump is up to 20 ft. and its high jump is up to 10 ft., with or without a running start.",
+            "damage": []
+          }
+        ],
+        "actions": [
+          {
+            "name": "Bite",
+            "desc": "Melee Weapon Attack: +3 to hit, reach 5 ft., one target. Hit: 4 (1d6 + 1) piercing damage, and the target is grappled (escape DC 11). Until this grapple ends, the target is restrained, and the frog can't bite another target.",
+            "attack_bonus": 3,
+            "damage": [
+              {
+                "damage_type": {
+                  "index": "piercing",
+                  "name": "Piercing",
+                  "url": "/api/2014/damage-types/piercing"
+                },
+                "damage_dice": "1d6+1"
+              }
+            ],
+            "actions": []
+          },
+          {
+            "damage": [],
+            "name": "Swallow",
+            "desc": "The frog makes one bite attack against a Small or smaller target it is grappling. If the attack hits, the target is swallowed, and the grapple ends. The swallowed target is blinded and restrained, it has total cover against attacks and other effects outside the frog, and it takes 5 (2d4) acid damage at the start of each of the frog's turns. The frog can have only one target swallowed at a time. If the frog dies, a swallowed creature is no longer restrained by it and can escape from the corpse using 5 ft. of movement, exiting prone.",
+            "actions": []
+          }
+        ],
+        "image": "/api/images/monsters/giant-frog.png",
+        "url": "/api/2014/monsters/giant-frog",
+        "updated_at": "2026-04-01T20:35:38.254Z",
+        "forms": [],
+        "legendary_actions": [],
+        "reactions": []
+      },
+      "engine": {
+        "type": "giant_frog",
+        "hp": {
+          "current": 18,
+          "max": 18
+        },
+        "ac": 11,
+        "stats": {
+          "str": 12,
+          "dex": 13,
+          "con": 11,
+          "int": 2,
+          "wis": 10,
+          "cha": 3
+        },
+        "conditions": [],
+        "xpValue": 50,
+        "attackBonus": 3,
+        "damageDice": "1d6+1",
+        "speed": 30,
+        "attackName": "Bite",
+        "attackRangeCells": 1,
+        "damageType": "piercing",
+        "movementModes": {
+          "walk": 30,
+          "swim": 30
+        }
+      }
+    },
+    "wight": {
+      "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/wight",
+      "sourceSha256": "fdf582a5e6097e446fd15da720b15b649242bf1cd9a42bd2a67ef8b1135f3961",
+      "source": {
+        "index": "wight",
+        "name": "Wight",
+        "size": "Medium",
+        "type": "undead",
+        "alignment": "neutral evil",
+        "armor_class": [
+          {
+            "type": "armor",
+            "value": 14,
+            "armor": [
+              {
+                "index": "studded-leather-armor",
+                "name": "Studded Leather Armor",
+                "url": "/api/2014/equipment/studded-leather-armor"
+              }
+            ]
+          }
+        ],
+        "hit_points": 45,
+        "hit_dice": "6d8",
+        "hit_points_roll": "6d8+18",
+        "speed": {
+          "walk": "30 ft."
+        },
+        "strength": 15,
+        "dexterity": 14,
+        "constitution": 16,
+        "intelligence": 10,
+        "wisdom": 13,
+        "charisma": 15,
+        "proficiencies": [
+          {
+            "value": 3,
+            "proficiency": {
+              "index": "skill-perception",
+              "name": "Skill: Perception",
+              "url": "/api/2014/proficiencies/skill-perception"
+            }
+          },
+          {
+            "value": 4,
+            "proficiency": {
+              "index": "skill-stealth",
+              "name": "Skill: Stealth",
+              "url": "/api/2014/proficiencies/skill-stealth"
+            }
+          }
+        ],
+        "damage_vulnerabilities": [],
+        "damage_resistances": [
+          "necrotic",
+          "bludgeoning, piercing, and slashing from nonmagical weapons that aren't silvered"
+        ],
+        "damage_immunities": [
+          "poison"
+        ],
+        "condition_immunities": [
+          {
+            "index": "exhaustion",
+            "name": "Exhaustion",
+            "url": "/api/2014/conditions/exhaustion"
+          },
+          {
+            "index": "poisoned",
+            "name": "Poisoned",
+            "url": "/api/2014/conditions/poisoned"
+          }
+        ],
+        "senses": {
+          "darkvision": "60 ft.",
+          "passive_perception": 13
+        },
+        "languages": "the languages it knew in life",
+        "challenge_rating": 3,
+        "proficiency_bonus": 2,
+        "xp": 700,
+        "special_abilities": [
+          {
+            "name": "Sunlight Sensitivity",
+            "desc": "While in sunlight, the wight has disadvantage on attack rolls, as well as on Wisdom (Perception) checks that rely on sight.",
+            "damage": []
+          }
+        ],
+        "actions": [
+          {
+            "damage": [],
+            "name": "Multiattack",
+            "multiattack_type": "action_options",
+            "desc": "The wight makes two longsword attacks or two longbow attacks. It can use its Life Drain in place of one longsword attack.",
+            "action_options": {
+              "choose": 1,
+              "type": "action",
+              "from": {
+                "option_set_type": "options_array",
+                "options": [
+                  {
+                    "option_type": "action",
+                    "action_name": "Longsword",
+                    "count": 2,
+                    "type": "melee"
+                  },
+                  {
+                    "option_type": "action",
+                    "action_name": "Longbow",
+                    "count": 2,
+                    "type": "ranged"
+                  },
+                  {
+                    "option_type": "multiple",
+                    "items": [
+                      {
+                        "option_type": "action",
+                        "action_name": "Life Drain",
+                        "count": 1,
+                        "type": "ability"
+                      },
+                      {
+                        "option_type": "action",
+                        "action_name": "Longsword",
+                        "count": 1,
+                        "type": "melee"
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            "actions": []
+          },
+          {
+            "name": "Life Drain",
+            "desc": "Melee Weapon Attack: +4 to hit, reach 5 ft., one creature. Hit: 5 (1d6 + 2) necrotic damage. The target must succeed on a DC 13 Constitution saving throw or its hit point maximum is reduced by an amount equal to the damage taken. This reduction lasts until the target finishes a long rest. The target dies if this effect reduces its hit point maximum to 0.\nA humanoid slain by this attack rises 24 hours later as a zombie under the wight's control, unless the humanoid is restored to life or its body is destroyed. The wight can have no more than twelve zombies under its control at one time.",
+            "attack_bonus": 4,
+            "damage": [
+              {
+                "damage_type": {
+                  "index": "necrotic",
+                  "name": "Necrotic",
+                  "url": "/api/2014/damage-types/necrotic"
+                },
+                "damage_dice": "1d6+2"
+              }
+            ],
+            "actions": []
+          },
+          {
+            "name": "Longsword",
+            "desc": "Melee Weapon Attack: +4 to hit, reach 5 ft., one target. Hit: 6 (1d8 + 2) slashing damage, or 7 (1d10 + 2) slashing damage if used with two hands.",
+            "attack_bonus": 4,
+            "damage": [
+              {
+                "choose": 1,
+                "type": "damage",
+                "from": {
+                  "option_set_type": "options_array",
+                  "options": [
+                    {
+                      "option_type": "damage",
+                      "notes": "One handed",
+                      "damage_type": {
+                        "index": "slashing",
+                        "name": "Slashing",
+                        "url": "/api/2014/damage-types/slashing"
+                      },
+                      "damage_dice": "1d8+2"
+                    },
+                    {
+                      "option_type": "damage",
+                      "notes": "Two handed",
+                      "damage_type": {
+                        "index": "slashing",
+                        "name": "Slashing",
+                        "url": "/api/2014/damage-types/slashing"
+                      },
+                      "damage_dice": "1d10+2"
+                    }
+                  ]
+                }
+              }
+            ],
+            "actions": []
+          },
+          {
+            "name": "Longbow",
+            "desc": "Ranged Weapon Attack: +4 to hit, range 150/600 ft., one target. Hit: 6 (1d8 + 2) piercing damage.",
+            "attack_bonus": 4,
+            "damage": [
+              {
+                "damage_type": {
+                  "index": "piercing",
+                  "name": "Piercing",
+                  "url": "/api/2014/damage-types/piercing"
+                },
+                "damage_dice": "1d8+2"
+              }
+            ],
+            "actions": []
+          }
+        ],
+        "image": "/api/images/monsters/wight.png",
+        "url": "/api/2014/monsters/wight",
+        "updated_at": "2026-04-01T20:35:38.254Z",
+        "forms": [],
+        "legendary_actions": [],
+        "reactions": []
+      },
+      "engine": {
+        "type": "wight",
+        "hp": {
+          "current": 45,
+          "max": 45
+        },
+        "ac": 14,
+        "stats": {
+          "str": 15,
+          "dex": 14,
+          "con": 16,
+          "int": 10,
+          "wis": 13,
+          "cha": 15
+        },
+        "conditions": [],
+        "xpValue": 700,
+        "attackBonus": 4,
+        "damageDice": "1d8+2",
+        "speed": 30,
+        "attackName": "Longsword",
+        "attackRangeCells": 1,
+        "damageType": "slashing",
+        "movementModes": {
+          "walk": 30
+        }
+      }
+    },
+    "ghost": {
+      "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/ghost",
+      "sourceSha256": "32c6f528707440c9da15aa5c9ae0ae19fcb703231b5762608dd0b3e646fda234",
+      "source": {
+        "index": "ghost",
+        "name": "Ghost",
+        "size": "Medium",
+        "type": "undead",
+        "alignment": "any alignment",
+        "armor_class": [
+          {
+            "type": "dex",
+            "value": 11
+          }
+        ],
+        "hit_points": 45,
+        "hit_dice": "10d8",
+        "hit_points_roll": "10d8",
+        "speed": {
+          "walk": "0 ft.",
+          "fly": "40 ft.",
+          "hover": true
+        },
+        "strength": 7,
+        "dexterity": 13,
+        "constitution": 10,
+        "intelligence": 10,
+        "wisdom": 12,
+        "charisma": 17,
+        "proficiencies": [],
+        "damage_vulnerabilities": [],
+        "damage_resistances": [
+          "acid",
+          "fire",
+          "lightning",
+          "thunder",
+          "bludgeoning, piercing, and slashing from nonmagical weapons"
+        ],
+        "damage_immunities": [
+          "cold",
+          "necrotic",
+          "poison"
+        ],
+        "condition_immunities": [
+          {
+            "index": "charmed",
+            "name": "Charmed",
+            "url": "/api/2014/conditions/charmed"
+          },
+          {
+            "index": "exhaustion",
+            "name": "Exhaustion",
+            "url": "/api/2014/conditions/exhaustion"
+          },
+          {
+            "index": "frightened",
+            "name": "Frightened",
+            "url": "/api/2014/conditions/frightened"
+          },
+          {
+            "index": "grappled",
+            "name": "Grappled",
+            "url": "/api/2014/conditions/grappled"
+          },
+          {
+            "index": "paralyzed",
+            "name": "Paralyzed",
+            "url": "/api/2014/conditions/paralyzed"
+          },
+          {
+            "index": "petrified",
+            "name": "Petrified",
+            "url": "/api/2014/conditions/petrified"
+          },
+          {
+            "index": "poisoned",
+            "name": "Poisoned",
+            "url": "/api/2014/conditions/poisoned"
+          },
+          {
+            "index": "prone",
+            "name": "Prone",
+            "url": "/api/2014/conditions/prone"
+          },
+          {
+            "index": "restrained",
+            "name": "Restrained",
+            "url": "/api/2014/conditions/restrained"
+          }
+        ],
+        "senses": {
+          "darkvision": "60 ft.",
+          "passive_perception": 11
+        },
+        "languages": "any languages it knew in life",
+        "challenge_rating": 4,
+        "proficiency_bonus": 2,
+        "xp": 1100,
+        "special_abilities": [
+          {
+            "name": "Ethereal Sight",
+            "desc": "The ghost can see 60 ft. into the Ethereal Plane when it is on the Material Plane, and vice versa.",
+            "damage": []
+          },
+          {
+            "name": "Incorporeal Movement",
+            "desc": "The ghost can move through other creatures and objects as if they were difficult terrain. It takes 5 (1d10) force damage if it ends its turn inside an object.",
+            "damage": []
+          }
+        ],
+        "actions": [
+          {
+            "name": "Withering Touch",
+            "desc": "Melee Weapon Attack: +5 to hit, reach 5 ft., one target. Hit: 17 (4d6 + 3) necrotic damage.",
+            "attack_bonus": 5,
+            "damage": [
+              {
+                "damage_type": {
+                  "index": "necrotic",
+                  "name": "Necrotic",
+                  "url": "/api/2014/damage-types/necrotic"
+                },
+                "damage_dice": "4d6+3"
+              }
+            ],
+            "actions": []
+          },
+          {
+            "damage": [],
+            "name": "Etherealness",
+            "desc": "The ghost enters the Ethereal Plane from the Material Plane, or vice versa. It is visible on the Material Plane while it is in the Border Ethereal, and vice versa, yet it can't affect or be affected by anything on the other plane.",
+            "actions": []
+          },
+          {
+            "damage": [],
+            "name": "Horrifying Visage",
+            "desc": "Each non-undead creature within 60 ft. of the ghost that can see it must succeed on a DC 13 Wisdom saving throw or be frightened for 1 minute. If the save fails by 5 or more, the target also ages 1d4 × 10 years. A frightened target can repeat the saving throw at the end of each of its turns, ending the frightened condition on itself on a success. If a target's saving throw is successful or the effect ends for it, the target is immune to this ghost's Horrifying Visage for the next 24 hours. The aging effect can be reversed with a greater restoration spell, but only within 24 hours of it occurring.",
+            "dc": {
+              "dc_type": {
+                "index": "wis",
+                "name": "WIS",
+                "url": "/api/2014/ability-scores/wis"
+              },
+              "dc_value": 13,
+              "success_type": "none"
+            },
+            "actions": []
+          },
+          {
+            "damage": [],
+            "name": "Possession",
+            "desc": "One humanoid that the ghost can see within 5 ft. of it must succeed on a DC 13 Charisma saving throw or be possessed by the ghost; the ghost then disappears, and the target is incapacitated and loses control of its body. The ghost now controls the body but doesn't deprive the target of awareness. The ghost can't be targeted by any attack, spell, or other effect, except ones that turn undead, and it retains its alignment, Intelligence, Wisdom, Charisma, and immunity to being charmed and frightened. It otherwise uses the possessed target's statistics, but doesn't gain access to the target's knowledge, class features, or proficiencies.\nThe possession lasts until the body drops to 0 hit points, the ghost ends it as a bonus action, or the ghost is turned or forced out by an effect like the dispel evil and good spell. When the possession ends, the ghost reappears in an unoccupied space within 5 ft. of the body. The target is immune to this ghost's Possession for 24 hours after succeeding on the saving throw or after the possession ends.",
+            "usage": {
+              "type": "recharge on roll",
+              "dice": "1d6",
+              "min_value": 6
+            },
+            "dc": {
+              "dc_type": {
+                "index": "cha",
+                "name": "CHA",
+                "url": "/api/2014/ability-scores/cha"
+              },
+              "dc_value": 13,
+              "success_type": "none"
+            },
+            "actions": []
+          }
+        ],
+        "image": "/api/images/monsters/ghost.png",
+        "url": "/api/2014/monsters/ghost",
+        "updated_at": "2026-04-01T20:35:38.254Z",
+        "forms": [],
+        "legendary_actions": [],
+        "reactions": []
+      },
+      "engine": {
+        "type": "ghost",
+        "hp": {
+          "current": 45,
+          "max": 45
+        },
+        "ac": 11,
+        "stats": {
+          "str": 7,
+          "dex": 13,
+          "con": 10,
+          "int": 10,
+          "wis": 12,
+          "cha": 17
+        },
+        "conditions": [],
+        "xpValue": 1100,
+        "attackBonus": 5,
+        "damageDice": "4d6+3",
+        "speed": 0,
+        "attackName": "Withering Touch",
+        "attackRangeCells": 1,
+        "damageType": "necrotic",
+        "movementModes": {
+          "walk": 0,
+          "fly": 40,
+          "hover": true
+        }
+      }
+    },
+    "cultist": {
+      "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/cultist",
+      "sourceSha256": "afae4e230c718d77ce7c3207ac561884e688fa86942d9d406b0d3b9b70b97368",
+      "source": {
+        "index": "cultist",
+        "name": "Cultist",
+        "desc": "Cultists swear allegiance to dark powers such as elemental princes, demon lords, or archdevils. Most conceal their loyalties to avoid being ostracized, imprisoned, or executed for their beliefs. Unlike evil acolytes, cultists often show signs of insanity in their beliefs and practices.",
+        "size": "Medium",
+        "type": "humanoid",
+        "subtype": "any race",
+        "alignment": "any non-good alignment",
+        "armor_class": [
+          {
+            "type": "armor",
+            "value": 12,
+            "armor": [
+              {
+                "index": "leather-armor",
+                "name": "Leather Armor",
+                "url": "/api/2014/equipment/leather-armor"
+              }
+            ]
+          }
+        ],
+        "hit_points": 9,
+        "hit_dice": "2d8",
+        "hit_points_roll": "2d8",
+        "speed": {
+          "walk": "30 ft."
+        },
+        "strength": 11,
+        "dexterity": 12,
+        "constitution": 10,
+        "intelligence": 10,
+        "wisdom": 11,
+        "charisma": 10,
+        "proficiencies": [
+          {
+            "value": 2,
+            "proficiency": {
+              "index": "skill-deception",
+              "name": "Skill: Deception",
+              "url": "/api/2014/proficiencies/skill-deception"
+            }
+          },
+          {
+            "value": 2,
+            "proficiency": {
+              "index": "skill-religion",
+              "name": "Skill: Religion",
+              "url": "/api/2014/proficiencies/skill-religion"
+            }
+          }
+        ],
+        "damage_vulnerabilities": [],
+        "damage_resistances": [],
+        "damage_immunities": [],
+        "condition_immunities": [],
+        "senses": {
+          "passive_perception": 10
+        },
+        "languages": "any one language (usually Common)",
+        "challenge_rating": 0.125,
+        "proficiency_bonus": 2,
+        "xp": 25,
+        "special_abilities": [
+          {
+            "name": "Dark Devotion",
+            "desc": "The cultist has advantage on saving throws against being charmed or frightened.",
+            "damage": []
+          }
+        ],
+        "actions": [
+          {
+            "name": "Scimitar",
+            "desc": "Melee Weapon Attack: +3 to hit, reach 5 ft., one creature. Hit: 4 (1d6 + 1) slashing damage.",
+            "attack_bonus": 3,
+            "damage": [
+              {
+                "damage_type": {
+                  "index": "slashing",
+                  "name": "Slashing",
+                  "url": "/api/2014/damage-types/slashing"
+                },
+                "damage_dice": "1d6+1"
+              }
+            ],
+            "actions": []
+          }
+        ],
+        "image": "/api/images/monsters/cultist.png",
+        "url": "/api/2014/monsters/cultist",
+        "updated_at": "2026-04-01T20:35:38.253Z",
+        "forms": [],
+        "legendary_actions": [],
+        "reactions": []
+      },
+      "engine": {
+        "type": "cultist",
+        "hp": {
+          "current": 9,
+          "max": 9
+        },
+        "ac": 12,
+        "stats": {
+          "str": 11,
+          "dex": 12,
+          "con": 10,
+          "int": 10,
+          "wis": 11,
+          "cha": 10
+        },
+        "conditions": [],
+        "xpValue": 25,
+        "attackBonus": 3,
+        "damageDice": "1d6+1",
+        "speed": 30,
+        "attackName": "Scimitar",
+        "attackRangeCells": 1,
+        "damageType": "slashing",
+        "movementModes": {
+          "walk": 30
+        }
+      }
+    },
+    "cult_fanatic": {
+      "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/cult-fanatic",
+      "sourceSha256": "d04ae22b4164596a5138a9e2dad6ad07c6b067b32a3a6296486b9434d79271fc",
+      "source": {
+        "index": "cult-fanatic",
+        "name": "Cult Fanatic",
+        "desc": "Fanatics are often part of a cult’s leadership, using their charisma and dogma to influence and prey on those of weak will. Most are interested in personal power above all else.",
+        "size": "Medium",
+        "type": "humanoid",
+        "subtype": "any race",
+        "alignment": "any non-good alignment",
+        "armor_class": [
+          {
+            "type": "armor",
+            "value": 13,
+            "armor": [
+              {
+                "index": "leather-armor",
+                "name": "Leather Armor",
+                "url": "/api/2014/equipment/leather-armor"
+              }
+            ]
+          }
+        ],
+        "hit_points": 22,
+        "hit_dice": "6d8",
+        "hit_points_roll": "6d8-5",
+        "speed": {
+          "walk": "30 ft."
+        },
+        "strength": 11,
+        "dexterity": 14,
+        "constitution": 12,
+        "intelligence": 10,
+        "wisdom": 13,
+        "charisma": 14,
+        "proficiencies": [
+          {
+            "value": 4,
+            "proficiency": {
+              "index": "skill-deception",
+              "name": "Skill: Deception",
+              "url": "/api/2014/proficiencies/skill-deception"
+            }
+          },
+          {
+            "value": 4,
+            "proficiency": {
+              "index": "skill-persuasion",
+              "name": "Skill: Persuasion",
+              "url": "/api/2014/proficiencies/skill-persuasion"
+            }
+          },
+          {
+            "value": 2,
+            "proficiency": {
+              "index": "skill-religion",
+              "name": "Skill: Religion",
+              "url": "/api/2014/proficiencies/skill-religion"
+            }
+          }
+        ],
+        "damage_vulnerabilities": [],
+        "damage_resistances": [],
+        "damage_immunities": [],
+        "condition_immunities": [],
+        "senses": {
+          "passive_perception": 11
+        },
+        "languages": "any one language (usually Common)",
+        "challenge_rating": 2,
+        "proficiency_bonus": 2,
+        "xp": 450,
+        "special_abilities": [
+          {
+            "name": "Dark Devotion",
+            "desc": "The fanatic has advantage on saving throws against being charmed or frightened.",
+            "damage": []
+          },
+          {
+            "name": "Spellcasting",
+            "desc": "The fanatic is a 4th-level spellcaster. Its spell casting ability is Wisdom (spell save DC 11, +3 to hit with spell attacks). The fanatic has the following cleric spells prepared:\n\nCantrips (at will): light, sacred flame, thaumaturgy\n- 1st level (4 slots): command, inflict wounds, shield of faith\n- 2nd level (3 slots): hold person, spiritual weapon",
+            "spellcasting": {
+              "level": 4,
+              "ability": {
+                "index": "wis",
+                "name": "WIS",
+                "url": "/api/2014/ability-scores/wis"
+              },
+              "dc": 11,
+              "modifier": 3,
+              "components_required": [
+                "V",
+                "S",
+                "M"
+              ],
+              "school": "cleric",
+              "slots": {
+                "1": 4,
+                "2": 3
+              },
+              "spells": [
+                {
+                  "name": "Light",
+                  "level": 0,
+                  "url": "/api/2014/spells/light"
+                },
+                {
+                  "name": "Sacred Flame",
+                  "level": 0,
+                  "url": "/api/2014/spells/sacred-flame"
+                },
+                {
+                  "name": "Thaumaturgy",
+                  "level": 0,
+                  "url": "/api/2014/spells/thaumaturgy"
+                },
+                {
+                  "name": "Command",
+                  "level": 1,
+                  "url": "/api/2014/spells/command"
+                },
+                {
+                  "name": "Inflict Wounds",
+                  "level": 1,
+                  "url": "/api/2014/spells/inflict-wounds"
+                },
+                {
+                  "name": "Shield of Faith",
+                  "level": 1,
+                  "url": "/api/2014/spells/shield-of-faith"
+                },
+                {
+                  "name": "Hold Person",
+                  "level": 2,
+                  "url": "/api/2014/spells/hold-person"
+                },
+                {
+                  "name": "Spiritual Weapon",
+                  "level": 2,
+                  "url": "/api/2014/spells/spiritual-weapon"
+                }
+              ]
+            },
+            "damage": []
+          }
+        ],
+        "actions": [
+          {
+            "damage": [],
+            "name": "Multiattack",
+            "multiattack_type": "actions",
+            "desc": "The fanatic makes two melee attacks.",
+            "actions": [
+              {
+                "action_name": "Dagger",
+                "count": "2",
+                "type": "melee"
+              }
+            ]
+          },
+          {
+            "name": "Dagger",
+            "desc": "Melee or Ranged Weapon Attack: +4 to hit, reach 5 ft. or range 20/60 ft., one creature. Hit: 4 (1d4 + 2) piercing damage.",
+            "attack_bonus": 4,
+            "damage": [
+              {
+                "damage_type": {
+                  "index": "piercing",
+                  "name": "Piercing",
+                  "url": "/api/2014/damage-types/piercing"
+                },
+                "damage_dice": "1d4+2"
+              }
+            ],
+            "actions": []
+          }
+        ],
+        "image": "/api/images/monsters/cult-fanatic.png",
+        "url": "/api/2014/monsters/cult-fanatic",
+        "updated_at": "2026-04-01T20:35:38.253Z",
+        "forms": [],
+        "legendary_actions": [],
+        "reactions": []
+      },
+      "engine": {
+        "type": "cult_fanatic",
+        "hp": {
+          "current": 22,
+          "max": 22
+        },
+        "ac": 13,
+        "stats": {
+          "str": 11,
+          "dex": 14,
+          "con": 12,
+          "int": 10,
+          "wis": 13,
+          "cha": 14
+        },
+        "conditions": [],
+        "xpValue": 450,
+        "attackBonus": 4,
+        "damageDice": "1d4+2",
+        "speed": 30,
+        "attackName": "Dagger",
+        "attackRangeCells": 1,
+        "damageType": "piercing",
+        "movementModes": {
+          "walk": 30
+        }
+      }
+    },
+    "thug": {
+      "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/thug",
+      "sourceSha256": "1027b8a2ae03ae0fabe8afb05d76b42b79726d5a40a1005919d1c6840c9b71fd",
+      "source": {
+        "index": "thug",
+        "name": "Thug",
+        "desc": "Thugs are ruthless enforcers skilled at intimidation and violence. They work for money and have few scruples.",
+        "size": "Medium",
+        "type": "humanoid",
+        "subtype": "any race",
+        "alignment": "any non-good alignment",
+        "armor_class": [
+          {
+            "type": "armor",
+            "value": 11,
+            "armor": [
+              {
+                "index": "leather-armor",
+                "name": "Leather Armor",
+                "url": "/api/2014/equipment/leather-armor"
+              }
+            ]
+          }
+        ],
+        "hit_points": 32,
+        "hit_dice": "5d8",
+        "hit_points_roll": "5d8+10",
+        "speed": {
+          "walk": "30 ft."
+        },
+        "strength": 15,
+        "dexterity": 11,
+        "constitution": 14,
+        "intelligence": 10,
+        "wisdom": 10,
+        "charisma": 11,
+        "proficiencies": [
+          {
+            "value": 2,
+            "proficiency": {
+              "index": "skill-intimidation",
+              "name": "Skill: Intimidation",
+              "url": "/api/2014/proficiencies/skill-intimidation"
+            }
+          }
+        ],
+        "damage_vulnerabilities": [],
+        "damage_resistances": [],
+        "damage_immunities": [],
+        "condition_immunities": [],
+        "senses": {
+          "passive_perception": 10
+        },
+        "languages": "any one language (usually Common)",
+        "challenge_rating": 0.5,
+        "proficiency_bonus": 2,
+        "xp": 100,
+        "special_abilities": [
+          {
+            "name": "Pack Tactics",
+            "desc": "The thug has advantage on an attack roll against a creature if at least one of the thug's allies is within 5 ft. of the creature and the ally isn't incapacitated.",
+            "damage": []
+          }
+        ],
+        "actions": [
+          {
+            "damage": [],
+            "name": "Multiattack",
+            "multiattack_type": "actions",
+            "desc": "The thug makes two melee attacks.",
+            "actions": [
+              {
+                "action_name": "Mace",
+                "count": "2",
+                "type": "melee"
+              }
+            ]
+          },
+          {
+            "name": "Mace",
+            "desc": "Melee Weapon Attack: +4 to hit, reach 5 ft., one creature. Hit: 5 (1d6 + 2) bludgeoning damage.",
+            "attack_bonus": 4,
+            "damage": [
+              {
+                "damage_type": {
+                  "index": "bludgeoning",
+                  "name": "Bludgeoning",
+                  "url": "/api/2014/damage-types/bludgeoning"
+                },
+                "damage_dice": "1d6+2"
+              }
+            ],
+            "actions": []
+          },
+          {
+            "name": "Heavy Crossbow",
+            "desc": "Ranged Weapon Attack: +2 to hit, range 100/400 ft., one target. Hit: 5 (1d10) piercing damage.",
+            "attack_bonus": 2,
+            "damage": [
+              {
+                "damage_type": {
+                  "index": "piercing",
+                  "name": "Piercing",
+                  "url": "/api/2014/damage-types/piercing"
+                },
+                "damage_dice": "1d10"
+              }
+            ],
+            "actions": []
+          }
+        ],
+        "image": "/api/images/monsters/thug.png",
+        "url": "/api/2014/monsters/thug",
+        "updated_at": "2026-04-01T20:35:38.254Z",
+        "forms": [],
+        "legendary_actions": [],
+        "reactions": []
+      },
+      "engine": {
+        "type": "thug",
+        "hp": {
+          "current": 32,
+          "max": 32
+        },
+        "ac": 11,
+        "stats": {
+          "str": 15,
+          "dex": 11,
+          "con": 14,
+          "int": 10,
+          "wis": 10,
+          "cha": 11
+        },
+        "conditions": [],
+        "xpValue": 100,
+        "attackBonus": 4,
+        "damageDice": "1d6+2",
+        "speed": 30,
+        "attackName": "Mace",
+        "attackRangeCells": 1,
+        "damageType": "bludgeoning",
+        "movementModes": {
+          "walk": 30
+        }
+      }
+    },
+    "veteran": {
+      "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/veteran",
+      "sourceSha256": "bca0cc6a8e5b77728b431aaba94f78312c534810c5b522ab48c5aa2dc3a5bfa0",
+      "source": {
+        "index": "veteran",
+        "name": "Veteran",
+        "desc": "Veterans are professional fighters that take up arms for pay or to protect something they believe in or value. Their ranks include soldiers retired from long service and warriors who never served anyone but themselves.",
+        "size": "Medium",
+        "type": "humanoid",
+        "subtype": "any race",
+        "alignment": "any alignment",
+        "armor_class": [
+          {
+            "type": "armor",
+            "value": 17,
+            "armor": [
+              {
+                "index": "splint-armor",
+                "name": "Splint Armor",
+                "url": "/api/2014/equipment/splint-armor"
+              }
+            ]
+          }
+        ],
+        "hit_points": 58,
+        "hit_dice": "9d8",
+        "hit_points_roll": "9d8+18",
+        "speed": {
+          "walk": "30 ft."
+        },
+        "strength": 16,
+        "dexterity": 13,
+        "constitution": 14,
+        "intelligence": 10,
+        "wisdom": 11,
+        "charisma": 10,
+        "proficiencies": [
+          {
+            "value": 5,
+            "proficiency": {
+              "index": "skill-athletics",
+              "name": "Skill: Athletics",
+              "url": "/api/2014/proficiencies/skill-athletics"
+            }
+          },
+          {
+            "value": 2,
+            "proficiency": {
+              "index": "skill-perception",
+              "name": "Skill: Perception",
+              "url": "/api/2014/proficiencies/skill-perception"
+            }
+          }
+        ],
+        "damage_vulnerabilities": [],
+        "damage_resistances": [],
+        "damage_immunities": [],
+        "condition_immunities": [],
+        "senses": {
+          "passive_perception": 12
+        },
+        "languages": "any one language (usually Common)",
+        "challenge_rating": 3,
+        "proficiency_bonus": 2,
+        "xp": 700,
+        "actions": [
+          {
+            "damage": [],
+            "name": "Multiattack",
+            "multiattack_type": "actions",
+            "desc": "The veteran makes two longsword attacks. If it has a shortsword drawn, it can also make a shortsword attack.",
+            "actions": [
+              {
+                "action_name": "Longsword",
+                "count": "2",
+                "type": "melee"
+              },
+              {
+                "action_name": "Shortsword",
+                "count": "2",
+                "type": "melee"
+              }
+            ]
+          },
+          {
+            "name": "Longsword",
+            "desc": "Melee Weapon Attack: +5 to hit, reach 5 ft., one target. Hit: 7 (1d8 + 3) slashing damage, or 8 (1d10 + 3) slashing damage if used with two hands.",
+            "attack_bonus": 5,
+            "damage": [
+              {
+                "choose": 1,
+                "type": "damage",
+                "from": {
+                  "option_set_type": "options_array",
+                  "options": [
+                    {
+                      "option_type": "damage",
+                      "notes": "One handed",
+                      "damage_type": {
+                        "index": "slashing",
+                        "name": "Slashing",
+                        "url": "/api/2014/damage-types/slashing"
+                      },
+                      "damage_dice": "1d8+3"
+                    },
+                    {
+                      "option_type": "damage",
+                      "notes": "Two handed",
+                      "damage_type": {
+                        "index": "slashing",
+                        "name": "Slashing",
+                        "url": "/api/2014/damage-types/slashing"
+                      },
+                      "damage_dice": "1d10+3"
+                    }
+                  ]
+                }
+              }
+            ],
+            "actions": []
+          },
+          {
+            "name": "Shortsword",
+            "desc": "Melee Weapon Attack: +5 to hit, reach 5 ft., one target. Hit: 6 (1d6 + 3) piercing damage.",
+            "attack_bonus": 5,
+            "damage": [
+              {
+                "damage_type": {
+                  "index": "piercing",
+                  "name": "Piercing",
+                  "url": "/api/2014/damage-types/piercing"
+                },
+                "damage_dice": "1d6+3"
+              }
+            ],
+            "actions": []
+          },
+          {
+            "name": "Heavy Crossbow",
+            "desc": "Ranged Weapon Attack: +3 to hit, range 100/400 ft., one target. Hit: 6 (1d10 + 1) piercing damage.",
+            "attack_bonus": 3,
+            "damage": [
+              {
+                "damage_type": {
+                  "index": "piercing",
+                  "name": "Piercing",
+                  "url": "/api/2014/damage-types/piercing"
+                },
+                "damage_dice": "1d10+1"
+              }
+            ],
+            "actions": []
+          }
+        ],
+        "image": "/api/images/monsters/veteran.png",
+        "url": "/api/2014/monsters/veteran",
+        "updated_at": "2026-04-01T20:35:38.254Z",
+        "forms": [],
+        "legendary_actions": [],
+        "reactions": [],
+        "special_abilities": []
+      },
+      "engine": {
+        "type": "veteran",
+        "hp": {
+          "current": 58,
+          "max": 58
+        },
+        "ac": 17,
+        "stats": {
+          "str": 16,
+          "dex": 13,
+          "con": 14,
+          "int": 10,
+          "wis": 11,
+          "cha": 10
+        },
+        "conditions": [],
+        "xpValue": 700,
+        "attackBonus": 5,
+        "damageDice": "1d8+3",
+        "speed": 30,
+        "attackName": "Longsword",
+        "attackRangeCells": 1,
+        "damageType": "slashing",
+        "movementModes": {
+          "walk": 30
+        }
+      }
+    },
+    "noble": {
+      "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/noble",
+      "sourceSha256": "74c227943b01184d93c1167a63a5881afe6c1148042370477bff5a466b3a30cc",
+      "source": {
+        "index": "noble",
+        "name": "Noble",
+        "desc": "**Nobles** wield great authority and influence as members of the upper class, possessing wealth and connections that can make them as powerful as monarchs and generals. A noble often travels in the company of guards, as well as servants who are commoners.\n\nThe noble’s statistics can also be used to represent **courtiers** who aren’t of noble birth.",
+        "size": "Medium",
+        "type": "humanoid",
+        "subtype": "any race",
+        "alignment": "any alignment",
+        "armor_class": [
+          {
+            "type": "armor",
+            "value": 15,
+            "armor": [
+              {
+                "index": "breastplate",
+                "name": "Breastplate",
+                "url": "/api/2014/equipment/breastplate"
+              }
+            ]
+          }
+        ],
+        "hit_points": 9,
+        "hit_dice": "2d8",
+        "hit_points_roll": "2d8",
+        "speed": {
+          "walk": "30 ft."
+        },
+        "strength": 11,
+        "dexterity": 12,
+        "constitution": 11,
+        "intelligence": 12,
+        "wisdom": 14,
+        "charisma": 16,
+        "proficiencies": [
+          {
+            "value": 5,
+            "proficiency": {
+              "index": "skill-deception",
+              "name": "Skill: Deception",
+              "url": "/api/2014/proficiencies/skill-deception"
+            }
+          },
+          {
+            "value": 4,
+            "proficiency": {
+              "index": "skill-insight",
+              "name": "Skill: Insight",
+              "url": "/api/2014/proficiencies/skill-insight"
+            }
+          },
+          {
+            "value": 5,
+            "proficiency": {
+              "index": "skill-persuasion",
+              "name": "Skill: Persuasion",
+              "url": "/api/2014/proficiencies/skill-persuasion"
+            }
+          }
+        ],
+        "damage_vulnerabilities": [],
+        "damage_resistances": [],
+        "damage_immunities": [],
+        "condition_immunities": [],
+        "senses": {
+          "passive_perception": 12
+        },
+        "languages": "any two languages",
+        "challenge_rating": 0.125,
+        "proficiency_bonus": 2,
+        "xp": 25,
+        "actions": [
+          {
+            "name": "Rapier",
+            "desc": "Melee Weapon Attack: +3 to hit, reach 5 ft., one target. Hit: 5 (1d8 + 1) piercing damage.",
+            "attack_bonus": 3,
+            "damage": [
+              {
+                "damage_type": {
+                  "index": "piercing",
+                  "name": "Piercing",
+                  "url": "/api/2014/damage-types/piercing"
+                },
+                "damage_dice": "1d8+1"
+              }
+            ],
+            "actions": []
+          }
+        ],
+        "reactions": [
+          {
+            "name": "Parry",
+            "desc": "The noble adds 2 to its AC against one melee attack that would hit it. To do so, the noble must see the attacker and be wielding a melee weapon."
+          }
+        ],
+        "image": "/api/images/monsters/noble.png",
+        "url": "/api/2014/monsters/noble",
+        "updated_at": "2026-06-02T19:33:15.988Z",
+        "forms": [],
+        "legendary_actions": [],
+        "special_abilities": []
+      },
+      "engine": {
+        "type": "noble",
+        "hp": {
+          "current": 9,
+          "max": 9
+        },
+        "ac": 15,
+        "stats": {
+          "str": 11,
+          "dex": 12,
+          "con": 11,
+          "int": 12,
+          "wis": 14,
+          "cha": 16
+        },
+        "conditions": [],
+        "xpValue": 25,
+        "attackBonus": 3,
+        "damageDice": "1d8+1",
+        "speed": 30,
+        "attackName": "Rapier",
+        "attackRangeCells": 1,
+        "damageType": "piercing",
+        "movementModes": {
+          "walk": 30
+        }
+      }
+    },
+    "knight": {
+      "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/knight",
+      "sourceSha256": "d3aa70e443c5cefc21fccabfc09cd855b4ebc552ac72f5ca28dd0d9e617464a9",
+      "source": {
+        "index": "knight",
+        "name": "Knight",
+        "desc": "Knights are warriors who pledge service to rulers, religious orders, and noble causes. A knight’s alignment determines the extent to which a pledge is honored. Whether undertaking a quest or patrolling a realm, a knight often travels with an entourage that includes squires and hirelings who are commoners.",
+        "size": "Medium",
+        "type": "humanoid",
+        "subtype": "any race",
+        "alignment": "any alignment",
+        "armor_class": [
+          {
+            "type": "armor",
+            "value": 18,
+            "armor": [
+              {
+                "index": "plate-armor",
+                "name": "Plate Armor",
+                "url": "/api/2014/equipment/plate-armor"
+              }
+            ]
+          }
+        ],
+        "hit_points": 52,
+        "hit_dice": "8d8",
+        "hit_points_roll": "8d8+16",
+        "speed": {
+          "walk": "30 ft."
+        },
+        "strength": 16,
+        "dexterity": 11,
+        "constitution": 14,
+        "intelligence": 11,
+        "wisdom": 11,
+        "charisma": 15,
+        "proficiencies": [
+          {
+            "value": 4,
+            "proficiency": {
+              "index": "saving-throw-con",
+              "name": "Saving Throw: CON",
+              "url": "/api/2014/proficiencies/saving-throw-con"
+            }
+          },
+          {
+            "value": 2,
+            "proficiency": {
+              "index": "saving-throw-wis",
+              "name": "Saving Throw: WIS",
+              "url": "/api/2014/proficiencies/saving-throw-wis"
+            }
+          }
+        ],
+        "damage_vulnerabilities": [],
+        "damage_resistances": [],
+        "damage_immunities": [],
+        "condition_immunities": [],
+        "senses": {
+          "passive_perception": 10
+        },
+        "languages": "any one language (usually Common)",
+        "challenge_rating": 3,
+        "proficiency_bonus": 2,
+        "xp": 700,
+        "special_abilities": [
+          {
+            "name": "Brave",
+            "desc": "The knight has advantage on saving throws against being frightened.",
+            "damage": []
+          }
+        ],
+        "actions": [
+          {
+            "damage": [],
+            "name": "Multiattack",
+            "multiattack_type": "actions",
+            "desc": "The knight makes two melee attacks.",
+            "actions": [
+              {
+                "action_name": "Greatsword",
+                "count": "2",
+                "type": "melee"
+              }
+            ]
+          },
+          {
+            "name": "Greatsword",
+            "desc": "Melee Weapon Attack: +5 to hit, reach 5 ft., one target. Hit: 10 (2d6 + 3) slashing damage.",
+            "attack_bonus": 5,
+            "damage": [
+              {
+                "damage_type": {
+                  "index": "slashing",
+                  "name": "Slashing",
+                  "url": "/api/2014/damage-types/slashing"
+                },
+                "damage_dice": "2d6+3"
+              }
+            ],
+            "actions": []
+          },
+          {
+            "name": "Heavy Crossbow",
+            "desc": "Ranged Weapon Attack: +2 to hit, range 100/400 ft., one target. Hit: 5 (1d10) piercing damage.",
+            "attack_bonus": 2,
+            "damage": [
+              {
+                "damage_type": {
+                  "index": "piercing",
+                  "name": "Piercing",
+                  "url": "/api/2014/damage-types/piercing"
+                },
+                "damage_dice": "1d10"
+              }
+            ],
+            "actions": []
+          },
+          {
+            "damage": [],
+            "name": "Leadership",
+            "desc": "For 1 minute, the knight can utter a special command or warning whenever a nonhostile creature that it can see within 30 ft. of it makes an attack roll or a saving throw. The creature can add a d4 to its roll provided it can hear and understand the knight. A creature can benefit from only one Leadership die at a time. This effect ends if the knight is incapacitated.",
+            "usage": {
+              "type": "recharge after rest",
+              "rest_types": [
+                "short",
+                "long"
+              ]
+            },
+            "actions": []
+          }
+        ],
+        "reactions": [
+          {
+            "name": "Parry",
+            "desc": "The knight adds 2 to its AC against one melee attack that would hit it. To do so, the knight must see the attacker and be wielding a melee weapon."
+          }
+        ],
+        "image": "/api/images/monsters/knight.png",
+        "url": "/api/2014/monsters/knight",
+        "updated_at": "2026-04-01T20:35:38.254Z",
+        "forms": [],
+        "legendary_actions": []
+      },
+      "engine": {
+        "type": "knight",
+        "hp": {
+          "current": 52,
+          "max": 52
+        },
+        "ac": 18,
+        "stats": {
+          "str": 16,
+          "dex": 11,
+          "con": 14,
+          "int": 11,
+          "wis": 11,
+          "cha": 15
+        },
+        "conditions": [],
+        "xpValue": 700,
+        "attackBonus": 5,
+        "damageDice": "2d6+3",
+        "speed": 30,
+        "attackName": "Greatsword",
+        "attackRangeCells": 1,
+        "damageType": "slashing",
+        "movementModes": {
+          "walk": 30
+        }
+      }
+    },
+    "mage": {
+      "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/mage",
+      "sourceSha256": "53fd3fcbdaacc4aba125e315cd9e1b943efc6a64de1344f087e99865f30242d1",
+      "source": {
+        "index": "mage",
+        "name": "Mage",
+        "desc": "Mages spend their lives in the study and practice of magic. Good-aligned mages offer counsel to nobles and others in power, while evil mages dwell in isolated sites to perform unspeakable experiments without interference.",
+        "size": "Medium",
+        "type": "humanoid",
+        "subtype": "any race",
+        "alignment": "any alignment",
+        "armor_class": [
+          {
+            "type": "dex",
+            "value": 12
+          },
+          {
+            "type": "spell",
+            "value": 15,
+            "spell": {
+              "index": "mage-armor",
+              "name": "Mage Armor",
+              "url": "/api/2014/spells/mage-armor"
+            }
+          }
+        ],
+        "hit_points": 40,
+        "hit_dice": "9d8",
+        "hit_points_roll": "9d8",
+        "speed": {
+          "walk": "30 ft."
+        },
+        "strength": 9,
+        "dexterity": 14,
+        "constitution": 11,
+        "intelligence": 17,
+        "wisdom": 12,
+        "charisma": 11,
+        "proficiencies": [
+          {
+            "value": 6,
+            "proficiency": {
+              "index": "saving-throw-int",
+              "name": "Saving Throw: INT",
+              "url": "/api/2014/proficiencies/saving-throw-int"
+            }
+          },
+          {
+            "value": 4,
+            "proficiency": {
+              "index": "saving-throw-wis",
+              "name": "Saving Throw: WIS",
+              "url": "/api/2014/proficiencies/saving-throw-wis"
+            }
+          },
+          {
+            "value": 6,
+            "proficiency": {
+              "index": "skill-arcana",
+              "name": "Skill: Arcana",
+              "url": "/api/2014/proficiencies/skill-arcana"
+            }
+          },
+          {
+            "value": 6,
+            "proficiency": {
+              "index": "skill-history",
+              "name": "Skill: History",
+              "url": "/api/2014/proficiencies/skill-history"
+            }
+          }
+        ],
+        "damage_vulnerabilities": [],
+        "damage_resistances": [],
+        "damage_immunities": [],
+        "condition_immunities": [],
+        "senses": {
+          "passive_perception": 11
+        },
+        "languages": "any four languages",
+        "challenge_rating": 6,
+        "proficiency_bonus": 3,
+        "xp": 2300,
+        "special_abilities": [
+          {
+            "name": "Spellcasting",
+            "desc": "The mage is a 9th-level spellcaster. Its spellcasting ability is Intelligence (spell save DC 14, +6 to hit with spell attacks). The mage has the following wizard spells prepared:\n\n- Cantrips (at will): fire bolt, light, mage hand, prestidigitation\n- 1st level (4 slots): detect magic, mage armor, magic missile, shield\n- 2nd level (3 slots): misty step, suggestion\n- 3rd level (3 slots): counterspell, fireball, fly\n- 4th level (3 slots): greater invisibility, ice storm\n- 5th level (1 slot): cone of cold",
+            "spellcasting": {
+              "level": 9,
+              "ability": {
+                "index": "int",
+                "name": "INT",
+                "url": "/api/2014/ability-scores/int"
+              },
+              "dc": 14,
+              "modifier": 6,
+              "components_required": [
+                "V",
+                "S",
+                "M"
+              ],
+              "school": "wizard",
+              "slots": {
+                "1": 4,
+                "2": 3,
+                "3": 3,
+                "4": 3,
+                "5": 1
+              },
+              "spells": [
+                {
+                  "name": "Fire Bolt",
+                  "level": 0,
+                  "url": "/api/2014/spells/fire-bolt"
+                },
+                {
+                  "name": "Light",
+                  "level": 0,
+                  "url": "/api/2014/spells/light"
+                },
+                {
+                  "name": "Mage Hand",
+                  "level": 0,
+                  "url": "/api/2014/spells/mage-hand"
+                },
+                {
+                  "name": "Prestidigitation",
+                  "level": 0,
+                  "url": "/api/2014/spells/prestidigitation"
+                },
+                {
+                  "name": "Detect Magic",
+                  "level": 1,
+                  "url": "/api/2014/spells/detect-magic"
+                },
+                {
+                  "name": "Mage Armor",
+                  "level": 1,
+                  "url": "/api/2014/spells/mage-armor"
+                },
+                {
+                  "name": "Magic Missile",
+                  "level": 1,
+                  "url": "/api/2014/spells/magic-missile"
+                },
+                {
+                  "name": "Shield",
+                  "level": 1,
+                  "url": "/api/2014/spells/shield"
+                },
+                {
+                  "name": "Misty Step",
+                  "level": 2,
+                  "url": "/api/2014/spells/misty-step"
+                },
+                {
+                  "name": "Suggestion",
+                  "level": 2,
+                  "url": "/api/2014/spells/suggestion"
+                },
+                {
+                  "name": "Counterspell",
+                  "level": 3,
+                  "url": "/api/2014/spells/counterspell"
+                },
+                {
+                  "name": "Fireball",
+                  "level": 3,
+                  "url": "/api/2014/spells/fireball"
+                },
+                {
+                  "name": "Fly",
+                  "level": 3,
+                  "url": "/api/2014/spells/fly"
+                },
+                {
+                  "name": "Greater Invisibility",
+                  "level": 4,
+                  "url": "/api/2014/spells/greater-invisibility"
+                },
+                {
+                  "name": "Ice Storm",
+                  "level": 4,
+                  "url": "/api/2014/spells/ice-storm"
+                },
+                {
+                  "name": "Cone of Cold",
+                  "level": 5,
+                  "url": "/api/2014/spells/cone-of-cold"
+                }
+              ]
+            },
+            "damage": []
+          }
+        ],
+        "actions": [
+          {
+            "name": "Dagger",
+            "desc": "Melee or Ranged Weapon Attack: +5 to hit, reach 5 ft. or range 20/60 ft., one target. Hit: 4 (1d4 + 2) piercing damage.",
+            "attack_bonus": 5,
+            "damage": [
+              {
+                "damage_type": {
+                  "index": "piercing",
+                  "name": "Piercing",
+                  "url": "/api/2014/damage-types/piercing"
+                },
+                "damage_dice": "1d4+2"
+              }
+            ],
+            "actions": []
+          }
+        ],
+        "image": "/api/images/monsters/mage.png",
+        "url": "/api/2014/monsters/mage",
+        "updated_at": "2026-04-01T20:35:38.254Z",
+        "forms": [],
+        "legendary_actions": [],
+        "reactions": []
+      },
+      "engine": {
+        "type": "mage",
+        "hp": {
+          "current": 40,
+          "max": 40
+        },
+        "ac": 12,
+        "stats": {
+          "str": 9,
+          "dex": 14,
+          "con": 11,
+          "int": 17,
+          "wis": 12,
+          "cha": 11
+        },
+        "conditions": [],
+        "xpValue": 2300,
+        "attackBonus": 5,
+        "damageDice": "1d4+2",
+        "speed": 30,
+        "attackName": "Dagger",
+        "attackRangeCells": 1,
+        "damageType": "piercing",
+        "movementModes": {
+          "walk": 30
+        }
+      }
+    },
+    "grick": {
+      "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/grick",
+      "sourceSha256": "a452dc0ed5695aa3800a87f1cac5b00be0551d06fcc85baf2ccb5ae35227132f",
+      "source": {
+        "index": "grick",
+        "name": "Grick",
+        "size": "Medium",
+        "type": "monstrosity",
+        "alignment": "neutral",
+        "armor_class": [
+          {
+            "type": "natural",
+            "value": 14
+          }
+        ],
+        "hit_points": 27,
+        "hit_dice": "6d8",
+        "hit_points_roll": "6d8",
+        "speed": {
+          "walk": "30 ft.",
+          "climb": "30 ft."
+        },
+        "strength": 14,
+        "dexterity": 14,
+        "constitution": 11,
+        "intelligence": 3,
+        "wisdom": 14,
+        "charisma": 5,
+        "proficiencies": [],
+        "damage_vulnerabilities": [],
+        "damage_resistances": [
+          "bludgeoning, piercing, and slashing from nonmagical weapons"
+        ],
+        "damage_immunities": [],
+        "condition_immunities": [],
+        "senses": {
+          "darkvision": "60 ft.",
+          "passive_perception": 12
+        },
+        "languages": "",
+        "challenge_rating": 2,
+        "proficiency_bonus": 2,
+        "xp": 450,
+        "special_abilities": [
+          {
+            "name": "Stone Camouflage",
+            "desc": "The grick has advantage on Dexterity (Stealth) checks made to hide in rocky terrain.",
+            "damage": []
+          }
+        ],
+        "actions": [
+          {
+            "damage": [],
+            "name": "Multiattack",
+            "multiattack_type": "actions",
+            "desc": "The grick makes one attack with its tentacles. If that attack hits, the grick can make one beak attack against the same target.",
+            "actions": [
+              {
+                "action_name": "Tentacles",
+                "count": "1",
+                "type": "melee"
+              },
+              {
+                "action_name": "Beak",
+                "count": "1",
+                "type": "melee"
+              }
+            ]
+          },
+          {
+            "name": "Tentacles",
+            "desc": "Melee Weapon Attack: +4 to hit, reach 5 ft., one target. Hit: 9 (2d6 + 2) slashing damage.",
+            "attack_bonus": 4,
+            "damage": [
+              {
+                "damage_type": {
+                  "index": "slashing",
+                  "name": "Slashing",
+                  "url": "/api/2014/damage-types/slashing"
+                },
+                "damage_dice": "2d6+2"
+              }
+            ],
+            "actions": []
+          },
+          {
+            "name": "Beak",
+            "desc": "Melee Weapon Attack: +4 to hit, reach 5 ft., one target. Hit: 5 (1d6 + 2) piercing damage.",
+            "attack_bonus": 4,
+            "damage": [
+              {
+                "damage_type": {
+                  "index": "piercing",
+                  "name": "Piercing",
+                  "url": "/api/2014/damage-types/piercing"
+                },
+                "damage_dice": "1d6+2"
+              }
+            ],
+            "actions": []
+          }
+        ],
+        "image": "/api/images/monsters/grick.png",
+        "url": "/api/2014/monsters/grick",
+        "updated_at": "2026-04-01T20:35:38.254Z",
+        "forms": [],
+        "legendary_actions": [],
+        "reactions": []
+      },
+      "engine": {
+        "type": "grick",
+        "hp": {
+          "current": 27,
+          "max": 27
+        },
+        "ac": 14,
+        "stats": {
+          "str": 14,
+          "dex": 14,
+          "con": 11,
+          "int": 3,
+          "wis": 14,
+          "cha": 5
+        },
+        "conditions": [],
+        "xpValue": 450,
+        "attackBonus": 4,
+        "damageDice": "2d6+2",
+        "speed": 30,
+        "attackName": "Tentacles",
+        "attackRangeCells": 1,
+        "damageType": "slashing",
+        "movementModes": {
+          "walk": 30,
+          "climb": 30
+        }
+      }
+    },
+    "commoner": {
+      "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/commoner",
+      "sourceSha256": "534451fc4f991c7957ab93a702adc3a2249e2b34a98825e64ad07d73e9be7074",
+      "source": {
+        "index": "commoner",
+        "name": "Commoner",
+        "desc": "Commoners include peasants, serfs, slaves, servants, pilgrims, merchants, artisans, and hermits.",
+        "size": "Medium",
+        "type": "humanoid",
+        "subtype": "any race",
+        "alignment": "any alignment",
+        "armor_class": [
+          {
+            "type": "dex",
+            "value": 10
+          }
+        ],
+        "hit_points": 4,
+        "hit_dice": "1d8",
+        "hit_points_roll": "1d8",
+        "speed": {
+          "walk": "30 ft."
+        },
+        "strength": 10,
+        "dexterity": 10,
+        "constitution": 10,
+        "intelligence": 10,
+        "wisdom": 10,
+        "charisma": 10,
+        "proficiencies": [],
+        "damage_vulnerabilities": [],
+        "damage_resistances": [],
+        "damage_immunities": [],
+        "condition_immunities": [],
+        "senses": {
+          "passive_perception": 10
+        },
+        "languages": "any one language (usually Common)",
+        "challenge_rating": 0,
+        "proficiency_bonus": 2,
+        "xp": 10,
+        "actions": [
+          {
+            "name": "Club",
+            "desc": "Melee Weapon Attack: +2 to hit, reach 5 ft., one target. Hit: 2 (1d4) bludgeoning damage.",
+            "attack_bonus": 2,
+            "damage": [
+              {
+                "damage_type": {
+                  "index": "bludgeoning",
+                  "name": "Bludgeoning",
+                  "url": "/api/2014/damage-types/bludgeoning"
+                },
+                "damage_dice": "1d4"
+              }
+            ],
+            "actions": []
+          }
+        ],
+        "image": "/api/images/monsters/commoner.png",
+        "url": "/api/2014/monsters/commoner",
+        "updated_at": "2026-04-01T20:35:38.253Z",
+        "forms": [],
+        "legendary_actions": [],
+        "reactions": [],
+        "special_abilities": []
+      },
+      "engine": {
+        "type": "commoner",
+        "hp": {
+          "current": 4,
+          "max": 4
+        },
+        "ac": 10,
+        "stats": {
+          "str": 10,
+          "dex": 10,
+          "con": 10,
+          "int": 10,
+          "wis": 10,
+          "cha": 10
+        },
+        "conditions": [],
+        "xpValue": 10,
+        "attackBonus": 2,
+        "damageDice": "1d4",
+        "speed": 30,
+        "attackName": "Club",
+        "attackRangeCells": 1,
+        "damageType": "bludgeoning",
+        "movementModes": {
+          "walk": 30
+        }
+      }
+    },
+    "rat": {
+      "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/rat",
+      "sourceSha256": "c0e21c785f92b6a2593c50156b1e874d30e100888f7c983e13e7e57bc39782d9",
+      "retrievedAt": "2026-10-31T11:50:06.330Z",
+      "source": {
+        "index": "rat",
+        "name": "Rat",
+        "size": "Tiny",
+        "type": "beast",
+        "alignment": "unaligned",
+        "armor_class": [
+          {
+            "type": "dex",
+            "value": 10
+          }
+        ],
+        "hit_points": 1,
+        "hit_dice": "1d4",
+        "hit_points_roll": "1d4-1",
+        "speed": {
+          "walk": "20 ft."
+        },
+        "strength": 2,
+        "dexterity": 11,
+        "constitution": 9,
+        "intelligence": 2,
+        "wisdom": 10,
+        "charisma": 4,
+        "proficiencies": [],
+        "damage_vulnerabilities": [],
+        "damage_resistances": [],
+        "damage_immunities": [],
+        "condition_immunities": [],
+        "senses": {
+          "darkvision": "30 ft.",
+          "passive_perception": 10
+        },
+        "languages": "",
+        "challenge_rating": 0,
+        "proficiency_bonus": 2,
+        "xp": 10,
+        "special_abilities": [
+          {
+            "name": "Keen Smell",
+            "desc": "The rat has advantage on Wisdom (Perception) checks that rely on smell.",
+            "damage": []
+          }
+        ],
+        "actions": [
+          {
+            "name": "Bite",
+            "desc": "Melee Weapon Attack: +0 to hit, reach 5 ft., one target. Hit: 1 piercing damage.",
+            "attack_bonus": 0,
+            "damage": [
+              {
+                "damage_type": {
+                  "index": "piercing",
+                  "name": "Piercing",
+                  "url": "/api/2014/damage-types/piercing"
+                },
+                "damage_dice": "1"
+              }
+            ],
+            "actions": []
+          }
+        ],
+        "image": "/api/images/monsters/rat.png",
+        "url": "/api/2014/monsters/rat",
+        "updated_at": "2026-04-01T20:35:38.254Z",
+        "forms": [],
+        "legendary_actions": [],
+        "reactions": []
+      },
+      "engine": {
+        "type": "rat",
+        "hp": {
+          "current": 1,
+          "max": 1
+        },
+        "ac": 10,
+        "stats": {
+          "str": 2,
+          "dex": 11,
+          "con": 9,
+          "int": 2,
+          "wis": 10,
+          "cha": 4
+        },
+        "conditions": [],
+        "xpValue": 10,
+        "attackBonus": 0,
+        "damageDice": "1",
+        "speed": 20,
+        "attackName": "Bite",
+        "attackRangeCells": 1,
+        "damageType": "piercing",
+        "movementModes": {
+          "walk": 20
+        }
+      }
+    },
+    "ape": {
+      "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/ape",
+      "sourceSha256": "5782171a58837755433ed61c121c5afc5ab5fb9042ea553f0f9f35f161b3d0a5",
+      "source": {
+        "index": "ape",
+        "name": "Ape",
+        "size": "Medium",
+        "type": "beast",
+        "alignment": "unaligned",
+        "armor_class": [
+          {
+            "type": "dex",
+            "value": 12
+          }
+        ],
+        "hit_points": 19,
+        "hit_dice": "3d8",
+        "hit_points_roll": "3d8+6",
+        "speed": {
+          "walk": "30 ft.",
+          "climb": "30 ft."
+        },
+        "strength": 16,
+        "dexterity": 14,
+        "constitution": 14,
+        "intelligence": 6,
+        "wisdom": 12,
+        "charisma": 7,
+        "proficiencies": [
+          {
+            "value": 5,
+            "proficiency": {
+              "index": "skill-athletics",
+              "name": "Skill: Athletics",
+              "url": "/api/2014/proficiencies/skill-athletics"
+            }
+          },
+          {
+            "value": 3,
+            "proficiency": {
+              "index": "skill-perception",
+              "name": "Skill: Perception",
+              "url": "/api/2014/proficiencies/skill-perception"
+            }
+          }
+        ],
+        "damage_vulnerabilities": [],
+        "damage_resistances": [],
+        "damage_immunities": [],
+        "condition_immunities": [],
+        "senses": {
+          "passive_perception": 13
+        },
+        "languages": "",
+        "challenge_rating": 0.5,
+        "proficiency_bonus": 2,
+        "xp": 100,
+        "actions": [
+          {
+            "damage": [],
+            "name": "Multiattack",
+            "multiattack_type": "actions",
+            "desc": "The ape makes two fist attacks.",
+            "actions": [
+              {
+                "action_name": "Fist",
+                "count": "2",
+                "type": "melee"
+              }
+            ]
+          },
+          {
+            "name": "Fist",
+            "desc": "Melee Weapon Attack: +5 to hit, reach 5 ft., one target. Hit: 6 (1d6 + 3) bludgeoning damage.",
+            "attack_bonus": 5,
+            "damage": [
+              {
+                "damage_type": {
+                  "index": "bludgeoning",
+                  "name": "Bludgeoning",
+                  "url": "/api/2014/damage-types/bludgeoning"
+                },
+                "damage_dice": "1d6+3"
+              }
+            ],
+            "actions": []
+          },
+          {
+            "name": "Rock",
+            "desc": "Ranged Weapon Attack: +5 to hit, range 25/50 ft., one target. Hit: 6 (1d6 + 3) bludgeoning damage.",
+            "attack_bonus": 5,
+            "damage": [
+              {
+                "damage_type": {
+                  "index": "bludgeoning",
+                  "name": "Bludgeoning",
+                  "url": "/api/2014/damage-types/bludgeoning"
+                },
+                "damage_dice": "1d6+3"
+              }
+            ],
+            "actions": []
+          }
+        ],
+        "image": "/api/images/monsters/ape.png",
+        "url": "/api/2014/monsters/ape",
+        "updated_at": "2026-04-01T20:35:38.253Z",
+        "forms": [],
+        "legendary_actions": [],
+        "reactions": [],
+        "special_abilities": []
+      },
+      "engine": {
+        "type": "ape",
+        "hp": {
+          "current": 19,
+          "max": 19
+        },
+        "ac": 12,
+        "stats": {
+          "str": 16,
+          "dex": 14,
+          "con": 14,
+          "int": 6,
+          "wis": 12,
+          "cha": 7
+        },
+        "conditions": [],
+        "xpValue": 100,
+        "attackBonus": 5,
+        "damageDice": "1d6+3",
+        "speed": 30,
+        "attackName": "Fist",
+        "attackRangeCells": 1,
+        "damageType": "bludgeoning",
+        "movementModes": {
+          "walk": 30,
+          "climb": 30
+        }
+      }
+    },
+    "gargoyle": {
+      "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/gargoyle",
+      "sourceSha256": "0678543f35c892365ba4735549f798cf00f5e28f128114ce51625a33f295b77e",
+      "source": {
+        "index": "gargoyle",
+        "name": "Gargoyle",
+        "size": "Medium",
+        "type": "elemental",
+        "alignment": "chaotic evil",
+        "armor_class": [
+          {
+            "type": "natural",
+            "value": 15
+          }
+        ],
+        "hit_points": 52,
+        "hit_dice": "7d8",
+        "hit_points_roll": "7d8+21",
+        "speed": {
+          "walk": "30 ft.",
+          "fly": "60 ft."
+        },
+        "strength": 15,
+        "dexterity": 11,
+        "constitution": 16,
+        "intelligence": 6,
+        "wisdom": 11,
+        "charisma": 7,
+        "proficiencies": [],
+        "damage_vulnerabilities": [],
+        "damage_resistances": [
+          "bludgeoning, piercing, and slashing from nonmagical weapons that aren't adamantine"
+        ],
+        "damage_immunities": [
+          "poison"
+        ],
+        "condition_immunities": [
+          {
+            "index": "exhaustion",
+            "name": "Exhaustion",
+            "url": "/api/2014/conditions/exhaustion"
+          },
+          {
+            "index": "petrified",
+            "name": "Petrified",
+            "url": "/api/2014/conditions/petrified"
+          },
+          {
+            "index": "poisoned",
+            "name": "Poisoned",
+            "url": "/api/2014/conditions/poisoned"
+          }
+        ],
+        "senses": {
+          "darkvision": "60 ft.",
+          "passive_perception": 10
+        },
+        "languages": "Terran",
+        "challenge_rating": 2,
+        "proficiency_bonus": 2,
+        "xp": 450,
+        "special_abilities": [
+          {
+            "name": "False Appearance",
+            "desc": "While the gargoyle remains motion less, it is indistinguishable from an inanimate statue.",
+            "damage": []
+          }
+        ],
+        "actions": [
+          {
+            "damage": [],
+            "name": "Multiattack",
+            "multiattack_type": "actions",
+            "desc": "The gargoyle makes two attacks: one with its bite and one with its claws.",
+            "actions": [
+              {
+                "action_name": "Bite",
+                "count": "1",
+                "type": "melee"
+              },
+              {
+                "action_name": "Claws",
+                "count": "1",
+                "type": "melee"
+              }
+            ]
+          },
+          {
+            "name": "Bite",
+            "desc": "Melee Weapon Attack: +4 to hit, reach 5 ft., one target. Hit: 5 (1d6 + 2) piercing damage.",
+            "attack_bonus": 4,
+            "damage": [
+              {
+                "damage_type": {
+                  "index": "piercing",
+                  "name": "Piercing",
+                  "url": "/api/2014/damage-types/piercing"
+                },
+                "damage_dice": "1d6+2"
+              }
+            ],
+            "actions": []
+          },
+          {
+            "name": "Claws",
+            "desc": "Melee Weapon Attack: +4 to hit, reach 5 ft., one target. Hit: 5 (1d6 + 2) slashing damage.",
+            "attack_bonus": 4,
+            "damage": [
+              {
+                "damage_type": {
+                  "index": "slashing",
+                  "name": "Slashing",
+                  "url": "/api/2014/damage-types/slashing"
+                },
+                "damage_dice": "1d6+2"
+              }
+            ],
+            "actions": []
+          }
+        ],
+        "image": "/api/images/monsters/gargoyle.png",
+        "url": "/api/2014/monsters/gargoyle",
+        "updated_at": "2026-04-01T20:35:38.254Z",
+        "forms": [],
+        "legendary_actions": [],
+        "reactions": []
+      },
+      "engine": {
+        "type": "gargoyle",
+        "hp": {
+          "current": 52,
+          "max": 52
+        },
+        "ac": 15,
+        "stats": {
+          "str": 15,
+          "dex": 11,
+          "con": 16,
+          "int": 6,
+          "wis": 11,
+          "cha": 7
+        },
+        "conditions": [],
+        "xpValue": 450,
+        "attackBonus": 4,
+        "damageDice": "1d6+2",
+        "speed": 30,
+        "attackName": "Bite",
+        "attackRangeCells": 1,
+        "damageType": "piercing",
+        "movementModes": {
+          "walk": 30,
+          "fly": 60
+        }
+      }
+    },
+    "shadow": {
+      "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/shadow",
+      "sourceSha256": "e42637d8f4c97e93f5eefcec4740bd937e9765bd599b5fdf1c298b1a267e27b5",
+      "source": {
+        "index": "shadow",
+        "name": "Shadow",
+        "size": "Medium",
+        "type": "undead",
+        "alignment": "chaotic evil",
+        "armor_class": [
+          {
+            "type": "dex",
+            "value": 12
+          }
+        ],
+        "hit_points": 16,
+        "hit_dice": "3d8",
+        "hit_points_roll": "3d8+3",
+        "speed": {
+          "walk": "40 ft."
+        },
+        "strength": 6,
+        "dexterity": 14,
+        "constitution": 13,
+        "intelligence": 6,
+        "wisdom": 10,
+        "charisma": 8,
+        "proficiencies": [
+          {
+            "value": 4,
+            "proficiency": {
+              "index": "skill-stealth",
+              "name": "Skill: Stealth",
+              "url": "/api/2014/proficiencies/skill-stealth"
+            }
+          }
+        ],
+        "damage_vulnerabilities": [
+          "radiant"
+        ],
+        "damage_resistances": [
+          "acid",
+          "cold",
+          "fire",
+          "lightning",
+          "thunder",
+          "bludgeoning, piercing, and slashing from nonmagical weapons"
+        ],
+        "damage_immunities": [
+          "necrotic",
+          "poison"
+        ],
+        "condition_immunities": [
+          {
+            "index": "exhaustion",
+            "name": "Exhaustion",
+            "url": "/api/2014/conditions/exhaustion"
+          },
+          {
+            "index": "frightened",
+            "name": "Frightened",
+            "url": "/api/2014/conditions/frightened"
+          },
+          {
+            "index": "grappled",
+            "name": "Grappled",
+            "url": "/api/2014/conditions/grappled"
+          },
+          {
+            "index": "paralyzed",
+            "name": "Paralyzed",
+            "url": "/api/2014/conditions/paralyzed"
+          },
+          {
+            "index": "petrified",
+            "name": "Petrified",
+            "url": "/api/2014/conditions/petrified"
+          },
+          {
+            "index": "poisoned",
+            "name": "Poisoned",
+            "url": "/api/2014/conditions/poisoned"
+          },
+          {
+            "index": "prone",
+            "name": "Prone",
+            "url": "/api/2014/conditions/prone"
+          },
+          {
+            "index": "restrained",
+            "name": "Restrained",
+            "url": "/api/2014/conditions/restrained"
+          }
+        ],
+        "senses": {
+          "darkvision": "60 ft.",
+          "passive_perception": 10
+        },
+        "languages": "",
+        "challenge_rating": 0.5,
+        "proficiency_bonus": 2,
+        "xp": 100,
+        "special_abilities": [
+          {
+            "name": "Amorphous",
+            "desc": "The shadow can move through a space as narrow as 1 inch wide without squeezing.",
+            "damage": []
+          },
+          {
+            "name": "Shadow Stealth",
+            "desc": "While in dim light or darkness, the shadow can take the Hide action as a bonus action. Its stealth bonus is also improved to +6.",
+            "damage": []
+          },
+          {
+            "name": "Sunlight Weakness",
+            "desc": "While in sunlight, the shadow has disadvantage on attack rolls, ability checks, and saving throws.",
+            "damage": []
+          }
+        ],
+        "actions": [
+          {
+            "name": "Strength Drain",
+            "desc": "Melee Weapon Attack: +4 to hit, reach 5 ft., one creature. Hit: 9 (2d6 + 2) necrotic damage, and the target's Strength score is reduced by 1d4. The target dies if this reduces its Strength to 0. Otherwise, the reduction lasts until the target finishes a short or long rest.\nIf a non-evil humanoid dies from this attack, a new shadow rises from the corpse 1d4 hours later.",
+            "attack_bonus": 4,
+            "damage": [
+              {
+                "damage_type": {
+                  "index": "necrotic",
+                  "name": "Necrotic",
+                  "url": "/api/2014/damage-types/necrotic"
+                },
+                "damage_dice": "2d6+2"
+              }
+            ],
+            "actions": []
+          }
+        ],
+        "image": "/api/images/monsters/shadow.png",
+        "url": "/api/2014/monsters/shadow",
+        "updated_at": "2026-04-01T20:35:38.254Z",
+        "forms": [],
+        "legendary_actions": [],
+        "reactions": []
+      },
+      "engine": {
+        "type": "shadow",
+        "hp": {
+          "current": 16,
+          "max": 16
+        },
+        "ac": 12,
+        "stats": {
+          "str": 6,
+          "dex": 14,
+          "con": 13,
+          "int": 6,
+          "wis": 10,
+          "cha": 8
+        },
+        "conditions": [],
+        "xpValue": 100,
+        "attackBonus": 4,
+        "damageDice": "2d6+2",
+        "speed": 40,
+        "attackName": "Strength Drain",
+        "attackRangeCells": 1,
+        "damageType": "necrotic",
+        "movementModes": {
+          "walk": 40
+        }
+      }
+    },
+    "archmage": {
+      "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/archmage",
+      "sourceSha256": "a5616a050646580770cb62395d799528f56bdc6b316cac671e72de95873211e6",
+      "source": {
+        "index": "archmage",
+        "name": "Archmage",
+        "desc": "Archmages are powerful (and usually quite old) spellcasters dedicated to the study of the arcane arts. Benevolent ones counsel kings and queens, while evil ones rule as tyrants and pursue lichdom. Those who are neither good nor evil sequester themselves in remote towers to practice their magic without interruption. \n\nAn archmage typically has one or more apprentice mages, and an archmage’s abode has numerous magical wards and guardians to discourage interlopers.",
+        "size": "Medium",
+        "type": "humanoid",
+        "subtype": "any race",
+        "alignment": "any alignment",
+        "armor_class": [
+          {
+            "type": "dex",
+            "value": 12
+          },
+          {
+            "type": "spell",
+            "value": 15,
+            "spell": {
+              "index": "mage-armor",
+              "name": "Mage Armor",
+              "url": "/api/2014/spells/mage-armor"
+            }
+          }
+        ],
+        "hit_points": 99,
+        "hit_dice": "18d8",
+        "hit_points_roll": "18d8+18",
+        "speed": {
+          "walk": "30 ft."
+        },
+        "strength": 10,
+        "dexterity": 14,
+        "constitution": 12,
+        "intelligence": 20,
+        "wisdom": 15,
+        "charisma": 16,
+        "proficiencies": [
+          {
+            "value": 9,
+            "proficiency": {
+              "index": "saving-throw-int",
+              "name": "Saving Throw: INT",
+              "url": "/api/2014/proficiencies/saving-throw-int"
+            }
+          },
+          {
+            "value": 6,
+            "proficiency": {
+              "index": "saving-throw-wis",
+              "name": "Saving Throw: WIS",
+              "url": "/api/2014/proficiencies/saving-throw-wis"
+            }
+          },
+          {
+            "value": 13,
+            "proficiency": {
+              "index": "skill-arcana",
+              "name": "Skill: Arcana",
+              "url": "/api/2014/proficiencies/skill-arcana"
+            }
+          },
+          {
+            "value": 13,
+            "proficiency": {
+              "index": "skill-history",
+              "name": "Skill: History",
+              "url": "/api/2014/proficiencies/skill-history"
+            }
+          }
+        ],
+        "damage_vulnerabilities": [],
+        "damage_resistances": [
+          "damage from spells",
+          "bludgeoning, piercing, and slashing from nonmagical attacks (from stoneskin)"
+        ],
+        "damage_immunities": [],
+        "condition_immunities": [],
+        "senses": {
+          "passive_perception": 12
+        },
+        "languages": "any six languages",
+        "challenge_rating": 12,
+        "proficiency_bonus": 4,
+        "xp": 8400,
+        "special_abilities": [
+          {
+            "name": "Magic Resistance",
+            "desc": "The archmage has advantage on saving throws against spells and other magical effects.",
+            "damage": []
+          },
+          {
+            "name": "Spellcasting",
+            "desc": "The archmage is an 18th-level spellcaster. Its spellcasting ability is Intelligence (spell save DC 17, +9 to hit with spell attacks). The archmage can cast disguise self and invisibility at will and has the following wizard spells prepared:\n\n- Cantrips (at will): fire bolt, light, mage hand, prestidigitation, shocking grasp\n- 1st level (4 slots): detect magic, identify, mage armor*, magic missile\n- 2nd level (3 slots): detect thoughts, mirror image, misty step\n- 3rd level (3 slots): counterspell, fly, lightning bolt\n- 4th level (3 slots): banishment, fire shield, stoneskin*\n- 5th level (3 slots): cone of cold, scrying, wall of force\n- 6th level (1 slot): globe of invulnerability\n- 7th level (1 slot): teleport\n- 8th level (1 slot): mind blank*\n- 9th level (1 slot): time stop\n* The archmage casts these spells on itself before combat.",
+            "spellcasting": {
+              "level": 18,
+              "ability": {
+                "index": "int",
+                "name": "INT",
+                "url": "/api/2014/ability-scores/int"
+              },
+              "dc": 17,
+              "modifier": 9,
+              "components_required": [
+                "V",
+                "S",
+                "M"
+              ],
+              "school": "wizard",
+              "slots": {
+                "1": 4,
+                "2": 3,
+                "3": 3,
+                "4": 3,
+                "5": 3,
+                "6": 1,
+                "7": 1,
+                "8": 1,
+                "9": 1
+              },
+              "spells": [
+                {
+                  "name": "Disguise Self",
+                  "level": 1,
+                  "url": "/api/2014/spells/disguise-self",
+                  "usage": {
+                    "type": "at will",
+                    "rest_types": []
+                  }
+                },
+                {
+                  "name": "Invisibility",
+                  "level": 2,
+                  "url": "/api/2014/spells/invisibility",
+                  "usage": {
+                    "type": "at will",
+                    "rest_types": []
+                  }
+                },
+                {
+                  "name": "Fire Bolt",
+                  "level": 0,
+                  "url": "/api/2014/spells/fire-bolt"
+                },
+                {
+                  "name": "Light",
+                  "level": 0,
+                  "url": "/api/2014/spells/light"
+                },
+                {
+                  "name": "Mage Hand",
+                  "level": 0,
+                  "url": "/api/2014/spells/mage-hand"
+                },
+                {
+                  "name": "Prestidigitation",
+                  "level": 0,
+                  "url": "/api/2014/spells/prestidigitation"
+                },
+                {
+                  "name": "Shocking Grasp",
+                  "level": 0,
+                  "url": "/api/2014/spells/shocking-grasp"
+                },
+                {
+                  "name": "Detect Magic",
+                  "level": 1,
+                  "url": "/api/2014/spells/detect-magic"
+                },
+                {
+                  "name": "Identify",
+                  "level": 1,
+                  "url": "/api/2014/spells/identify"
+                },
+                {
+                  "name": "Mage Armor",
+                  "level": 1,
+                  "url": "/api/2014/spells/mage-armor",
+                  "notes": "Cast on self before combat"
+                },
+                {
+                  "name": "Magic Missile",
+                  "level": 1,
+                  "url": "/api/2014/spells/magic-missile"
+                },
+                {
+                  "name": "Detect Thoughts",
+                  "level": 2,
+                  "url": "/api/2014/spells/detect-thoughts"
+                },
+                {
+                  "name": "Mirror Image",
+                  "level": 2,
+                  "url": "/api/2014/spells/mirror-image"
+                },
+                {
+                  "name": "Misty Step",
+                  "level": 2,
+                  "url": "/api/2014/spells/misty-step"
+                },
+                {
+                  "name": "Counterspell",
+                  "level": 3,
+                  "url": "/api/2014/spells/counterspell"
+                },
+                {
+                  "name": "Fly",
+                  "level": 3,
+                  "url": "/api/2014/spells/fly"
+                },
+                {
+                  "name": "Lightning Bolt",
+                  "level": 3,
+                  "url": "/api/2014/spells/lightning-bolt"
+                },
+                {
+                  "name": "Banishment",
+                  "level": 4,
+                  "url": "/api/2014/spells/banishment"
+                },
+                {
+                  "name": "Fire Shield",
+                  "level": 4,
+                  "url": "/api/2014/spells/fire-shield"
+                },
+                {
+                  "name": "Stoneskin",
+                  "level": 4,
+                  "url": "/api/2014/spells/stoneskin",
+                  "notes": "Cast on self before combat"
+                },
+                {
+                  "name": "Cone of Cold",
+                  "level": 5,
+                  "url": "/api/2014/spells/cone-of-cold"
+                },
+                {
+                  "name": "Scrying",
+                  "level": 5,
+                  "url": "/api/2014/spells/scrying"
+                },
+                {
+                  "name": "Wall of Force",
+                  "level": 5,
+                  "url": "/api/2014/spells/wall-of-force"
+                },
+                {
+                  "name": "Globe of Invulnerability",
+                  "level": 6,
+                  "url": "/api/2014/spells/globe-of-invulnerability"
+                },
+                {
+                  "name": "Teleport",
+                  "level": 7,
+                  "url": "/api/2014/spells/teleport"
+                },
+                {
+                  "name": "Mind Blank",
+                  "level": 8,
+                  "url": "/api/2014/spells/mind-blank",
+                  "notes": "Cast on self before combat"
+                },
+                {
+                  "name": "Time Stop",
+                  "level": 9,
+                  "url": "/api/2014/spells/time-stop"
+                }
+              ]
+            },
+            "damage": []
+          }
+        ],
+        "actions": [
+          {
+            "name": "Dagger",
+            "desc": "Melee or Ranged Weapon Attack: +6 to hit, reach 5 ft. or range 20/60 ft., one target. Hit: 4 (1d4 + 2) piercing damage.",
+            "attack_bonus": 6,
+            "damage": [
+              {
+                "damage_type": {
+                  "index": "piercing",
+                  "name": "Piercing",
+                  "url": "/api/2014/damage-types/piercing"
+                },
+                "damage_dice": "1d4+2"
+              }
+            ],
+            "actions": []
+          }
+        ],
+        "image": "/api/images/monsters/archmage.png",
+        "url": "/api/2014/monsters/archmage",
+        "updated_at": "2026-04-01T20:35:38.253Z",
+        "forms": [],
+        "legendary_actions": [],
+        "reactions": []
+      },
+      "engine": {
+        "type": "archmage",
+        "hp": {
+          "current": 99,
+          "max": 99
+        },
+        "ac": 12,
+        "stats": {
+          "str": 10,
+          "dex": 14,
+          "con": 12,
+          "int": 20,
+          "wis": 15,
+          "cha": 16
+        },
+        "conditions": [],
+        "xpValue": 8400,
+        "attackBonus": 6,
+        "damageDice": "1d4+2",
+        "speed": 30,
+        "attackName": "Dagger",
+        "attackRangeCells": 1,
+        "damageType": "piercing",
+        "movementModes": {
+          "walk": 30
+        }
+      }
+    }
+  },
+  "license": "CC-BY-4.0",
+  "licenseAttributionPath": "lib/srd/monsters.LICENSE.txt"
+}

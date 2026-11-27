@@ -3,11 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "npm run build:mcp && concurrently \"next dev\" \"node mcp-server/dist/mcp-server/index.js\"",
+    "dev": "npm run build:mcp && next dev",
     "dev:mock": "node scripts/dev-mock.cjs",
     "playtest": "node scripts/playtest.cjs",
     "replay:session-log": "node scripts/replay-session-log.cjs",
     "playtest:mock": "npm run build:mcp && node scripts/playtest.cjs --mode mock",
+    "training:generate": "npm run build:mcp && node scripts/generate-training-dataset.cjs",
     "build:mcp": "tsc -p mcp-server/tsconfig.json",
     "build": "npm run build:mcp && next build",
     "typecheck": "npm run typecheck:mcp && npm run typecheck:next",
@@ -19,7 +20,6 @@
     "start": "next start"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.92.0",
     "@auth/pg-adapter": "^1.11.2",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "concurrently": "^9.2.1",
@@ -29,6 +29,7 @@
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "stripe": "^22.3.0",
+    "three": "^0.187.0",
     "zod": "^4.0.0"
   },
   "engines": {
@@ -44,6 +45,7 @@
     "@types/pg": "^8.20.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/three": "^0.187.0",
     "pg-mem": "^3.0.14",
     "tailwindcss": "^4",
     "typescript": "^5"

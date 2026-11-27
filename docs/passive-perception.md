@@ -1,0 +1,11 @@
+# Perception passive et épuisement 2014
+
+Le calcul mécanique passif existant se trouve dans `combat_action(action="hide")` : la Dextérité (Discrétion) du joueur est opposée à la plus forte Perception passive des observateurs hostiles vivants. Le seuil conserve la convention existante : le jet doit dépasser le score passif, donc DD = score + 1. Un score d'observateur inférieur à dix conserve sa valeur réelle ; dix sert uniquement de repli lorsqu'il n'existe aucun observateur.
+
+`passivePerceptionScore` utilise dix plus le modificateur de Perception réel. Les monstres utilisent leur maîtrise SRD lorsqu'elle existe. Le joueur utilise ses maîtrises, expertise et Touche-à-tout réelles. Dès le premier niveau d'épuisement 2014, le désavantage aux tests de caractéristique entraîne −5 au score passif. Plusieurs désavantages ne cumulent pas plusieurs pénalités ; un avantage explicitement établi et un désavantage s'annulent. Ce calcul ne lance aucun dé et ne consomme jamais une inspiration du MJ préparée. Un marqueur historique `exhaustion` sans niveau refuse la résolution avant le test de Discrétion ou la dépense d'action.
+
+L'embuscade de `encounter-ambush.ts` utilise un test actif de Perception, puis éventuellement une sauvegarde, selon la règle propre au module. Elle bénéficie déjà des raccords D20 d'épuisement ; elle ne doit pas recevoir une seconde pénalité passive de −5. Les rayons de visibilité, la vision dans l'obscurité et les projections narratives de salles voisines ne sont pas des tests passifs et ne changent pas.
+
+Le résolveur de cachette ne possède pas de sélection du sens employé par chaque observateur. Il ne déduit donc pas un avantage d'ouïe ou d'odorat affûté, ni un désavantage visuel d'éclairage faible, à partir du texte ou du nom d'un trait. Les autres contextes d'observation passive, la découverte passive de pièges et les valeurs passives de compétences autres que Perception ne disposent pas encore de résolveur mécanique dédié. Aucun de ces événements n'est fabriqué automatiquement.
+
+`tests/passive-perception.test.cjs` couvre le −5 sans cumul, l'annulation par avantage, l'indépendance de l'inspiration, les modificateurs de fiche, la vraie DD de cachette et le refus atomique d'un niveau historique inconnu.

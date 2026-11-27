@@ -1,0 +1,25 @@
+const test=require('node:test'),assert=require('node:assert/strict')
+process.env.MONETIZATION_ENABLED='false'
+const {installPgMem}=require('./helpers/pg-mem.cjs'),pg=installPgMem()
+const {saveSession,loadSession,deleteSession}=require('../lib/session-store.ts')
+const {engine,ok,adjacent}=require('./helpers/mcp-toolkit.cjs')
+test.after(()=>pg.restore())
+test('real stdio observed size, source Bite, SQL, exact source turns and acid persist actual containment through a fresh engine process',async t=>{
+ const call=await engine(t,{dice:[1,20,17,1,1,1,1,...Array(6).fill(1),19].join(',')}),initial=await call('get_game_state')
+ const fact=ok(await call('record_scene_fact',{description:'Le corps réel du personnage est de taille Moyenne, sans transformation.',cell:initial.player.position})).worldFact
+ ok(await call('record_swallow_body_size',{entityId:'player',size:'Medium',factId:fact.id,source:'Observation actuelle de ce vrai corps.'}))
+ const host=ok(await call('spawn_monster',{monsterType:'purple_worm',cell:adjacent(initial)[0]}));ok(await call('enter_combat',{combatants:['player',host.id]}))
+ const a=ok(await call('resolve_monster_action',{monsterId:host.id,targetId:'player',actionName:'Bite'}));assert.equal(a.attacks[0].swallow.save.dc,19);assert.equal(a.attacks[0].swallow.swallowed,true)
+ const state=await call('get_game_state'),id=`source-swallow-${process.pid}`;t.after(()=>deleteSession(id));await saveSession(id,{gameState:state,history:[],adventureId:state.adventureId,characterId:state.characterId});ok(await call('replace_game_state',{gameState:(await loadSession(id)).gameState}))
+ ok(await call('next_turn',{actorId:host.id}));ok(await call('pass_turn',{reason:'Le personnage conserve son vrai tour, sans action de sortie inventée.'}))
+ const event=ok(await call('inspect_swallowing')).dueEvents.find(e=>e.kind==='acid');assert.ok(event);const acid=ok(await call('resolve_swallow_event',{eventId:event.id}));assert.equal(acid.roll.notation,'6d6');assert.equal(acid.results[0].damageDealt,6)
+ const saved=await call('get_game_state');await saveSession(id,{gameState:saved,history:[],adventureId:saved.adventureId,characterId:saved.characterId})
+ const fresh=await engine(t,{dice:'19'});ok(await fresh('replace_game_state',{gameState:(await loadSession(id)).gameState}));const restored=await fresh('get_game_state');assert.deepEqual(restored.dmTools.swallow,saved.dmTools.swallow);assert.deepEqual(restored.player.position,restored.monsters[host.id].position);assert.ok(restored.player.conditions.includes('restrained'));assert.equal(ok(await fresh('inspect_swallowing')).dueEvents.length,0);assert.equal(ok(await fresh('roll_dice',{notation:'1d20'})).total,19);assert.equal(ok(await call('roll_dice',{notation:'1d20'})).total,19)
+ const support=ok(await fresh('get_rules_support',{domain:'swallowing'}));assert.ok(support.tools.includes('resolve_swallow_event'));assert.match(support.limitations.join(' '),/no invented interior map/)
+})
+test('real stdio whole Multiattack can resolve its selected Stinger first and then the complete source swallowing Bite without a simplified rider',async t=>{
+ const call=await engine(t,{dice:[1,20,17,1,1,1,1,...Array(12).fill(1),17,1,1,1,1,19].join(',')}),initial=await call('get_game_state')
+ const fact=ok(await call('record_scene_fact',{description:'La taille Moyenne du vrai personnage est actuellement observée.',cell:initial.player.position})).worldFact;ok(await call('record_swallow_body_size',{entityId:'player',size:'Medium',factId:fact.id,source:'Observation réelle de taille.'}))
+ const host=ok(await call('spawn_monster',{monsterType:'purple_worm',cell:adjacent(initial)[0]}));ok(await call('enter_combat',{combatants:['player',host.id]}))
+ const a=ok(await call('resolve_monster_action',{monsterId:host.id,targetId:'player',actionName:'Multiattack',attackActions:['Tail Stinger','Bite']}));assert.equal(a.attacks.length,2);assert.equal(a.attacks[0].playerPoison.save.dc,19);assert.equal(a.attacks[0].playerPoison.damageRoll.notation,'12d6');assert.equal(a.attacks[1].swallow.save.dc,19);assert.equal(a.attacks[1].swallow.swallowed,true);const state=await call('get_game_state');assert.equal(state.actionUsed[host.id],true);assert.equal(Object.keys(state.dmTools.nativePoison.hits).length,1);assert.equal(Object.keys(state.dmTools.swallow.episodes).length,1);assert.equal(ok(await call('roll_dice',{notation:'1d20'})).total,19)
+})

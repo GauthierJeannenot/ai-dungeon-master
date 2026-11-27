@@ -1,0 +1,715 @@
+{
+  "bakery": {
+    "version": 1,
+    "mapId": "bakery",
+    "grid": {
+      "cols": 17,
+      "rows": 15
+    },
+    "source": {
+      "image": "/battlemaps/grammys-interior-topdown.png",
+      "sha256": "8f69e4cfcc149aded48d9ca8e0fe833ae360ec23372ca097c0ff7367df87df62",
+      "metadataSha256": "9c4e200a5c1b6cb501a425bcfd97787aec7d21403b4d040c60620e6fb8c0727f",
+      "model": "conversation-image-review"
+    },
+    "review": "approved",
+    "blockedCells": [],
+    "edges": [
+      {
+        "from": {
+          "x": 3,
+          "y": 3
+        },
+        "to": {
+          "x": 3,
+          "y": 4
+        },
+        "kind": "wall"
+      },
+      {
+        "from": {
+          "x": 4,
+          "y": 3
+        },
+        "to": {
+          "x": 4,
+          "y": 4
+        },
+        "kind": "wall"
+      },
+      {
+        "from": {
+          "x": 5,
+          "y": 3
+        },
+        "to": {
+          "x": 5,
+          "y": 4
+        },
+        "kind": "wall"
+      },
+      {
+        "from": {
+          "x": 6,
+          "y": 3
+        },
+        "to": {
+          "x": 6,
+          "y": 4
+        },
+        "kind": "wall"
+      },
+      {
+        "from": {
+          "x": 7,
+          "y": 3
+        },
+        "to": {
+          "x": 7,
+          "y": 4
+        },
+        "kind": "wall"
+      },
+      {
+        "from": {
+          "x": 8,
+          "y": 3
+        },
+        "to": {
+          "x": 8,
+          "y": 4
+        },
+        "kind": "wall"
+      },
+      {
+        "from": {
+          "x": 9,
+          "y": 3
+        },
+        "to": {
+          "x": 9,
+          "y": 4
+        },
+        "kind": "wall"
+      },
+      {
+        "from": {
+          "x": 10,
+          "y": 3
+        },
+        "to": {
+          "x": 10,
+          "y": 4
+        },
+        "kind": "wall"
+      },
+      {
+        "from": {
+          "x": 11,
+          "y": 3
+        },
+        "to": {
+          "x": 11,
+          "y": 4
+        },
+        "kind": "wall"
+      },
+      {
+        "from": {
+          "x": 2,
+          "y": 4
+        },
+        "to": {
+          "x": 3,
+          "y": 4
+        },
+        "kind": "wall"
+      },
+      {
+        "from": {
+          "x": 2,
+          "y": 5
+        },
+        "to": {
+          "x": 3,
+          "y": 5
+        },
+        "kind": "wall"
+      },
+      {
+        "from": {
+          "x": 2,
+          "y": 6
+        },
+        "to": {
+          "x": 3,
+          "y": 6
+        },
+        "kind": "wall"
+      },
+      {
+        "from": {
+          "x": 2,
+          "y": 7
+        },
+        "to": {
+          "x": 3,
+          "y": 7
+        },
+        "kind": "wall"
+      },
+      {
+        "from": {
+          "x": 11,
+          "y": 4
+        },
+        "to": {
+          "x": 12,
+          "y": 4
+        },
+        "kind": "wall"
+      },
+      {
+        "from": {
+          "x": 11,
+          "y": 5
+        },
+        "to": {
+          "x": 12,
+          "y": 5
+        },
+        "kind": "wall"
+      },
+      {
+        "from": {
+          "x": 11,
+          "y": 6
+        },
+        "to": {
+          "x": 12,
+          "y": 6
+        },
+        "kind": "wall"
+      },
+      {
+        "from": {
+          "x": 11,
+          "y": 7
+        },
+        "to": {
+          "x": 12,
+          "y": 7
+        },
+        "kind": "wall"
+      },
+      {
+        "from": {
+          "x": 11,
+          "y": 8
+        },
+        "to": {
+          "x": 12,
+          "y": 8
+        },
+        "kind": "wall"
+      },
+      {
+        "from": {
+          "x": 3,
+          "y": 7
+        },
+        "to": {
+          "x": 3,
+          "y": 8
+        },
+        "kind": "wall"
+      },
+      {
+        "from": {
+          "x": 4,
+          "y": 7
+        },
+        "to": {
+          "x": 4,
+          "y": 8
+        },
+        "kind": "wall"
+      },
+      {
+        "from": {
+          "x": 5,
+          "y": 7
+        },
+        "to": {
+          "x": 5,
+          "y": 8
+        },
+        "kind": "wall"
+      },
+      {
+        "from": {
+          "x": 7,
+          "y": 7
+        },
+        "to": {
+          "x": 7,
+          "y": 8
+        },
+        "kind": "wall"
+      },
+      {
+        "from": {
+          "x": 11,
+          "y": 8
+        },
+        "to": {
+          "x": 11,
+          "y": 9
+        },
+        "kind": "wall"
+      },
+      {
+        "from": {
+          "x": 12,
+          "y": 8
+        },
+        "to": {
+          "x": 12,
+          "y": 9
+        },
+        "kind": "wall"
+      },
+      {
+        "from": {
+          "x": 13,
+          "y": 8
+        },
+        "to": {
+          "x": 13,
+          "y": 9
+        },
+        "kind": "wall"
+      },
+      {
+        "from": {
+          "x": 13,
+          "y": 9
+        },
+        "to": {
+          "x": 14,
+          "y": 9
+        },
+        "kind": "wall"
+      },
+      {
+        "from": {
+          "x": 13,
+          "y": 10
+        },
+        "to": {
+          "x": 14,
+          "y": 10
+        },
+        "kind": "wall"
+      },
+      {
+        "from": {
+          "x": 13,
+          "y": 11
+        },
+        "to": {
+          "x": 14,
+          "y": 11
+        },
+        "kind": "wall"
+      },
+      {
+        "from": {
+          "x": 13,
+          "y": 12
+        },
+        "to": {
+          "x": 14,
+          "y": 12
+        },
+        "kind": "wall"
+      },
+      {
+        "from": {
+          "x": 5,
+          "y": 12
+        },
+        "to": {
+          "x": 5,
+          "y": 13
+        },
+        "kind": "wall"
+      },
+      {
+        "from": {
+          "x": 6,
+          "y": 12
+        },
+        "to": {
+          "x": 6,
+          "y": 13
+        },
+        "kind": "wall"
+      },
+      {
+        "from": {
+          "x": 7,
+          "y": 12
+        },
+        "to": {
+          "x": 7,
+          "y": 13
+        },
+        "kind": "wall"
+      },
+      {
+        "from": {
+          "x": 8,
+          "y": 12
+        },
+        "to": {
+          "x": 8,
+          "y": 13
+        },
+        "kind": "wall"
+      },
+      {
+        "from": {
+          "x": 10,
+          "y": 12
+        },
+        "to": {
+          "x": 10,
+          "y": 13
+        },
+        "kind": "wall"
+      },
+      {
+        "from": {
+          "x": 12,
+          "y": 12
+        },
+        "to": {
+          "x": 12,
+          "y": 13
+        },
+        "kind": "wall"
+      },
+      {
+        "from": {
+          "x": 13,
+          "y": 12
+        },
+        "to": {
+          "x": 13,
+          "y": 13
+        },
+        "kind": "wall"
+      },
+      {
+        "from": {
+          "x": 4,
+          "y": 8
+        },
+        "to": {
+          "x": 5,
+          "y": 8
+        },
+        "kind": "wall"
+      },
+      {
+        "from": {
+          "x": 4,
+          "y": 9
+        },
+        "to": {
+          "x": 5,
+          "y": 9
+        },
+        "kind": "wall"
+      },
+      {
+        "from": {
+          "x": 4,
+          "y": 10
+        },
+        "to": {
+          "x": 5,
+          "y": 10
+        },
+        "kind": "wall"
+      },
+      {
+        "from": {
+          "x": 4,
+          "y": 11
+        },
+        "to": {
+          "x": 5,
+          "y": 11
+        },
+        "kind": "wall"
+      },
+      {
+        "from": {
+          "x": 4,
+          "y": 12
+        },
+        "to": {
+          "x": 5,
+          "y": 12
+        },
+        "kind": "wall"
+      },
+      {
+        "from": {
+          "x": 6,
+          "y": 8
+        },
+        "to": {
+          "x": 7,
+          "y": 8
+        },
+        "kind": "wall"
+      },
+      {
+        "from": {
+          "x": 6,
+          "y": 9
+        },
+        "to": {
+          "x": 7,
+          "y": 9
+        },
+        "kind": "wall"
+      },
+      {
+        "from": {
+          "x": 6,
+          "y": 10
+        },
+        "to": {
+          "x": 7,
+          "y": 10
+        },
+        "kind": "wall"
+      },
+      {
+        "from": {
+          "x": 6,
+          "y": 11
+        },
+        "to": {
+          "x": 7,
+          "y": 11
+        },
+        "kind": "wall"
+      },
+      {
+        "from": {
+          "x": 6,
+          "y": 12
+        },
+        "to": {
+          "x": 7,
+          "y": 12
+        },
+        "kind": "wall"
+      },
+      {
+        "from": {
+          "x": 9,
+          "y": 9
+        },
+        "to": {
+          "x": 10,
+          "y": 9
+        },
+        "kind": "wall"
+      },
+      {
+        "from": {
+          "x": 9,
+          "y": 11
+        },
+        "to": {
+          "x": 10,
+          "y": 11
+        },
+        "kind": "wall"
+      },
+      {
+        "from": {
+          "x": 9,
+          "y": 12
+        },
+        "to": {
+          "x": 10,
+          "y": 12
+        },
+        "kind": "wall"
+      },
+      {
+        "from": {
+          "x": 6,
+          "y": 7
+        },
+        "to": {
+          "x": 6,
+          "y": 8
+        },
+        "kind": "door",
+        "doorId": "floor-office"
+      },
+      {
+        "from": {
+          "x": 8,
+          "y": 7
+        },
+        "to": {
+          "x": 8,
+          "y": 8
+        },
+        "kind": "door",
+        "doorId": "floor-apartment"
+      },
+      {
+        "from": {
+          "x": 10,
+          "y": 8
+        },
+        "to": {
+          "x": 10,
+          "y": 9
+        },
+        "kind": "door",
+        "doorId": "entry-floor"
+      },
+      {
+        "from": {
+          "x": 9,
+          "y": 10
+        },
+        "to": {
+          "x": 10,
+          "y": 10
+        },
+        "kind": "door",
+        "doorId": "entry-apartment"
+      },
+      {
+        "from": {
+          "x": 11,
+          "y": 12
+        },
+        "to": {
+          "x": 11,
+          "y": 13
+        },
+        "kind": "door",
+        "doorId": "front"
+      },
+      {
+        "from": {
+          "x": 6,
+          "y": 4
+        },
+        "to": {
+          "x": 5,
+          "y": 4
+        },
+        "kind": "wall"
+      },
+      {
+        "from": {
+          "x": 6,
+          "y": 5
+        },
+        "to": {
+          "x": 5,
+          "y": 5
+        },
+        "kind": "wall"
+      },
+      {
+        "from": {
+          "x": 5,
+          "y": 7
+        },
+        "to": {
+          "x": 6,
+          "y": 7
+        },
+        "kind": "wall"
+      },
+      {
+        "from": {
+          "x": 9,
+          "y": 12
+        },
+        "to": {
+          "x": 9,
+          "y": 13
+        },
+        "kind": "wall"
+      },
+      {
+        "from": {
+          "x": 9,
+          "y": 8
+        },
+        "to": {
+          "x": 10,
+          "y": 8
+        },
+        "kind": "wall"
+      },
+      {
+        "from": {
+          "x": 9,
+          "y": 7
+        },
+        "to": {
+          "x": 9,
+          "y": 8
+        },
+        "kind": "wall"
+      },
+      {
+        "from": {
+          "x": 5,
+          "y": 6
+        },
+        "to": {
+          "x": 6,
+          "y": 6
+        },
+        "kind": "door",
+        "doorId": "dock-floor"
+      }
+    ],
+    "decorations": [
+      {
+        "cell": {
+          "x": 4,
+          "y": 6
+        },
+        "label": "Wooden cart: clearance needs review"
+      },
+      {
+        "cell": {
+          "x": 8,
+          "y": 10
+        },
+        "label": "Round dining table; no automatic whole-cell obstruction"
+      }
+    ],
+    "uncertainties": [],
+    "contradictions": []
+  }
+}

@@ -1,0 +1,1547 @@
+{
+  "schemaVersion": 1,
+  "description": "Démonstrations écrites de l’agent MCP : consultations choisies par l’agent avant une action, lectures paginées, reformulation et contrastes directs. Aucun joueur ne demande de consulter les règles.",
+  "scenarios": [
+    {
+      "id": "agent-research-perception-success",
+      "group": "wisdom-perception",
+      "split": "train",
+      "adventureId": "grammys-country-apple-pie",
+      "characterId": "fighter",
+      "ruleLookupInitiative": "agent",
+      "diceSequence": "17",
+      "message": "Je tends l’oreille pour repérer les sons autour de moi, sans me déplacer.",
+      "unchanged": [
+        "player.position",
+        "player.hp",
+        "player.inventory",
+        "worldFacts"
+      ],
+      "steps": [
+        {
+          "operation": "dm.turn",
+          "checks": [],
+          "tool": {
+            "name": "consult_rules",
+            "input": {
+              "book": "srd-5.1-2014",
+              "query": "Wisdom checks"
+            }
+          }
+        },
+        {
+          "operation": "dm.turn",
+          "checks": [
+            {
+              "path": "lastToolResult.kind",
+              "equals": "search"
+            },
+            {
+              "path": "lastToolResult.results.0.source.license",
+              "equals": "CC-BY-4.0"
+            }
+          ],
+          "tool": {
+            "name": "consult_rules",
+            "input": {
+              "sectionId": {
+                "$ref": "lastToolResult.results.0.sectionId"
+              },
+              "limit": 5000
+            }
+          }
+        },
+        {
+          "operation": "dm.turn",
+          "checks": [
+            {
+              "path": "lastTool.name",
+              "equals": "consult_rules"
+            },
+            {
+              "path": "lastToolResult.kind",
+              "equals": "passage"
+            },
+            {
+              "path": "lastToolResult.source.license",
+              "equals": "CC-BY-4.0"
+            },
+            {
+              "path": "lastToolResult.text",
+              "includes": "Perception."
+            }
+          ],
+          "tool": {
+            "name": "roll_ability_check",
+            "input": {
+              "entityId": "player",
+              "ability": "wis",
+              "skill": "perception",
+              "dc": 15,
+              "label": "Écoute",
+              "sightBased": false
+            }
+          }
+        },
+        {
+          "operation": "dm.turn",
+          "checks": [
+            {
+              "path": "lastTool.name",
+              "equals": "roll_ability_check"
+            },
+            {
+              "path": "lastTool.isError",
+              "equals": false
+            },
+            {
+              "path": "lastToolResult.success",
+              "equals": true
+            }
+          ],
+          "text": "Ton test de Écoute est réussi. Tu restes sur place ; ce jet ne crée pas automatiquement une découverte."
+        }
+      ]
+    },
+    {
+      "id": "agent-research-perception-failure",
+      "group": "wisdom-perception",
+      "split": "train",
+      "adventureId": "grammys-country-apple-pie",
+      "characterId": "fighter",
+      "ruleLookupInitiative": "agent",
+      "diceSequence": "1",
+      "message": "Je tends l’oreille pour repérer les sons autour de moi, sans me déplacer.",
+      "unchanged": [
+        "player.position",
+        "player.hp",
+        "player.inventory",
+        "worldFacts"
+      ],
+      "steps": [
+        {
+          "operation": "dm.turn",
+          "checks": [],
+          "tool": {
+            "name": "consult_rules",
+            "input": {
+              "book": "srd-5.1-2014",
+              "query": "Wisdom checks"
+            }
+          }
+        },
+        {
+          "operation": "dm.turn",
+          "checks": [
+            {
+              "path": "lastToolResult.kind",
+              "equals": "search"
+            },
+            {
+              "path": "lastToolResult.results.0.source.license",
+              "equals": "CC-BY-4.0"
+            }
+          ],
+          "tool": {
+            "name": "consult_rules",
+            "input": {
+              "sectionId": {
+                "$ref": "lastToolResult.results.0.sectionId"
+              },
+              "limit": 5000
+            }
+          }
+        },
+        {
+          "operation": "dm.turn",
+          "checks": [
+            {
+              "path": "lastTool.name",
+              "equals": "consult_rules"
+            },
+            {
+              "path": "lastToolResult.kind",
+              "equals": "passage"
+            },
+            {
+              "path": "lastToolResult.source.license",
+              "equals": "CC-BY-4.0"
+            },
+            {
+              "path": "lastToolResult.text",
+              "includes": "Perception."
+            }
+          ],
+          "tool": {
+            "name": "roll_ability_check",
+            "input": {
+              "entityId": "player",
+              "ability": "wis",
+              "skill": "perception",
+              "dc": 15,
+              "label": "Écoute",
+              "sightBased": false
+            }
+          }
+        },
+        {
+          "operation": "dm.turn",
+          "checks": [
+            {
+              "path": "lastTool.name",
+              "equals": "roll_ability_check"
+            },
+            {
+              "path": "lastTool.isError",
+              "equals": false
+            },
+            {
+              "path": "lastToolResult.success",
+              "equals": false
+            }
+          ],
+          "text": "Ton test de Écoute échoue. Tu restes sur place ; ce jet ne crée pas automatiquement une découverte."
+        }
+      ]
+    },
+    {
+      "id": "agent-research-athletics-success",
+      "group": "strength-athletics",
+      "split": "train",
+      "adventureId": "grammys-country-apple-pie",
+      "characterId": "fighter",
+      "ruleLookupInitiative": "agent",
+      "diceSequence": "17",
+      "message": "Fais-moi un test de Force (Athlétisme) DD 15, sans toucher aux portes ni déplacer un objet.",
+      "unchanged": [
+        "player.position",
+        "player.hp",
+        "player.inventory",
+        "worldFacts"
+      ],
+      "steps": [
+        {
+          "operation": "dm.turn",
+          "checks": [],
+          "tool": {
+            "name": "consult_rules",
+            "input": {
+              "book": "srd-5.1-2014",
+              "query": "Strength checks"
+            }
+          }
+        },
+        {
+          "operation": "dm.turn",
+          "checks": [
+            {
+              "path": "lastToolResult.kind",
+              "equals": "search"
+            },
+            {
+              "path": "lastToolResult.results.0.source.license",
+              "equals": "CC-BY-4.0"
+            }
+          ],
+          "tool": {
+            "name": "consult_rules",
+            "input": {
+              "sectionId": {
+                "$ref": "lastToolResult.results.0.sectionId"
+              },
+              "limit": 5000
+            }
+          }
+        },
+        {
+          "operation": "dm.turn",
+          "checks": [
+            {
+              "path": "lastTool.name",
+              "equals": "consult_rules"
+            },
+            {
+              "path": "lastToolResult.kind",
+              "equals": "passage"
+            },
+            {
+              "path": "lastToolResult.source.license",
+              "equals": "CC-BY-4.0"
+            },
+            {
+              "path": "lastToolResult.text",
+              "includes": "Athletics."
+            }
+          ],
+          "tool": {
+            "name": "roll_ability_check",
+            "input": {
+              "entityId": "player",
+              "ability": "str",
+              "skill": "athletics",
+              "dc": 15,
+              "label": "Athlétisme"
+            }
+          }
+        },
+        {
+          "operation": "dm.turn",
+          "checks": [
+            {
+              "path": "lastTool.name",
+              "equals": "roll_ability_check"
+            },
+            {
+              "path": "lastTool.isError",
+              "equals": false
+            },
+            {
+              "path": "lastToolResult.success",
+              "equals": true
+            }
+          ],
+          "text": "Ton test de Athlétisme est réussi. Tu restes sur place ; ce jet ne crée pas automatiquement une découverte."
+        }
+      ]
+    },
+    {
+      "id": "agent-research-athletics-failure",
+      "group": "strength-athletics",
+      "split": "train",
+      "adventureId": "grammys-country-apple-pie",
+      "characterId": "fighter",
+      "ruleLookupInitiative": "agent",
+      "diceSequence": "1",
+      "message": "Fais-moi un test de Force (Athlétisme) DD 15, sans toucher aux portes ni déplacer un objet.",
+      "unchanged": [
+        "player.position",
+        "player.hp",
+        "player.inventory",
+        "worldFacts"
+      ],
+      "steps": [
+        {
+          "operation": "dm.turn",
+          "checks": [],
+          "tool": {
+            "name": "consult_rules",
+            "input": {
+              "book": "srd-5.1-2014",
+              "query": "Strength checks"
+            }
+          }
+        },
+        {
+          "operation": "dm.turn",
+          "checks": [
+            {
+              "path": "lastToolResult.kind",
+              "equals": "search"
+            },
+            {
+              "path": "lastToolResult.results.0.source.license",
+              "equals": "CC-BY-4.0"
+            }
+          ],
+          "tool": {
+            "name": "consult_rules",
+            "input": {
+              "sectionId": {
+                "$ref": "lastToolResult.results.0.sectionId"
+              },
+              "limit": 5000
+            }
+          }
+        },
+        {
+          "operation": "dm.turn",
+          "checks": [
+            {
+              "path": "lastTool.name",
+              "equals": "consult_rules"
+            },
+            {
+              "path": "lastToolResult.kind",
+              "equals": "passage"
+            },
+            {
+              "path": "lastToolResult.source.license",
+              "equals": "CC-BY-4.0"
+            },
+            {
+              "path": "lastToolResult.text",
+              "includes": "Athletics."
+            }
+          ],
+          "tool": {
+            "name": "roll_ability_check",
+            "input": {
+              "entityId": "player",
+              "ability": "str",
+              "skill": "athletics",
+              "dc": 15,
+              "label": "Athlétisme"
+            }
+          }
+        },
+        {
+          "operation": "dm.turn",
+          "checks": [
+            {
+              "path": "lastTool.name",
+              "equals": "roll_ability_check"
+            },
+            {
+              "path": "lastTool.isError",
+              "equals": false
+            },
+            {
+              "path": "lastToolResult.success",
+              "equals": false
+            }
+          ],
+          "text": "Ton test de Athlétisme échoue. Tu restes sur place ; ce jet ne crée pas automatiquement une découverte."
+        }
+      ]
+    },
+    {
+      "id": "agent-research-acrobatics-success",
+      "group": "dexterity-acrobatics",
+      "split": "train",
+      "adventureId": "grammys-country-apple-pie",
+      "characterId": "wizard",
+      "ruleLookupInitiative": "agent",
+      "diceSequence": "17",
+      "message": "Je teste mon équilibre sur place : résous un test de Dextérité (Acrobaties) DD 15, sans déplacement.",
+      "unchanged": [
+        "player.position",
+        "player.hp",
+        "player.inventory",
+        "worldFacts"
+      ],
+      "steps": [
+        {
+          "operation": "dm.turn",
+          "checks": [],
+          "tool": {
+            "name": "consult_rules",
+            "input": {
+              "book": "srd-5.1-2014",
+              "query": "Dexterity checks"
+            }
+          }
+        },
+        {
+          "operation": "dm.turn",
+          "checks": [
+            {
+              "path": "lastToolResult.kind",
+              "equals": "search"
+            },
+            {
+              "path": "lastToolResult.results.0.source.license",
+              "equals": "CC-BY-4.0"
+            }
+          ],
+          "tool": {
+            "name": "consult_rules",
+            "input": {
+              "sectionId": {
+                "$ref": "lastToolResult.results.0.sectionId"
+              },
+              "limit": 5000
+            }
+          }
+        },
+        {
+          "operation": "dm.turn",
+          "checks": [
+            {
+              "path": "lastTool.name",
+              "equals": "consult_rules"
+            },
+            {
+              "path": "lastToolResult.kind",
+              "equals": "passage"
+            },
+            {
+              "path": "lastToolResult.source.license",
+              "equals": "CC-BY-4.0"
+            },
+            {
+              "path": "lastToolResult.text",
+              "includes": "Acrobatics."
+            }
+          ],
+          "tool": {
+            "name": "roll_ability_check",
+            "input": {
+              "entityId": "player",
+              "ability": "dex",
+              "skill": "acrobatics",
+              "dc": 15,
+              "label": "Équilibre"
+            }
+          }
+        },
+        {
+          "operation": "dm.turn",
+          "checks": [
+            {
+              "path": "lastTool.name",
+              "equals": "roll_ability_check"
+            },
+            {
+              "path": "lastTool.isError",
+              "equals": false
+            },
+            {
+              "path": "lastToolResult.success",
+              "equals": true
+            }
+          ],
+          "text": "Ton test de Équilibre est réussi. Tu restes sur place ; ce jet ne crée pas automatiquement une découverte."
+        }
+      ]
+    },
+    {
+      "id": "agent-research-acrobatics-failure",
+      "group": "dexterity-acrobatics",
+      "split": "train",
+      "adventureId": "grammys-country-apple-pie",
+      "characterId": "wizard",
+      "ruleLookupInitiative": "agent",
+      "diceSequence": "1",
+      "message": "Je teste mon équilibre sur place : résous un test de Dextérité (Acrobaties) DD 15, sans déplacement.",
+      "unchanged": [
+        "player.position",
+        "player.hp",
+        "player.inventory",
+        "worldFacts"
+      ],
+      "steps": [
+        {
+          "operation": "dm.turn",
+          "checks": [],
+          "tool": {
+            "name": "consult_rules",
+            "input": {
+              "book": "srd-5.1-2014",
+              "query": "Dexterity checks"
+            }
+          }
+        },
+        {
+          "operation": "dm.turn",
+          "checks": [
+            {
+              "path": "lastToolResult.kind",
+              "equals": "search"
+            },
+            {
+              "path": "lastToolResult.results.0.source.license",
+              "equals": "CC-BY-4.0"
+            }
+          ],
+          "tool": {
+            "name": "consult_rules",
+            "input": {
+              "sectionId": {
+                "$ref": "lastToolResult.results.0.sectionId"
+              },
+              "limit": 5000
+            }
+          }
+        },
+        {
+          "operation": "dm.turn",
+          "checks": [
+            {
+              "path": "lastTool.name",
+              "equals": "consult_rules"
+            },
+            {
+              "path": "lastToolResult.kind",
+              "equals": "passage"
+            },
+            {
+              "path": "lastToolResult.source.license",
+              "equals": "CC-BY-4.0"
+            },
+            {
+              "path": "lastToolResult.text",
+              "includes": "Acrobatics."
+            }
+          ],
+          "tool": {
+            "name": "roll_ability_check",
+            "input": {
+              "entityId": "player",
+              "ability": "dex",
+              "skill": "acrobatics",
+              "dc": 15,
+              "label": "Équilibre"
+            }
+          }
+        },
+        {
+          "operation": "dm.turn",
+          "checks": [
+            {
+              "path": "lastTool.name",
+              "equals": "roll_ability_check"
+            },
+            {
+              "path": "lastTool.isError",
+              "equals": false
+            },
+            {
+              "path": "lastToolResult.success",
+              "equals": false
+            }
+          ],
+          "text": "Ton test de Équilibre échoue. Tu restes sur place ; ce jet ne crée pas automatiquement une découverte."
+        }
+      ]
+    },
+    {
+      "id": "agent-research-arcana-success",
+      "group": "intelligence-knowledge",
+      "split": "validation",
+      "adventureId": "grammys-country-apple-pie",
+      "characterId": "wizard",
+      "ruleLookupInitiative": "agent",
+      "diceSequence": "17",
+      "message": "Fais-moi un test d’Intelligence (Arcanes) DD 15 pour mobiliser mes connaissances, sans lancer de sort.",
+      "unchanged": [
+        "player.position",
+        "player.hp",
+        "player.inventory",
+        "worldFacts"
+      ],
+      "steps": [
+        {
+          "operation": "dm.turn",
+          "checks": [],
+          "tool": {
+            "name": "consult_rules",
+            "input": {
+              "book": "srd-5.1-2014",
+              "query": "Intelligence checks"
+            }
+          }
+        },
+        {
+          "operation": "dm.turn",
+          "checks": [
+            {
+              "path": "lastToolResult.kind",
+              "equals": "search"
+            },
+            {
+              "path": "lastToolResult.results.0.source.license",
+              "equals": "CC-BY-4.0"
+            }
+          ],
+          "tool": {
+            "name": "consult_rules",
+            "input": {
+              "sectionId": {
+                "$ref": "lastToolResult.results.0.sectionId"
+              },
+              "limit": 5000
+            }
+          }
+        },
+        {
+          "operation": "dm.turn",
+          "checks": [
+            {
+              "path": "lastTool.name",
+              "equals": "consult_rules"
+            },
+            {
+              "path": "lastToolResult.kind",
+              "equals": "passage"
+            },
+            {
+              "path": "lastToolResult.source.license",
+              "equals": "CC-BY-4.0"
+            },
+            {
+              "path": "lastToolResult.text",
+              "includes": "Arcana."
+            }
+          ],
+          "tool": {
+            "name": "roll_ability_check",
+            "input": {
+              "entityId": "player",
+              "ability": "int",
+              "skill": "arcana",
+              "dc": 15,
+              "label": "Arcanes"
+            }
+          }
+        },
+        {
+          "operation": "dm.turn",
+          "checks": [
+            {
+              "path": "lastTool.name",
+              "equals": "roll_ability_check"
+            },
+            {
+              "path": "lastTool.isError",
+              "equals": false
+            },
+            {
+              "path": "lastToolResult.success",
+              "equals": true
+            }
+          ],
+          "text": "Ton test de Arcanes est réussi. Tu restes sur place ; ce jet ne crée pas automatiquement une découverte."
+        }
+      ]
+    },
+    {
+      "id": "agent-research-arcana-failure",
+      "group": "intelligence-knowledge",
+      "split": "validation",
+      "adventureId": "grammys-country-apple-pie",
+      "characterId": "wizard",
+      "ruleLookupInitiative": "agent",
+      "diceSequence": "1",
+      "message": "Fais-moi un test d’Intelligence (Arcanes) DD 15 pour mobiliser mes connaissances, sans lancer de sort.",
+      "unchanged": [
+        "player.position",
+        "player.hp",
+        "player.inventory",
+        "worldFacts"
+      ],
+      "steps": [
+        {
+          "operation": "dm.turn",
+          "checks": [],
+          "tool": {
+            "name": "consult_rules",
+            "input": {
+              "book": "srd-5.1-2014",
+              "query": "Intelligence checks"
+            }
+          }
+        },
+        {
+          "operation": "dm.turn",
+          "checks": [
+            {
+              "path": "lastToolResult.kind",
+              "equals": "search"
+            },
+            {
+              "path": "lastToolResult.results.0.source.license",
+              "equals": "CC-BY-4.0"
+            }
+          ],
+          "tool": {
+            "name": "consult_rules",
+            "input": {
+              "sectionId": {
+                "$ref": "lastToolResult.results.0.sectionId"
+              },
+              "limit": 5000
+            }
+          }
+        },
+        {
+          "operation": "dm.turn",
+          "checks": [
+            {
+              "path": "lastTool.name",
+              "equals": "consult_rules"
+            },
+            {
+              "path": "lastToolResult.kind",
+              "equals": "passage"
+            },
+            {
+              "path": "lastToolResult.source.license",
+              "equals": "CC-BY-4.0"
+            },
+            {
+              "path": "lastToolResult.text",
+              "includes": "Arcana."
+            }
+          ],
+          "tool": {
+            "name": "roll_ability_check",
+            "input": {
+              "entityId": "player",
+              "ability": "int",
+              "skill": "arcana",
+              "dc": 15,
+              "label": "Arcanes"
+            }
+          }
+        },
+        {
+          "operation": "dm.turn",
+          "checks": [
+            {
+              "path": "lastTool.name",
+              "equals": "roll_ability_check"
+            },
+            {
+              "path": "lastTool.isError",
+              "equals": false
+            },
+            {
+              "path": "lastToolResult.success",
+              "equals": false
+            }
+          ],
+          "text": "Ton test de Arcanes échoue. Tu restes sur place ; ce jet ne crée pas automatiquement une découverte."
+        }
+      ]
+    },
+    {
+      "id": "agent-research-religion-success",
+      "group": "intelligence-knowledge",
+      "split": "validation",
+      "adventureId": "grammys-country-apple-pie",
+      "characterId": "cleric",
+      "ruleLookupInitiative": "agent",
+      "diceSequence": "17",
+      "message": "Je mobilise mes connaissances religieuses : fais un test d’Intelligence (Religion) DD 15, sans lancer de sort.",
+      "unchanged": [
+        "player.position",
+        "player.hp",
+        "player.inventory",
+        "worldFacts"
+      ],
+      "steps": [
+        {
+          "operation": "dm.turn",
+          "checks": [],
+          "tool": {
+            "name": "consult_rules",
+            "input": {
+              "book": "srd-5.1-2014",
+              "query": "Intelligence checks"
+            }
+          }
+        },
+        {
+          "operation": "dm.turn",
+          "checks": [
+            {
+              "path": "lastToolResult.kind",
+              "equals": "search"
+            },
+            {
+              "path": "lastToolResult.results.0.source.license",
+              "equals": "CC-BY-4.0"
+            }
+          ],
+          "tool": {
+            "name": "consult_rules",
+            "input": {
+              "sectionId": {
+                "$ref": "lastToolResult.results.0.sectionId"
+              },
+              "limit": 5000
+            }
+          }
+        },
+        {
+          "operation": "dm.turn",
+          "checks": [
+            {
+              "path": "lastToolResult.kind",
+              "equals": "passage"
+            },
+            {
+              "path": "lastToolResult.nextOffset",
+              "equals": 5000
+            },
+            {
+              "path": "lastToolResult.source.license",
+              "equals": "CC-BY-4.0"
+            }
+          ],
+          "tool": {
+            "name": "consult_rules",
+            "input": {
+              "sectionId": {
+                "$ref": "lastToolResult.sectionId"
+              },
+              "offset": {
+                "$ref": "lastToolResult.nextOffset"
+              },
+              "limit": 5000
+            }
+          }
+        },
+        {
+          "operation": "dm.turn",
+          "checks": [
+            {
+              "path": "lastTool.name",
+              "equals": "consult_rules"
+            },
+            {
+              "path": "lastToolResult.kind",
+              "equals": "passage"
+            },
+            {
+              "path": "lastToolResult.source.license",
+              "equals": "CC-BY-4.0"
+            },
+            {
+              "path": "lastToolResult.text",
+              "includes": "Religion."
+            }
+          ],
+          "tool": {
+            "name": "roll_ability_check",
+            "input": {
+              "entityId": "player",
+              "ability": "int",
+              "skill": "religion",
+              "dc": 15,
+              "label": "Religion"
+            }
+          }
+        },
+        {
+          "operation": "dm.turn",
+          "checks": [
+            {
+              "path": "lastTool.name",
+              "equals": "roll_ability_check"
+            },
+            {
+              "path": "lastTool.isError",
+              "equals": false
+            },
+            {
+              "path": "lastToolResult.success",
+              "equals": true
+            }
+          ],
+          "text": "Ton test de Religion est réussi. Tu restes sur place ; ce jet ne crée pas automatiquement une découverte."
+        }
+      ]
+    },
+    {
+      "id": "agent-research-religion-failure",
+      "group": "intelligence-knowledge",
+      "split": "validation",
+      "adventureId": "grammys-country-apple-pie",
+      "characterId": "cleric",
+      "ruleLookupInitiative": "agent",
+      "diceSequence": "1",
+      "message": "Je mobilise mes connaissances religieuses : fais un test d’Intelligence (Religion) DD 15, sans lancer de sort.",
+      "unchanged": [
+        "player.position",
+        "player.hp",
+        "player.inventory",
+        "worldFacts"
+      ],
+      "steps": [
+        {
+          "operation": "dm.turn",
+          "checks": [],
+          "tool": {
+            "name": "consult_rules",
+            "input": {
+              "book": "srd-5.1-2014",
+              "query": "Intelligence checks"
+            }
+          }
+        },
+        {
+          "operation": "dm.turn",
+          "checks": [
+            {
+              "path": "lastToolResult.kind",
+              "equals": "search"
+            },
+            {
+              "path": "lastToolResult.results.0.source.license",
+              "equals": "CC-BY-4.0"
+            }
+          ],
+          "tool": {
+            "name": "consult_rules",
+            "input": {
+              "sectionId": {
+                "$ref": "lastToolResult.results.0.sectionId"
+              },
+              "limit": 5000
+            }
+          }
+        },
+        {
+          "operation": "dm.turn",
+          "checks": [
+            {
+              "path": "lastToolResult.kind",
+              "equals": "passage"
+            },
+            {
+              "path": "lastToolResult.nextOffset",
+              "equals": 5000
+            },
+            {
+              "path": "lastToolResult.source.license",
+              "equals": "CC-BY-4.0"
+            }
+          ],
+          "tool": {
+            "name": "consult_rules",
+            "input": {
+              "sectionId": {
+                "$ref": "lastToolResult.sectionId"
+              },
+              "offset": {
+                "$ref": "lastToolResult.nextOffset"
+              },
+              "limit": 5000
+            }
+          }
+        },
+        {
+          "operation": "dm.turn",
+          "checks": [
+            {
+              "path": "lastTool.name",
+              "equals": "consult_rules"
+            },
+            {
+              "path": "lastToolResult.kind",
+              "equals": "passage"
+            },
+            {
+              "path": "lastToolResult.source.license",
+              "equals": "CC-BY-4.0"
+            },
+            {
+              "path": "lastToolResult.text",
+              "includes": "Religion."
+            }
+          ],
+          "tool": {
+            "name": "roll_ability_check",
+            "input": {
+              "entityId": "player",
+              "ability": "int",
+              "skill": "religion",
+              "dc": 15,
+              "label": "Religion"
+            }
+          }
+        },
+        {
+          "operation": "dm.turn",
+          "checks": [
+            {
+              "path": "lastTool.name",
+              "equals": "roll_ability_check"
+            },
+            {
+              "path": "lastTool.isError",
+              "equals": false
+            },
+            {
+              "path": "lastToolResult.success",
+              "equals": false
+            }
+          ],
+          "text": "Ton test de Religion échoue. Tu restes sur place ; ce jet ne crée pas automatiquement une découverte."
+        }
+      ]
+    },
+    {
+      "id": "agent-research-stealth-success",
+      "group": "stealth-navigation",
+      "split": "train",
+      "adventureId": "grammys-country-apple-pie",
+      "characterId": "fighter",
+      "ruleLookupInitiative": "agent",
+      "diceSequence": "17",
+      "message": "Je me déplace discrètement en (5,13).",
+      "unchanged": [
+        "player.hp",
+        "player.inventory"
+      ],
+      "checks": [
+        {
+          "path": "state.player.position",
+          "equals": {
+            "x": 5,
+            "y": 13
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "dm.turn",
+          "checks": [],
+          "tool": {
+            "name": "consult_rules",
+            "input": {
+              "book": "srd-5.1-2014",
+              "query": "Dexterity checks"
+            }
+          }
+        },
+        {
+          "operation": "dm.turn",
+          "checks": [
+            {
+              "path": "lastToolResult.kind",
+              "equals": "search"
+            },
+            {
+              "path": "lastToolResult.results.0.source.license",
+              "equals": "CC-BY-4.0"
+            }
+          ],
+          "tool": {
+            "name": "consult_rules",
+            "input": {
+              "sectionId": {
+                "$ref": "lastToolResult.results.0.sectionId"
+              },
+              "limit": 5000
+            }
+          }
+        },
+        {
+          "operation": "dm.turn",
+          "checks": [
+            {
+              "path": "lastTool.name",
+              "equals": "consult_rules"
+            },
+            {
+              "path": "lastToolResult.kind",
+              "equals": "passage"
+            },
+            {
+              "path": "lastToolResult.source.license",
+              "equals": "CC-BY-4.0"
+            },
+            {
+              "path": "lastToolResult.text",
+              "includes": "Stealth."
+            }
+          ],
+          "tool": {
+            "name": "move_token",
+            "input": {
+              "tokenId": "player",
+              "toCell": {
+                "x": 5,
+                "y": 13
+              },
+              "stealth": true
+            }
+          }
+        },
+        {
+          "operation": "dm.turn",
+          "checks": [
+            {
+              "path": "lastTool.name",
+              "equals": "move_token"
+            },
+            {
+              "path": "lastToolResult.success",
+              "equals": true
+            },
+            {
+              "path": "lastToolResult.stealthCheck.success",
+              "equals": true
+            },
+            {
+              "path": "lastToolResult.sceneContext",
+              "exists": true
+            }
+          ],
+          "text": "Tu atteins (5,13) et ton test de Discrétion réussit."
+        }
+      ]
+    },
+    {
+      "id": "agent-research-stealth-failure",
+      "group": "stealth-navigation",
+      "split": "train",
+      "adventureId": "grammys-country-apple-pie",
+      "characterId": "fighter",
+      "ruleLookupInitiative": "agent",
+      "diceSequence": "1",
+      "message": "Je me déplace discrètement en (5,13).",
+      "unchanged": [
+        "player.hp",
+        "player.inventory"
+      ],
+      "checks": [
+        {
+          "path": "state.player.position",
+          "equals": {
+            "x": 5,
+            "y": 13
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "dm.turn",
+          "checks": [],
+          "tool": {
+            "name": "consult_rules",
+            "input": {
+              "book": "srd-5.1-2014",
+              "query": "Dexterity checks"
+            }
+          }
+        },
+        {
+          "operation": "dm.turn",
+          "checks": [
+            {
+              "path": "lastToolResult.kind",
+              "equals": "search"
+            },
+            {
+              "path": "lastToolResult.results.0.source.license",
+              "equals": "CC-BY-4.0"
+            }
+          ],
+          "tool": {
+            "name": "consult_rules",
+            "input": {
+              "sectionId": {
+                "$ref": "lastToolResult.results.0.sectionId"
+              },
+              "limit": 5000
+            }
+          }
+        },
+        {
+          "operation": "dm.turn",
+          "checks": [
+            {
+              "path": "lastTool.name",
+              "equals": "consult_rules"
+            },
+            {
+              "path": "lastToolResult.kind",
+              "equals": "passage"
+            },
+            {
+              "path": "lastToolResult.source.license",
+              "equals": "CC-BY-4.0"
+            },
+            {
+              "path": "lastToolResult.text",
+              "includes": "Stealth."
+            }
+          ],
+          "tool": {
+            "name": "move_token",
+            "input": {
+              "tokenId": "player",
+              "toCell": {
+                "x": 5,
+                "y": 13
+              },
+              "stealth": true
+            }
+          }
+        },
+        {
+          "operation": "dm.turn",
+          "checks": [
+            {
+              "path": "lastTool.name",
+              "equals": "move_token"
+            },
+            {
+              "path": "lastToolResult.success",
+              "equals": true
+            },
+            {
+              "path": "lastToolResult.stealthCheck.success",
+              "equals": false
+            },
+            {
+              "path": "lastToolResult.sceneContext",
+              "exists": true
+            }
+          ],
+          "text": "Tu atteins (5,13), mais ton test de Discrétion échoue."
+        }
+      ]
+    },
+    {
+      "id": "agent-research-query-recovery",
+      "group": "stealth-navigation",
+      "split": "train",
+      "adventureId": "grammys-country-apple-pie",
+      "characterId": "fighter",
+      "ruleLookupInitiative": "agent",
+      "diceSequence": "17",
+      "message": "Je me faufile jusqu’en (5,13) en essayant de ne pas me faire remarquer.",
+      "unchanged": [
+        "player.hp",
+        "player.inventory"
+      ],
+      "checks": [
+        {
+          "path": "state.player.position",
+          "equals": {
+            "x": 5,
+            "y": 13
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "dm.turn",
+          "checks": [],
+          "tool": {
+            "name": "consult_rules",
+            "input": {
+              "book": "srd-5.1-2014",
+              "query": "déplacement furtif"
+            }
+          }
+        },
+        {
+          "operation": "dm.turn",
+          "checks": [
+            {
+              "path": "lastToolResult.kind",
+              "equals": "search"
+            },
+            {
+              "path": "lastToolResult.results.length",
+              "equals": 0
+            }
+          ],
+          "tool": {
+            "name": "consult_rules",
+            "input": {
+              "book": "srd-5.1-2014",
+              "query": "Dexterity checks"
+            }
+          }
+        },
+        {
+          "operation": "dm.turn",
+          "checks": [
+            {
+              "path": "lastToolResult.kind",
+              "equals": "search"
+            },
+            {
+              "path": "lastToolResult.results.0.source.license",
+              "equals": "CC-BY-4.0"
+            }
+          ],
+          "tool": {
+            "name": "consult_rules",
+            "input": {
+              "sectionId": {
+                "$ref": "lastToolResult.results.0.sectionId"
+              },
+              "limit": 5000
+            }
+          }
+        },
+        {
+          "operation": "dm.turn",
+          "checks": [
+            {
+              "path": "lastTool.name",
+              "equals": "consult_rules"
+            },
+            {
+              "path": "lastToolResult.kind",
+              "equals": "passage"
+            },
+            {
+              "path": "lastToolResult.source.license",
+              "equals": "CC-BY-4.0"
+            },
+            {
+              "path": "lastToolResult.text",
+              "includes": "Stealth."
+            }
+          ],
+          "tool": {
+            "name": "move_token",
+            "input": {
+              "tokenId": "player",
+              "toCell": {
+                "x": 5,
+                "y": 13
+              },
+              "stealth": true
+            }
+          }
+        },
+        {
+          "operation": "dm.turn",
+          "checks": [
+            {
+              "path": "lastToolResult.success",
+              "equals": true
+            },
+            {
+              "path": "lastToolResult.stealthCheck.success",
+              "equals": true
+            }
+          ],
+          "text": "Tu atteins (5,13) ; ton test de Discrétion est réussi."
+        }
+      ]
+    },
+    {
+      "id": "direct-movement-no-lookup",
+      "group": "direct-navigation",
+      "split": "train",
+      "adventureId": "grammys-country-apple-pie",
+      "characterId": "fighter",
+      "ruleLookupInitiative": "none",
+      "message": "Je vais en (5,13).",
+      "unchanged": [
+        "player.hp",
+        "player.inventory"
+      ],
+      "checks": [
+        {
+          "path": "state.player.position",
+          "equals": {
+            "x": 5,
+            "y": 13
+          }
+        }
+      ],
+      "steps": [
+        {
+          "operation": "dm.turn",
+          "tool": {
+            "name": "move_token",
+            "input": {
+              "tokenId": "player",
+              "toCell": {
+                "x": 5,
+                "y": 13
+              }
+            }
+          }
+        },
+        {
+          "operation": "dm.turn",
+          "checks": [
+            {
+              "path": "lastToolResult.success",
+              "equals": true
+            }
+          ],
+          "text": "Tu atteins la position (5,13)."
+        }
+      ]
+    },
+    {
+      "id": "direct-perception-no-lookup",
+      "group": "wisdom-perception",
+      "split": "train",
+      "adventureId": "grammys-country-apple-pie",
+      "characterId": "fighter",
+      "ruleLookupInitiative": "none",
+      "diceSequence": "17",
+      "message": "Résous simplement un test de Sagesse (Perception) DD 15 pour écouter, sans bouger.",
+      "unchanged": [
+        "player.position",
+        "player.hp",
+        "player.inventory",
+        "worldFacts"
+      ],
+      "steps": [
+        {
+          "operation": "dm.turn",
+          "tool": {
+            "name": "roll_ability_check",
+            "input": {
+              "entityId": "player",
+              "ability": "wis",
+              "skill": "perception",
+              "dc": 15,
+              "label": "Écoute",
+              "sightBased": false
+            }
+          }
+        },
+        {
+          "operation": "dm.turn",
+          "checks": [
+            {
+              "path": "lastToolResult.success",
+              "equals": true
+            }
+          ],
+          "text": "Ton test de Perception est réussi. Tu n’as pas bougé."
+        }
+      ]
+    },
+    {
+      "id": "direct-invalid-destination",
+      "group": "direct-navigation",
+      "split": "train",
+      "adventureId": "grammys-country-apple-pie",
+      "characterId": "fighter",
+      "ruleLookupInitiative": "none",
+      "message": "Je veux aller exactement en (999,999).",
+      "unchanged": [
+        "player.position",
+        "player.hp",
+        "player.inventory",
+        "movementUsed"
+      ],
+      "steps": [
+        {
+          "operation": "dm.turn",
+          "tool": {
+            "name": "move_token",
+            "input": {
+              "tokenId": "player",
+              "toCell": {
+                "x": 999,
+                "y": 999
+              }
+            }
+          }
+        },
+        {
+          "operation": "dm.turn",
+          "checks": [
+            {
+              "path": "lastTool.isError",
+              "equals": true
+            },
+            {
+              "path": "lastToolResult.code",
+              "equals": "INVALID_GRID_CELL"
+            }
+          ],
+          "text": "Cette destination est hors de la carte. Tu restes sur place."
+        }
+      ]
+    }
+  ]
+}

@@ -44,7 +44,48 @@ export const GRAMMYS_CONTENT: AdventureContent = {
   level: 'Niveau 1 · D&D 5e',
   duration: '~1-2 h',
   accent: 'amber',
-  battlemapImage: '/battlemaps/grammys_bakery.png',
+  battlemapImage: '/battlemaps/grammys-interior-topdown.png',
+  tacticalViews: [{ mapId: 'bakery', roomIds: ['4', '5', '7', '8', '9'],
+    image: '/battlemaps/grammys-interior-rooms-hd.png',
+    bounds: { minX: 3, maxX: 13, minY: 4, maxY: 12 } }],
+  scenes: {
+    bakery: {
+      navigationMode: 'exploration',
+      image: '/adventures/grammys-country-apple-pie/bakery-exterior.png',
+      alt: 'La boulangerie de Grammy, son toit de tuiles, le verger et le chemin extérieur.',
+      width: 1335,
+      height: 1178,
+      hint: 'À l’extérieur, explore librement le chemin, le verger et les déchets. Clique sur un repère pour décrire ton intention au MJ. Franchir la porte de la boulangerie affiche le plan tactique intérieur.',
+      hotspots: [
+        {
+          id: 'old_apple_tree', marker: '1', label: 'Mac, le vieux pommier', roomIds: ['1'],
+          message: 'Je m’approche de Mac, le vieux pommier près du chemin, et je lui adresse la parole.',
+          bounds: { x: 14, y: 54, width: 6, height: 7 },
+        },
+        {
+          id: 'orchard', marker: '2', label: 'Verger de pommiers', destinationRoomId: '2', roomIds: ['1', '2', '3'],
+          message: 'Je souhaite explorer le verger en contournant la boulangerie par l’extérieur.',
+          bounds: { x: 54, y: 5, width: 6, height: 7 },
+        },
+        {
+          id: 'refuse_heap', marker: '3', label: 'Tas de déchets', destinationRoomId: '3', roomIds: ['1', '2', '3'],
+          message: 'Je souhaite observer le tas de déchets à l’est de la boulangerie, en restant à distance sans le toucher.',
+          bounds: { x: 84, y: 34, width: 6, height: 7 },
+        },
+        {
+          id: 'front_door', marker: '4', label: 'Porte extérieure', roomIds: ['1', '2', '3', '4'],
+          message: 'Je m’approche de la porte extérieure depuis ma zone actuelle et m’arrête devant, sans l’ouvrir, la forcer ni la franchir.',
+          bounds: { x: 60, y: 44, width: 6, height: 7 },
+        },
+        {
+          id: 'outside_path', marker: '5', label: 'Chemin extérieur', destinationRoomId: '1', roomIds: ['2', '3', '4'],
+          message: 'Je souhaite retourner sur le chemin devant la boulangerie. Si la porte extérieure est fermée, je m’arrête devant sans l’ouvrir ni la forcer.',
+          bounds: { x: 43, y: 84, width: 6, height: 7 },
+        },
+      ],
+      npcOverlays: [],
+    },
+  },
   // Source de vérité unique : la grille du moteur (map.ts, première map). Pas de duplication.
   grid: GRAMMYS_MAP.maps[0].grid,
   welcomeMessage: WELCOME,
@@ -61,14 +102,13 @@ export const GRAMMYS_CONTENT: AdventureContent = {
     namedPlaces: 'verger, tas de déchets, entrée/façade, bureau, quai de chargement, sol de la boulangerie, appartement',
     visibleNpcExample: 'Mac dès le départ',
     nonHostileNpcs: 'Mac le Tréant, la dryade',
-    revealNpcKindExample: 'reveal_npc:dryad',
-    plannerExamples: [
-      '- "je fouille la bibliothèque" → requiresMechanic=true, tool=roll_ability_check, ability=wis, dc≈13, confidence=high.',
-      '- "je crochète la serrure du coffre" → requiresMechanic=true, tool=roll_ability_check, ability=dex, dc≈15, confidence=high.',
-      '- "je dépose une offrande au pied des arbres" → requiresMechanic=true, tool=roll_ability_check, ability=cha, sceneMarkers=["reveal_npc:dryad"], confidence=medium.',
-      '- "j\'attaque le gobelin" → requiresMechanic=true, tool=resolve_player_attack, target="gobelin", confidence=high.',
-      '- "j\'entre dans la salle suivante" → requiresMechanic=true, tool=move_token, sceneMarkers=["trigger_room_event:enter"], confidence=high.',
-      '- "je lève les yeux vers le plafond / qui es-tu ?" → requiresMechanic=false, confidence=high.',
+    actionExamples: [
+      '- "je fouille la bibliothèque" → appelle roll_ability_check, ability=wis, dc≈13.',
+      '- "je crochète la serrure du coffre" → appelle roll_ability_check, ability=dex, dc≈15.',
+      '- "je dépose une offrande au pied des arbres" → appelle roll_ability_check, ability=cha ; après réussite confirmée, choisis reveal_npc si la scène le justifie, avec un npcId exact du profil dryad présent.',
+      '- "j\'attaque le gobelin" → appelle resolve_player_attack, target="gobelin".',
+      '- "j\'entre dans la salle suivante" → appelle move_token ; après arrivée confirmée, choisis trigger_room_event si un événement établi le nécessite.',
+      '- "je lève les yeux vers le plafond / qui es-tu ?" → dialogue ou description sans effet mécanique.',
     ],
   },
 }

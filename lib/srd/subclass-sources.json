@@ -1,0 +1,2944 @@
+{
+  "ruleset": "2014",
+  "retrievedAt": "2026-10-30T23:40:48.283Z",
+  "primarySource": "https://media.wizards.com/2023/downloads/dnd/SRD_CC_v5.1.pdf",
+  "license": "CC-BY-4.0",
+  "records": {
+    "subclasses/champion": {
+      "url": "https://www.dnd5eapi.co/api/2014/subclasses/champion",
+      "sha256": "8bca623eaa30f75c1fbf9943b43fb2bee190901a0880fa34bacad8f11493f5f3",
+      "source": {
+        "index": "champion",
+        "class": {
+          "index": "fighter",
+          "name": "Fighter",
+          "url": "/api/2014/classes/fighter"
+        },
+        "name": "Champion",
+        "subclass_flavor": "Martial Archetype",
+        "desc": [
+          "The archetypal Champion focuses on the development of raw physical power honed to deadly perfection. Those who model themselves on this archetype combine rigorous training with physical excellence to deal devastating blows."
+        ],
+        "subclass_levels": "/api/2014/subclasses/champion/levels",
+        "url": "/api/2014/subclasses/champion",
+        "updated_at": "2026-04-01T20:35:39.401Z",
+        "spells": []
+      }
+    },
+    "subclasses/lore": {
+      "url": "https://www.dnd5eapi.co/api/2014/subclasses/lore",
+      "sha256": "88f5fabb4cd6454c21a31c7a35dca0f5b1df0373466ac597a4bb0b26928adb8d",
+      "source": {
+        "index": "lore",
+        "class": {
+          "index": "bard",
+          "name": "Bard",
+          "url": "/api/2014/classes/bard"
+        },
+        "name": "Lore",
+        "subclass_flavor": "Bard College",
+        "desc": [
+          "Bards of the College of Lore know something about most things, collecting bits of knowledge from sources as diverse as scholarly tomes and peasant tales. Whether singing folk ballads in taverns or elaborate compositions in royal courts, these bards use their gifts to hold audiences spellbound. When the applause dies down, the audience members might find themselves questioning everything they held to be true, from their faith in the priesthood of the local temple to their loyalty to the king. The loyalty of these bards lies in the pursuit of beauty and truth, not in fealty to a monarch or following the tenets of a deity. A noble who keeps such a bard as a herald or advisor knows that the bard would rather be honest than politic. The college's members gather in libraries and sometimes in actual colleges, complete with classrooms and dormitories, to share their lore with one another. They also meet at festivals or affairs of state, where they can expose corruption, unravel lies, and poke fun at self-important figures of authority."
+        ],
+        "subclass_levels": "/api/2014/subclasses/lore/levels",
+        "url": "/api/2014/subclasses/lore",
+        "updated_at": "2026-04-01T20:35:39.401Z",
+        "spells": []
+      }
+    },
+    "subclasses/evocation": {
+      "url": "https://www.dnd5eapi.co/api/2014/subclasses/evocation",
+      "sha256": "4a2b3479c0202ae4dba8bfccd1a6c0a112f0095cb5bc99395dd514ffda83355d",
+      "source": {
+        "index": "evocation",
+        "class": {
+          "index": "wizard",
+          "name": "Wizard",
+          "url": "/api/2014/classes/wizard"
+        },
+        "name": "Evocation",
+        "subclass_flavor": "Arcane Tradition",
+        "desc": [
+          "You focus your study on magic that creates powerful elemental effects such as bitter cold, searing flame, rolling thunder, crackling lightning, and burning acid. Some evokers find employment in military forces, serving as artillery to blast enemy armies from afar. Others use their spectacular power to protect the weak, while some seek their own gain as bandits, adventurers, or aspiring tyrants."
+        ],
+        "subclass_levels": "/api/2014/subclasses/evocation/levels",
+        "url": "/api/2014/subclasses/evocation",
+        "updated_at": "2026-04-01T20:35:39.401Z",
+        "spells": []
+      }
+    },
+    "subclasses/life": {
+      "url": "https://www.dnd5eapi.co/api/2014/subclasses/life",
+      "sha256": "31046c9fc3786c77b6e0c6d6db8735f3b8769acbe7ccd7d8a56a749162a5445c",
+      "source": {
+        "index": "life",
+        "class": {
+          "index": "cleric",
+          "name": "Cleric",
+          "url": "/api/2014/classes/cleric"
+        },
+        "name": "Life",
+        "subclass_flavor": "Divine Domain",
+        "desc": [
+          "The Life domain focuses on the vibrant positive energy--one of the fundamental forces of the universe--that sustains all life. The gods of life promote vitality and health through healing the sick and wounded, caring for those in need, and driving away the forces of death and undeath. Almost any non-evil deity can claim influence over this domain, particularly agricultural deities, sun gods, gods of healing or endurance, and gods of home and community."
+        ],
+        "spells": [
+          {
+            "prerequisites": [
+              {
+                "index": "cleric-1",
+                "type": "level",
+                "name": "Cleric 1",
+                "url": "/api/2014/classes/cleric/levels/1"
+              }
+            ],
+            "spell": {
+              "index": "bless",
+              "name": "Bless",
+              "url": "/api/2014/spells/bless"
+            }
+          },
+          {
+            "prerequisites": [
+              {
+                "index": "cleric-1",
+                "type": "level",
+                "name": "Cleric 1",
+                "url": "/api/2014/classes/cleric/levels/1"
+              }
+            ],
+            "spell": {
+              "index": "cure-wounds",
+              "name": "Cure Wounds",
+              "url": "/api/2014/spells/cure-wounds"
+            }
+          },
+          {
+            "prerequisites": [
+              {
+                "index": "cleric-3",
+                "type": "level",
+                "name": "Cleric 3",
+                "url": "/api/2014/classes/cleric/levels/3"
+              }
+            ],
+            "spell": {
+              "index": "lesser-restoration",
+              "name": "Lesser Restoration",
+              "url": "/api/2014/spells/lesser-restoration"
+            }
+          },
+          {
+            "prerequisites": [
+              {
+                "index": "cleric-3",
+                "type": "level",
+                "name": "Cleric 3",
+                "url": "/api/2014/classes/cleric/levels/3"
+              }
+            ],
+            "spell": {
+              "index": "spiritual-weapon",
+              "name": "Spiritual Weapon",
+              "url": "/api/2014/spells/spiritual-weapon"
+            }
+          },
+          {
+            "prerequisites": [
+              {
+                "index": "cleric-5",
+                "type": "level",
+                "name": "Cleric 5",
+                "url": "/api/2014/classes/cleric/levels/5"
+              }
+            ],
+            "spell": {
+              "index": "beacon-of-hope",
+              "name": "Beacon of Hope",
+              "url": "/api/2014/spells/beacon-of-hope"
+            }
+          },
+          {
+            "prerequisites": [
+              {
+                "index": "cleric-5",
+                "type": "level",
+                "name": "Cleric 5",
+                "url": "/api/2014/classes/cleric/levels/5"
+              }
+            ],
+            "spell": {
+              "index": "revivify",
+              "name": "Revivify",
+              "url": "/api/2014/spells/revivify"
+            }
+          },
+          {
+            "prerequisites": [
+              {
+                "index": "cleric-7",
+                "type": "level",
+                "name": "Cleric 7",
+                "url": "/api/2014/classes/cleric/levels/7"
+              }
+            ],
+            "spell": {
+              "index": "death-ward",
+              "name": "Death Ward",
+              "url": "/api/2014/spells/death-ward"
+            }
+          },
+          {
+            "prerequisites": [
+              {
+                "index": "cleric-9",
+                "type": "level",
+                "name": "Cleric 9",
+                "url": "/api/2014/classes/cleric/levels/9"
+              }
+            ],
+            "spell": {
+              "index": "mass-cure-wounds",
+              "name": "Mass Cure Wounds",
+              "url": "/api/2014/spells/mass-cure-wounds"
+            }
+          },
+          {
+            "prerequisites": [
+              {
+                "index": "cleric-9",
+                "type": "level",
+                "name": "Cleric 9",
+                "url": "/api/2014/classes/cleric/levels/9"
+              }
+            ],
+            "spell": {
+              "index": "raise-dead",
+              "name": "Raise Dead",
+              "url": "/api/2014/spells/raise-dead"
+            }
+          }
+        ],
+        "subclass_levels": "/api/2014/subclasses/life/levels",
+        "url": "/api/2014/subclasses/life",
+        "updated_at": "2026-04-01T20:35:39.401Z"
+      }
+    },
+    "features/song-of-rest-d6": {
+      "url": "https://www.dnd5eapi.co/api/2014/features/song-of-rest-d6",
+      "sha256": "ffd61bc1b14833d463cabfb6b358d38c74ba4bb2bdc4d143cf27d7e261fc39d4",
+      "source": {
+        "index": "song-of-rest-d6",
+        "class": {
+          "index": "bard",
+          "name": "Bard",
+          "url": "/api/2014/classes/bard"
+        },
+        "name": "Song of Rest (d6)",
+        "level": 2,
+        "prerequisites": [],
+        "desc": [
+          "Beginning at 2nd level, you can use soothing music or oration to help revitalize your wounded allies during a short rest. If you or any friendly creatures who can hear your performance regain hit points at the end of the short rest by spending one or more Hit Dice, each of those creatures regains an extra 1d6 hit points. ",
+          "The extra hit points increase when you reach certain levels in this class: to 1d8 at 9th level, to 1d10 at 13th level, and to 1d12 at 17th level."
+        ],
+        "url": "/api/2014/features/song-of-rest-d6",
+        "updated_at": "2026-04-01T20:35:37.430Z"
+      }
+    },
+    "features/font-of-inspiration": {
+      "url": "https://www.dnd5eapi.co/api/2014/features/font-of-inspiration",
+      "sha256": "f0c50a08f46d7048bbc93ff6e4eac3fe0b9103637496112560427df08ac72df8",
+      "source": {
+        "index": "font-of-inspiration",
+        "class": {
+          "index": "bard",
+          "name": "Bard",
+          "url": "/api/2014/classes/bard"
+        },
+        "name": "Font of Inspiration",
+        "level": 5,
+        "prerequisites": [],
+        "desc": [
+          "Beginning when you reach 5th level, you regain all of your expended uses of Bardic Inspiration when you finish a short or long rest."
+        ],
+        "url": "/api/2014/features/font-of-inspiration",
+        "updated_at": "2026-04-01T20:35:37.430Z"
+      }
+    },
+    "features/countercharm": {
+      "url": "https://www.dnd5eapi.co/api/2014/features/countercharm",
+      "sha256": "4aca5436c9af47d9070bd83718156fe8ecb2f752b3bdf1c95c614b5aff04297d",
+      "source": {
+        "index": "countercharm",
+        "class": {
+          "index": "bard",
+          "name": "Bard",
+          "url": "/api/2014/classes/bard"
+        },
+        "name": "Countercharm",
+        "level": 6,
+        "prerequisites": [],
+        "desc": [
+          "At 6th level, you gain the ability to use musical notes or words of power to disrupt mind-influencing effects. As an action, you can start a performance that lasts until the end of your next turn. During that time, you and any friendly creatures within 30 feet of you have advantage on saving throws against being frightened or charmed. A creature must be able to hear you to gain this benefit. The performance ends early if you are incapacitated or silenced or if you voluntarily end it (no action required)."
+        ],
+        "url": "/api/2014/features/countercharm",
+        "updated_at": "2026-04-01T20:35:37.430Z"
+      }
+    },
+    "features/cutting-words": {
+      "url": "https://www.dnd5eapi.co/api/2014/features/cutting-words",
+      "sha256": "7bedf3cf30d34eb31f13b3925888af61bd4e67001a075248b989585247afd351",
+      "source": {
+        "index": "cutting-words",
+        "class": {
+          "index": "bard",
+          "name": "Bard",
+          "url": "/api/2014/classes/bard"
+        },
+        "subclass": {
+          "index": "lore",
+          "name": "Lore",
+          "url": "/api/2014/subclasses/lore"
+        },
+        "name": "Cutting Words",
+        "level": 3,
+        "prerequisites": [],
+        "desc": [
+          "Also at 3rd level, you learn how to use your wit to distract, confuse, and otherwise sap the confidence and competence of others.",
+          "When a creature that you can see within 60 feet of you makes an attack roll, an ability check, or a damage roll, you can use your reaction to expend one of your uses of Bardic Inspiration, rolling a Bardic Inspiration die and subtracting the number rolled from the creature's roll.",
+          "You can choose to use this feature after the creature makes its roll, but before the GM determines whether the attack roll or ability check succeeds or fails, or before the creature deals its damage. The creature is immune if it can't hear you or if it's immune to being charmed."
+        ],
+        "url": "/api/2014/features/cutting-words",
+        "updated_at": "2026-04-01T20:35:37.430Z"
+      }
+    },
+    "features/additional-magical-secrets": {
+      "url": "https://www.dnd5eapi.co/api/2014/features/additional-magical-secrets",
+      "sha256": "d3c76e25ec475ce98869fcc02c209b9bc67f0e18f4d80159c697327079ca85b8",
+      "source": {
+        "index": "additional-magical-secrets",
+        "class": {
+          "index": "bard",
+          "name": "Bard",
+          "url": "/api/2014/classes/bard"
+        },
+        "subclass": {
+          "index": "lore",
+          "name": "Lore",
+          "url": "/api/2014/subclasses/lore"
+        },
+        "name": "Additional Magical Secrets",
+        "level": 6,
+        "prerequisites": [],
+        "desc": [
+          "At 6th level, you learn two spells of your choice from any class. A spell you choose must be of a level you can cast, as shown on the Bard table, or a cantrip. The chosen spells count as bard spells for you but don't count against the number of bard spells you know."
+        ],
+        "url": "/api/2014/features/additional-magical-secrets",
+        "updated_at": "2026-04-01T20:35:37.430Z"
+      }
+    },
+    "features/improved-critical": {
+      "url": "https://www.dnd5eapi.co/api/2014/features/improved-critical",
+      "sha256": "4695ee0a7791b4a9abc6e9c052bec217208479674eae124127af73e92df92faf",
+      "source": {
+        "index": "improved-critical",
+        "class": {
+          "index": "fighter",
+          "name": "Fighter",
+          "url": "/api/2014/classes/fighter"
+        },
+        "subclass": {
+          "index": "champion",
+          "name": "Champion",
+          "url": "/api/2014/subclasses/champion"
+        },
+        "name": "Improved Critical",
+        "level": 3,
+        "prerequisites": [],
+        "desc": [
+          "Beginning when you choose this archetype at 3rd level, your weapon attacks score a critical hit on a roll of 19 or 20."
+        ],
+        "url": "/api/2014/features/improved-critical",
+        "updated_at": "2026-04-01T20:35:37.430Z"
+      }
+    },
+    "features/remarkable-athlete": {
+      "url": "https://www.dnd5eapi.co/api/2014/features/remarkable-athlete",
+      "sha256": "a10d79664fd6d77a6e3a33b0f5cc5febbcca81c7c2c4be40b3c7d5a7cd1a7ed4",
+      "source": {
+        "index": "remarkable-athlete",
+        "class": {
+          "index": "fighter",
+          "name": "Fighter",
+          "url": "/api/2014/classes/fighter"
+        },
+        "subclass": {
+          "index": "champion",
+          "name": "Champion",
+          "url": "/api/2014/subclasses/champion"
+        },
+        "name": "Remarkable Athlete",
+        "level": 7,
+        "prerequisites": [],
+        "desc": [
+          "Starting at 7th level, you can add half your proficiency bonus (round up) to any Strength, Dexterity, or Constitution check you make that doesn't already use your proficiency bonus. In addition, when you make a running long jump, the distance you can cover increases by a number of feet equal to your Strength modifier."
+        ],
+        "url": "/api/2014/features/remarkable-athlete",
+        "updated_at": "2026-04-01T20:35:37.430Z"
+      }
+    },
+    "features/evocation-savant": {
+      "url": "https://www.dnd5eapi.co/api/2014/features/evocation-savant",
+      "sha256": "262349ad4106a9bb0282edc1942be8bba32044ee34bbd149cb11ee10357bac1a",
+      "source": {
+        "index": "evocation-savant",
+        "class": {
+          "index": "wizard",
+          "name": "Wizard",
+          "url": "/api/2014/classes/wizard"
+        },
+        "subclass": {
+          "index": "evocation",
+          "name": "Evocation",
+          "url": "/api/2014/subclasses/evocation"
+        },
+        "name": "Evocation Savant",
+        "level": 2,
+        "prerequisites": [],
+        "desc": [
+          "Beginning when you select this school at 2nd level, the gold and time you must spend to copy an evocation spell into your spellbook is halved."
+        ],
+        "url": "/api/2014/features/evocation-savant",
+        "updated_at": "2026-04-01T20:35:37.430Z"
+      }
+    },
+    "features/sculpt-spells": {
+      "url": "https://www.dnd5eapi.co/api/2014/features/sculpt-spells",
+      "sha256": "9e6aede00c0efc944c6cf668e544cf2b49c7d094f97b85401a15751f07537be1",
+      "source": {
+        "index": "sculpt-spells",
+        "class": {
+          "index": "wizard",
+          "name": "Wizard",
+          "url": "/api/2014/classes/wizard"
+        },
+        "subclass": {
+          "index": "evocation",
+          "name": "Evocation",
+          "url": "/api/2014/subclasses/evocation"
+        },
+        "name": "Sculpt Spells",
+        "level": 2,
+        "prerequisites": [],
+        "desc": [
+          "Beginning at 2nd level, you can create pockets of relative safety within the effects of your evocation spells. When you cast an evocation spell that affects other creatures that you can see, you can choose a number of them equal to 1 + the spell's level. The chosen creatures automatically succeed on their saving throws against the spell, and they take no damage if they would normally take half damage on a successful save."
+        ],
+        "url": "/api/2014/features/sculpt-spells",
+        "updated_at": "2026-04-01T20:35:37.430Z"
+      }
+    },
+    "features/potent-cantrip": {
+      "url": "https://www.dnd5eapi.co/api/2014/features/potent-cantrip",
+      "sha256": "b97d95a92e0691db31a10c73233a75f4392ad97377da84d47fca721e99136eed",
+      "source": {
+        "index": "potent-cantrip",
+        "class": {
+          "index": "wizard",
+          "name": "Wizard",
+          "url": "/api/2014/classes/wizard"
+        },
+        "subclass": {
+          "index": "evocation",
+          "name": "Evocation",
+          "url": "/api/2014/subclasses/evocation"
+        },
+        "name": "Potent Cantrip",
+        "level": 6,
+        "prerequisites": [],
+        "desc": [
+          "Starting at 6th level, your damaging cantrips affect even creatures that avoid the brunt of the effect. When a creature succeeds on a saving throw against your cantrip, the creature takes half the cantrip's damage (if any) but suffers no additional effect from the cantrip."
+        ],
+        "url": "/api/2014/features/potent-cantrip",
+        "updated_at": "2026-04-01T20:35:37.430Z"
+      }
+    },
+    "features/arcane-recovery": {
+      "url": "https://www.dnd5eapi.co/api/2014/features/arcane-recovery",
+      "sha256": "86de2abde32211c4cb3ce28be2527c6c1805bacd87923ab90035a8def44859a6",
+      "source": {
+        "index": "arcane-recovery",
+        "class": {
+          "index": "wizard",
+          "name": "Wizard",
+          "url": "/api/2014/classes/wizard"
+        },
+        "name": "Arcane Recovery",
+        "level": 1,
+        "prerequisites": [],
+        "desc": [
+          "You have learned to regain some of your magical energy by studying your spellbook. Once per day when you finish a short rest, you can choose expended spell slots to recover. The spell slots can have a combined level that is equal to or less than half your wizard level (rounded up), and none of the slots can be 6th level or higher.",
+          "For example, if you're a 4th-level wizard, you can recover up to two levels worth of spell slots. You can recover either a 2nd-level spell slot or two 1st-level spell slots."
+        ],
+        "url": "/api/2014/features/arcane-recovery",
+        "updated_at": "2026-04-01T20:35:37.430Z"
+      }
+    },
+    "features/disciple-of-life": {
+      "url": "https://www.dnd5eapi.co/api/2014/features/disciple-of-life",
+      "sha256": "5ec22d48bdc6cb4f68b5efaaa540d25f3bb4e1d8148f037bffe85c99006f722f",
+      "source": {
+        "index": "disciple-of-life",
+        "class": {
+          "index": "cleric",
+          "name": "Cleric",
+          "url": "/api/2014/classes/cleric"
+        },
+        "subclass": {
+          "index": "life",
+          "name": "Life",
+          "url": "/api/2014/subclasses/life"
+        },
+        "name": "Disciple of Life",
+        "level": 1,
+        "prerequisites": [],
+        "desc": [
+          "Also starting at 1st level, your healing spells are more effective. Whenever you use a spell of 1st level or higher to restore hit points to a creature, the creature regains additional hit points equal to 2 + the spell's level."
+        ],
+        "url": "/api/2014/features/disciple-of-life",
+        "updated_at": "2026-04-01T20:35:37.430Z"
+      }
+    },
+    "features/blessed-healer": {
+      "url": "https://www.dnd5eapi.co/api/2014/features/blessed-healer",
+      "sha256": "1871f9379eb84eab3039bda4f181e40ae1f15c769e1cc79e93d44447a042b4ad",
+      "source": {
+        "index": "blessed-healer",
+        "class": {
+          "index": "cleric",
+          "name": "Cleric",
+          "url": "/api/2014/classes/cleric"
+        },
+        "subclass": {
+          "index": "life",
+          "name": "Life",
+          "url": "/api/2014/subclasses/life"
+        },
+        "name": "Blessed Healer",
+        "level": 6,
+        "prerequisites": [],
+        "desc": [
+          "Beginning at 6th level, the healing spells you cast on others heal you as well. When you cast a spell of 1st level or higher that restores hit points to a creature other than you, you regain hit points equal to 2 + the spell's level."
+        ],
+        "url": "/api/2014/features/blessed-healer",
+        "updated_at": "2026-04-01T20:35:37.430Z"
+      }
+    },
+    "spells/bless": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/bless",
+      "sha256": "d13c61e03b2f8710ffda0acab999056f4c33201fa45157fdf97e23823237f63a",
+      "source": {
+        "index": "bless",
+        "name": "Bless",
+        "desc": [
+          "You bless up to three creatures of your choice within range. Whenever a target makes an attack roll or a saving throw before the spell ends, the target can roll a d4 and add the number rolled to the attack roll or saving throw."
+        ],
+        "higher_level": [
+          "When you cast this spell using a spell slot of 2nd level or higher, you can target one additional creature for each slot level above 1st."
+        ],
+        "range": "30 feet",
+        "components": [
+          "V",
+          "S",
+          "M"
+        ],
+        "material": "A sprinkling of holy water.",
+        "ritual": false,
+        "duration": "Up to 1 minute",
+        "concentration": true,
+        "casting_time": "1 action",
+        "level": 1,
+        "school": {
+          "index": "enchantment",
+          "name": "Enchantment",
+          "url": "/api/2014/magic-schools/enchantment"
+        },
+        "classes": [
+          {
+            "index": "cleric",
+            "name": "Cleric",
+            "url": "/api/2014/classes/cleric"
+          },
+          {
+            "index": "paladin",
+            "name": "Paladin",
+            "url": "/api/2014/classes/paladin"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          },
+          {
+            "index": "life",
+            "name": "Life",
+            "url": "/api/2014/subclasses/life"
+          }
+        ],
+        "url": "/api/2014/spells/bless",
+        "updated_at": "2026-04-01T20:35:39.217Z",
+        "damage": []
+      }
+    },
+    "spells/spiritual-weapon": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/spiritual-weapon",
+      "sha256": "ade69d67717ed98ac728067e31bba8b3aa876328eb89a64b4a4290198b3c455d",
+      "source": {
+        "index": "spiritual-weapon",
+        "name": "Spiritual Weapon",
+        "desc": [
+          "You create a floating, spectral weapon within range that lasts for the duration or until you cast this spell again. When you cast the spell, you can make a melee spell attack against a creature within 5 feet of the weapon. On a hit, the target takes force damage equal to 1d8 + your spellcasting ability modifier.",
+          "As a bonus action on your turn, you can move the weapon up to 20 feet and repeat the attack against a creature within 5 feet of it.",
+          "The weapon can take whatever form you choose. Clerics of deities who are associated with a particular weapon (as St. Cuthbert is known for his mace and Thor for his hammer) make this spell's effect resemble that weapon."
+        ],
+        "higher_level": [
+          "When you cast this spell using a spell slot of 3rd level or higher, the damage increases by 1d8 for every two slot levels above the 2nd."
+        ],
+        "range": "60 feet",
+        "components": [
+          "V",
+          "S"
+        ],
+        "ritual": false,
+        "duration": "1 minute",
+        "concentration": false,
+        "casting_time": "1 bonus action",
+        "level": 2,
+        "attack_type": "melee",
+        "damage": [
+          {
+            "damage_type": {
+              "index": "force",
+              "name": "Force",
+              "url": "/api/2014/damage-types/force"
+            },
+            "damage_at_slot_level": {
+              "2": "1d8 + MOD",
+              "3": "1d8 + MOD",
+              "4": "2d8 + MOD",
+              "5": "2d8 + MOD",
+              "6": "3d8 + MOD",
+              "7": "3d8 + MOD",
+              "8": "4d8 + MOD",
+              "9": "4d8 + MOD"
+            }
+          }
+        ],
+        "school": {
+          "index": "evocation",
+          "name": "Evocation",
+          "url": "/api/2014/magic-schools/evocation"
+        },
+        "classes": [
+          {
+            "index": "cleric",
+            "name": "Cleric",
+            "url": "/api/2014/classes/cleric"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          },
+          {
+            "index": "life",
+            "name": "Life",
+            "url": "/api/2014/subclasses/life"
+          }
+        ],
+        "url": "/api/2014/spells/spiritual-weapon",
+        "updated_at": "2026-09-12T22:47:56.871Z"
+      }
+    },
+    "spells/beacon-of-hope": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/beacon-of-hope",
+      "sha256": "8bdba50d5572dda5a9800c3d770ddd400ff6f31d2f8aa96dcaaccd0649430b67",
+      "source": {
+        "higher_level": [],
+        "index": "beacon-of-hope",
+        "name": "Beacon of Hope",
+        "desc": [
+          "This spell bestows hope and vitality. Choose any number of creatures within range. For the duration, each target has advantage on wisdom saving throws and death saving throws, and regains the maximum number of hit points possible from any healing."
+        ],
+        "range": "30 feet",
+        "components": [
+          "V",
+          "S"
+        ],
+        "ritual": false,
+        "duration": "Up to 1 minute",
+        "concentration": true,
+        "casting_time": "1 action",
+        "level": 3,
+        "school": {
+          "index": "abjuration",
+          "name": "Abjuration",
+          "url": "/api/2014/magic-schools/abjuration"
+        },
+        "classes": [
+          {
+            "index": "cleric",
+            "name": "Cleric",
+            "url": "/api/2014/classes/cleric"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          },
+          {
+            "index": "life",
+            "name": "Life",
+            "url": "/api/2014/subclasses/life"
+          },
+          {
+            "index": "devotion",
+            "name": "Devotion",
+            "url": "/api/2014/subclasses/devotion"
+          }
+        ],
+        "url": "/api/2014/spells/beacon-of-hope",
+        "updated_at": "2026-04-01T20:35:39.217Z",
+        "damage": []
+      }
+    },
+    "spells/revivify": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/revivify",
+      "sha256": "eefbbe6c49031bbc6c4b426a71f358dbb031ef69cc3ebf8a4da87679d2fdc998",
+      "source": {
+        "higher_level": [],
+        "index": "revivify",
+        "name": "Revivify",
+        "desc": [
+          "You touch a creature that has died within the last minute. That creature returns to life with 1 hit point. This spell can't return to life a creature that has died of old age, nor can it restore any missing body parts."
+        ],
+        "range": "Touch",
+        "components": [
+          "V",
+          "S",
+          "M"
+        ],
+        "material": "Diamonds worth 300gp, which the spell consumes.",
+        "ritual": false,
+        "duration": "Instantaneous",
+        "concentration": false,
+        "casting_time": "1 action",
+        "level": 3,
+        "school": {
+          "index": "conjuration",
+          "name": "Conjuration",
+          "url": "/api/2014/magic-schools/conjuration"
+        },
+        "classes": [
+          {
+            "index": "cleric",
+            "name": "Cleric",
+            "url": "/api/2014/classes/cleric"
+          },
+          {
+            "index": "paladin",
+            "name": "Paladin",
+            "url": "/api/2014/classes/paladin"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          },
+          {
+            "index": "life",
+            "name": "Life",
+            "url": "/api/2014/subclasses/life"
+          }
+        ],
+        "url": "/api/2014/spells/revivify",
+        "updated_at": "2026-04-01T20:35:39.217Z",
+        "damage": []
+      }
+    },
+    "spells/death-ward": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/death-ward",
+      "sha256": "b961ed6fe17584050cb2c9430e14f6df56dcf18b720a5b3642b43a11af66fdc8",
+      "source": {
+        "higher_level": [],
+        "index": "death-ward",
+        "name": "Death Ward",
+        "desc": [
+          "You touch a creature and grant it a measure of protection from death.",
+          "The first time the target would drop to 0 hit points as a result of taking damage, the target instead drops to 1 hit point, and the spell ends.",
+          "If the spell is still in effect when the target is subjected to an effect that would kill it instantaneously without dealing damage, that effect is instead negated against the target, and the spell ends."
+        ],
+        "range": "Touch",
+        "components": [
+          "V",
+          "S"
+        ],
+        "ritual": false,
+        "duration": "8 hours",
+        "concentration": false,
+        "casting_time": "1 action",
+        "level": 4,
+        "school": {
+          "index": "abjuration",
+          "name": "Abjuration",
+          "url": "/api/2014/magic-schools/abjuration"
+        },
+        "classes": [
+          {
+            "index": "cleric",
+            "name": "Cleric",
+            "url": "/api/2014/classes/cleric"
+          },
+          {
+            "index": "paladin",
+            "name": "Paladin",
+            "url": "/api/2014/classes/paladin"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "life",
+            "name": "Life",
+            "url": "/api/2014/subclasses/life"
+          }
+        ],
+        "url": "/api/2014/spells/death-ward",
+        "updated_at": "2026-04-01T20:35:39.217Z",
+        "damage": []
+      }
+    },
+    "spells/guardian-of-faith": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/guardian-of-faith",
+      "sha256": "ecdd407771984da0f8d8a1762ca352309a46508c204f82e49b4fcf6d5aec8d5b",
+      "source": {
+        "higher_level": [],
+        "index": "guardian-of-faith",
+        "name": "Guardian of Faith",
+        "desc": [
+          "A Large spectral guardian appears and hovers for the duration in an unoccupied space of your choice that you can see within range. The guardian occupies that space and is indistinct except for a gleaming sword and shield emblazoned with the symbol of your deity.",
+          "Any creature hostile to you that moves to a space within 10 feet of the guardian for the first time on a turn must succeed on a dexterity saving throw. The creature takes 20 radiant damage on a failed save, or half as much damage on a successful one. The guardian vanishes when it has dealt a total of 60 damage."
+        ],
+        "range": "30 feet",
+        "components": [
+          "V"
+        ],
+        "ritual": false,
+        "duration": "8 hours",
+        "concentration": false,
+        "casting_time": "1 action",
+        "level": 4,
+        "damage": [
+          {
+            "damage_type": {
+              "index": "radiant",
+              "name": "Radiant",
+              "url": "/api/2014/damage-types/radiant"
+            },
+            "damage_at_slot_level": {
+              "4": "20"
+            }
+          }
+        ],
+        "dc": {
+          "dc_type": {
+            "index": "dex",
+            "name": "DEX",
+            "url": "/api/2014/ability-scores/dex"
+          },
+          "dc_success": "half"
+        },
+        "area_of_effect": {
+          "type": "cylinder",
+          "size": 10
+        },
+        "school": {
+          "index": "conjuration",
+          "name": "Conjuration",
+          "url": "/api/2014/magic-schools/conjuration"
+        },
+        "classes": [
+          {
+            "index": "cleric",
+            "name": "Cleric",
+            "url": "/api/2014/classes/cleric"
+          }
+        ],
+        "subclasses": [],
+        "url": "/api/2014/spells/guardian-of-faith",
+        "updated_at": "2026-09-12T22:47:56.866Z"
+      }
+    },
+    "spells/shield": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/shield",
+      "sha256": "b41db5a7e392778a06f08978302b1e30b5899ea729a8baba2c80eb778b5d4d9c",
+      "source": {
+        "higher_level": [],
+        "index": "shield",
+        "name": "Shield",
+        "desc": [
+          "An invisible barrier of magical force appears and protects you. Until the start of your next turn, you have a +5 bonus to AC, including against the triggering attack, and you take no damage from magic missile."
+        ],
+        "range": "Self",
+        "components": [
+          "V",
+          "S"
+        ],
+        "ritual": false,
+        "duration": "1 round",
+        "concentration": false,
+        "casting_time": "1 reaction",
+        "level": 1,
+        "school": {
+          "index": "abjuration",
+          "name": "Abjuration",
+          "url": "/api/2014/magic-schools/abjuration"
+        },
+        "classes": [
+          {
+            "index": "sorcerer",
+            "name": "Sorcerer",
+            "url": "/api/2014/classes/sorcerer"
+          },
+          {
+            "index": "wizard",
+            "name": "Wizard",
+            "url": "/api/2014/classes/wizard"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          }
+        ],
+        "url": "/api/2014/spells/shield",
+        "updated_at": "2026-04-01T20:35:39.218Z",
+        "damage": []
+      }
+    },
+    "spells/mage-armor": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/mage-armor",
+      "sha256": "f4082b6002ffc4c38b2b2409e4504a7e9326c616207fd691e4600f74124d59e0",
+      "source": {
+        "higher_level": [],
+        "index": "mage-armor",
+        "name": "Mage Armor",
+        "desc": [
+          "You touch a willing creature who isn't wearing armor, and a protective magical force surrounds it until the spell ends. The target's base AC becomes 13 + its Dexterity modifier. The spell ends if the target dons armor or if you dismiss the spell as an action."
+        ],
+        "range": "Touch",
+        "components": [
+          "V",
+          "S",
+          "M"
+        ],
+        "material": "A piece of cured leather.",
+        "ritual": false,
+        "duration": "8 hours",
+        "concentration": false,
+        "casting_time": "1 action",
+        "level": 1,
+        "school": {
+          "index": "abjuration",
+          "name": "Abjuration",
+          "url": "/api/2014/magic-schools/abjuration"
+        },
+        "classes": [
+          {
+            "index": "sorcerer",
+            "name": "Sorcerer",
+            "url": "/api/2014/classes/sorcerer"
+          },
+          {
+            "index": "wizard",
+            "name": "Wizard",
+            "url": "/api/2014/classes/wizard"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          }
+        ],
+        "url": "/api/2014/spells/mage-armor",
+        "updated_at": "2026-04-01T20:35:39.217Z",
+        "damage": []
+      }
+    },
+    "spells/counterspell": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/counterspell",
+      "sha256": "5b6f3c83e675575d10b49051934eab102392956496796c038524e5f33589f63e",
+      "source": {
+        "index": "counterspell",
+        "name": "Counterspell",
+        "desc": [
+          "You attempt to interrupt a creature in the process of casting a spell. If the creature is casting a spell of 3rd level or lower, its spell fails and has no effect. If it is casting a spell of 4th level or higher, make an ability check using your spellcasting ability. The DC equals 10 + the spell's level. On a success, the creature's spell fails and has no effect."
+        ],
+        "higher_level": [
+          "When you cast this spell using a spell slot of 4th level or higher, the interrupted spell has no effect if its level is less than or equal to the level of the spell slot you used."
+        ],
+        "range": "60 feet",
+        "components": [
+          "S"
+        ],
+        "ritual": false,
+        "duration": "Instantaneous",
+        "concentration": false,
+        "casting_time": "1 reaction",
+        "level": 3,
+        "school": {
+          "index": "abjuration",
+          "name": "Abjuration",
+          "url": "/api/2014/magic-schools/abjuration"
+        },
+        "classes": [
+          {
+            "index": "sorcerer",
+            "name": "Sorcerer",
+            "url": "/api/2014/classes/sorcerer"
+          },
+          {
+            "index": "warlock",
+            "name": "Warlock",
+            "url": "/api/2014/classes/warlock"
+          },
+          {
+            "index": "wizard",
+            "name": "Wizard",
+            "url": "/api/2014/classes/wizard"
+          }
+        ],
+        "subclasses": [],
+        "url": "/api/2014/spells/counterspell",
+        "updated_at": "2026-04-01T20:35:39.217Z",
+        "damage": []
+      }
+    },
+    "spells/fireball": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/fireball",
+      "sha256": "77fd15bae3881d294460675346b1c8060419dbe0146baa72ade3e3135978c79c",
+      "source": {
+        "index": "fireball",
+        "name": "Fireball",
+        "desc": [
+          "A bright streak flashes from your pointing finger to a point you choose within range and then blossoms with a low roar into an explosion of flame. Each creature in a 20-foot-radius sphere centered on that point must make a dexterity saving throw. A target takes 8d6 fire damage on a failed save, or half as much damage on a successful one.",
+          "The fire spreads around corners. It ignites flammable objects in the area that aren't being worn or carried."
+        ],
+        "higher_level": [
+          "When you cast this spell using a spell slot of 4th level or higher, the damage increases by 1d6 for each slot level above 3rd."
+        ],
+        "range": "150 feet",
+        "components": [
+          "V",
+          "S",
+          "M"
+        ],
+        "material": "A tiny ball of bat guano and sulfur.",
+        "ritual": false,
+        "duration": "Instantaneous",
+        "concentration": false,
+        "casting_time": "1 action",
+        "level": 3,
+        "damage": [
+          {
+            "damage_type": {
+              "index": "fire",
+              "name": "Fire",
+              "url": "/api/2014/damage-types/fire"
+            },
+            "damage_at_slot_level": {
+              "3": "8d6",
+              "4": "9d6",
+              "5": "10d6",
+              "6": "11d6",
+              "7": "12d6",
+              "8": "13d6",
+              "9": "14d6"
+            }
+          }
+        ],
+        "dc": {
+          "dc_type": {
+            "index": "dex",
+            "name": "DEX",
+            "url": "/api/2014/ability-scores/dex"
+          },
+          "dc_success": "half"
+        },
+        "area_of_effect": {
+          "type": "sphere",
+          "size": 20
+        },
+        "school": {
+          "index": "evocation",
+          "name": "Evocation",
+          "url": "/api/2014/magic-schools/evocation"
+        },
+        "classes": [
+          {
+            "index": "sorcerer",
+            "name": "Sorcerer",
+            "url": "/api/2014/classes/sorcerer"
+          },
+          {
+            "index": "wizard",
+            "name": "Wizard",
+            "url": "/api/2014/classes/wizard"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          },
+          {
+            "index": "fiend",
+            "name": "Fiend",
+            "url": "/api/2014/subclasses/fiend"
+          }
+        ],
+        "url": "/api/2014/spells/fireball",
+        "updated_at": "2026-09-12T22:47:56.865Z"
+      }
+    },
+    "spells/dispel-magic": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/dispel-magic",
+      "sha256": "e6b49e845e1b310ec919e298e94121a056dd9814d807f14bbc1c0f1fd6ed1d66",
+      "source": {
+        "index": "dispel-magic",
+        "name": "Dispel Magic",
+        "desc": [
+          "Choose one creature, object, or magical effect within range. Any spell of 3rd level or lower on the target ends. For each spell of 4th level or higher on the target, make an ability check using your spellcasting ability. The DC equals 10 + the spell's level. On a successful check, the spell ends."
+        ],
+        "higher_level": [
+          "When you cast this spell using a spell slot of 4th level or higher, you automatically end the effects of a spell on the target if the spell's level is equal to or less than the level of the spell slot you used."
+        ],
+        "range": "120 feet",
+        "components": [
+          "V",
+          "S"
+        ],
+        "ritual": false,
+        "duration": "Instantaneous",
+        "concentration": false,
+        "casting_time": "1 action",
+        "level": 3,
+        "school": {
+          "index": "abjuration",
+          "name": "Abjuration",
+          "url": "/api/2014/magic-schools/abjuration"
+        },
+        "classes": [
+          {
+            "index": "bard",
+            "name": "Bard",
+            "url": "/api/2014/classes/bard"
+          },
+          {
+            "index": "cleric",
+            "name": "Cleric",
+            "url": "/api/2014/classes/cleric"
+          },
+          {
+            "index": "druid",
+            "name": "Druid",
+            "url": "/api/2014/classes/druid"
+          },
+          {
+            "index": "paladin",
+            "name": "Paladin",
+            "url": "/api/2014/classes/paladin"
+          },
+          {
+            "index": "sorcerer",
+            "name": "Sorcerer",
+            "url": "/api/2014/classes/sorcerer"
+          },
+          {
+            "index": "warlock",
+            "name": "Warlock",
+            "url": "/api/2014/classes/warlock"
+          },
+          {
+            "index": "wizard",
+            "name": "Wizard",
+            "url": "/api/2014/classes/wizard"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          },
+          {
+            "index": "devotion",
+            "name": "Devotion",
+            "url": "/api/2014/subclasses/devotion"
+          }
+        ],
+        "url": "/api/2014/spells/dispel-magic",
+        "updated_at": "2026-04-01T20:35:39.217Z",
+        "damage": []
+      }
+    },
+    "spells/misty-step": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/misty-step",
+      "sha256": "3060270db4fa3da3068f1fe5ef7a66c452b2505d20868d6bac23ead154b59ac6",
+      "source": {
+        "higher_level": [],
+        "index": "misty-step",
+        "name": "Misty Step",
+        "desc": [
+          "Briefly surrounded by silvery mist, you teleport up to 30 feet to an unoccupied space that you can see."
+        ],
+        "range": "Self",
+        "components": [
+          "V"
+        ],
+        "ritual": false,
+        "duration": "Instantaneous",
+        "concentration": false,
+        "casting_time": "1 bonus action",
+        "level": 2,
+        "school": {
+          "index": "conjuration",
+          "name": "Conjuration",
+          "url": "/api/2014/magic-schools/conjuration"
+        },
+        "classes": [
+          {
+            "index": "sorcerer",
+            "name": "Sorcerer",
+            "url": "/api/2014/classes/sorcerer"
+          },
+          {
+            "index": "warlock",
+            "name": "Warlock",
+            "url": "/api/2014/classes/warlock"
+          },
+          {
+            "index": "wizard",
+            "name": "Wizard",
+            "url": "/api/2014/classes/wizard"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          },
+          {
+            "index": "land",
+            "name": "Land",
+            "url": "/api/2014/subclasses/land"
+          }
+        ],
+        "url": "/api/2014/spells/misty-step",
+        "updated_at": "2026-04-01T20:35:39.217Z",
+        "damage": []
+      }
+    },
+    "spells/greater-invisibility": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/greater-invisibility",
+      "sha256": "67fbf367568fdba57ac199f68b7466434334138ac39dc36a4616572cf967965c",
+      "source": {
+        "higher_level": [],
+        "index": "greater-invisibility",
+        "name": "Greater Invisibility",
+        "desc": [
+          "You or a creature you touch becomes invisible until the spell ends. Anything the target is wearing or carrying is invisible as long as it is on the target's person."
+        ],
+        "range": "Touch",
+        "components": [
+          "V",
+          "S"
+        ],
+        "ritual": false,
+        "duration": "Up to 1 minute",
+        "concentration": true,
+        "casting_time": "1 action",
+        "level": 4,
+        "school": {
+          "index": "illusion",
+          "name": "Illusion",
+          "url": "/api/2014/magic-schools/illusion"
+        },
+        "classes": [
+          {
+            "index": "bard",
+            "name": "Bard",
+            "url": "/api/2014/classes/bard"
+          },
+          {
+            "index": "sorcerer",
+            "name": "Sorcerer",
+            "url": "/api/2014/classes/sorcerer"
+          },
+          {
+            "index": "wizard",
+            "name": "Wizard",
+            "url": "/api/2014/classes/wizard"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "land",
+            "name": "Land",
+            "url": "/api/2014/subclasses/land"
+          }
+        ],
+        "url": "/api/2014/spells/greater-invisibility",
+        "updated_at": "2026-04-01T20:35:39.217Z",
+        "damage": []
+      }
+    },
+    "spells/identify": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/identify",
+      "sha256": "f954413717c412c7817a312f8d5f334949d9e68ca39d9d918800a7fcbbc6cb34",
+      "source": {
+        "higher_level": [],
+        "index": "identify",
+        "name": "Identify",
+        "desc": [
+          "You choose one object that you must touch throughout the casting of the spell. If it is a magic item or some other magic-imbued object, you learn its properties and how to use them, whether it requires attunement to use, and how many charges it has, if any. You learn whether any spells are affecting the item and what they are. If the item was created by a spell, you learn which spell created it.",
+          "If you instead touch a creature throughout the casting, you learn what spells, if any, are currently affecting it."
+        ],
+        "range": "Touch",
+        "components": [
+          "V",
+          "S",
+          "M"
+        ],
+        "material": "A pearl worth at least 100gp and an owl feather.",
+        "ritual": true,
+        "duration": "Instantaneous",
+        "concentration": false,
+        "casting_time": "1 minute",
+        "level": 1,
+        "school": {
+          "index": "divination",
+          "name": "Divination",
+          "url": "/api/2014/magic-schools/divination"
+        },
+        "classes": [
+          {
+            "index": "bard",
+            "name": "Bard",
+            "url": "/api/2014/classes/bard"
+          },
+          {
+            "index": "wizard",
+            "name": "Wizard",
+            "url": "/api/2014/classes/wizard"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          }
+        ],
+        "url": "/api/2014/spells/identify",
+        "updated_at": "2026-04-01T20:35:39.217Z",
+        "damage": []
+      }
+    },
+    "spells/detect-magic": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/detect-magic",
+      "sha256": "b80c1bd44a8c1106cfa0616cca3baf762b3a24c5e1d2512a5bc13317623ce794",
+      "source": {
+        "higher_level": [],
+        "index": "detect-magic",
+        "name": "Detect Magic",
+        "desc": [
+          "For the duration, you sense the presence of magic within 30 feet of you. If you sense magic in this way, you can use your action to see a faint aura around any visible creature or object in the area that bears magic, and you learn its school of magic, if any.",
+          "The spell can penetrate most barriers, but it is blocked by 1 foot of stone, 1 inch of common metal, a thin sheet of lead, or 3 feet of wood or dirt."
+        ],
+        "range": "Self",
+        "components": [
+          "V",
+          "S"
+        ],
+        "ritual": true,
+        "duration": "Up to 10 minutes",
+        "concentration": true,
+        "casting_time": "1 action",
+        "level": 1,
+        "area_of_effect": {
+          "type": "sphere",
+          "size": 30
+        },
+        "school": {
+          "index": "divination",
+          "name": "Divination",
+          "url": "/api/2014/magic-schools/divination"
+        },
+        "classes": [
+          {
+            "index": "bard",
+            "name": "Bard",
+            "url": "/api/2014/classes/bard"
+          },
+          {
+            "index": "cleric",
+            "name": "Cleric",
+            "url": "/api/2014/classes/cleric"
+          },
+          {
+            "index": "druid",
+            "name": "Druid",
+            "url": "/api/2014/classes/druid"
+          },
+          {
+            "index": "paladin",
+            "name": "Paladin",
+            "url": "/api/2014/classes/paladin"
+          },
+          {
+            "index": "ranger",
+            "name": "Ranger",
+            "url": "/api/2014/classes/ranger"
+          },
+          {
+            "index": "sorcerer",
+            "name": "Sorcerer",
+            "url": "/api/2014/classes/sorcerer"
+          },
+          {
+            "index": "wizard",
+            "name": "Wizard",
+            "url": "/api/2014/classes/wizard"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          }
+        ],
+        "url": "/api/2014/spells/detect-magic",
+        "updated_at": "2026-04-01T20:35:39.217Z",
+        "damage": []
+      }
+    },
+    "spells/ray-of-frost": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/ray-of-frost",
+      "sha256": "ee032f4ffc16cd9cb6b61f23dc8ab7f6e608748a5e416b39b0f8c97160cb7d0e",
+      "source": {
+        "higher_level": [],
+        "index": "ray-of-frost",
+        "name": "Ray of Frost",
+        "desc": [
+          "A frigid beam of blue-white light streaks toward a creature within range. Make a ranged spell attack against the target. On a hit, it takes 1d8 cold damage, and its speed is reduced by 10 feet until the start of your next turn.",
+          "The spell's damage increases by 1d8 when you reach 5th level (2d8), 11th level (3d8), and 17th level (4d8)."
+        ],
+        "range": "60 feet",
+        "components": [
+          "V",
+          "S"
+        ],
+        "ritual": false,
+        "duration": "Instantaneous",
+        "concentration": false,
+        "casting_time": "1 action",
+        "level": 0,
+        "attack_type": "ranged",
+        "damage": [
+          {
+            "damage_type": {
+              "index": "cold",
+              "name": "Cold",
+              "url": "/api/2014/damage-types/cold"
+            },
+            "damage_at_character_level": {
+              "1": "1d8",
+              "5": "2d8",
+              "11": "3d8",
+              "17": "4d8"
+            }
+          }
+        ],
+        "school": {
+          "index": "evocation",
+          "name": "Evocation",
+          "url": "/api/2014/magic-schools/evocation"
+        },
+        "classes": [
+          {
+            "index": "sorcerer",
+            "name": "Sorcerer",
+            "url": "/api/2014/classes/sorcerer"
+          },
+          {
+            "index": "wizard",
+            "name": "Wizard",
+            "url": "/api/2014/classes/wizard"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          }
+        ],
+        "url": "/api/2014/spells/ray-of-frost",
+        "updated_at": "2026-09-12T22:47:56.870Z"
+      }
+    },
+    "spells/sacred-flame": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/sacred-flame",
+      "sha256": "1d0b82f7add46ecdc47ab9d33dc8c358d1c21f16991a2f52a537cd37b596edfb",
+      "source": {
+        "higher_level": [],
+        "index": "sacred-flame",
+        "name": "Sacred Flame",
+        "desc": [
+          "Flame-like radiance descends on a creature that you can see within range. The target must succeed on a dexterity saving throw or take 1d8 radiant damage. The target gains no benefit from cover for this saving throw.",
+          "The spell's damage increases by 1d8 when you reach 5th level (2d8), 11th level (3d8), and 17th level (4d8)."
+        ],
+        "range": "60 feet",
+        "components": [
+          "V",
+          "S"
+        ],
+        "ritual": false,
+        "duration": "Instantaneous",
+        "concentration": false,
+        "casting_time": "1 action",
+        "level": 0,
+        "damage": [
+          {
+            "damage_type": {
+              "index": "radiant",
+              "name": "Radiant",
+              "url": "/api/2014/damage-types/radiant"
+            },
+            "damage_at_character_level": {
+              "1": "1d8",
+              "5": "2d8",
+              "11": "3d8",
+              "17": "4d8"
+            }
+          }
+        ],
+        "dc": {
+          "dc_type": {
+            "index": "dex",
+            "name": "DEX",
+            "url": "/api/2014/ability-scores/dex"
+          },
+          "dc_success": "none"
+        },
+        "school": {
+          "index": "evocation",
+          "name": "Evocation",
+          "url": "/api/2014/magic-schools/evocation"
+        },
+        "classes": [
+          {
+            "index": "cleric",
+            "name": "Cleric",
+            "url": "/api/2014/classes/cleric"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          }
+        ],
+        "url": "/api/2014/spells/sacred-flame",
+        "updated_at": "2026-09-12T22:47:56.870Z"
+      }
+    },
+    "spells/vicious-mockery": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/vicious-mockery",
+      "sha256": "56dc070a137118caf2b2bd102fa319ed9b7c51429fc4a98fbf64d4efa0a19da3",
+      "source": {
+        "higher_level": [],
+        "index": "vicious-mockery",
+        "name": "Vicious Mockery",
+        "desc": [
+          "You unleash a string of insults laced with subtle enchantments at a creature you can see within range. If the target can hear you (though it need not understand you), it must succeed on a wisdom saving throw or take 1d4 psychic damage and have disadvantage on the next attack roll it makes before the end of its next turn.",
+          "This spell's damage increases by 1d4 when you reach 5th level (2d4), 11th level (3d4), and 17th level (4d4)."
+        ],
+        "range": "60 feet",
+        "components": [
+          "V"
+        ],
+        "ritual": false,
+        "duration": "Instantaneous",
+        "concentration": false,
+        "casting_time": "1 action",
+        "level": 0,
+        "damage": [
+          {
+            "damage_type": {
+              "index": "psychic",
+              "name": "Psychic",
+              "url": "/api/2014/damage-types/psychic"
+            },
+            "damage_at_character_level": {
+              "1": "1d4",
+              "5": "2d4",
+              "11": "3d4",
+              "17": "4d4"
+            }
+          }
+        ],
+        "dc": {
+          "dc_type": {
+            "index": "wis",
+            "name": "WIS",
+            "url": "/api/2014/ability-scores/wis"
+          },
+          "dc_success": "none"
+        },
+        "school": {
+          "index": "enchantment",
+          "name": "Enchantment",
+          "url": "/api/2014/magic-schools/enchantment"
+        },
+        "classes": [
+          {
+            "index": "bard",
+            "name": "Bard",
+            "url": "/api/2014/classes/bard"
+          }
+        ],
+        "subclasses": [],
+        "url": "/api/2014/spells/vicious-mockery",
+        "updated_at": "2026-09-12T22:47:56.874Z"
+      }
+    },
+    "spells/minor-illusion": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/minor-illusion",
+      "sha256": "588a18288f140be717c309facb486d5d3935b1fd5f5f6f5289d47bc9d054c6a1",
+      "source": {
+        "higher_level": [],
+        "index": "minor-illusion",
+        "name": "Minor Illusion",
+        "desc": [
+          "You create a sound or an image of an object within range that lasts for the duration. The illusion also ends if you dismiss it as an action or cast this spell again.",
+          "If you create a sound, its volume can range from a whisper to a scream. It can be your voice, someone else's voice, a lion's roar, a beating of drums, or any other sound you choose. The sound continues unabated throughout the duration, or you can make discrete sounds at different times before the spell ends.",
+          "If you create an image of an object--such as a chair, muddy footprints, or a small chest--it must be no larger than a 5-foot cube. The image can't create sound, light, smell, or any other sensory effect. Physical interaction with the image reveals it to be an illusion, because things can pass through it.",
+          "If a creature uses its action to examine the sound or image, the creature can determine that it is an illusion with a successful Intelligence (Investigation) check against your spell save DC. If a creature discerns the illusion for what it is, the illusion becomes faint to the creature."
+        ],
+        "range": "30 feet",
+        "components": [
+          "S",
+          "M"
+        ],
+        "material": "A bit of fleece.",
+        "ritual": false,
+        "duration": "1 minute",
+        "concentration": false,
+        "casting_time": "1 action",
+        "level": 0,
+        "school": {
+          "index": "illusion",
+          "name": "Illusion",
+          "url": "/api/2014/magic-schools/illusion"
+        },
+        "classes": [
+          {
+            "index": "bard",
+            "name": "Bard",
+            "url": "/api/2014/classes/bard"
+          },
+          {
+            "index": "sorcerer",
+            "name": "Sorcerer",
+            "url": "/api/2014/classes/sorcerer"
+          },
+          {
+            "index": "warlock",
+            "name": "Warlock",
+            "url": "/api/2014/classes/warlock"
+          },
+          {
+            "index": "wizard",
+            "name": "Wizard",
+            "url": "/api/2014/classes/wizard"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          }
+        ],
+        "url": "/api/2014/spells/minor-illusion",
+        "updated_at": "2026-04-01T20:35:39.217Z",
+        "damage": []
+      }
+    },
+    "spells/light": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/light",
+      "sha256": "6ac63bd89190f745d5eb0b811f7559b9e3fd3111c871cc809c5244037767e066",
+      "source": {
+        "higher_level": [],
+        "index": "light",
+        "name": "Light",
+        "desc": [
+          "You touch one object that is no larger than 10 feet in any dimension. Until the spell ends, the object sheds bright light in a 20-foot radius and dim light for an additional 20 feet. The light can be colored as you like. Completely covering the object with something opaque blocks the light. The spell ends if you cast it again or dismiss it as an action.",
+          "If you target an object held or worn by a hostile creature, that creature must succeed on a dexterity saving throw to avoid the spell."
+        ],
+        "range": "Touch",
+        "components": [
+          "V",
+          "M"
+        ],
+        "material": "A firefly or phosphorescent moss.",
+        "ritual": false,
+        "duration": "1 hour",
+        "concentration": false,
+        "casting_time": "1 action",
+        "level": 0,
+        "dc": {
+          "dc_type": {
+            "index": "dex",
+            "name": "DEX",
+            "url": "/api/2014/ability-scores/dex"
+          },
+          "dc_success": "none"
+        },
+        "school": {
+          "index": "evocation",
+          "name": "Evocation",
+          "url": "/api/2014/magic-schools/evocation"
+        },
+        "classes": [
+          {
+            "index": "bard",
+            "name": "Bard",
+            "url": "/api/2014/classes/bard"
+          },
+          {
+            "index": "cleric",
+            "name": "Cleric",
+            "url": "/api/2014/classes/cleric"
+          },
+          {
+            "index": "sorcerer",
+            "name": "Sorcerer",
+            "url": "/api/2014/classes/sorcerer"
+          },
+          {
+            "index": "wizard",
+            "name": "Wizard",
+            "url": "/api/2014/classes/wizard"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          }
+        ],
+        "url": "/api/2014/spells/light",
+        "updated_at": "2026-04-01T20:35:39.217Z",
+        "damage": []
+      }
+    },
+    "spells/magic-missile": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/magic-missile",
+      "sha256": "62fbbf4469f2a985d0f5ed09de943c645f33e5288be1e76813a25cbc2f1b1d79",
+      "source": {
+        "index": "magic-missile",
+        "name": "Magic Missile",
+        "desc": [
+          "You create three glowing darts of magical force. Each dart hits a creature of your choice that you can see within range. A dart deals 1d4 + 1 force damage to its target. The darts all strike simultaneously, and you can direct them to hit one creature or several."
+        ],
+        "higher_level": [
+          "When you cast this spell using a spell slot of 2nd level or higher, the spell creates one more dart for each slot level above 1st."
+        ],
+        "range": "120 feet",
+        "components": [
+          "V",
+          "S"
+        ],
+        "ritual": false,
+        "duration": "Instantaneous",
+        "concentration": false,
+        "casting_time": "1 action",
+        "level": 1,
+        "damage": [
+          {
+            "damage_type": {
+              "index": "force",
+              "name": "Force",
+              "url": "/api/2014/damage-types/force"
+            },
+            "damage_at_slot_level": {
+              "1": "3d4 + 3",
+              "2": "4d4 + 4",
+              "3": "5d4 + 5",
+              "4": "6d4 + 6",
+              "5": "7d4 + 7",
+              "6": "8d4 + 8",
+              "7": "9d4 + 9",
+              "8": "10d4 + 10",
+              "9": "11d4 + 11"
+            }
+          }
+        ],
+        "school": {
+          "index": "evocation",
+          "name": "Evocation",
+          "url": "/api/2014/magic-schools/evocation"
+        },
+        "classes": [
+          {
+            "index": "sorcerer",
+            "name": "Sorcerer",
+            "url": "/api/2014/classes/sorcerer"
+          },
+          {
+            "index": "wizard",
+            "name": "Wizard",
+            "url": "/api/2014/classes/wizard"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          }
+        ],
+        "url": "/api/2014/spells/magic-missile",
+        "updated_at": "2026-09-12T22:47:56.868Z"
+      }
+    },
+    "spells/thaumaturgy": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/thaumaturgy",
+      "sha256": "440b16ed3e0b6d7d609c7bf23beffd1fddd5e4a49e1b61aea3cf61ee21e35e62",
+      "source": {
+        "higher_level": [],
+        "index": "thaumaturgy",
+        "name": "Thaumaturgy",
+        "desc": [
+          "You manifest a minor wonder, a sign of supernatural power, within range. You create one of the following magical effects within range.",
+          "- Your voice booms up to three times as loud as normal for 1 minute.",
+          "- You cause flames to flicker, brighten, dim, or change color for 1 minute.",
+          "- You cause harmless tremors in the ground for 1 minute.",
+          "- You create an instantaneous sound that originates from a point of your choice within range, such as a rumble of thunder, the cry of a raven, or ominous whispers.",
+          "- You instantaneously cause an unlocked door or window to fly open or slam shut.",
+          "- You alter the appearance of your eyes for 1 minute.",
+          "If you cast this spell multiple times, you can have up to three of its 1-minute effects active at a time, and you can dismiss such an effect as an action."
+        ],
+        "range": "30 feet",
+        "components": [
+          "V"
+        ],
+        "ritual": false,
+        "duration": "1 minute",
+        "concentration": false,
+        "casting_time": "1 action",
+        "level": 0,
+        "school": {
+          "index": "transmutation",
+          "name": "Transmutation",
+          "url": "/api/2014/magic-schools/transmutation"
+        },
+        "classes": [
+          {
+            "index": "cleric",
+            "name": "Cleric",
+            "url": "/api/2014/classes/cleric"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          }
+        ],
+        "url": "/api/2014/spells/thaumaturgy",
+        "updated_at": "2026-04-01T20:35:39.218Z",
+        "damage": []
+      }
+    },
+    "spells/burning-hands": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/burning-hands",
+      "sha256": "e3f6c2e3f7d73b99541264123b33a1b6a561c29195227dcdb4bad9f950c41ea0",
+      "source": {
+        "index": "burning-hands",
+        "name": "Burning Hands",
+        "desc": [
+          "As you hold your hands with thumbs touching and fingers spread, a thin sheet of flames shoots forth from your outstretched fingertips. Each creature in a 15-foot cone must make a dexterity saving throw. A creature takes 3d6 fire damage on a failed save, or half as much damage on a successful one.",
+          "The fire ignites any flammable objects in the area that aren't being worn or carried."
+        ],
+        "higher_level": [
+          "When you cast this spell using a spell slot of 2nd level or higher, the damage increases by 1d6 for each slot level above 1st."
+        ],
+        "range": "Self",
+        "components": [
+          "V",
+          "S"
+        ],
+        "ritual": false,
+        "duration": "Instantaneous",
+        "concentration": false,
+        "casting_time": "1 action",
+        "level": 1,
+        "damage": [
+          {
+            "damage_type": {
+              "index": "fire",
+              "name": "Fire",
+              "url": "/api/2014/damage-types/fire"
+            },
+            "damage_at_slot_level": {
+              "1": "3d6",
+              "2": "4d6",
+              "3": "5d6",
+              "4": "6d6",
+              "5": "7d6",
+              "6": "8d6",
+              "7": "9d6",
+              "8": "10d6",
+              "9": "11d6"
+            }
+          }
+        ],
+        "dc": {
+          "dc_type": {
+            "index": "dex",
+            "name": "DEX",
+            "url": "/api/2014/ability-scores/dex"
+          },
+          "dc_success": "half"
+        },
+        "area_of_effect": {
+          "type": "cone",
+          "size": 15
+        },
+        "school": {
+          "index": "evocation",
+          "name": "Evocation",
+          "url": "/api/2014/magic-schools/evocation"
+        },
+        "classes": [
+          {
+            "index": "sorcerer",
+            "name": "Sorcerer",
+            "url": "/api/2014/classes/sorcerer"
+          },
+          {
+            "index": "wizard",
+            "name": "Wizard",
+            "url": "/api/2014/classes/wizard"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          },
+          {
+            "index": "fiend",
+            "name": "Fiend",
+            "url": "/api/2014/subclasses/fiend"
+          }
+        ],
+        "url": "/api/2014/spells/burning-hands",
+        "updated_at": "2026-09-12T22:47:56.861Z"
+      }
+    },
+    "spells/cure-wounds": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/cure-wounds",
+      "sha256": "2f86eda434b060d697e048b016a42953fcdf4d06d2ed647782f04a80e562e29c",
+      "source": {
+        "index": "cure-wounds",
+        "name": "Cure Wounds",
+        "desc": [
+          "A creature you touch regains a number of hit points equal to 1d8 + your spellcasting ability modifier. This spell has no effect on undead or constructs."
+        ],
+        "higher_level": [
+          "When you cast this spell using a spell slot of 2nd level or higher, the healing increases by 1d8 for each slot level above 1st."
+        ],
+        "range": "Touch",
+        "components": [
+          "V",
+          "S"
+        ],
+        "ritual": false,
+        "duration": "Instantaneous",
+        "concentration": false,
+        "casting_time": "1 action",
+        "level": 1,
+        "heal_at_slot_level": {
+          "1": "1d8 + MOD",
+          "2": "2d8 + MOD",
+          "3": "3d8 + MOD",
+          "4": "4d8 + MOD",
+          "5": "5d8 + MOD",
+          "6": "6d8 + MOD",
+          "7": "7d8 + MOD",
+          "8": "8d8 + MOD",
+          "9": "9d8 + MOD"
+        },
+        "school": {
+          "index": "evocation",
+          "name": "Evocation",
+          "url": "/api/2014/magic-schools/evocation"
+        },
+        "classes": [
+          {
+            "index": "bard",
+            "name": "Bard",
+            "url": "/api/2014/classes/bard"
+          },
+          {
+            "index": "cleric",
+            "name": "Cleric",
+            "url": "/api/2014/classes/cleric"
+          },
+          {
+            "index": "druid",
+            "name": "Druid",
+            "url": "/api/2014/classes/druid"
+          },
+          {
+            "index": "paladin",
+            "name": "Paladin",
+            "url": "/api/2014/classes/paladin"
+          },
+          {
+            "index": "ranger",
+            "name": "Ranger",
+            "url": "/api/2014/classes/ranger"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          },
+          {
+            "index": "life",
+            "name": "Life",
+            "url": "/api/2014/subclasses/life"
+          }
+        ],
+        "url": "/api/2014/spells/cure-wounds",
+        "updated_at": "2026-04-01T20:35:39.217Z",
+        "damage": []
+      }
+    },
+    "spells/guiding-bolt": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/guiding-bolt",
+      "sha256": "fc9628a87bb2902b0d50977bede2bd8c9194f4c7a72b11dae9732f6ca1abf5e4",
+      "source": {
+        "index": "guiding-bolt",
+        "name": "Guiding Bolt",
+        "desc": [
+          "A flash of light streaks toward a creature of your choice within range. Make a ranged spell attack against the target. On a hit, the target takes 4d6 radiant damage, and the next attack roll made against this target before the end of your next turn has advantage, thanks to the mystical dim light glittering on the target until then."
+        ],
+        "higher_level": [
+          "When you cast this spell using a spell slot of 2nd level or higher, the damage increases by 1d6 for each slot level above 1st."
+        ],
+        "range": "120 feet",
+        "components": [
+          "V",
+          "S"
+        ],
+        "ritual": false,
+        "duration": "1 round",
+        "concentration": false,
+        "casting_time": "1 action",
+        "level": 1,
+        "attack_type": "ranged",
+        "damage": [
+          {
+            "damage_type": {
+              "index": "radiant",
+              "name": "Radiant",
+              "url": "/api/2014/damage-types/radiant"
+            },
+            "damage_at_slot_level": {
+              "1": "4d6",
+              "2": "5d6",
+              "3": "6d6",
+              "4": "7d6",
+              "5": "8d6",
+              "6": "9d6",
+              "7": "10d6",
+              "8": "11d6",
+              "9": "12d6"
+            }
+          }
+        ],
+        "school": {
+          "index": "evocation",
+          "name": "Evocation",
+          "url": "/api/2014/magic-schools/evocation"
+        },
+        "classes": [
+          {
+            "index": "cleric",
+            "name": "Cleric",
+            "url": "/api/2014/classes/cleric"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          }
+        ],
+        "url": "/api/2014/spells/guiding-bolt",
+        "updated_at": "2026-09-12T22:47:56.866Z"
+      }
+    },
+    "spells/healing-word": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/healing-word",
+      "sha256": "0c23ec446fefdae9dbb0f3de2c3bb1ffa1a8031273cfc6ae88c4b98088c8df98",
+      "source": {
+        "index": "healing-word",
+        "name": "Healing Word",
+        "desc": [
+          "A creature of your choice that you can see within range regains hit points equal to 1d4 + your spellcasting ability modifier. This spell has no effect on undead or constructs."
+        ],
+        "higher_level": [
+          "When you cast this spell using a spell slot of 2nd level or higher, the healing increases by 1d4 for each slot level above 1st."
+        ],
+        "range": "60 feet",
+        "components": [
+          "V"
+        ],
+        "ritual": false,
+        "duration": "Instantaneous",
+        "concentration": false,
+        "casting_time": "1 bonus action",
+        "level": 1,
+        "heal_at_slot_level": {
+          "1": "1d4 + MOD",
+          "2": "2d4 + MOD",
+          "3": "3d4 + MOD",
+          "4": "4d4 + MOD",
+          "5": "5d4 + MOD",
+          "6": "6d4 + MOD",
+          "7": "7d4 + MOD",
+          "8": "8d4 + MOD",
+          "9": "9d4 + MOD"
+        },
+        "school": {
+          "index": "evocation",
+          "name": "Evocation",
+          "url": "/api/2014/magic-schools/evocation"
+        },
+        "classes": [
+          {
+            "index": "bard",
+            "name": "Bard",
+            "url": "/api/2014/classes/bard"
+          },
+          {
+            "index": "cleric",
+            "name": "Cleric",
+            "url": "/api/2014/classes/cleric"
+          },
+          {
+            "index": "druid",
+            "name": "Druid",
+            "url": "/api/2014/classes/druid"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          }
+        ],
+        "url": "/api/2014/spells/healing-word",
+        "updated_at": "2026-04-01T20:35:39.217Z",
+        "damage": []
+      }
+    },
+    "spells/create-or-destroy-water": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/create-or-destroy-water",
+      "sha256": "ad2c2589530beec2324a21a55bfd3978e2b413025a9b1f23918540d079627589",
+      "source": {
+        "index": "create-or-destroy-water",
+        "name": "Create or Destroy Water",
+        "desc": [
+          "You either create or destroy water.",
+          "***Create Water.*** You create up to 10 gallons of clean water within range in an open container. Alternatively, the water falls as rain in a 30-foot cube within range.",
+          "***Destroy Water.*** You destroy up to 10 gallons of water in an open container within range. Alternatively, you destroy fog in a 30-foot cube within range."
+        ],
+        "higher_level": [
+          "When you cast this spell using a spell slot of 2nd level or higher, you create or destroy 10 additional gallons of water, or the size of the cube increases by 5 feet, for each slot level above 1st."
+        ],
+        "range": "30 feet",
+        "components": [
+          "V",
+          "S",
+          "M"
+        ],
+        "material": "A drop of water if creating water, or a few grains of sand if destroying it.",
+        "ritual": false,
+        "duration": "Instantaneous",
+        "concentration": false,
+        "casting_time": "1 action",
+        "level": 1,
+        "area_of_effect": {
+          "type": "cube",
+          "size": 30
+        },
+        "school": {
+          "index": "transmutation",
+          "name": "Transmutation",
+          "url": "/api/2014/magic-schools/transmutation"
+        },
+        "classes": [
+          {
+            "index": "cleric",
+            "name": "Cleric",
+            "url": "/api/2014/classes/cleric"
+          },
+          {
+            "index": "druid",
+            "name": "Druid",
+            "url": "/api/2014/classes/druid"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          }
+        ],
+        "url": "/api/2014/spells/create-or-destroy-water",
+        "updated_at": "2026-04-01T20:35:39.217Z",
+        "damage": []
+      }
+    },
+    "spells/thunderwave": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/thunderwave",
+      "sha256": "57fe5dd88f578c7a40c78cce48afa3146c7c2da430abcce592a92aa34e8bc5b7",
+      "source": {
+        "index": "thunderwave",
+        "name": "Thunderwave",
+        "desc": [
+          "A wave of thunderous force sweeps out from you. Each creature in a 15-foot cube originating from you must make a constitution saving throw. On a failed save, a creature takes 2d8 thunder damage and is pushed 10 feet away from you. On a successful save, the creature takes half as much damage and isn't pushed.",
+          "In addition, unsecured objects that are completely within the area of effect are automatically pushed 10 feet away from you by the spell's effect, and the spell emits a thunderous boom audible out to 300 feet."
+        ],
+        "higher_level": [
+          "When you cast this spell using a spell slot of 2nd level or higher, the damage increases by 1d8 for each slot level above 1st."
+        ],
+        "range": "Self",
+        "components": [
+          "V",
+          "S"
+        ],
+        "ritual": false,
+        "duration": "Instantaneous",
+        "concentration": false,
+        "casting_time": "1 action",
+        "level": 1,
+        "damage": [
+          {
+            "damage_type": {
+              "index": "thunder",
+              "name": "Thunder",
+              "url": "/api/2014/damage-types/thunder"
+            },
+            "damage_at_slot_level": {
+              "1": "2d8",
+              "2": "3d8",
+              "3": "4d8",
+              "4": "5d8",
+              "5": "6d8",
+              "6": "7d8",
+              "7": "8d8",
+              "8": "9d8",
+              "9": "10d8"
+            }
+          }
+        ],
+        "dc": {
+          "dc_type": {
+            "index": "con",
+            "name": "CON",
+            "url": "/api/2014/ability-scores/con"
+          },
+          "dc_success": "half"
+        },
+        "area_of_effect": {
+          "type": "cube",
+          "size": 15
+        },
+        "school": {
+          "index": "evocation",
+          "name": "Evocation",
+          "url": "/api/2014/magic-schools/evocation"
+        },
+        "classes": [
+          {
+            "index": "bard",
+            "name": "Bard",
+            "url": "/api/2014/classes/bard"
+          },
+          {
+            "index": "druid",
+            "name": "Druid",
+            "url": "/api/2014/classes/druid"
+          },
+          {
+            "index": "sorcerer",
+            "name": "Sorcerer",
+            "url": "/api/2014/classes/sorcerer"
+          },
+          {
+            "index": "wizard",
+            "name": "Wizard",
+            "url": "/api/2014/classes/wizard"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          }
+        ],
+        "url": "/api/2014/spells/thunderwave",
+        "updated_at": "2026-09-12T22:47:56.872Z"
+      }
+    },
+    "spells/disguise-self": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/disguise-self",
+      "sha256": "1524c42c7b37b30d9ee4b8a486637d0fcecbb5de46b56b4ebd6e8e0966f7dcd6",
+      "source": {
+        "higher_level": [],
+        "index": "disguise-self",
+        "name": "Disguise Self",
+        "desc": [
+          "You make yourself--including your clothing, armor, weapons, and other belongings on your person--look different until the spell ends or until you use your action to dismiss it. You can seem 1 foot shorter or taller and can appear thin, fat, or in between. You can't change your body type, so you must adopt a form that has the same basic arrangement of limbs. Otherwise, the extent of the illusion is up to you.",
+          "The changes wrought by this spell fail to hold up to physical inspection. For example, if you use this spell to add a hat to your outfit, objects pass through the hat, and anyone who touches it would feel nothing or would feel your head and hair. If you use this spell to appear thinner than you are, the hand of someone who reaches out to touch you would bump into you while it was seemingly still in midair.",
+          "To discern that you are disguised, a creature can use its action to inspect your appearance and must succeed on an Intelligence (Investigation) check against your spell save DC."
+        ],
+        "range": "Self",
+        "components": [
+          "V",
+          "S"
+        ],
+        "ritual": false,
+        "duration": "1 hour",
+        "concentration": false,
+        "casting_time": "1 action",
+        "level": 1,
+        "school": {
+          "index": "illusion",
+          "name": "Illusion",
+          "url": "/api/2014/magic-schools/illusion"
+        },
+        "classes": [
+          {
+            "index": "bard",
+            "name": "Bard",
+            "url": "/api/2014/classes/bard"
+          },
+          {
+            "index": "sorcerer",
+            "name": "Sorcerer",
+            "url": "/api/2014/classes/sorcerer"
+          },
+          {
+            "index": "wizard",
+            "name": "Wizard",
+            "url": "/api/2014/classes/wizard"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          }
+        ],
+        "url": "/api/2014/spells/disguise-self",
+        "updated_at": "2026-04-01T20:35:39.217Z",
+        "damage": []
+      }
+    },
+    "spells/speak-with-animals": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/speak-with-animals",
+      "sha256": "e3c60fa89a595d5cd6e49989ae4b48e127a5d59c3d831c5ae8817acd329a7918",
+      "source": {
+        "higher_level": [],
+        "index": "speak-with-animals",
+        "name": "Speak with Animals",
+        "desc": [
+          "You gain the ability to comprehend and verbally communicate with beasts for the duration. The knowledge and awareness of many beasts is limited by their intelligence, but at a minimum, beasts can give you information about nearby locations and monsters, including whatever they can perceive or have perceived within the past day. You might be able to persuade a beast to perform a small favor for you, at the GM's discretion."
+        ],
+        "range": "Self",
+        "components": [
+          "V",
+          "S"
+        ],
+        "ritual": true,
+        "duration": "10 minutes",
+        "concentration": false,
+        "casting_time": "1 action",
+        "level": 1,
+        "school": {
+          "index": "divination",
+          "name": "Divination",
+          "url": "/api/2014/magic-schools/divination"
+        },
+        "classes": [
+          {
+            "index": "bard",
+            "name": "Bard",
+            "url": "/api/2014/classes/bard"
+          },
+          {
+            "index": "druid",
+            "name": "Druid",
+            "url": "/api/2014/classes/druid"
+          },
+          {
+            "index": "ranger",
+            "name": "Ranger",
+            "url": "/api/2014/classes/ranger"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          }
+        ],
+        "url": "/api/2014/spells/speak-with-animals",
+        "updated_at": "2026-04-01T20:35:39.218Z",
+        "damage": []
+      }
+    },
+    "spells/mage-hand": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/mage-hand",
+      "sha256": "e5f5e1fb1e1fc814fb20b53ce1ba8658c6b11399bae421305156c8d09751ca8f",
+      "source": {
+        "higher_level": [],
+        "index": "mage-hand",
+        "name": "Mage Hand",
+        "desc": [
+          "A spectral, floating hand appears at a point you choose within range. The hand lasts for the duration or until you dismiss it as an action. The hand vanishes if it is ever more than 30 feet away from you or if you cast this spell again.",
+          "You can use your action to control the hand. You can use the hand to manipulate an object, open an unlocked door or container, stow or retrieve an item from an open container, or pour the contents out of a vial. You can move the hand up to 30 feet each time you use it.",
+          "The hand can't attack, activate magic items, or carry more than 10 pounds."
+        ],
+        "range": "30 feet",
+        "components": [
+          "V",
+          "S"
+        ],
+        "ritual": false,
+        "duration": "1 minute",
+        "concentration": false,
+        "casting_time": "1 action",
+        "level": 0,
+        "school": {
+          "index": "conjuration",
+          "name": "Conjuration",
+          "url": "/api/2014/magic-schools/conjuration"
+        },
+        "classes": [
+          {
+            "index": "bard",
+            "name": "Bard",
+            "url": "/api/2014/classes/bard"
+          },
+          {
+            "index": "sorcerer",
+            "name": "Sorcerer",
+            "url": "/api/2014/classes/sorcerer"
+          },
+          {
+            "index": "warlock",
+            "name": "Warlock",
+            "url": "/api/2014/classes/warlock"
+          },
+          {
+            "index": "wizard",
+            "name": "Wizard",
+            "url": "/api/2014/classes/wizard"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          }
+        ],
+        "url": "/api/2014/spells/mage-hand",
+        "updated_at": "2026-04-01T20:35:39.217Z",
+        "damage": []
+      }
+    },
+    "spells/mending": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/mending",
+      "sha256": "f3e52a4d952c0b746a693f83ddb346b27cc72e67a36cd5681f01cd0bcc21fb44",
+      "source": {
+        "higher_level": [],
+        "index": "mending",
+        "name": "Mending",
+        "desc": [
+          "This spell repairs a single break or tear in an object you touch, such as a broken key, a torn cloak, or a leaking wineskin. As long as the break or tear is no longer than 1 foot in any dimension, you mend it, leaving no trace of the former damage.",
+          "This spell can physically repair a magic item or construct, but the spell can't restore magic to such an object."
+        ],
+        "range": "Touch",
+        "components": [
+          "V",
+          "S",
+          "M"
+        ],
+        "material": "Two lodestones.",
+        "ritual": false,
+        "duration": "Instantaneous",
+        "concentration": false,
+        "casting_time": "1 minute",
+        "level": 0,
+        "school": {
+          "index": "transmutation",
+          "name": "Transmutation",
+          "url": "/api/2014/magic-schools/transmutation"
+        },
+        "classes": [
+          {
+            "index": "cleric",
+            "name": "Cleric",
+            "url": "/api/2014/classes/cleric"
+          },
+          {
+            "index": "bard",
+            "name": "Bard",
+            "url": "/api/2014/classes/bard"
+          },
+          {
+            "index": "druid",
+            "name": "Druid",
+            "url": "/api/2014/classes/druid"
+          },
+          {
+            "index": "sorcerer",
+            "name": "Sorcerer",
+            "url": "/api/2014/classes/sorcerer"
+          },
+          {
+            "index": "wizard",
+            "name": "Wizard",
+            "url": "/api/2014/classes/wizard"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          }
+        ],
+        "url": "/api/2014/spells/mending",
+        "updated_at": "2026-04-01T20:35:39.217Z",
+        "damage": []
+      }
+    },
+    "spells/acid-splash": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/acid-splash",
+      "sha256": "62279ad2c881c14b00353bb12400f132b69d78e36f6d891da4b78b4d501df304",
+      "source": {
+        "higher_level": [],
+        "index": "acid-splash",
+        "name": "Acid Splash",
+        "desc": [
+          "You hurl a bubble of acid. Choose one creature within range, or choose two creatures within range that are within 5 feet of each other. A target must succeed on a dexterity saving throw or take 1d6 acid damage.",
+          "This spell's damage increases by 1d6 when you reach 5th level (2d6), 11th level (3d6), and 17th level (4d6)."
+        ],
+        "range": "60 feet",
+        "components": [
+          "V",
+          "S"
+        ],
+        "ritual": false,
+        "duration": "Instantaneous",
+        "concentration": false,
+        "casting_time": "1 action",
+        "level": 0,
+        "damage": [
+          {
+            "damage_type": {
+              "index": "acid",
+              "name": "Acid",
+              "url": "/api/2014/damage-types/acid"
+            },
+            "damage_at_character_level": {
+              "1": "1d6",
+              "5": "2d6",
+              "11": "3d6",
+              "17": "4d6"
+            }
+          }
+        ],
+        "dc": {
+          "dc_type": {
+            "index": "dex",
+            "name": "DEX",
+            "url": "/api/2014/ability-scores/dex"
+          },
+          "dc_success": "none"
+        },
+        "school": {
+          "index": "conjuration",
+          "name": "Conjuration",
+          "url": "/api/2014/magic-schools/conjuration"
+        },
+        "classes": [
+          {
+            "index": "sorcerer",
+            "name": "Sorcerer",
+            "url": "/api/2014/classes/sorcerer"
+          },
+          {
+            "index": "wizard",
+            "name": "Wizard",
+            "url": "/api/2014/classes/wizard"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          }
+        ],
+        "url": "/api/2014/spells/acid-splash",
+        "updated_at": "2026-09-12T22:47:56.860Z"
+      }
+    },
+    "features/bardic-inspiration-d8": {
+      "url": "https://www.dnd5eapi.co/api/2014/features/bardic-inspiration-d8",
+      "sha256": "c07705980c754873d90e446f6a23a93a235d11486fb8d6314536bb2cf0848205",
+      "source": {
+        "index": "bardic-inspiration-d8",
+        "class": {
+          "index": "bard",
+          "name": "Bard",
+          "url": "/api/2014/classes/bard"
+        },
+        "name": "Bardic Inspiration (d8)",
+        "level": 5,
+        "prerequisites": [],
+        "desc": [
+          "You can inspire others through stirring words or music. To do so, you use a bonus action on your turn to choose one creature other than yourself within 60 feet of you who can hear you. That creature gains one Bardic Inspiration die, a d6. Once within the next 10 minutes, the creature can roll the die and add the number rolled to one ability check, attack roll, or saving throw it makes. The creature can wait until after it rolls the d20 before deciding to use the Bardic Inspiration die, but must decide before the GM says whether the roll succeeds or fails. Once the Bardic Inspiration die is rolled, it is lost. A creature can have only one Bardic Inspiration die at a time.",
+          "You can use this feature a number of times equal to your Charisma modifier (a minimum of once). You regain any expended uses when you finish a long rest. ",
+          "Your Bardic Inspiration die changes when you reach certain levels in this class. The die becomes a d8 at 5th level, a d10 at 10th level, and a d12 at 15th level."
+        ],
+        "url": "/api/2014/features/bardic-inspiration-d8",
+        "updated_at": "2026-04-01T20:35:37.430Z"
+      }
+    },
+    "features/channel-divinity-preserve-life": {
+      "url": "https://www.dnd5eapi.co/api/2014/features/channel-divinity-preserve-life",
+      "sha256": "f731487931a02220ab1cf0be319b726b07ce3f6e001092782d3fed69ebb67348",
+      "source": {
+        "index": "channel-divinity-preserve-life",
+        "class": {
+          "index": "cleric",
+          "name": "Cleric",
+          "url": "/api/2014/classes/cleric"
+        },
+        "subclass": {
+          "index": "life",
+          "name": "Life",
+          "url": "/api/2014/subclasses/life"
+        },
+        "name": "Channel Divinity: Preserve Life",
+        "level": 2,
+        "prerequisites": [],
+        "desc": [
+          "Starting at 2nd level, you can use your Channel Divinity to heal the badly injured.",
+          "As an action, you present your holy symbol and evoke healing energy that can restore a number of hit points equal to five times your cleric level.",
+          "Choose any creatures within 30 feet of you, and divide those hit points among them. This feature can restore a creature to no more than half of its hit point maximum. You can't use this feature on an undead or a construct."
+        ],
+        "url": "/api/2014/features/channel-divinity-preserve-life",
+        "updated_at": "2026-04-01T20:35:37.430Z"
+      }
+    },
+    "features/channel-divinity-turn-undead": {
+      "url": "https://www.dnd5eapi.co/api/2014/features/channel-divinity-turn-undead",
+      "sha256": "09c0e043452a71b289a057d40acda9e68631de97d10041706f346f746cf89242",
+      "source": {
+        "index": "channel-divinity-turn-undead",
+        "class": {
+          "index": "cleric",
+          "name": "Cleric",
+          "url": "/api/2014/classes/cleric"
+        },
+        "name": "Channel Divinity: Turn Undead",
+        "level": 2,
+        "prerequisites": [],
+        "desc": [
+          "As an action, you present your holy symbol and speak a prayer censuring the undead. Each undead that can see or hear you within 30 feet of you must make a Wisdom saving throw. If the creature fails its saving throw, it is turned for 1 minute or until it takes any damage.",
+          "A turned creature must spend its turns trying to move as far away from you as it can, and it can't willingly move to a space within 30 feet of you. It also can't take reactions. For its action, it can use only the Dash action or try to escape from an effect that prevents it from moving. If there's nowhere to move, the creature can use the Dodge action."
+        ],
+        "url": "/api/2014/features/channel-divinity-turn-undead",
+        "updated_at": "2026-04-01T20:35:37.430Z"
+      }
+    },
+    "features/destroy-undead-cr-1-2-or-below": {
+      "url": "https://www.dnd5eapi.co/api/2014/features/destroy-undead-cr-1-2-or-below",
+      "sha256": "e9405e3c02b341960384a3ed6b04a8bccf150eb18d0bf937b3aa735d892d6322",
+      "source": {
+        "index": "destroy-undead-cr-1-2-or-below",
+        "class": {
+          "index": "cleric",
+          "name": "Cleric",
+          "url": "/api/2014/classes/cleric"
+        },
+        "name": "Destroy Undead (CR 1/2 or below)",
+        "level": 5,
+        "prerequisites": [],
+        "desc": [
+          "Starting at 5th level, when an undead fails its saving throw against your Turn Undead feature, the creature is instantly destroyed if its challenge rating is at or below a certain threshold."
+        ],
+        "url": "/api/2014/features/destroy-undead-cr-1-2-or-below",
+        "updated_at": "2026-04-01T20:35:37.430Z"
+      }
+    },
+    "spells/aid": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/aid",
+      "sha256": "c2bf9c9768f3b5a203b2afe4e9a5a074cdfbc515a49f704978ea7f62c120bc61",
+      "source": {
+        "index": "aid",
+        "name": "Aid",
+        "desc": [
+          "Your spell bolsters your allies with toughness and resolve. Choose up to three creatures within range. Each target's hit point maximum and current hit points increase by 5 for the duration."
+        ],
+        "higher_level": [
+          "When you cast this spell using a spell slot of 3rd level or higher, a target's hit points increase by an additional 5 for each slot level above 2nd."
+        ],
+        "range": "30 feet",
+        "components": [
+          "V",
+          "S",
+          "M"
+        ],
+        "material": "A tiny strip of white cloth.",
+        "ritual": false,
+        "duration": "8 hours",
+        "concentration": false,
+        "casting_time": "1 action",
+        "level": 2,
+        "heal_at_slot_level": {
+          "2": "5",
+          "3": "10",
+          "4": "15",
+          "5": "20",
+          "6": "25",
+          "7": "30",
+          "8": "35",
+          "9": "40"
+        },
+        "school": {
+          "index": "abjuration",
+          "name": "Abjuration",
+          "url": "/api/2014/magic-schools/abjuration"
+        },
+        "classes": [
+          {
+            "index": "cleric",
+            "name": "Cleric",
+            "url": "/api/2014/classes/cleric"
+          },
+          {
+            "index": "paladin",
+            "name": "Paladin",
+            "url": "/api/2014/classes/paladin"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          }
+        ],
+        "url": "/api/2014/spells/aid",
+        "updated_at": "2026-04-01T20:35:39.217Z",
+        "damage": []
+      }
+    },
+    "spells/protection-from-poison": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/protection-from-poison",
+      "sha256": "15a94dfc89396afa0be79fba042a481adecc5be56ba2d20872a5697ce98f695e",
+      "source": {
+        "higher_level": [],
+        "index": "protection-from-poison",
+        "name": "Protection from Poison",
+        "desc": [
+          "You touch a creature. If it is poisoned, you neutralize the poison. If more than one poison afflicts the target, you neutralize one poison that you know is present, or you neutralize one at random.",
+          "For the duration, the target has advantage on saving throws against being poisoned, and it has resistance to poison damage."
+        ],
+        "range": "Touch",
+        "components": [
+          "V",
+          "S"
+        ],
+        "ritual": false,
+        "duration": "1 hour",
+        "concentration": false,
+        "casting_time": "1 action",
+        "level": 2,
+        "school": {
+          "index": "abjuration",
+          "name": "Abjuration",
+          "url": "/api/2014/magic-schools/abjuration"
+        },
+        "classes": [
+          {
+            "index": "cleric",
+            "name": "Cleric",
+            "url": "/api/2014/classes/cleric"
+          },
+          {
+            "index": "druid",
+            "name": "Druid",
+            "url": "/api/2014/classes/druid"
+          },
+          {
+            "index": "paladin",
+            "name": "Paladin",
+            "url": "/api/2014/classes/paladin"
+          },
+          {
+            "index": "ranger",
+            "name": "Ranger",
+            "url": "/api/2014/classes/ranger"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          }
+        ],
+        "url": "/api/2014/spells/protection-from-poison",
+        "updated_at": "2026-04-01T20:35:39.217Z",
+        "damage": []
+      }
+    },
+    "spells/blindness-deafness": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/blindness-deafness",
+      "sha256": "2cf6305373ae3376fa80afd3aaab8b041380493d18b813d986d83ac980a1d3ee",
+      "source": {
+        "index": "blindness-deafness",
+        "name": "Blindness/Deafness",
+        "desc": [
+          "You can blind or deafen a foe. Choose one creature that you can see within range to make a constitution saving throw. If it fails, the target is either blinded or deafened (your choice) for the duration. At the end of each of its turns, the target can make a constitution saving throw. On a success, the spell ends."
+        ],
+        "higher_level": [
+          "When you cast this spell using a spell slot of 3rd level or higher, you can target one additional creature for each slot level above 2nd."
+        ],
+        "range": "30 feet",
+        "components": [
+          "V"
+        ],
+        "ritual": false,
+        "duration": "1 minute",
+        "concentration": false,
+        "casting_time": "1 action",
+        "level": 2,
+        "dc": {
+          "dc_type": {
+            "index": "con",
+            "name": "CON",
+            "url": "/api/2014/ability-scores/con"
+          },
+          "dc_success": "none"
+        },
+        "school": {
+          "index": "necromancy",
+          "name": "Necromancy",
+          "url": "/api/2014/magic-schools/necromancy"
+        },
+        "classes": [
+          {
+            "index": "bard",
+            "name": "Bard",
+            "url": "/api/2014/classes/bard"
+          },
+          {
+            "index": "cleric",
+            "name": "Cleric",
+            "url": "/api/2014/classes/cleric"
+          },
+          {
+            "index": "sorcerer",
+            "name": "Sorcerer",
+            "url": "/api/2014/classes/sorcerer"
+          },
+          {
+            "index": "wizard",
+            "name": "Wizard",
+            "url": "/api/2014/classes/wizard"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          },
+          {
+            "index": "fiend",
+            "name": "Fiend",
+            "url": "/api/2014/subclasses/fiend"
+          }
+        ],
+        "url": "/api/2014/spells/blindness-deafness",
+        "updated_at": "2026-04-01T20:35:39.217Z",
+        "damage": []
+      }
+    }
+  }
+}

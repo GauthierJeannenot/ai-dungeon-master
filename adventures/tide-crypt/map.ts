@@ -1,9 +1,9 @@
+import { TIDE_CRYPT_SOCIAL } from './social'
 import type {
   AdventureRoom,
   AdventureMapData,
   EncounterDefinition,
   AdventureNpcSpec,
-  AdventureTransition,
   GridCell,
 } from '../../lib/adventure-map'
 
@@ -20,7 +20,7 @@ import type {
 // Grille : 17 colonnes (x:0-16) × 15 rangées (y:0-14) — mêmes bornes que
 // MAP_BOUNDS du moteur (mcp-server/rules.ts).
 // Types de monstres : uniquement des types existants du moteur
-// (wolf, bandit, skeleton, zombie, hobgoblin_captain) avec reskin par `name`.
+// (wolf, bandit, skeleton, zombie, wight, ghost) avec apparence par `name`.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const TIDE_CRYPT_ID = 'tide-crypt'
@@ -109,8 +109,8 @@ export const TIDE_CRYPT_ENCOUNTERS: Record<string, EncounterDefinition> = {
     name: 'Le Gardien Noyé',
     playerCell: { x: 8, y: 4 },
     monsters: [
-      // hobgoblin_captain (52 HP de base) retaillé pour un héros niveau 2 seul.
-      { monsterType: 'hobgoblin_captain', cell: { x: 8, y: 2 }, name: 'Le Gardien Noyé', hpOverride: 33 },
+      // Wight SRD 2014 : véritable mort-vivant, sans réduction de PV.
+      { monsterType: 'wight', cell: { x: 8, y: 2 }, name: 'Le Gardien Noyé' },
       { monsterType: 'zombie', cell: { x: 10, y: 2 }, name: 'Noyé de la chapelle' },
     ],
   },
@@ -120,6 +120,7 @@ export const TIDE_CRYPT_ENCOUNTERS: Record<string, EncounterDefinition> = {
 export const TIDE_CRYPT_NPCS: AdventureNpcSpec[] = [
   {
     id: 'mael',
+    statBlock: 'commoner',
     name: 'Maël',
     kind: 'hermit',
     roomId: '1',
@@ -130,6 +131,12 @@ export const TIDE_CRYPT_NPCS: AdventureNpcSpec[] = [
   },
   {
     id: 'guardian_echo',
+    statBlock: 'ghost',
+    reactive: {
+      objectives: ['Veiller sur le tombeau et protéger la Flamme.', 'Privilégier le dialogue ; approcher un profanateur avant de décider explicitement un combat.'],
+      capabilities: ['move', 'initiate_combat', 'attack'], speed: 30,
+      combatTemplate: 'ghost', triggers: ['after_player_action', 'turn_start'],
+    },
     name: 'Écho de la Gardienne',
     kind: 'ghost',
     roomId: '8',
@@ -138,38 +145,6 @@ export const TIDE_CRYPT_NPCS: AdventureNpcSpec[] = [
     visibleFromStart: false,
     description: "Silhouette d'eau et de lumière — le souvenir de Morgane, première Gardienne des Marées.",
   },
-]
-
-export const TIDE_CRYPT_NAMED_LOCATION_CELLS: Array<{ id: string; pattern: RegExp; cell: GridCell }> = [
-  { id: 'mael', pattern: /\b(mael|maël|gardien du phare|vieux gardien|ermite)\b/, cell: { x: 12, y: 13 } },
-]
-
-export const TIDE_CRYPT_ROOM_NAVIGATION_ALIASES: Array<{ roomId: string; pattern: RegExp }> = [
-  { roomId: '2', pattern: /\b(phare|tour|lanterne du phare)\b/ },
-  { roomId: '3', pattern: /\b(epave|épave|sirene|sirène|carcasse|navire|bateau)\b/ },
-  { roomId: '4', pattern: /\b(passage|chaussee|chaussée|marees?|marées?|gue|gué)\b/ },
-  { roomId: '5', pattern: /\b(antichambre|salle engloutie|entree de la crypte|entrée de la crypte)\b/ },
-  { roomId: '6', pattern: /\b(ossuaire|niches?|ossements|tombes? des marins)\b/ },
-  { roomId: '7', pattern: /\b(cloches?|carillon|salle des cloches)\b/ },
-  { roomId: '8', pattern: /\b(chapelle|gardienne|tombeau|autel)\b/ },
-  { roomId: '1', pattern: /\b(greve|grève|plage|dehors|exterieur|extérieur|sortie|sable)\b/ },
-]
-
-export const TIDE_CRYPT_DOOR_TRANSITIONS: AdventureTransition[] = [
-  { fromRoomId: '1', toRoomId: '4' },
-  { fromRoomId: '1', toRoomId: '2', pattern: /\b(phare|tour)\b/ },
-  { fromRoomId: '1', toRoomId: '3', pattern: /\b(epave|épave|navire|bateau)\b/ },
-  { fromRoomId: '4', toRoomId: '5' },
-  { fromRoomId: '5', toRoomId: '6', pattern: /\b(ossuaire|gauche|ouest|niches?)\b/ },
-  { fromRoomId: '5', toRoomId: '7', pattern: /\b(cloches?|droite|est)\b/ },
-  { fromRoomId: '5', toRoomId: '8' },
-  { fromRoomId: '5', toRoomId: '4', pattern: /\b(sortie|remonte|retour|arriere|arrière)\b/ },
-]
-
-export const TIDE_CRYPT_FORWARD_TRANSITIONS: AdventureTransition[] = [
-  { fromRoomId: '1', toRoomId: '4' },
-  { fromRoomId: '4', toRoomId: '5' },
-  { fromRoomId: '5', toRoomId: '8' },
 ]
 
 // Accroches mécaniques par salle, injectées dans le prompt dynamique du DM.
@@ -225,9 +200,8 @@ export function describeTideCryptRoomHooks(roomId: string | null | undefined): s
 }
 
 // Agrégat consommé par le registre lib/adventure-map.ts (getAdventureMap).
-// La crypte n'a pas d'alias de contexte dédiés → roomContextAliases vide (le
-// moteur retombe alors sur roomNavigationAliases).
 export const TIDE_CRYPT_MAP: AdventureMapData = {
+  social: TIDE_CRYPT_SOCIAL,
   // Aventure 1-map : toutes les salles vivent sur la map unique (mapId implicite).
   maps: [{ id: 'shore', name: 'La grève et la crypte', grid: { cols: 17, rows: 15 } }],
   mapQuests: {},
@@ -245,10 +219,5 @@ export const TIDE_CRYPT_MAP: AdventureMapData = {
   entryCells: TIDE_CRYPT_ENTRY_CELLS,
   encounters: TIDE_CRYPT_ENCOUNTERS,
   npcs: TIDE_CRYPT_NPCS,
-  namedLocationCells: TIDE_CRYPT_NAMED_LOCATION_CELLS,
-  roomNavigationAliases: TIDE_CRYPT_ROOM_NAVIGATION_ALIASES,
-  roomContextAliases: [],
-  doorTransitions: TIDE_CRYPT_DOOR_TRANSITIONS,
-  forwardTransitions: TIDE_CRYPT_FORWARD_TRANSITIONS,
   roomHooks: TIDE_CRYPT_ROOM_HOOKS,
 }

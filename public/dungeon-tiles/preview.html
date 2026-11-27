@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="fr">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Donjons au crayon · Atelier du MJ</title>
+<style>
+  *{box-sizing:border-box}body{margin:0;background:#f5f3ee;color:#292a28;font:16px/1.55 system-ui,sans-serif}
+  main{max-width:1120px;margin:auto;padding:40px 24px}small{letter-spacing:.16em;text-transform:uppercase;color:#72746b}
+  h1{font:clamp(2rem,5vw,3.5rem)/1.1 Georgia,serif;margin:12px 0 18px}p{max-width:720px;color:#61625b}
+  form{display:flex;gap:12px;flex-wrap:wrap;align-items:end;margin:28px 0}label{display:grid;gap:4px;font-size:13px}
+  input,button{font:inherit;border:1px solid #c9c8bd;border-radius:6px;padding:10px;background:#fff;color:inherit}
+  input[type=number]{width:85px}button{cursor:pointer;background:#333b32;color:white}button.secondary{background:white;color:#333b32}
+  .paper{background:white;border:1px solid #ddddd4;border-radius:8px;overflow:hidden;box-shadow:0 8px 28px #2828180a}
+  canvas{display:block;width:100%;height:auto}#status{font-size:14px;min-height:22px}.kit{display:flex;gap:12px;flex-wrap:wrap;margin:20px 0}
+  figure{margin:0;width:calc(16.66% - 10px);min-width:110px}figure img{width:100%;background:white;border:1px solid #ddddd4;border-radius:6px}
+  figcaption{font-size:12px;text-align:center;color:#66685d}a{color:#354d35}footer{font-size:13px;margin-top:28px;color:#73756b}
+</style>
+<main>
+  <small>Atelier du maître du jeu</small>
+  <h1>Un donjon, quelques coups de crayon.</h1>
+  <p>Six tuiles dessinées au crayon à mine, assemblées par leurs ouvertures. Change la graine pour explorer un autre plan ou garde-la pour retrouver le même donjon.</p>
+  <form id="controls">
+    <label>Graine<input id="seed" value="crayon-01" maxlength="80" required></label>
+    <label>Tuiles<input id="count" type="number" min="5" max="49" value="24" required></label>
+    <button type="submit">Assembler</button>
+    <button type="button" id="random" class="secondary">Autre donjon</button>
+    <button type="button" id="png" class="secondary">Exporter le PNG</button>
+    <button type="button" id="json" class="secondary">Exporter le plan JSON</button>
+  </form>
+  <p id="status" role="status" aria-live="polite">Chargement des tuiles…</p>
+  <div class="paper"><canvas id="map" width="1792" height="1792" aria-label="Plan du donjon assemblé"></canvas></div>
+  <h2>Les six pièces du jeu</h2><div class="kit" id="kit"></div>
+  <footer>La salle centrale et tous les passages sont reliés. Aucune ouverture ne débouche dans le vide. Les deux repères indiquent l’entrée et l’objectif suggérés.<br>Ce plan sert à préparer une aventure ; il ne remplace pas la carte mécanique d’une session en cours. <a href="manifest.json">Catalogue des tuiles</a>.</footer>
+</main>
+<script src="layout.js"></script>
+<script>
+  const canvas = document.getElementById('map'), ctx = canvas.getContext('2d')
+  const status = document.getElementById('status'), seed = document.getElementById('seed'), count = document.getElementById('count')
+  let manifest, images, plan
+  const load = url => new Promise((resolve,reject) => { const image = new Image(); image.onload=()=>resolve(image); image.onerror=()=>reject(new Error('Image absente : '+url)); image.src=url })
+  const download = (blob,name) => { const url=URL.createObjectURL(blob), a=document.createElement('a'); a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000) }
+  function render() {
+    try {
+      const dimensions = new URLSearchParams(location.search)
+      plan = DungeonTiles.generate(manifest,{seed:seed.value,count:Number(count.value),
+        width:Number(dimensions.get('width')||7),height:Number(dimensions.get('height')||7)})
+      const size=256
+      canvas.width=plan.width*size;canvas.height=plan.height*size;count.max=String(plan.width*plan.height)
+      ctx.fillStyle='white';ctx.fillRect(0,0,canvas.width,canvas.height)
+      for(const tile of plan.tiles){
+        ctx.save();ctx.translate((tile.x+.5)*size,(tile.y+.5)*size);ctx.rotate(tile.rotation*Math.PI/180)
+        ctx.drawImage(images.get(tile.tileId),-size/2,-size/2,size,size);ctx.restore()
+      }
+      for(const [point,label] of [[plan.entrance,'E'],[plan.objective,'O']]){
+        const x=(point.x+.5)*size,y=(point.y+.5)*size
+        ctx.beginPath();ctx.arc(x,y,20,0,Math.PI*2);ctx.fillStyle='#343d33';ctx.fill()
+        ctx.fillStyle='white';ctx.font='bold 23px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(label,x,y)
+      }
+      status.textContent=plan.tiles.length+' tuiles reliées · Entrée E · Objectif O · Graine : '+plan.seed
+      const url=new URL(location.href);url.searchParams.set('seed',plan.seed);url.searchParams.set('count',String(plan.tiles.length));history.replaceState(null,'',url)
+    }catch(error){status.textContent=error.message}
+  }
+  document.getElementById('controls').addEventListener('submit',event=>{event.preventDefault();if(images)render()})
+  document.getElementById('random').onclick=()=>{seed.value='crayon-'+crypto.getRandomValues(new Uint32Array(1))[0].toString(36);if(images)render()}
+  document.getElementById('png').onclick=()=>{if(plan)canvas.toBlob(blob=>{if(blob)download(blob,'donjon.png')},'image/png')}
+  document.getElementById('json').onclick=()=>{if(plan)download(new Blob([JSON.stringify(plan,null,2)],{type:'application/json'}),'donjon.json')}
+  ;(async()=>{
+    try{
+      const response=await fetch('manifest.json');if(!response.ok)throw new Error('Catalogue de tuiles indisponible.')
+      manifest=await response.json();images=new Map(await Promise.all(manifest.tiles.map(async tile=>[tile.id,await load(tile.file)])))
+      for(const tile of manifest.tiles){const figure=document.createElement('figure'),img=document.createElement('img'),caption=document.createElement('figcaption');img.src=tile.file;img.alt=tile.label;caption.textContent=tile.label;figure.append(img,caption);document.getElementById('kit').append(figure)}
+      const params=new URLSearchParams(location.search);if(params.has('seed'))seed.value=params.get('seed');if(params.has('count'))count.value=params.get('count')
+      render()
+    }catch(error){status.textContent=error.message}
+  })()
+</script>
+</html>

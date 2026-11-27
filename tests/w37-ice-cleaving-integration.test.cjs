@@ -1,0 +1,82 @@
+// SOURCE DRAFT ONLY. Copy this exact file to tests/ in the future merged W37 candidate.
+// No syntax/runtime result is claimed before the parent's coordinated validation slot.
+const test=require('node:test'),assert=require('node:assert/strict')
+Object.assign(process.env,{MONETIZATION_ENABLED:'false',LLM_MODE:'mock',ALLOW_PAID_LLM:'false',DM_RATE_LIMIT_PER_MINUTE:'0',APP_LOG_PERSIST_ENABLED:'false',APP_LOG_LEVEL:'error'})
+const {installPgMem}=require('./helpers/pg-mem.cjs'),pg=installPgMem()
+const {engine,ok}=require('./helpers/mcp-toolkit.cjs')
+const {prepareForcedIce,resolveIce}=require('./helpers/forced-ice-fixture.cjs')
+const {prepareCleavingAtCurrentSite,persistCleaving}=require('./helpers/cleaving-fixture.cjs')
+test.after(()=>pg.restore())
+
+test('a true Aside ice entry and explicit prone resolution preserve a full-HP origin for the remaining Extra Attack Cleaving, then explicit carry/stop survive SQL and replay',async t=>{
+ // Four source stages: initiative(player/bandit/goblin), Aside DIS/opposition,
+ // forced ice DEX failure. The future attack is rolled only by the new real process.
+ const call=await engine(t,{characterId:'fighter',dice:'20,1,1,20,19,1,1,17'})
+ // Prepare the secondary FIRST: the ice helper then selects a still-free pair,
+ // rather than spawning a creature into the later chosen forced destination.
+ const c=await prepareCleavingAtCurrentSite(call,{types:['goblin']}),secondary=c.targets[0]
+ const f=await prepareForcedIce(call,{id:'cross-ice-cleaving'})
+ ok(await call('enter_combat',{combatants:['player',f.target.id,secondary.id],tieOrder:['player',f.target.id,secondary.id]}))
+ const before=await call('get_game_state'),originBefore=before.monsters[f.target.id]
+ assert.equal(originBefore.hp.current,originBefore.hp.max);assert.equal(originBefore.hp.max,11)
+ assert.equal(before.monsters[secondary.id].hp.current,7)
+ const shoved=ok(await call('combat_action',f.input))
+ assert.equal(shoved.success,true);assert.ok(shoved.slipperyIceContactId)
+ assert.deepEqual(shoved.check.roll.rolls,[19]);assert.match(shoved.check.roll.detail,/DIS/)
+ assert.deepEqual(shoved.opposition.roll.rolls,[1])
+ const paid=await call('get_game_state')
+ assert.deepEqual(paid.monsters[f.target.id].position,f.toCell)
+ assert.deepEqual(paid.monsters[f.target.id].hp,originBefore.hp)
+ assert.equal(paid.hero.actionCredits,0);assert.equal(paid.hero.attackAction.used,1);assert.equal(paid.hero.attackAction.remaining,1)
+ // The agent must choose the actual contact before adopting another attack.
+ const input={targetId:f.target.id,weaponOrSpell:'longsword',cleaving:true}
+ const blocked=await call('resolve_player_attack',input)
+ assert.equal(blocked.code,'GROUND_GEAR_CONTACT_DUE',JSON.stringify(blocked))
+ assert.deepEqual(await call('get_game_state'),paid)
+ const ice=ok(await resolveIce(call,shoved.slipperyIceContactId))
+ assert.equal(ice.contactResults[0].check.success,false);assert.equal(ice.contactResults[0].check.dc,10)
+ assert.deepEqual(ice.contactResults[0].check.roll.rolls,[1])
+ const ready=await call('get_game_state')
+ assert.ok(ready.monsters[f.target.id].conditions.includes('prone'))
+ assert.deepEqual(ready.monsters[f.target.id].hp,originBefore.hp)
+ assert.deepEqual(ready.hero.attackAction,paid.hero.attackAction)
+ assert.deepEqual(ready.movementUsed,before.movementUsed);assert.equal(ready.worldTimeSeconds,before.worldTimeSeconds)
+ const asideReceipt=structuredClone(ready.dmTools.shoveAside.attempts[shoved.shoveAsideId])
+ const contactReceipt=structuredClone(ready.dmTools.groundGear.contacts[shoved.slipperyIceContactId])
+ const fresh=await persistCleaving(t,call,'20,19,8,8,17')
+ assert.equal(ok(await resolveIce(fresh,shoved.slipperyIceContactId)).replayed,true)
+ assert.deepEqual(await fresh('get_game_state'),ready)
+ const attack=ok(await fresh('resolve_player_attack',input))
+ assert.equal(attack.hit,true);assert.equal(attack.criticalHit,true);assert.equal(attack.naturalRoll,20)
+ assert.match(attack.attackRoll.detail,/ADV/);assert.equal(attack.damageRoll.total,22)
+ assert.equal(attack.cleaving.remainingDamage,11)
+ const attacked=await fresh('get_game_state')
+ assert.equal(attacked.hero.actionCredits,0);assert.equal(attacked.hero.attackAction.id,paid.hero.attackAction.id)
+ assert.equal(attacked.hero.attackAction.used,2);assert.equal(attacked.hero.attackAction.remaining,0)
+ assert.equal(attacked.monsters[f.target.id].hp.current,0)
+ assert.equal(attacked.monsters[secondary.id].hp.current,7)
+ await persistCleaving(t,fresh)
+ const carryInput={cleaveId:attack.cleaving.cleaveId,stepId:'cross-explicit-carry',choice:'carry',targetId:secondary.id}
+ const carry=ok(await fresh('resolve_cleaving',carryInput))
+ assert.equal(carry.hit,true);assert.deepEqual(carry.originalAttackRoll,attack.attackRoll)
+ assert.equal(carry.newAttackOrDamageDiceRolled,false);assert.equal(carry.damageResolution.rawDamage,11)
+ assert.equal(carry.targetHpAfter,0);assert.equal(carry.remainingAfter,4);assert.equal(carry.status,'awaiting_choice')
+ const stopInput={cleaveId:carry.cleaveId,stepId:'cross-explicit-stop',choice:'stop'}
+ const stop=ok(await fresh('resolve_cleaving',stopInput))
+ assert.equal(stop.status,'closed');assert.equal(stop.discardedDamage,4)
+ const after=await fresh('get_game_state')
+ assert.deepEqual(after.hero.attackAction,attacked.hero.attackAction)
+ assert.equal(after.hero.actionCredits,0);assert.deepEqual(after.bonusActionUsed,before.bonusActionUsed)
+ assert.deepEqual(after.player.hp,before.player.hp);assert.deepEqual(after.player.resources,before.player.resources)
+ assert.deepEqual(after.player.spellSlots,before.player.spellSlots);assert.deepEqual(after.hero.hitDice,before.hero.hitDice)
+ assert.deepEqual(after.movementUsed,before.movementUsed);assert.equal(after.worldTimeSeconds,before.worldTimeSeconds)
+ assert.deepEqual(after.dmTools.shoveAside.attempts[shoved.shoveAsideId],asideReceipt)
+ assert.deepEqual(after.dmTools.groundGear.contacts[shoved.slipperyIceContactId],contactReceipt)
+ const restored=await persistCleaving(t,fresh)
+ assert.equal(ok(await resolveIce(restored,shoved.slipperyIceContactId)).replayed,true)
+ assert.equal(ok(await restored('resolve_cleaving',carryInput)).replayed,true)
+ assert.equal(ok(await restored('resolve_cleaving',stopInput)).replayed,true)
+ assert.deepEqual(await restored('get_game_state'),after)
+ // Check the process that performed the real second attack/carry/stop: no carry dice.
+ assert.equal(ok(await fresh('roll_dice',{notation:'1d20'})).total,17)
+})

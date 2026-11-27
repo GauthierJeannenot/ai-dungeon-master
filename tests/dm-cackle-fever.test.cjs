@@ -1,0 +1,18 @@
+const test=require('node:test'),assert=require('node:assert/strict')
+Object.assign(process.env,{MONETIZATION_ENABLED:'false',LLM_MODE:'mock',ALLOW_PAID_LLM:'false',DM_RATE_LIMIT_PER_MINUTE:'0',APP_LOG_PERSIST_ENABLED:'false',APP_LOG_LEVEL:'error'})
+const{installPgMem}=require('./helpers/pg-mem.cjs'),pg=installPgMem()
+const{ok}=require('./helpers/mcp-toolkit.cjs')
+const{setupCackle,persistCackle}=require('./helpers/cackle-fever-fixture.cjs')
+const{play,lastResult}=require('./helpers/dm-scripted-turn.cjs')
+test.after(()=>pg.restore())
+test('the API agent chooses the actual source stress event and its true Constitution save while SQL retains only committed disease consequences',async t=>{
+ const{call,npcId,cell}=await setupCackle(t,{contagion:false,dice:'1,1,2,19'})
+ const fact=ok(await call('record_scene_fact',{cell,description:'Le MJ atteste cet événement extérieur distinct de grand stress actuellement vécu par ce porteur.'})).worldFact
+ const stress=ok(await call('record_cackle_fever_stress',{eventId:'api-actual-cackle-stress',creatureId:npcId,factId:fact.id,reason:'Cet événement extérieur réellement observé est éprouvant.',actualGreatStressConfirmed:true}))
+ const{result,seen,selected}=await play(t,call,[{name:'inspect_cackle_fever',input:{}},{name:'resolve_cackle_fever_event',input:{eventId:stress.event.id}},params=>{assert.equal(lastResult(params).damageRoll.total,2);return 'Le jet conservé déclenche la crise réelle et ses dégâts, sans action du personnage inventée.'}],'Résous exactement ce stress déjà constaté avec le moteur et conserve son résultat.')
+ assert.deepEqual(seen,selected)
+ assert.ok(result.newGameState.npcs[npcId].conditions.includes('incapacitated'))
+ const fresh=await persistCackle(t,call)
+ assert.equal(ok(await fresh('resolve_cackle_fever_event',{eventId:stress.event.id})).replayed,true)
+ assert.equal(ok(await fresh('roll_dice',{notation:'1d20'})).total,19)
+})

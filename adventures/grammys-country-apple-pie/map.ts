@@ -1,3 +1,4 @@
+import { GRAMMYS_SOCIAL } from './social'
 import type { AdventureMapData, GridCell } from '../../lib/adventure-map'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -16,8 +17,11 @@ export const GRAMMYS_ID = 'grammys-country-apple-pie'
 export const GRAMMYS_START_CELL: GridCell = { x: 4, y: 13 }
 
 export const GRAMMYS_MAP: AdventureMapData = {
+  social: GRAMMYS_SOCIAL,
   // Aventure 1-map : toutes les salles vivent sur la map unique (mapId implicite).
-  maps: [{ id: 'bakery', name: 'La boulangerie et ses abords', grid: { cols: 17, rows: 15 } }],
+  maps: [{ id: 'bakery', name: 'La boulangerie et ses abords', navigationMode: 'tactical',
+    explorationRoomIds: ['1', '2', '3'], fogOfWar: true, fogReveal: 'open-door',
+    fogHiddenRoomIds: ['4', '5', '7', '8', '9'], grid: { cols: 17, rows: 15 } }],
   mapQuests: {},
   mapTransitions: [],
   startCell: GRAMMYS_START_CELL,
@@ -30,15 +34,16 @@ export const GRAMMYS_MAP: AdventureMapData = {
     { id: '1', name: 'Entrée extérieure', zone: { minX: 3, maxX: 16, minY: 13, maxY: 14 } },
     { id: '2', name: 'Verger de pommiers', zone: { minX: 3, maxX: 15, minY: 1, maxY: 2 } },
     { id: '3', name: 'Tas de déchets', zone: { minX: 12, maxX: 13, minY: 5, maxY: 7 } },
-    { id: '4', name: "L'entrée", zone: { minX: 10, maxX: 13, minY: 9, maxY: 12 } },
-    { id: '5', name: 'Le Bureau', zone: { minX: 5, maxX: 6, minY: 8, maxY: 11 } },
-    { id: '7', name: 'Quai de chargement', zone: { minX: 3, maxX: 5, minY: 5, maxY: 7 } },
-    { id: '8', name: 'Sol de la boulangerie', zone: { minX: 6, maxX: 11, minY: 5, maxY: 8 } },
-    { id: '9', name: 'Appartement de Grammy', zone: { minX: 7, maxX: 9, minY: 8, maxY: 11 } },
+    { id: '4', enclosed: true, name: "L'entrée", zone: { minX: 10, maxX: 13, minY: 9, maxY: 12 } },
+    { id: '5', enclosed: true, name: 'Le Bureau', zone: { minX: 5, maxX: 6, minY: 8, maxY: 12 } },
+    { id: '7', enclosed: true, name: 'Quai de chargement', entryStealthDc: 13, zone: { minX: 3, maxX: 5, minY: 4, maxY: 7 } },
+    { id: '8', enclosed: true, name: 'Sol de la boulangerie', zone: { minX: 6, maxX: 11, minY: 4, maxY: 8 },
+      areas: [{ minX: 6, maxX: 11, minY: 4, maxY: 7 }, { minX: 10, maxX: 11, minY: 8, maxY: 8 }] },
+    { id: '9', enclosed: true, navigationEvent: { id: 'apartment-guards', label: 'Decider comment aborder les gardes avant de franchir le seuil.' }, name: 'Appartement de Grammy', zone: { minX: 7, maxX: 9, minY: 8, maxY: 12 } },
   ],
 
-  // Alignés sur les lignes « Point d'entrée » du module markdown (source de
-  // vérité que le DM lit pour les déplacements).
+  // Arrivées mécaniques alignées sur la géométrie corrigée ; le module narratif
+  // les documente, mais ne les remplace jamais pendant la navigation.
   entryCells: {
     '1': { x: 4, y: 13 },
     '2': { x: 14, y: 2 },
@@ -50,37 +55,44 @@ export const GRAMMYS_MAP: AdventureMapData = {
     '9': { x: 8, y: 9 },
   },
 
+  // Chaque côté est une case DANS la salle correspondante : approcher ne
+  // franchit jamais le seuil. Les directions sont vues depuis cette salle.
+  doors: [
+    { id: 'front', name: 'Porte extérieure', initialState: 'closed', forceDc: 14, barredFromRoomId: '1',
+      sides: [{ roomId: '1', cell: { x: 11, y: 13 }, direction: 'nord' }, { roomId: '4', cell: { x: 11, y: 12 }, direction: 'sud' }] },
+    { id: 'entry-apartment', name: 'Porte de l’appartement', initialState: 'closed', forceDc: 14,
+      sides: [{ roomId: '4', cell: { x: 10, y: 10 }, direction: 'ouest' }, { roomId: '9', cell: { x: 9, y: 10 }, direction: 'est' }] },
+    { id: 'entry-floor', name: 'Porte de la boulangerie', initialState: 'open',
+      sides: [{ roomId: '4', cell: { x: 10, y: 9 }, direction: 'nord' }, { roomId: '8', cell: { x: 10, y: 8 }, direction: 'sud' }] },
+    { id: 'dock-floor', name: 'Porte du quai', initialState: 'open',
+      sides: [{ roomId: '7', cell: { x: 5, y: 6 }, direction: 'est' }, { roomId: '8', cell: { x: 6, y: 6 }, direction: 'ouest' }] },
+    { id: 'floor-office', name: 'Porte du bureau', initialState: 'closed',
+      sides: [{ roomId: '8', cell: { x: 6, y: 7 }, direction: 'sud-ouest' }, { roomId: '5', cell: { x: 6, y: 8 }, direction: 'nord' }] },
+    { id: 'floor-apartment', name: 'Porte de l’appartement côté fourneaux', initialState: 'closed',
+      sides: [{ roomId: '8', cell: { x: 8, y: 7 }, direction: 'sud' }, { roomId: '9', cell: { x: 8, y: 8 }, direction: 'nord' }] },
+  ],
+
   encounters: {
-    loading_dock_patrol: {
-      id: 'loading_dock_patrol',
-      roomId: '7',
-      name: 'Patrouille du quai de chargement',
-      playerCell: { x: 4, y: 6 },
-      monsters: [
-        { monsterType: 'goblin', cell: { x: 5, y: 5 }, name: 'Gobelin Patrouille' },
-        { monsterType: 'goblin', cell: { x: 5, y: 6 }, name: 'Gobelin Patrouille' },
-      ],
-    },
     bakery_floor_goblins: {
       id: 'bakery_floor_goblins',
       roomId: '8',
-      name: 'Gobelin Charpentier',
+      name: 'Gobelins pâtissiers',
       playerCell: { x: 9, y: 6 },
       monsters: [
-        { monsterType: 'goblin_minion', cell: { x: 10, y: 5 }, name: 'Gobelin Charpentier' },
-        { monsterType: 'goblin_minion', cell: { x: 10, y: 8 }, name: 'Gobelin Charpentier' },
-        { monsterType: 'goblin_minion', cell: { x: 7, y: 7 }, name: 'Gobelin Charpentier' },
+        { monsterType: 'goblin', cell: { x: 7, y: 5 }, name: 'Gobelin Pâtissier' },
+        { monsterType: 'goblin', cell: { x: 7, y: 6 }, name: 'Gobelin Pâtissier' },
       ],
     },
     grammy_apartment_guards: {
       id: 'grammy_apartment_guards',
       roomId: '9',
       name: 'Gardes de Chef Grukk',
+      noiseAmbush: { perceptionDc: 13, dexterityDc: 13 },
       playerCell: { x: 8, y: 9 },
       monsters: [
         { monsterType: 'goblin', cell: { x: 9, y: 11 }, name: 'Gobelin Garde' },
         { monsterType: 'goblin', cell: { x: 9, y: 10 }, name: 'Gobelin Garde' },
-        { monsterType: 'hobgoblin', cell: { x: 7, y: 11 }, name: 'Chef Grukk', hpOverride: 18 },
+        { monsterType: 'hobgoblin', cell: { x: 7, y: 11 }, name: 'Chef Grukk' },
       ],
     },
     violet_fungus_heap: {
@@ -102,6 +114,7 @@ export const GRAMMYS_MAP: AdventureMapData = {
   npcs: [
     {
       id: 'mac',
+    statBlock: 'awakened_tree',
       name: 'Mac',
       kind: 'awakened_tree',
       roomId: '1',
@@ -112,6 +125,7 @@ export const GRAMMYS_MAP: AdventureMapData = {
     },
     {
       id: 'dryad_1',
+    statBlock: 'dryad',
       name: 'Dryade',
       kind: 'dryad',
       roomId: '2',
@@ -122,6 +136,7 @@ export const GRAMMYS_MAP: AdventureMapData = {
     },
     {
       id: 'dryad_2',
+    statBlock: 'dryad',
       name: 'Dryade',
       kind: 'dryad',
       roomId: '2',
@@ -132,6 +147,7 @@ export const GRAMMYS_MAP: AdventureMapData = {
     },
     {
       id: 'dryad_3',
+    statBlock: 'dryad',
       name: 'Dryade',
       kind: 'dryad',
       roomId: '2',
@@ -140,73 +156,6 @@ export const GRAMMYS_MAP: AdventureMapData = {
       visibleFromStart: false,
       description: 'Esprit malicieux du verger, caché dans les pommiers.',
     },
-    // Patrouille du quai : tokens visibles dès que le joueur entre en salle 7
-    // (la narration les décrit immédiatement). Mêmes noms que l'encounter
-    // loading_dock_patrol : si le combat démarre, les tokens monstres
-    // remplacent les tokens PNJ (filtre anti-doublon par nom). Cases distinctes
-    // des spawns de l'encounter — invariant adventure-modules.test.cjs.
-    {
-      id: 'goblin_patrol_1',
-      name: 'Gobelin Patrouille',
-      kind: 'goblin',
-      roomId: '7',
-      cell: { x: 4, y: 5 },
-      disposition: 'hostile',
-      visibleFromStart: true,
-      description: 'Gobelin en patrouille près de l\'ouverture vers la boulangerie.',
-    },
-    {
-      id: 'goblin_patrol_2',
-      name: 'Gobelin Patrouille',
-      kind: 'goblin',
-      roomId: '7',
-      cell: { x: 4, y: 7 },
-      disposition: 'hostile',
-      visibleFromStart: true,
-      description: 'Gobelin en patrouille près de l\'ouverture vers la boulangerie.',
-    },
-  ],
-
-  namedLocationCells: [
-    { id: 'mac', pattern: /\b(mac|treant|grand pommier|pommier anime|pommier eveille)\b/, cell: { x: 3, y: 13 } },
-  ],
-
-  roomNavigationAliases: [
-    { roomId: '5', pattern: /\b(bureau|bureau de grammy)\b/ },
-    { roomId: '9', pattern: /\b(appartement|appartement de grammy|etage|a l etage|en haut|escalier)\b/ },
-    { roomId: '8', pattern: /\b(sol de la boulangerie|boulangerie|four|cuisine)\b/ },
-    { roomId: '7', pattern: /\b(quai|chargement|dock)\b/ },
-    { roomId: '2', pattern: /\b(verger|pommiers?|pommier|arbres?)\b/ },
-    { roomId: '3', pattern: /\b(dechets?|tas|champignons?|fungus)\b/ },
-    { roomId: '4', pattern: /\b(entree|hall)\b/ },
-    { roomId: '1', pattern: /\b(exterieur|dehors|sortie)\b/ },
-  ],
-
-  roomContextAliases: [
-    { roomId: '8', pattern: /\b(porte des reserves?|reserves?|sol(?: de la)? boulangerie|fours?|fournee|plans de travail)\b/ },
-    { roomId: '9', pattern: /\b(appartement(?: de grammy)?|grammy|chef grukk|grukk)\b/ },
-    { roomId: '7', pattern: /\b(quai de chargement|quai|chargement|porte laterale)\b/ },
-    { roomId: '5', pattern: /\b(bureau|paperasse|registres?|classeurs?)\b/ },
-    { roomId: '3', pattern: /\b(tas de dechets?|dechets?|champignons? violets?)\b/ },
-    { roomId: '2', pattern: /\b(verger|pommiers?|pommier)\b/ },
-  ],
-
-  doorTransitions: [
-    { fromRoomId: '1', toRoomId: '4' },
-    { fromRoomId: '7', toRoomId: '8' },
-    { fromRoomId: '4', toRoomId: '9', pattern: /\b(appartement|grammy|gauche|etage|haut|escalier)\b/ },
-    { fromRoomId: '4', toRoomId: '1', pattern: /\b(dehors|exterieur|sortie|arriere|retour)\b/ },
-    { fromRoomId: '4', toRoomId: '8' },
-    { fromRoomId: '8', toRoomId: '9', pattern: /\b(appartement|grammy|etage|haut|escalier)\b/ },
-    { fromRoomId: '8', toRoomId: '5', pattern: /\b(bureau|paperasse|registres?)\b/ },
-    { fromRoomId: '8', toRoomId: '7', pattern: /\b(quai|chargement|laterale|dock)\b/ },
-  ],
-
-  forwardTransitions: [
-    { fromRoomId: '1', toRoomId: '4' },
-    { fromRoomId: '4', toRoomId: '8' },
-    { fromRoomId: '7', toRoomId: '8' },
-    { fromRoomId: '8', toRoomId: '9' },
   ],
 
   // Synthèse des accroches mécaniques par salle. Injectée dans le prompt
@@ -218,7 +167,7 @@ export const GRAMMYS_MAP: AdventureMapData = {
       'Si Mac devient hostile : spawn_monster (awakened_tree, à sa position) + enter_combat (son token PNJ laisse place au combattant).',
       'DD 12 Persuasion ou Investigation (roll_ability_check) → il évoque les secrets des dryades du verger.',
       'Mac ne sait RIEN de la recette (ni contenu, ni deux moitiés, ni emplacements) : il ne révèle JAMAIS ces informations et renvoie vers les dryades.',
-      'Grandes portes barrées : DD 14 Force (roll_ability_check) pour enfoncer, ou contourner par le quai de chargement (salle 7).',
+      'Grandes portes barrées : approcher front puis interact_door(action="force"), DD 14 Force. La géométrie corrigée ferme le quai côté extérieur : aucun contournement par la salle 7.',
     ].join('\n'),
     '2': [
       "Trois dryades malicieuses, présentes mais CACHÉES (tokens invisibles) : n'apparaissent que sur offrande ou DD 13 Persuasion (roll_ability_check).",
@@ -231,6 +180,7 @@ export const GRAMMYS_MAP: AdventureMapData = {
       'Champignon violet hostile : start_encounter("violet_fungus_heap") dès qu’on approche à ≤1 case (5 pieds).',
     ].join('\n'),
     '4': [
+      'Si Grukk et ses gardes (salle 9) entendent un bruit important réellement résolu ici : react_to_noise(response="ambush", encounterId="grammy_apartment_guards", sourceRoomId="4", doorId="entry-apartment", moves explicites dans la salle 9). Ils restent dans leur chambre, derrière cette porte, sans venir enquêter.',
       "Caisse verrouillée derrière le comptoir : DD 12 Perception pour la trouver, puis DD 14 Dextérité (outils) ou DD 16 Force pour l'ouvrir (roll_ability_check). Butin : 8 po, 11 pa, 21 pc.",
       "Indices d'infestation gobeline visibles (traces, déjections).",
     ].join('\n'),
@@ -239,17 +189,20 @@ export const GRAMMYS_MAP: AdventureMapData = {
       'Tiroir piégé = 1re MOITIÉ DE LA RECETTE (objectif) : DD 13 Perception pour repérer, DD 16 Dextérité pour désamorcer. Si déclenché : resolve_saving_throw(con, DD 15) → empoisonné + dégâts de poison.',
     ].join('\n'),
     '7': [
-      'Patrouille de 2 gobelins déjà visible sur la carte en (4,5) et (4,7) — tokens PNJ, pas encore des combattants : ne PAS appeler reveal_npc.',
-      'DD 13 Discrétion (roll_ability_check) pour passer inaperçu.',
-      'Si repéré : start_encounter("loading_dock_patrol") — les combattants remplacent les tokens PNJ. Entrer discrètement ici donne la surprise sur les gobelins du sol de la boulangerie (salle 8).',
+      'Le quai est vide de créatures : aucun gobelin ni rencontre dans cette salle. Les gobelins restent dans la boulangerie (salle 8).',
+      'Depuis le quai, à travers dock-floor ouverte et dans la ligne de vue réelle, on voit les deux gobelins pâtissiers essayer de faire des tartes aux pommes en se chamaillant aux plans de travail (7,5) et (7,6). Ils sont à découvert, sans embuscade ; les observer ne déclenche aucun combat.',
+      'Entrée discrète : move_token avec stealth=true résout le déplacement et le jet de Discrétion (DEX, DD 13) ensemble. Ne pas relancer roll_ability_check pour cette même entrée.',
+      'Réussite : surprise sur les gobelins du sol de la boulangerie (salle 8). Échec : le bruit les alerte, sans surprise ; ne pas faire apparaître de gobelins dans le quai.',
     ].join('\n'),
     '8': [
+      'Bruit important entendu dans l’appartement : Grukk et ses gardes restent en salle 9 et préparent une embuscade derrière floor-apartment via react_to_noise(response="ambush", encounterId="grammy_apartment_guards", sourceRoomId="8", doorId="floor-apartment", moves explicites dans la salle 9). Jamais investigate ni join_combat pour eux.',
       'Armoire en verre (6,7) : 2 potions de soin ordinaires, sans verrou.',
       'Épices cachées : DD 15 Perception (roll_ability_check).',
-      '3 gobelins charpentiers dans les poutres : start_encounter("bakery_floor_goblins") si le joueur manipule les objets magiques (rouleaux, couteaux, fours). Négociation possible DD 14 CHA.',
+      'Deux gobelins pâtissiers à découvert aux plans de travail (7,5) et (7,6) essaient de faire des tartes aux pommes et se chamaillent. Visibles depuis le quai par dock-floor ouverte selon la ligne de vue ; aucune cachette dans les poutres ni embuscade. Observer, entrer ou manipuler les objets magiques ne déclenche pas de combat automatique. Dialogue possible ; start_encounter("bakery_floor_goblins") seulement si la scène devient réellement hostile, sans surprise accordée aux gobelins par défaut.',
     ].join('\n'),
     '9': [
       'SALLE FINALE. Chef Grukk (hobgoblin) + 2 gobelins gardes : start_encounter("grammy_apartment_guards") à l’entrée.',
+      'Même après beaucoup de bruit, ils ne quittent pas l’appartement : embuscade derrière la porte d’où vient le bruit. Le joueur doit réellement franchir ce seuil. start_encounter avec ambush={doorId,attackerIndex,weaponOrSpell,suspicious}, sans playerCell : une frappe de réaction contre CA si insouciant ; si méfiant, Perception DD 13 puis, uniquement sur réussite, sauvegarde DEX DD 13. Sauvegarde réussie : aucun dégât ; sinon frappe normale. Aucune frappe à la seule ouverture ni par l’autre porte. Une seule résolution, puis combat normal ou négociation.',
       '2e MOITIÉ DE LA RECETTE ici. Négociation possible DD 14 CHA (Grukk veut nourriture / or / paix).',
     ].join('\n'),
   },

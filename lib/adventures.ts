@@ -1,7 +1,10 @@
-import { getAdventureMap, DEFAULT_ADVENTURE_ID, type AdventureMapData } from './adventure-map'
+import { getAdventureMap, getMapSpec, getNavigationMode, DEFAULT_ADVENTURE_ID, type AdventureMapData } from './adventure-map'
+import type { GameState } from './types'
 import { GRAMMYS_CONTENT } from '../adventures/grammys-country-apple-pie/definition'
 import { TIDE_CRYPT_CONTENT } from '../adventures/tide-crypt/definition'
 import { FEY_SHADOW_FAIR_CONTENT } from '../adventures/fey-shadow-fair/definition'
+import { YELLOWCREST_CONTENT } from '../adventures/sarah-of-yellowcrest-manor/definition'
+import { completedRoundEvents } from './combat-round-events'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Registre des modules d'aventure — pur AGRÉGATEUR.
@@ -20,7 +23,49 @@ export { DEFAULT_ADVENTURE_ID }
 
 export type AdventureAccent = 'amber' | 'emerald' | 'purple'
 
-// Vocabulaire du module injecté dans les prompts DM (prompts.ts + planner.ts) à
+/** Percentage bounds within an illustration, independent of the engine grid. */
+export interface SceneBounds {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+export interface AdventureScene {
+  /** Optional mode restriction, for maps mixing an illustrated exterior and tactical interiors. */
+  navigationMode?: 'exploration' | 'tactical'
+  /** Author-reviewed illustration footprints, in percent (independent of the grid). */
+  fogRegions?: Array<{ roomId: string; points: Array<[number, number]> }>
+  image: string
+  alt: string
+  width: number
+  height: number
+  hint: string
+  hotspots: Array<{
+    id: string
+    label: string
+    message: string
+    roomIds: string[]
+    bounds: SceneBounds
+    /** Solid action button anchored inside the illustration. */
+    appearance?: 'button'
+    /** Numbered map pin, also listed below the image for small screens. */
+    marker?: string
+    requiresClueId?: string
+    /** Optional navigation binding; shared accessibility and fog rules apply. */
+    destinationRoomId?: string
+  }>
+  npcOverlays: Array<{
+    npcId: string
+    image: string
+    alt: string
+    bounds: SceneBounds
+  }>
+  actions?: Array<{ label: string; message: string; roomIds: string[]; requiresClueId?: string;
+    placement?: 'right' }>
+}
+
+// Vocabulaire du module injecté dans les prompts DM (prompts.ts) à
 // la place de valeurs en dur : garde les prompts d'un module exempts du
 // vocabulaire d'un autre. Voir docs/adventure-content-consolidation.md.
 export interface AdventurePromptGuidance {
@@ -32,10 +77,8 @@ export interface AdventurePromptGuidance {
   visibleNpcExample: string
   /** PNJ non hostiles que run_monster_turns ignore (« Mac le Tréant, la dryade… »). */
   nonHostileNpcs: string
-  /** 4-6 exemples « message → décision » pour le classifieur, dont un reveal_npc du module. */
-  plannerExamples: string[]
-  /** Exemple de marqueur reveal_npc du module (« reveal_npc:dryad » / « reveal_npc:ghost »). */
-  revealNpcKindExample: string
+  /** Exemples du module pour les appels explicites du MJ ; aucun effet automatique. */
+  actionExamples: string[]
 }
 
 // Contenu APP d'un module (adventures/<id>/definition.ts). Ne contient que du
@@ -58,6 +101,20 @@ export interface AdventureContent {
    * figurer ou non ; battlemapImage reste le repli.
    */
   battlemapImages?: Record<string, string>
+  /** Visual assets only; identity bindings never affect engine state. */
+  tokenImages?: {
+    npcs: Readonly<Record<string, string>>
+    creatures: Readonly<Record<string, string>>
+    credits: string
+  }
+  /** Local combat artwork using the existing map coordinates, without teleporting. */
+  combatViews?: Array<{ mapId: string; roomIds: string[]; image: string;
+    afterEventImages?: Record<string, string>;
+    bounds: { minX: number; maxX: number; minY: number; maxY: number } }>
+  /** Local framing used in tactical navigation, including outside combat. */
+  tacticalViews?: AdventureContent['combatViews']
+  /** Illustrated exploration scenes keyed by mapId; combat keeps its tactical map. */
+  scenes?: Record<string, AdventureScene>
   /** Dimensions de la grille de la PREMIÈRE map (les suivantes : map.maps[i].grid). */
   grid: { cols: number; rows: number }
   /** Message d'ouverture du DM affiché avant le premier message du joueur. */
@@ -97,12 +154,53 @@ export interface AdventureDefinition extends AdventureContent {
   map: AdventureMapData
 }
 
+/** Exact authored identity first, then an explicitly authored creature archetype. */
+export function tokenImageForActor(adventureId: string | undefined, actorId?: string, creatureType?: string): string | undefined {
+  const images = getAdventure(adventureId)?.tokenImages
+  if (!images) return undefined
+  if (actorId && Object.hasOwn(images.npcs, actorId)) return images.npcs[actorId]
+  return creatureType && Object.hasOwn(images.creatures, creatureType) ? images.creatures[creatureType] : undefined
+}
+
+export function getAdventureScene(adventure: AdventureContent, state: GameState): AdventureScene | undefined {
+  if (state.phase === 'combat') return undefined
+  const map = getMapSpec(state.currentMapId, state)
+  const scene = adventure.scenes?.[map.id]
+  if (scene?.navigationMode && scene.navigationMode !== getNavigationMode(state)) return undefined
+  return scene
+}
+
+export function getCombatView(adventure: AdventureContent, state: GameState) {
+  if (state.phase !== 'combat') return undefined
+  return selectTacticalView(adventure.combatViews, state)
+}
+
+export function getTacticalView(adventure: AdventureContent, state: GameState) {
+  return getCombatView(adventure, state) ?? (getNavigationMode(state) === 'tactical'
+    ? selectTacticalView(adventure.tacticalViews, state) : undefined)
+}
+
+function selectTacticalView(views: AdventureContent['combatViews'], state: GameState) {
+  const mapId = getMapSpec(state.currentMapId, state).id
+  const view = views?.find(view => {
+    if (view.mapId !== mapId || !state.currentRoomId || !view.roomIds.includes(state.currentRoomId)) return false
+    const inside = (cell: { x: number; y: number }) => cell.x >= view.bounds.minX && cell.x <= view.bounds.maxX
+      && cell.y >= view.bounds.minY && cell.y <= view.bounds.maxY
+    // A pursuit outside the local view restores the complete tactical board.
+    return inside(state.player.position) && Object.values(state.monsters).filter(m => m.isAlive).every(m => inside(m.position))
+  })
+  if (!view) return undefined
+  const variant = Object.entries(view.afterEventImages ?? {}).find(([eventId]) => completedRoundEvents(state)[eventId])
+  return variant ? { ...view, image: variant[1] } : view
+}
+
 // Disponibilité par module — « exploitation », pas du contenu : un module peut
 // être présent dans le registre mais verrouillé (placeholder landing).
 const AVAILABILITY: Record<string, boolean> = {
   'grammys-country-apple-pie': true,
   'tide-crypt': true,
   'fey-shadow-fair': true,
+  'sarah-of-yellowcrest-manor': true,
 }
 
 // Modules payants (accès à acheter, une fois, par compte connecté) et leur prix
@@ -130,11 +228,14 @@ function toDefinition(content: AdventureContent): AdventureDefinition {
   }
 }
 
-export const ADVENTURES: AdventureDefinition[] = [GRAMMYS_CONTENT, TIDE_CRYPT_CONTENT, FEY_SHADOW_FAIR_CONTENT].map(toDefinition)
+const REGISTERED_ADVENTURES: AdventureDefinition[] = [GRAMMYS_CONTENT, TIDE_CRYPT_CONTENT, FEY_SHADOW_FAIR_CONTENT, YELLOWCREST_CONTENT].map(toDefinition)
+
+// Keep retired content readable for existing sessions, outside the public catalogue.
+export const ADVENTURES = REGISTERED_ADVENTURES.filter(adventure => adventure.id !== TIDE_CRYPT_CONTENT.id)
 
 export function getAdventure(id: string | null | undefined): AdventureDefinition | null {
   if (!id) return null
-  return ADVENTURES.find(adventure => adventure.id === id) ?? null
+  return REGISTERED_ADVENTURES.find(adventure => adventure.id === id) ?? null
 }
 
 // Résout un module JOUABLE : lève si l'id est inconnu ou verrouillé. Utilisé par

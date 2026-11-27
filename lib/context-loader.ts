@@ -1,38 +1,112 @@
 import fs from 'fs'
 import path from 'path'
-import { DEFAULT_ADVENTURE_ID, isKnownAdventureId } from './adventure-map'
+import { SocialLoreSchema, type SocialActor, type SocialLore, type SocialProfile } from './social'
+import { DEFAULT_ADVENTURE_ID, isKnownAdventureId, getAdventureMap } from './adventure-map'
 import { DEFAULT_CHARACTER_ID, isKnownCharacterId } from './character-registry'
 
 interface ContextFiles {
   playerCharacter: string   // Fiche de personnage : stats, inventaire, capacités
-  playerRules: string       // Règles D&D côté joueur, PAR module : actions, capacités de classe
-  dmRules: string           // Règles DM génériques : UNIQUE fichier partagé (adventures/_shared/)
+  playerRules: string       // Socle joueur partagé + complément facultatif du module
+  dmRules: string           // Règles DM génériques partagées (adventures/_shared/)
   bestiary: string          // Bestiaire & notes de maîtrise PAR module (reskins, calibrage)
   adventureModule: string   // Module narratif PAR module
 }
 
 // Cache par (module, personnage) : la fiche de personnage dépend du personnage,
-// le reste du module. Une clé composite évite de mélanger les deux.
+// le complément joueur dépend du module. Une clé composite évite de mélanger les deux.
 const cachedFiles = new Map<string, ContextFiles>()
+const cachedBestiaryPrompts = new Map<string, string>()
+const cachedBestiaryManifests = new Map<string, BestiaryManifest>()
+interface NpcLoreCatalog {
+  version: number
+  bindings: { npcs: Record<string, string[]>; monsterTypes: Record<string, string[]> }
+  profiles: Record<string, Omit<SocialLore, 'id'>>
+}
+const cachedNpcLore = new Map<string, NpcLoreCatalog | null>()
+const cachedNpcLoreProfiles = new Map<string, SocialLore>()
+
+// Server-only content lookup. Narrative dossiers never enter map.ts, the client
+// bundle, or mechanical state. Call only after the existing positional filter.
+export function enrichLocalSocialProfile(adventureId: string | undefined, actor: SocialActor): SocialProfile {
+  const id = isKnownAdventureId(adventureId) ? adventureId! : DEFAULT_ADVENTURE_ID
+  if (!cachedNpcLore.has(id)) {
+    const text = readFileOrNull(adventureDir(id), 'npc-lore.json')
+    const catalog = text === null ? null : JSON.parse(text) as NpcLoreCatalog
+    if (catalog && (catalog.version !== 1 || !catalog.bindings || !catalog.profiles))
+      throw new Error(`Invalid NPC narrative catalog: ${id}`)
+    cachedNpcLore.set(id, catalog)
+  }
+  const catalog = cachedNpcLore.get(id)
+  if (!catalog) return actor.profile
+  const keys = catalog.bindings.npcs[actor.targetId] ?? catalog.bindings.npcs[actor.relationshipId]
+    ?? (actor.monsterType ? catalog.bindings.monsterTypes[actor.monsterType] : undefined)
+  if (!keys?.length) return actor.profile
+  const cacheKey = `${id}:${JSON.stringify(keys)}`
+  let lore = cachedNpcLoreProfiles.get(cacheKey)
+  if (!lore) {
+    const dossiers = keys.map(key => {
+      const dossier = catalog.profiles[key]
+      if (!dossier) throw new Error(`Missing NPC narrative profile: ${id}/${key}`)
+      return SocialLoreSchema.parse({ ...dossier, id: key })
+    })
+    const unique = <T>(items: T[], key: (item: T) => string): T[] => [...new Map(items.map(item => [key(item), item])).values()]
+    const personality: NonNullable<SocialLore['sourcePersonality']> = {}
+    for (const dossier of dossiers) for (const field of ['traits', 'ideals', 'bonds', 'flaws'] as const) {
+      const values = dossier.sourcePersonality?.[field]
+      if (values?.length) personality[field] = [...new Set([...(personality[field] ?? []), ...values])]
+    }
+    lore = SocialLoreSchema.parse({ ...dossiers[0], id: cacheKey,
+      name: dossiers.map(dossier => dossier.name).join(' ; '),
+      subjects: unique(dossiers.flatMap(dossier => dossier.subjects), subject => subject.id),
+      sources: unique(dossiers.flatMap(dossier => dossier.sources), source => `${source.file}:${source.sha256}`),
+      passages: unique(dossiers.flatMap(dossier => dossier.passages), passage => `${passage.sourceFile}:${passage.id}`),
+      portraits: unique(dossiers.flatMap(dossier => dossier.portraits), portrait => portrait.url),
+      adaptationNotes: [...new Set(dossiers.flatMap(dossier => dossier.adaptationNotes))],
+      ...(Object.keys(personality).length ? { sourcePersonality: personality } : {}),
+    })
+    cachedNpcLoreProfiles.set(cacheKey, lore)
+  }
+  const source = lore.sourcePersonality
+  const profile: SocialProfile = { ...actor.profile, lore }
+  if (source) {
+    const base = actor.profile.personality ?? { ideals: [], bonds: [], traits: [] }
+    profile.personality = { ...base,
+      ideals: [...new Set([...base.ideals, ...(source.ideals ?? [])])],
+      bonds: [...new Set([...base.bonds, ...(source.bonds ?? [])])],
+      traits: [...new Set([...base.traits, ...(source.traits ?? [])])],
+      ...(source.flaws?.length ? { flaws: [...new Set([...(base.flaws ?? []), ...source.flaws])] } : {}),
+    }
+  }
+  return profile
+}
+
+interface BestiaryManifest {
+  title: string
+  notes: string[]
+  creatures: Array<{ type: string; title: string; role?: string; notes?: string[]; npcIds?: string[] }>
+  narrativeNpcs?: string[]
+}
 
 function adventureDir(adventureId: string): string {
   return path.join(process.cwd(), 'adventures', adventureId)
 }
 
-// Règles DM génériques, SEUL contenu partagé entre modules (dm-rules.md).
-// Le `_` évite toute collision avec un id de module.
+// Socles génériques obligatoires, sans vocabulaire propre à une aventure.
 function sharedRulesDir(): string {
   return path.join(process.cwd(), 'adventures', '_shared')
 }
 
-// dm-rules.md est l'unique fichier commun : jamais redéfini par module (le
-// contenu propre à une aventure — bestiaire, calibrage, mise en scène — vit
-// dans son bestiary.md). Verrouillé sans vocabulaire de module par
-// tests/no-module-leaks.test.cjs.
-function readSharedDmRules(): string {
-  const shared = readFileOrNull(sharedRulesDir(), 'dm-rules.md')
+function readSharedRules(filename: string): string {
+  const shared = readFileOrNull(sharedRulesDir(), filename)
   if (shared !== null) return shared
-  throw new Error('Fichier de contexte manquant : adventures/_shared/dm-rules.md')
+  throw new Error(`Fichier de contexte manquant : adventures/_shared/${filename}`)
+}
+
+function readPlayerRules(adventureId: string): string {
+  const shared = readSharedRules('player-rules.md')
+  const resolvedId = isKnownAdventureId(adventureId) ? adventureId : DEFAULT_ADVENTURE_ID
+  const supplement = readFileOrNull(adventureDir(resolvedId), 'player-rules.md')
+  return supplement?.trim() ? `${shared.trimEnd()}\n\n${supplement.trim()}\n` : shared
 }
 
 function characterDir(characterId: string): string {
@@ -42,11 +116,13 @@ function characterDir(characterId: string): string {
 // Fiche de personnage GÉNÉRIQUE (characters/<id>/character-sheet.md), globale à
 // toutes les aventures. Personnage connu sans fiche = erreur (jamais de repli
 // silencieux sur un autre) ; id inconnu = fail-safe sur le guerrier par défaut.
-function readCharacterSheet(characterId: string): string {
+function readCharacterSheet(characterId: string, level?: number): string {
   const resolvedId = isKnownCharacterId(characterId) ? characterId : DEFAULT_CHARACTER_ID
-  const sheet = readFileOrNull(characterDir(resolvedId), 'character-sheet.md')
+  const filename = level === 7 ? 'character-sheet-level7.md'
+    : level === 3 ? 'character-sheet-level3.md' : 'character-sheet.md'
+  const sheet = readFileOrNull(characterDir(resolvedId), filename)
   if (sheet !== null) return sheet
-  throw new Error(`Fiche de personnage manquante : characters/${resolvedId}/character-sheet.md`)
+  throw new Error(`Fiche de personnage manquante : characters/${resolvedId}/${filename}`)
 }
 
 function readFileOrNull(dir: string, filename: string): string | null {
@@ -58,7 +134,7 @@ function readFileOrNull(dir: string, filename: string): string | null {
 }
 
 // Chargement d'un fichier de contexte PROPRE au module (adventure-module.md,
-// player-rules.md, bestiary.md) : le repli sur le module par défaut n'a lieu
+// bestiary.md) : le repli sur le module par défaut n'a lieu
 // QUE si l'id est inconnu du registre (fail-safe). Un module CONNU qui n'a pas
 // son propre fichier est une erreur — jamais servir en silence le contenu
 // d'une autre aventure.
@@ -85,9 +161,9 @@ export function loadContextFiles(
   const files: ContextFiles = {
     // Fiche = personnage GÉNÉRIQUE (globale) ; l'accroche narrative propre au
     // couple aventure×personnage est ajoutée par prompts.ts (characterHooks).
-    playerCharacter: readCharacterSheet(characterId),
-    playerRules: readPerModule(adventureId, 'player-rules.md'),
-    dmRules: readSharedDmRules(),
+    playerCharacter: readCharacterSheet(characterId, getAdventureMap(adventureId).initialPlayer.level),
+    playerRules: readPlayerRules(adventureId),
+    dmRules: readSharedRules('dm-rules.md'),
     bestiary: readPerModule(adventureId, 'bestiary.md'),
     adventureModule: readPerModule(adventureId, 'adventure-module.md'),
   }
@@ -95,9 +171,55 @@ export function loadContextFiles(
   return files
 }
 
+// Sans sélection : référence documentaire complète. Les prompts de jeu passent
+// toujours les types/PNJ locaux, sans casting ni placements globaux. Les blocs
+// SRD volumineux restent consultables explicitement via MCP.
+export function loadBestiaryPrompt(adventureId: string = DEFAULT_ADVENTURE_ID, localTypes?: Iterable<string>, npcIds: string[] = []): string {
+  const resolvedId = isKnownAdventureId(adventureId) ? adventureId : DEFAULT_ADVENTURE_ID
+  const cached = cachedBestiaryPrompts.get(resolvedId)
+  if (localTypes === undefined && cached !== undefined) return cached
+  let manifest = cachedBestiaryManifests.get(resolvedId)
+  if (!manifest) {
+    const source = readFileOrNull(adventureDir(resolvedId), 'bestiary.json')
+    if (source === null) {
+      if (localTypes !== undefined) throw new Error(`Bestiaire structuré manquant : adventures/${resolvedId}/bestiary.json`)
+      return readPerModule(resolvedId, 'bestiary.md')
+    }
+    manifest = JSON.parse(source) as BestiaryManifest
+    cachedBestiaryManifests.set(resolvedId, manifest)
+  }
+  if (localTypes !== undefined) {
+    const types = new Set(localTypes)
+    // Roles, titles and general notes can enumerate remote casts/rooms. Local
+    // identities come from the engine; keep only their species guidance here.
+    const creatures = manifest.creatures.filter(creature => types.has(creature.type)
+      || creature.npcIds?.some(id => npcIds.includes(id)))
+    return creatures.map(creature => [`### Type moteur ${JSON.stringify(creature.type)}`,
+      ...(creature.notes ?? [])].join('\n\n')).join('\n\n')
+  }
+  const prompt = [
+    `# ${manifest.title}`,
+    'Les statistiques SRD détaillées sont disponibles via `get_monster_stat_block({monsterType})` ou `get_monster_stat_block({monsterId})` (un seul sélecteur). Consulte cet outil si nécessaire avant de choisir une action de créature. Sa couverture `engineSupport` fait autorité : un trait décrit ne constitue jamais un effet résolu. Les jets, coûts et effets doivent passer par leurs outils MCP.',
+    ...manifest.notes,
+    ...manifest.creatures.map(creature => [
+      `### ${creature.title} — type moteur ${JSON.stringify(creature.type)}`,
+      ...(creature.role ? [creature.role] : []),
+      ...(creature.notes ?? []),
+    ].join('\n\n')),
+    ...(manifest.narrativeNpcs?.length
+      ? ['## PNJ — notes d’incarnation', ...manifest.narrativeNpcs] : []),
+  ].join('\n\n')
+  cachedBestiaryPrompts.set(resolvedId, prompt)
+  return prompt
+}
+
 // Invalidate caches (useful for hot-reload in dev)
 export function invalidateContextCache(): void {
+  cachedNpcLore.clear()
+  cachedNpcLoreProfiles.clear()
   cachedFiles.clear()
+  cachedBestiaryPrompts.clear()
+  cachedBestiaryManifests.clear()
   cachedParsedModule.clear()
 }
 
@@ -114,14 +236,17 @@ export interface ParsedAdventureModule {
 const cachedParsedModule = new Map<string, ParsedAdventureModule>()
 
 // Découpe le module d'aventure en un index permanent et des sections par salle.
-// Objectif contexte : n'envoyer au LLM que le détail de la salle courante (via le
-// bloc dynamique) au lieu des ~8 salles à chaque appel, tout en gardant la carte,
-// la table des points d'entrée et les annexes (récompenses, finale, monstres,
+// Objectif contexte : sélectionner la salle courante et ses voisines tactiques
+// dans le bloc dynamique, au lieu de toutes les salles à chaque appel, en gardant la carte,
+// la table des points d'entrée et les annexes (récompenses, finale,
 // notes) toujours accessibles dans l'index statique mis en cache.
 // Un module multi-maps découpe EN PLUS par "# Carte <mapId> — Titre" : chaque
 // section de carte est parsée comme un sous-module (intro + salles), et seule la
 // carte courante est envoyée au LLM.
 export function parseAdventureModule(moduleText: string): ParsedAdventureModule {
+  // Dedicated roster annexes would bypass the dynamic local bestiary. This is
+  // document parsing, never player-message interpretation.
+  moduleText = moduleText.replace(/^## (?:Bestiaire\b|Récapitulatif des monstres\b)[^\n]*\n[\s\S]*?(?=^#{1,2} |$(?![\s\S]))/gmi, '')
   const mapHeaderRegex = /^# Carte\s+(\S+)[^\n]*$/gm
   const mapMatches: { mapId: string; start: number }[] = []
   let mapMatch: RegExpExecArray | null

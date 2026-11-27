@@ -1,0 +1,12 @@
+const test=require('node:test'),assert=require('node:assert/strict')
+const{engine,ok}=require('./helpers/mcp-toolkit.cjs')
+test('actual stdio exposes both bounded source support domains without changing life, reserve, action or dice',async t=>{
+ const call=await engine(t,{dice:'19'}),before=await call('get_game_state')
+ const metadata=(await call.client.listTools()).tools.find(tool=>tool.name==='get_rules_support')
+ assert.ok(metadata.inputSchema.properties.domain.enum.includes('poison_harvest'))
+ assert.ok(metadata.inputSchema.properties.domain.enum.includes('legacy_npc_life'))
+ const harvest=ok(await call('get_rules_support',{domain:'poison_harvest'})),life=ok(await call('get_rules_support',{domain:'legacy_npc_life'}))
+ assert.ok(harvest.tools.includes('work_poison_harvest'));assert.ok(harvest.tools.includes('resolve_poison_harvest'));assert.match(harvest.source.join(' '),/8626/);assert.match(harvest.limitations.join(' '),/not RAW one-dose-per-body/)
+ assert.ok(life.tools.includes('observe_legacy_npc_life'));assert.ok(life.tools.includes('combat_action'));assert.match(life.source.join(' '),/6089/);assert.match(life.limitations.join(' '),/six-second.*ENGINE POLICY/);assert.match(life.limitations.join(' '),/unknown date/)
+ assert.deepEqual(await call('get_game_state'),before);assert.equal(ok(await call('roll_dice',{notation:'1d20'})).total,19)
+})

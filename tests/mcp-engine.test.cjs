@@ -164,7 +164,7 @@ test('advanceTurn keeps a dying player in initiative for death saves', () => {
   assert.ok(state.player.conditions.includes('unconscious'))
 })
 
-test('advanceTurn does not skip the next monster when the current player is filtered out', () => {
+test('advanceTurn does not skip the next monster while a stable player retains the original initiative slot', () => {
   gameState.spawnMonster(makeMonster('goblin_a'))
   gameState.spawnMonster(makeMonster('goblin_b'))
   gameState.setInitiativeOrder(['player', 'goblin_a', 'goblin_b'])
@@ -175,7 +175,7 @@ test('advanceTurn does not skip the next monster when the current player is filt
   const state = gameState.getState()
 
   assert.equal(next, 'goblin_a')
-  assert.deepEqual(state.initiativeOrder, ['goblin_a', 'goblin_b'])
+  assert.deepEqual(state.initiativeOrder, ['player', 'goblin_a', 'goblin_b'])
 })
 
 test('player damage at 0 HP records death failures and ordinary healing does not revive the dead', () => {
@@ -218,6 +218,7 @@ test('MCP server accepts replace_game_state and move_token toCell contracts', as
 test('MCP move_token tracks room transitions for the player', async () => {
   await withMcpClient(async client => {
     const baseState = await callTool(client, 'get_game_state')
+    baseState.sceneMemory = { doorStates: { front: 'open' } }
     await callTool(client, 'replace_game_state', { gameState: baseState })
 
     const move = await callTool(client, 'move_token', {
@@ -227,7 +228,8 @@ test('MCP move_token tracks room transitions for the player', async () => {
 
     assert.equal(move.success, true)
     assert.equal(move.currentRoomId, '4')
-    assert.deepEqual(move.roomsVisited, ['1', '4'])
+    assert.deepEqual(move.roomsVisited, ['1', '4']) // the reference admits exterior entry through the main threshold only
+    assert.ok(move.distanceMoved > 6, 'actual route costs more than direct geometric distance')
 
     const stateAfter = await callTool(client, 'get_game_state')
     assert.equal(stateAfter.currentRoomId, '4')
@@ -487,7 +489,7 @@ test('MCP resolve_player_attack resolves a spatial target hint', async () => {
   })
 })
 
-test('MCP resolve_player_attack resolves a named target before nearest fallback', async () => {
+test('MCP resolve_player_attack resolves an explicitly named target without nearest fallback', async () => {
   await withForcedDiceSequence('20,1,1', async () => {
     await withMcpClient(async client => {
       const baseState = await callTool(client, 'get_game_state')
@@ -520,7 +522,7 @@ test('MCP resolve_player_attack resolves a named target before nearest fallback'
       })
 
       const attack = await callTool(client, 'resolve_player_attack', {
-        targetName: 'Grukk',
+        targetName: 'Chef Grukk',
         weaponOrSpell: 'longsword',
         customDamageDice: '1d2',
       })
@@ -680,15 +682,15 @@ test('MCP roll_ability_check rolls with advantage and logs the DM reason', async
         dc: 14,
         label: 'Persuasion',
         advantage: true,
-        advantageReason: 'Le joueur exploite un fait établi de la scène.',
+        advantageReason: 'La situation établie facilite le test.',
       })
 
       assert.equal(check.advantage, true)
       assert.equal(check.disadvantage, false)
-      assert.equal(check.advantageReason, 'Le joueur exploite un fait établi de la scène.')
+      assert.equal(check.advantageReason, 'La situation établie facilite le test.')
       assert.equal(check.roll.rolls[0], 15)
       assert.match(check.roll.detail, /^ADV: /)
-      assert.match(check.mechanicalSummary, /AVANTAGE: Le joueur exploite un fait établi de la scène\./)
+      assert.match(check.mechanicalSummary, /AVANTAGE: La situation établie facilite le test\./)
     })
   })
 })
@@ -736,7 +738,7 @@ test('MCP roll_ability_check cancels simultaneous advantage and disadvantage', a
         ability: 'wis',
         advantage: true,
         disadvantage: true,
-        advantageReason: 'Avantage RP contrebalancé par la pénombre.',
+        advantageReason: 'Avantage de situation contrebalancé par la pénombre.',
       })
 
       assert.equal(check.roll.rolls.length, 1)
@@ -747,7 +749,7 @@ test('MCP roll_ability_check cancels simultaneous advantage and disadvantage', a
   })
 })
 
-test('MCP resolve_player_attack logs the RP advantage reason', async () => {
+test('MCP resolve_player_attack logs the situational advantage reason', async () => {
   await withForcedDiceSequence('18,4,6', async () => {
     await withMcpClient(async client => {
       const baseState = await callTool(client, 'get_game_state')
@@ -757,11 +759,11 @@ test('MCP resolve_player_attack logs the RP advantage reason', async () => {
         targetId: 'goblin_a',
         weaponOrSpell: 'longsword',
         advantage: true,
-        advantageReason: 'Le joueur exploite un élément du décor.',
+        advantageReason: 'La position surélevée facilite la frappe.',
       })
 
       assert.match(attack.attackRoll.detail, /^ADV: /)
-      assert.match(attack.mechanicalSummary, /AVANTAGE: Le joueur exploite un élément du décor\./)
+      assert.match(attack.mechanicalSummary, /AVANTAGE: La position surélevée facilite la frappe\./)
     })
   })
 })
@@ -889,7 +891,9 @@ test('MCP use_healing_potion is limited to the player turn in combat', async () 
 })
 
 test('MCP rules do not consume an action for rejected range attempts', async () => {
-  await withMcpClient(async client => {
+  // Fix both the attack and the next-round initiative: rerolled initiative
+  // may legitimately let the monster act first again.
+  await withForcedDiceSequence('2,20,1', () => withMcpClient(async client => {
     const baseState = await callTool(client, 'get_game_state')
 
     await callTool(client, 'replace_game_state', {
@@ -930,7 +934,7 @@ test('MCP rules do not consume an action for rejected range attempts', async () 
     const nextTurn = await callTool(client, 'next_turn', { actorId: 'goblin_a' })
     assert.equal(nextTurn.endedTurn, 'goblin_a')
     assert.equal(nextTurn.currentTurn, 'player')
-  })
+  }))
 })
 
 test('MCP rules require force to end combat with active enemies', async () => {
@@ -1011,7 +1015,7 @@ test('MCP end_combat sees all living monsters and awards XP only once', async ()
   })
 })
 
-test('MCP roll_death_save tracks player death saves and consumes the turn action', async () => {
+test('MCP roll_death_save tracks the real start event without spending the normal action or rerolling an exact retry', async () => {
   await withForcedDiceSequence('19', async () => {
     await withMcpClient(async client => {
       const baseState = await callTool(client, 'get_game_state')
@@ -1021,6 +1025,9 @@ test('MCP roll_death_save tracks player death saves and consumes the turn action
       state.player.conditions = ['unconscious']
 
       await callTool(client, 'replace_game_state', { gameState: state })
+      await callTool(client,'checkpoint_player_dying',{eventId:'known-player-observation',reason:'Observation présente de cet ancien état sans inventer son début de tour.'})
+      await callTool(client,'next_turn',{actorId:'player',skipAction:true})
+      await callTool(client,'next_turn',{actorId:'goblin_a',skipAction:true})
 
       const deathSave = await callTool(client, 'roll_death_save')
       assert.equal(deathSave.roll.total, 19)
@@ -1030,11 +1037,11 @@ test('MCP roll_death_save tracks player death saves and consumes the turn action
       assert.equal(deathSave.dead, false)
 
       const afterSave = await callTool(client, 'get_game_state')
-      assert.equal(afterSave.actionUsed.player, true)
+      assert.equal(Boolean(afterSave.actionUsed.player), false)
       assert.deepEqual(afterSave.player.deathSaves, { successes: 1, failures: 0 })
 
       const secondDeathSave = await callTool(client, 'roll_death_save')
-      assert.equal(secondDeathSave.code, 'ACTION_ALREADY_USED')
+      assert.equal(secondDeathSave.replayed, true)
       const afterSecondAttempt = await callTool(client, 'get_game_state')
       assert.deepEqual(afterSecondAttempt.player.deathSaves, { successes: 1, failures: 0 })
 
@@ -1045,7 +1052,7 @@ test('MCP roll_death_save tracks player death saves and consumes the turn action
 })
 
 test('MCP roll_death_save stabilizes the player on three successes', async () => {
-  await withForcedDiceSequence('12', async () => {
+  await withForcedDiceSequence('12,2', async () => {
     await withMcpClient(async client => {
       const baseState = await callTool(client, 'get_game_state')
       const state = makeCombatState(baseState)
@@ -1054,6 +1061,9 @@ test('MCP roll_death_save stabilizes the player on three successes', async () =>
       state.player.conditions = ['unconscious']
 
       await callTool(client, 'replace_game_state', { gameState: state })
+      await callTool(client,'checkpoint_player_dying',{eventId:'known-player-observation',reason:'Observation présente de cet ancien état sans inventer son début de tour.'})
+      await callTool(client,'next_turn',{actorId:'player',skipAction:true})
+      await callTool(client,'next_turn',{actorId:'goblin_a',skipAction:true})
 
       const deathSave = await callTool(client, 'roll_death_save')
       assert.equal(deathSave.stable, true)
@@ -1063,16 +1073,17 @@ test('MCP roll_death_save stabilizes the player on three successes', async () =>
 
       const afterSave = await callTool(client, 'get_game_state')
       assert.deepEqual(afterSave.player.deathSaves, { successes: 0, failures: 0, stable: true })
+      assert.equal(afterSave.dmTools.playerRecovery.episode.hours,2)
 
       const nextTurn = await callTool(client, 'next_turn', { actorId: 'player' })
       assert.equal(nextTurn.currentTurn, 'goblin_a')
-      assert.deepEqual(nextTurn.initiativeOrder, ['goblin_a'])
+      assert.deepEqual(nextTurn.initiativeOrder, ['player','goblin_a'])
     })
   })
 })
 
 test('MCP start_encounter atomically moves player, spawns real IDs, and enters combat', async () => {
-  await withMcpClient(async client => {
+  await withForcedDiceSequence('1,20,19', async () => withMcpClient(async client => {
     const baseState = await callTool(client, 'get_game_state')
     await callTool(client, 'replace_game_state', { gameState: baseState })
 
@@ -1083,13 +1094,16 @@ test('MCP start_encounter atomically moves player, spawns real IDs, and enters c
 
     assert.equal(encounter.roomId, '8')
     assert.deepEqual(encounter.movedPlayer.to, { x: 9, y: 6 })
-    assert.equal(encounter.spawnedMonsters.length, 3)
+    assert.equal(encounter.spawnedMonsters.length, 2)
     assert.ok(encounter.spawnedMonsters.every(monster => monster.id.startsWith('goblin_')))
     assert.ok(encounter.spawnedMonsters.every(monster => !['goblin1', 'goblin2', 'goblin3'].includes(monster.id)))
     assert.equal(encounter.combat.phase, 'combat')
-    assert.equal(encounter.combat.initiativeOrder.length, 4)
-    assert.equal(encounter.combat.currentTurn, 'player')
-    assert.equal(encounter.combat.initiativeOrder[0], 'player')
+    assert.equal(encounter.combat.initiativeOrder.length, 3)
+    assert.equal(encounter.combat.currentTurn, encounter.spawnedMonsters[0].id)
+    assert.deepEqual(encounter.combat.initiativeOrder, [...encounter.spawnedMonsters.map(monster => monster.id), 'player'])
+    assert.equal(encounter.combat.initiatives.find(row => row.id === 'player').initiative, 1 + Math.floor((baseState.player.stats.dex - 10) / 2))
+    assert.ok(encounter.combat.initiatives.filter(row => row.id !== 'player').every(row => row.initiative === 22))
+    assert.equal((await callTool(client, 'roll_dice', { notation: '1d20' })).total, 19, 'one player die and one shared group die')
     assert.ok(encounter.combat.initiativeOrder.includes('player'))
 
     const spawnedIds = encounter.spawnedMonsters.map(monster => monster.id)
@@ -1104,7 +1118,7 @@ test('MCP start_encounter atomically moves player, spawns real IDs, and enters c
     assert.deepEqual(stateAfter.player.position, { x: 9, y: 6 })
     assert.deepEqual(Object.keys(stateAfter.monsters).sort(), spawnedIds.sort())
     assert.deepEqual(stateAfter.encountersTriggered, ['bakery_floor_goblins'])
-  })
+  }))
 })
 
 test('MCP start_encounter rejects a preset encounter already triggered', async () => {
@@ -1139,7 +1153,7 @@ test('MCP start_encounter rejects a preset encounter already triggered', async (
   })
 })
 
-test('MCP start_encounter rolls back partial mutations on late validation failure', async () => {
+test('MCP start_encounter rolls back partial mutations on late validation failure for an actually dead player', async () => {
   await withMcpClient(async client => {
     const baseState = await callTool(client, 'get_game_state')
     const originalPosition = { x: 4, y: 13 }
@@ -1156,7 +1170,7 @@ test('MCP start_encounter rolls back partial mutations on late validation failur
         player: {
           ...baseState.player,
           hp: { current: 0, max: baseState.player.hp.max },
-          deathSaves: { successes: 0, failures: 1 },
+          deathSaves: { successes: 0, failures: 3, dead: true },
           position: originalPosition,
         },
         monsters: {},
@@ -1191,7 +1205,7 @@ test('MCP combat scenario resolves movement, attacks, turn order, and combat end
 
     await callTool(client, 'replace_game_state', { gameState: baseState })
     const monster = await callTool(client, 'spawn_monster', {
-      monsterType: 'training_dummy',
+      monsterType: 'goblin',
       cell: { x: 2, y: 0 },
       name: 'Training Dummy',
       hpOverride: 50,
@@ -1203,6 +1217,7 @@ test('MCP combat scenario resolves movement, attacks, turn order, and combat end
       stats: { ...stagedState.monsters[monster.id].stats, dex: 1 },
       attackBonus: 50,
       damageDice: '1d2',
+      srd: undefined, // Deliberately custom fixture; source attacks cannot override their dice.
     }
     await callTool(client, 'replace_game_state', { gameState: stagedState })
 
@@ -1274,8 +1289,8 @@ test('MCP combat scenario resolves movement, attacks, turn order, and combat end
 })
 
 test('MCP run_monster_turns resolves every monster turn in one call and returns to the player', async () => {
-  // Deux gobelins (4 jets : touche+dégâts chacun). Le joueur a une CA basse → ils touchent.
-  await withForcedDiceSequence('10,4,10,4', async () => {
+  // Two attacks, then the next round's initiative gives the player the lead.
+  await withForcedDiceSequence('10,4,10,4,20,1,1', async () => {
     await withMcpClient(async client => {
       const baseState = await callTool(client, 'get_game_state')
       const state = {
@@ -1288,14 +1303,14 @@ test('MCP run_monster_turns resolves every monster turn in one call and returns 
         actionUsed: {},
         player: {
           ...baseState.player,
-          position: { x: 5, y: 5 },
+          position: { x: 1, y: 1 },
           ac: 10,
           hp: { current: 30, max: 30 },
           conditions: [],
         },
         monsters: {
-          goblin_a: { ...makeMonster('goblin_a'), position: { x: 5, y: 7 } },
-          goblin_b: { ...makeMonster('goblin_b'), position: { x: 7, y: 5 } },
+          goblin_a: { ...makeMonster('goblin_a'), position: { x: 1, y: 3 } },
+          goblin_b: { ...makeMonster('goblin_b'), position: { x: 3, y: 1 } },
         },
       }
       await callTool(client, 'replace_game_state', { gameState: state })
@@ -1322,7 +1337,7 @@ test('MCP run_monster_turns resolves every monster turn in one call and returns 
       // Les deux gobelins ont rejoint le corps à corps (distance Chebyshev ≤ 1).
       for (const id of ['goblin_a', 'goblin_b']) {
         const m = after.monsters[id]
-        const dist = Math.max(Math.abs(m.position.x - 5), Math.abs(m.position.y - 5))
+        const dist = Math.max(Math.abs(m.position.x - 1), Math.abs(m.position.y - 1))
         assert.ok(dist <= 1, `${id} devrait être au contact (distance ${dist})`)
       }
     })
@@ -1330,7 +1345,7 @@ test('MCP run_monster_turns resolves every monster turn in one call and returns 
 })
 
 test('MCP run_monster_turns rejects the player turn, holds allies, and spares a downed player', async () => {
-  await withMcpClient(async client => {
+  await withForcedDiceSequence('20,1,1', async () => withMcpClient(async client => {
     const baseState = await callTool(client, 'get_game_state')
 
     // Contrat : interdit pendant le tour du joueur.
@@ -1376,5 +1391,5 @@ test('MCP run_monster_turns rejects the player turn, holds allies, and spares a 
     assert.equal(result.player.dead, false)
     assert.equal(result.currentTurn, 'player')
     assert.equal(result.combatShouldEnd, false)
-  })
+  }))
 })

@@ -1,3 +1,8 @@
+> **Mise à jour du 2 novembre 2026 — conception historique.** Le planner a été retiré.
+> Le contrat courant utilise `promptGuidance.actionExamples`, injecté dans le prompt
+> du MJ. `plannerExamples` et `revealNpcKindExample` ont été supprimés. Les passages
+> ci-dessous sur le classifieur décrivent l’ancien refactor terminé.
+
 # Directives — Consolidation du contenu des modules dans `adventures/`
 
 > **Document d'exécution.** Le refactor multi-modules (docs/multi-adventure-architecture.md)
@@ -74,9 +79,8 @@ adventures/<id>/
                           #   battlemapImage, grid
   adventure-module.md     # (déjà)
   player-character.md     # (déjà)
-  player-rules.md         # (depuis le refactor « règles par module » : REQUIS par
-  bestiary.md             #   module, avec bestiary.md ; dm-rules.md est devenu
-                          #   l'unique fichier partagé, adventures/_shared/dm-rules.md)
+  player-rules.md         # complément facultatif au socle _shared/player-rules.md
+  bestiary.md             # requis par module ; socles MJ/joueur dans _shared/
 
 public/battlemaps/<id>.png              # TOUTES les battlemaps (Grammy incluse)
 scripts/generate-battlemap-<id>.cjs     # un générateur par module
@@ -178,19 +182,14 @@ définition.
 ### Étape 6 — Nettoyage `context-loader`
 1. Supprimer les quatre constantes `DEFAULT_*` (~150 lignes, module fantôme
    « La Crypte des Ombres Oubliées » inclus).
-2. `readWithFallback` : si même le fichier du module par défaut est absent →
-   pour `player-rules.md`/`dm-rules.md` lever une erreur claire (« fichier de
-   règles manquant : adventures/<défaut>/… ») ; pour `adventure-module.md`/
-   `player-character.md` l'erreur est déjà la bonne réponse (un module sans
-   son propre module.md ne doit pas démarrer en silence sur celui d'un autre —
-   SAUF le repli volontaire des règles génériques, qui lui reste).
-   ⚠️ Attention : aujourd'hui `adventure-module.md` et `player-character.md`
-   retombent AUSSI sur le module par défaut (fallback total). Resserrer : ces
-   deux-là ne doivent retomber QUE si le module demandé est inconnu du registre
-   (cas déjà géré en amont par la route/`getAdventureMap`) — sinon erreur.
-3. Test : les 4 fichiers du module par défaut existent (garde-fou du repli) ;
-   `tests/context-loader.test.cjs` : adapter le test « unknown module defaults
-   to Grammy content » si le comportement choisi change (le documenter).
+2. Chargement actuel : les deux socles `_shared/dm-rules.md` et
+   `_shared/player-rules.md` sont obligatoires (erreur claire si absents).
+   Le complément joueur par campagne est facultatif et ajouté après le socle.
+   `adventure-module.md` et `bestiary.md` sont obligatoires pour un module connu ;
+   seul un identifiant inconnu se replie sur le module par défaut.
+   Les fiches viennent du catalogue global `characters/`.
+3. `tests/context-loader.test.cjs` vérifie la composition, le repli des
+   identifiants inconnus et l'erreur explicite en l'absence du socle joueur.
 4. ✅ Critère : 109+/109+ verts, les deux modules jouables en mock.
 
 ### Étape 7 — Verrou anti-régression + finitions

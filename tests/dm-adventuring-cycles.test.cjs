@@ -1,0 +1,10 @@
+const test=require('node:test'),assert=require('node:assert/strict')
+Object.assign(process.env,{LLM_MODE:'mock',ALLOW_PAID_LLM:'false',MONETIZATION_ENABLED:'false',DM_RATE_LIMIT_PER_MINUTE:'0',APP_LOG_PERSIST_ENABLED:'false',APP_LOG_LEVEL:'error',LLM_MAX_CALLS_PER_REQUEST:'12'})
+const{installPgMem}=require('./helpers/pg-mem.cjs'),pg=installPgMem()
+const{play,lastResult}=require('./helpers/dm-scripted-turn.cjs'),{engine,ok}=require('./helpers/mcp-toolkit.cjs')
+test.after(()=>pg.restore())
+test('POST executes only model-selected MJ cycle edges and documentary inspection, with no player primary action, time or resource grant',async t=>{
+ const call=await engine(t,{dice:'17,19'}),open={eventId:'actual-api-cycle-open',cycleId:'actual-api-cycle',reason:'Le MJ ouvre explicitement ce cycle actuel.'},close={eventId:'actual-api-cycle-close',cycleId:open.cycleId,reason:'Le MJ clôt explicitement le cycle sans histoire ni bénéfice ajoutés.'}
+ const{result,seen,selected,before}=await play(t,call,[{name:'open_adventuring_cycle',input:open},{name:'inspect_adventuring_cycles',input:{cycleId:open.cycleId}},{name:'close_adventuring_cycle',input:close},{name:'roll_ability_check',input:{entityId:'player',ability:'wis',dc:10}},{name:'roll_ability_check',input:{entityId:'player',ability:'wis',dc:10}},params=>{assert.equal(lastResult(params).code,'PRIMARY_ACTION_ALREADY_RESOLVED');return 'Le MJ a ouvert puis clos le cycle ; ton observation est résolue.'}],'Le MJ choisit ces deux bornes de suivi, puis je choisis une observation réelle.')
+ assert.deepEqual(seen,selected.slice(0,-1));assert.equal(result.newGameState.dmTools.adventuringCycles.activeCycleId,undefined);assert.equal(result.newGameState.dmTools.adventuringCycles.closes[open.cycleId].summary.xpAward,null);assert.equal(result.newGameState.worldTimeSeconds,before.worldTimeSeconds);assert.deepEqual(result.newGameState.player.hp,before.player.hp);assert.deepEqual(result.newGameState.player.resources,before.player.resources);assert.equal(ok(await call('roll_dice',{notation:'1d20'})).total,19)
+})

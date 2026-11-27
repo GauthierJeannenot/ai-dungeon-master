@@ -66,6 +66,13 @@ Si un objectif ne rentre dans aucune variante, c'est l'objectif qu'il faut
 reformuler — on n'ajoute une variante à la liste fermée que sur décision
 explicite (et elle doit rester vérifiable à partir du seul `GameState`).
 
+Le journal de quêtes proposées par les PNJ est distinct de ces conditions
+internes d’acte. Pour un objectif autoré révélé seulement en conversation,
+ajouter `dialogue: { npcIds: [...], label: 'libellé public' }` ; les quêtes
+inventées optionnelles sont déjà disponibles dans toutes les campagnes.
+Voir [le contrat et la procédure](objective-journal.md). Aucune quête inventée
+ne devient un nouveau verrou de sortie.
+
 ## Étape 1 — `map.ts` (données moteur)
 
 Suivre la forme de `adventures/fey-shadow-fair/map.ts`. Spécificités
@@ -139,7 +146,7 @@ grid: MON_MODULE_MAP.maps[0].grid, // source de vérité unique : map.ts
 
 - `chatPlaceholders` et `roomStatusHints` restent indexés par `roomId`
   (numérotation globale) — rien de spécial au multi-map.
-- `promptGuidance.plannerExamples` : inclure au moins un exemple
+- `promptGuidance.actionExamples` : inclure au moins un exemple
   `tool=travel_to_map` (la phrase du joueur qui franchit la transition), voir
   fey-shadow-fair.
 - Rappel frontière : `definition.ts` n'est JAMAIS importé par mcp-server ;
@@ -252,10 +259,10 @@ bons `label` — courts, narrables tels quels.
 - **Bornes de déplacement dynamiques** : les grilles varient par carte —
   jamais de bornes figées dans un schéma construit à l'import
   (`rules.mapBounds()` lit `state.currentMapId`).
-- **Cache prompt Anthropic** : l'intro `# Carte` va dans le bloc DYNAMIQUE,
-  jamais statique ; et les octets injectés pour les modules existants doivent
-  rester strictement identiques (playtest avant/après si lib/dm/prompts.ts ou
-  lib/context-loader.ts bougent).
+- **Contexte de carte** : l’intro `# Carte` va dans le bloc dynamique,
+  jamais dans le système permanent. Les changements de prompt ou de chargement
+  de contenu doivent passer les tests et `npm run playtest:mock`. Les procédures
+  mécaniques spécialisées vivent dans `lib/dm/rule-guides.json`, pas dans l’intro.
 - **Frontière moteur/app** : `battlemapImages` vit dans `definition.ts`
   (app), les grilles dans `map.ts` (moteur). Jamais d'import de
   `definition.ts` depuis mcp-server.

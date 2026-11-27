@@ -1,9 +1,22 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import type { GameState, MonsterState, PlayerState, WorldNpcDisposition } from '@/lib/types'
-import { DEFAULT_CELL_SIZE } from '@/lib/adventure-map'
+import { heroArmorClass } from '@/lib/hero-state'
+import { DEFAULT_CELL_SIZE, type AdventureRoom, type GridCell } from '@/lib/adventure-map'
+import { combatMovementCells } from '@/lib/navigation'
+import { explorationDestinationRooms } from '@/lib/exploration-navigation'
 import CharacterSheetModal from './CharacterSheetModal'
+import Miniature from './Miniature'
+import { miniatureForHero, miniatureForCreature, miniatureForNpc } from '@/lib/miniatures'
+import MapFog from './MapFog'
+import DungeonFloor from './DungeonFloor'
+import { isMapCellDiscovered } from '@/lib/map-discovery'
+import { getMapSpec } from '@/lib/adventure-map'
+import { roomDoorActions } from '@/lib/door-navigation'
+import { activeMapTerrain } from '@/lib/combat-round-events'
+import { weatherMasksTarget } from '@/lib/creature-senses'
+import { getAdventure, tokenImageForActor } from '@/lib/adventures'
 
 interface BattlemapProps {
   gameState: GameState
@@ -17,6 +30,12 @@ interface BattlemapProps {
   image: string
   cols?: number
   rows?: number
+  // A local image may focus part of a map; all engine coordinates stay global.
+  viewport?: { minX: number; maxX: number; minY: number; maxY: number }
+  onMove?: (destination: GridCell) => void
+  onMoveToRoom?: (room: AdventureRoom) => void
+  onDoorAction?: (message: string) => void
+  movementDisabled?: boolean
 }
 
 interface TooltipState {
@@ -68,6 +87,11 @@ export default function Battlemap({
   image,
   cols = 17,
   rows = 15,
+  viewport,
+  onMove,
+  onMoveToRoom,
+  onDoorAction,
+  movementDisabled = false,
 }: BattlemapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   // Surface (carte translatée) — référentiel des coordonnées de tooltip.
@@ -88,6 +112,14 @@ export default function Battlemap({
   const dragRef = useRef<{ startX: number; startY: number; panX: number; panY: number; moved: boolean } | null>(null)
   // Un pan venant de se terminer : avale le clic natif émis après pointerup.
   const suppressClickRef = useRef(false)
+  const movementCells = useMemo(
+    () => movementDisabled ? [] : combatMovementCells(gameState).filter(({ cell }) => isMapCellDiscovered(gameState, cell)),
+    [gameState, movementDisabled]
+  )
+  const movementRooms = useMemo(
+    () => movementDisabled ? [] : explorationDestinationRooms(gameState),
+    [gameState, movementDisabled]
+  )
 
   useEffect(() => {
     const el = containerRef.current
@@ -156,13 +188,18 @@ export default function Battlemap({
     setSheetOpen(true)
   }, [])
 
-  const aliveMonsters = Object.values(gameState.monsters).filter(m => m.isAlive)
-  const npcTokens = deriveNpcTokens(gameState)
+  const aliveMonsters = Object.values(gameState.monsters).filter(m => m.isAlive && isMapCellDiscovered(gameState, m.position)&&!weatherMasksTarget(gameState,gameState.player,m))
+  const npcTokens = deriveNpcTokens(gameState).filter(npc => isMapCellDiscovered(gameState, npc.position)&&!weatherMasksTarget(gameState,gameState.player,npc))
+  const doorActions = roomDoorActions(gameState)
 
   // Taille de la grille : dimensions de la map courante (défaut 17×15), étendues
   // si une entité déborde (fail-safe : un token hors bornes reste visible).
-  const gridCols = Math.max(cols, ...aliveMonsters.map(m => m.position.x + 2), ...npcTokens.map(npc => npc.position.x + 2), gameState.player.position.x + 2)
-  const gridRows = Math.max(rows, ...aliveMonsters.map(m => m.position.y + 2), ...npcTokens.map(npc => npc.position.y + 2), gameState.player.position.y + 2)
+  const worldCols = Math.max(cols, ...aliveMonsters.map(m => m.position.x + 1), ...npcTokens.map(npc => npc.position.x + 1), gameState.player.position.x + 1)
+  const worldRows = Math.max(rows, ...aliveMonsters.map(m => m.position.y + 1), ...npcTokens.map(npc => npc.position.y + 1), gameState.player.position.y + 1)
+  const originX = viewport?.minX ?? 0, originY = viewport?.minY ?? 0
+  const gridCols = viewport ? viewport.maxX - viewport.minX + 1 : worldCols
+  const gridRows = viewport ? viewport.maxY - viewport.minY + 1 : worldRows
+  const terrain = activeMapTerrain(gameState)
 
   // Cases CARRÉES, cellSize = minimum. Si la grille tient dans le conteneur, la
   // case grandit pour le remplir ; sinon elle reste au minimum et la carte
@@ -188,8 +225,8 @@ export default function Battlemap({
   useEffect(() => {
     if (!dims || dragRef.current) return
     if (mapW <= dims.w && mapH <= dims.h) return
-    const px = (gameState.player.position.x + 0.5) * cell
-    const py = (gameState.player.position.y + 0.5) * cell
+    const px = (gameState.player.position.x - originX + 0.5) * cell
+    const py = (gameState.player.position.y - originY + 0.5) * cell
     // Marge d'une case : on recadre dès que le pion approche du bord visible.
     const outX = mapW > dims.w && (px < -offsetX + cell || px > -offsetX + dims.w - cell)
     const outY = mapH > dims.h && (py < -offsetY + cell || py > -offsetY + dims.h - cell)
@@ -283,9 +320,13 @@ export default function Battlemap({
             backgroundSize: '100% 100%',   // étire l'image pour couvrir toute la grille
             backgroundRepeat: 'no-repeat',
             backgroundColor: '#3a2d1a',    // fallback si image absente
-            imageRendering: 'pixelated',
+            imageRendering: getMapSpec(gameState.currentMapId, gameState).imageRendering
+              ?? (viewport || getMapSpec(gameState.currentMapId, gameState).fogOfWar ? 'auto' : 'pixelated'),
           }}
         />
+
+        {Object.values(gameState.dmTools?.dungeons ?? {}).filter(dungeon=>`dungeon:${dungeon.id}`===gameState.currentMapId)
+          .map(dungeon=><DungeonFloor key={dungeon.id} layout={dungeon.layout} />)}
 
         {/* Grid overlay — léger, non-intrusif */}
         <svg
@@ -306,11 +347,100 @@ export default function Battlemap({
           <rect width="100%" height="100%" fill="url(#grid)" />
         </svg>
 
+        {/* Clip the world overlays to the local artwork; clicks retain global cells. */}
+        <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute" style={{ left: -originX * cell, top: -originY * cell, width: worldCols * cell, height: worldRows * cell }}>
+        {terrain.flatMap((feature, index) => feature.cells.map(position => (
+          <div key={`terrain:${index}:${position.x},${position.y}`} title={feature.label}
+            className="absolute pointer-events-none"
+            style={{ left: position.x * cell, top: position.y * cell, width: cell, height: cell,
+              border: feature.kind === 'difficult' ? '1px solid rgba(251,191,36,.45)' : '1px solid rgba(214,211,209,.25)',
+              background: feature.kind === 'difficult'
+                ? 'repeating-linear-gradient(135deg,transparent,transparent 8px,rgba(251,191,36,.18) 8px,rgba(251,191,36,.18) 10px)'
+                : 'rgba(28,25,23,.12)' }} />
+        )))}
+
+        {/* Exact room footprints, including rooms made of several rectangles. */}
+        {onMoveToRoom && movementRooms.flatMap(room => (room.areas ?? [room.zone]).map((area, index) => (
+          <button
+            key={`${room.id}:${index}`}
+            type="button"
+            aria-label={`Se déplacer vers ${room.name}`}
+            title={`Se déplacer vers ${room.name}`}
+            className="absolute flex items-center justify-center cursor-pointer bg-transparent focus-visible:outline-2 focus-visible:outline-amber-200 focus-visible:-outline-offset-2"
+            style={{ left: area.minX * cell, top: area.minY * cell, width: (area.maxX - area.minX + 1) * cell, height: (area.maxY - area.minY + 1) * cell }}
+            onClick={e => {
+              e.stopPropagation()
+              if (suppressClickRef.current) { suppressClickRef.current = false; return }
+              if (movementDisabled) return
+              setTooltip(null)
+              onMoveToRoom(room)
+            }}
+          >
+            {index === 0 && (
+              <span className="pointer-events-none max-w-full truncate rounded bg-stone-950/85 px-2 py-1 text-xs text-stone-100">
+                {room.name}
+              </span>
+            )}
+          </button>
+        )))}
+
+        {/* Only legal destinations receive a button; tokens stay above this layer. */}
+        {onMove && movementCells.map(({ cell: destination, costCells }) => (
+          <button
+            key={`${destination.x},${destination.y}`}
+            type="button"
+            aria-label={`Se déplacer en (${destination.x}, ${destination.y}) — ${costCells} case${costCells > 1 ? 's' : ''}`}
+            title={`Se déplacer ici · ${costCells} case${costCells > 1 ? 's' : ''} (${costCells * 5} pieds)`}
+            className="absolute cursor-pointer border border-sky-300/30 bg-sky-400/15 hover:bg-sky-300/35 focus-visible:bg-sky-300/40 focus-visible:outline-2 focus-visible:outline-sky-200 focus-visible:-outline-offset-2"
+            style={{ left: destination.x * cell, top: destination.y * cell, width: cell, height: cell }}
+            onClick={e => {
+              e.stopPropagation()
+              if (suppressClickRef.current) { suppressClickRef.current = false; return }
+              if (movementDisabled) return
+              setTooltip(null)
+              onMove(destination)
+            }}
+          />
+        ))}
+
+        <MapFog gameState={gameState} width={worldCols * cell} height={worldRows * cell} />
+
+        {/* Door markers stay on the visible side, including unknown destinations. */}
+        {onDoorAction && doorActions.map(action => <button key={action.id} type="button"
+          aria-label={action.label} title={action.label} disabled={movementDisabled}
+          className="absolute z-10 flex min-h-8 min-w-8 items-center justify-center rounded border border-amber-300 bg-stone-950/95 text-amber-100 shadow-lg disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-white"
+          style={{ left: action.anchor.x * cell - 16, top: action.anchor.y * cell - 16, width: 32, height: 32 }}
+          onClick={event => {
+            event.stopPropagation()
+            if (suppressClickRef.current) { suppressClickRef.current = false; return }
+            onDoorAction(action.message)
+          }}><span aria-hidden="true">{action.marker}</span></button>)}
+
+        {/* Persisted spatial spells use the same map and cells as navigation. */}
+        {gameState.hero?.effects.filter(effect =>
+          ['spiritual-weapon', 'guardian-of-faith'].includes(effect.kind)
+          && effect.expiresAt > (gameState.worldTimeSeconds ?? 0)
+          && effect.data.mapId === gameState.currentMapId
+          && isMapCellDiscovered(gameState, effect.data.cell as GridCell)
+        ).map(effect => {
+          const position = effect.data.cell as GridCell
+          const guardian = effect.kind === 'guardian-of-faith'
+          const label = guardian ? 'Gardien de la foi' : 'Arme spirituelle'
+          return <div key={effect.id} role="img" aria-label={label} title={label}
+            className="absolute pointer-events-none flex items-center justify-center rounded-lg border-2 border-cyan-200/80 bg-cyan-400/25 text-cyan-100 shadow-lg"
+            style={{ left: (position.x + (guardian ? 0 : .1)) * cell, top: (position.y + (guardian ? 0 : .1)) * cell,
+              width: cell * (guardian ? 2 : .8), height: cell * (guardian ? 2 : .8), fontSize: cell * .23 }}>
+            <span className="rounded bg-stone-950/70 px-1">{guardian ? 'Gardien' : 'Arme'}</span>
+          </div>
+        })}
+
         {/* Monster tokens */}
         {aliveMonsters.map(monster => (
           <TokenMonster
             key={monster.id}
             monster={monster}
+            adventureId={gameState.adventureId}
             cellW={cell}
             cellH={cell}
             isCurrentTurn={gameState.currentTurn === monster.id}
@@ -324,6 +454,7 @@ export default function Battlemap({
           <TokenNpc
             key={npc.id}
             npc={npc}
+            adventureId={gameState.adventureId}
             cellW={cell}
             cellH={cell}
             isAnimating={animating.has(`npc:${npc.id}`)}
@@ -340,11 +471,13 @@ export default function Battlemap({
           isAnimating={animating.has('player')}
           onOpenSheet={handleOpenSheet}
         />
+        </div>
+        </div>
 
         {/* Tooltip */}
         {tooltip && (
           <EntityTooltip
-            entity={tooltip.entity}
+            entity={'ac' in tooltip.entity ? {...tooltip.entity,ac:heroArmorClass(tooltip.entity,gameState.hero,gameState.worldTimeSeconds)} : tooltip.entity}
             x={tooltip.x}
             y={tooltip.y}
             mapW={mapW}
@@ -353,9 +486,39 @@ export default function Battlemap({
         )}
       </div>
 
+      {terrain.length > 0 && gameState.phase === 'combat' && (
+        <div className="absolute top-2 right-2 pointer-events-none rounded bg-stone-950/90 px-2 py-1 text-xs text-amber-200">
+          Hachures dorées : terrain difficile · coût ×2. Obstacles pleins : infranchissables.
+        </div>
+      )}
+
+      {onMove && movementCells.length > 0 && (
+        <div className="absolute bottom-2 left-2 pointer-events-none rounded border border-sky-700/60 bg-stone-950/90 px-2 py-1 text-xs text-sky-200">
+          Clique sur une case bleue pour te déplacer.
+        </div>
+      )}
+      {onMoveToRoom && movementRooms.length > 0 && (
+        <div className="absolute bottom-2 left-2 pointer-events-none rounded border border-stone-700/60 bg-stone-950/90 px-2 py-1 text-xs text-stone-200">
+          Clique sur un lieu pour t’y déplacer.
+        </div>
+      )}
+
+      <a
+        href={getAdventure(gameState.adventureId)?.tokenImages?.credits ?? '/miniatures/credits.html'}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="absolute bottom-2 right-2 z-30 rounded bg-stone-950/85 px-2 py-1 text-[10px] text-stone-300 hover:text-white"
+        onPointerDown={event => event.stopPropagation()}
+        onClick={event => event.stopPropagation()}
+      >
+        Crédits des visuels
+      </a>
+
       {/* Fiche complète du personnage joueur (modale, position fixe) */}
       <CharacterSheetModal
         player={gameState.player}
+        hero={gameState.hero}
+        worldTimeSeconds={gameState.worldTimeSeconds}
         open={sheetOpen}
         onClose={() => setSheetOpen(false)}
       />
@@ -437,7 +600,7 @@ function TokenPlayer({
     // `group` : le survol du pion révèle un aperçu d'info (PV/CA). C'est le clic
     // sur le pion lui-même qui ouvre la fiche complète (onOpenSheet ci-dessous).
     <div
-      className="group absolute pointer-events-auto cursor-pointer"
+      className="group absolute z-20 pointer-events-auto cursor-pointer"
       style={{
         left: px - r,
         top: py - r,
@@ -453,9 +616,9 @@ function TokenPlayer({
         shadow-lg shadow-blue-900/60`}
         style={{ background: 'radial-gradient(circle at 35% 35%, #60a5fa, #1d4ed8)' }}
       >
-        <span style={{ fontSize: cell * 0.3 }}>
+        <Miniature model={miniatureForHero(player.characterId)}><span style={{ fontSize: cell * 0.3 }}>
           {player.name.slice(0, 2).toUpperCase()}
-        </span>
+        </span></Miniature>
         {isCurrentTurn && (
           <div className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-400 rounded-full animate-pulse" />
         )}
@@ -487,9 +650,10 @@ function TokenPlayer({
 }
 
 function TokenMonster({
-  monster, cellW, cellH, isCurrentTurn, isAnimating, onClick
+  monster, adventureId, cellW, cellH, isCurrentTurn, isAnimating, onClick
 }: {
   monster: MonsterState
+  adventureId?: string
   cellW: number
   cellH: number
   isCurrentTurn: boolean
@@ -519,7 +683,7 @@ function TokenMonster({
         shadow-lg shadow-red-900/60`}
         style={{ background: 'radial-gradient(circle at 35% 35%, #f87171, #991b1b)' }}
       >
-        <span style={{ fontSize: cell * 0.28 }}>{abbrev}</span>
+        <Miniature image={tokenImageForActor(adventureId, monster.socialIdentity ?? monster.id, monster.type)} model={miniatureForCreature(monster.type, adventureId, monster.socialIdentity ?? monster.id)}><span style={{ fontSize: cell * 0.28 }}>{abbrev}</span></Miniature>
         {isCurrentTurn && (
           <div className="absolute -top-1 -right-1 w-3 h-3 bg-orange-400 rounded-full animate-pulse" />
         )}
@@ -548,9 +712,10 @@ function TokenMonster({
 }
 
 function TokenNpc({
-  npc, cellW, cellH, isAnimating, onClick
+  npc, adventureId, cellW, cellH, isAnimating, onClick
 }: {
   npc: MapNpcToken
+  adventureId?: string
   cellW: number
   cellH: number
   isAnimating: boolean
@@ -578,7 +743,7 @@ function TokenNpc({
       <div className={`relative w-full h-full rounded-full flex items-center justify-center font-bold text-white select-none ring-1 ${style.ring} shadow-lg ${style.shadow}`}
         style={{ background: style.background }}
       >
-        <span style={{ fontSize: cell * 0.24 }}>{abbrev}</span>
+        <Miniature image={tokenImageForActor(adventureId, npc.id)} model={miniatureForNpc(npc.kind, adventureId, npc.id)}><span style={{ fontSize: cell * 0.24 }}>{abbrev}</span></Miniature>
       </div>
 
       <div

@@ -1,0 +1,69 @@
+{
+  "title": "Bestiaire & notes de maîtrise — La Crypte des Marées",
+  "notes": [
+    "**Niveau du joueur : 2.** Tous les combats sont évitables. Les morts protègent leur Gardienne et la Flamme ; ils ne haïssent pas les vivants. Proposer un geste de respect et un test de Charisme ou de Sagesse DD 13 lorsque le module le prévoit.",
+    "Le Gardien Noyé utilise désormais le Wight SRD (FP 3, 45 PV), un véritable mort-vivant, et non un capitaine hobgobelin réduit à 33 PV. Avec le zombie de la chapelle, cette rencontre représente 750 XP bruts : le combat direct est particulièrement dangereux pour un héros solo de niveau 2. Préserver la médiation, le Médaillon et l'aide de l'Écho.",
+    "La marée est l'horloge narrative du module, pas une source de dégâts arbitraires. Les vitesses SRD restent intactes : un ralentissement dans l'eau demande une règle résolue, pas une réduction cachée des statistiques. Les morts cessent le combat après une résolution sociale confirmée et un appel explicite de fin de combat."
+  ],
+  "creatures": [
+    {
+      "type": "skeleton",
+      "title": "Marins et sonneurs squelettes",
+      "role": "Gardes des salles 5, 6 et 7.",
+      "notes": [
+        "Le sabre du décor conserve le profil de l'épée courte SRD et ses dégâts perforants ; son nom ne transforme pas le type de dégâts en tranchant."
+      ]
+    },
+    {
+      "type": "zombie",
+      "title": "Marins noyés",
+      "role": "Un noyé en salle 5 et un noyé de la chapelle en salle 8.",
+      "notes": [
+        "22 PV. Pas d'immunité générale au charme ou à la peur. La résistance des morts-vivants n'est pas limitée à une fois par tour dans le SRD ; ses exceptions radiant et critique figurent dans le texte source."
+      ]
+    },
+    {
+      "type": "wight",
+      "title": "Le Gardien Noyé — nécrophage (Wight)",
+      "role": "Capitaine mort-vivant de la chapelle, salle 8.",
+      "notes": [
+        "Reconnaît le Médaillon et respecte la médiation de l'Écho. Il n'hérite ni de l'avantage martial ni du leadership d'un hobgobelin. Son Drain de vie et sa multiattaque sont décrits à titre de référence ; ne pas en inventer la résolution dans le moteur actuel."
+      ]
+    },
+    {
+      "type": "ghost",
+      "title": "Écho de la Gardienne — fantôme",
+      "role": "Médiatrice de la salle 8 ; bloc utilisé uniquement si elle devient combattante.",
+      "notes": [
+        "Normalement protectrice et tournée vers le dialogue. La référence mécanique est un fantôme SRD, pas le feu follet de la campagne féerique. Les règles d'incorporéité et de possession ne sont pas automatiquement simulées."
+      ],
+      "npcIds": [
+        "guardian_echo"
+      ]
+    },
+    {
+      "type": "wolf",
+      "title": "Loups des dunes",
+      "role": "Deux charognards de la grève, salle 3.",
+      "notes": [
+        "Évitables en tenant la lanterne haut selon la scène ; ne pas ajouter de faiblesse mécanique à la lumière au bloc SRD."
+      ]
+    },
+    {
+      "type": "bandit",
+      "title": "Pilleurs d'épaves",
+      "role": "Deux naufrageurs vivants, salle 2.",
+      "notes": [
+        "Le coutelas conserve le profil du cimeterre SRD. Ce sont des humanoïdes vivants, sans traits de mort-vivant."
+      ]
+    },
+    {
+      "type": "commoner",
+      "title": "Profil des PNJ : Maël",
+      "notes": [],
+      "npcIds": [
+        "mael"
+      ]
+    }
+  ]
+}

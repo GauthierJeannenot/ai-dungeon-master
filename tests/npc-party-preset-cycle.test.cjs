@@ -1,0 +1,58 @@
+const test=require('node:test'),assert=require('node:assert/strict')
+Object.assign(process.env,{MONETIZATION_ENABLED:'false',LLM_MODE:'mock',ALLOW_PAID_LLM:'false',APP_LOG_PERSIST_ENABLED:'false'})
+const{installPgMem}=require('./helpers/pg-mem.cjs'),pg=installPgMem()
+const{engine,ok,grid,open,qualify}=require('./helpers/adventuring-cycle-fixture.cjs')
+const{reachSarahChapel,knockoutSarahOpponents,unchanged,persistCampaign}=require('./helpers/campaign-outcome-fixture.cjs')
+const{createPartyNpc}=require('./helpers/npc-party-fixture.cjs')
+const{reactionOpportunities}=require('../mcp-server/dist/lib/npc-reactions.js')
+const{getEncounter}=require('../mcp-server/dist/lib/adventure-map.js')
+test.after(()=>pg.restore())
+async function siteAndKnight(call,{declare=true,id='actual-preset-knight'}={}){
+ const site=await reachSarahChapel(call,{playerCell:{x:24,y:20}});ok(await call('move_token',{tokenId:'player',toCell:site.start.playerCell}))
+ const f=await createPartyNpc(call,{id});if(declare)ok(await call('declare_npc_party_role',f.declaration))
+ if(declare){const s=await call('get_game_state'),g=grid(s,f.npc.id),source=getEncounter('viallis_ritual',s),target=source.monsters[0].cell
+  const cell=g.neighbors(target).find(c=>g.free(c)&&g.roomAt(c)===s.currentRoomId&&!source.monsters.some(m=>m.cell.x===c.x&&m.cell.y===c.y));assert.ok(cell)
+  ok(await call('move_party_npc',{eventId:id+'-actual-place',npcId:f.npc.id,toCell:cell}))
+ }
+ return{site,...f}
+}
+test('a real selected Knight joins the Sarah preset once, takes its own actual attack, then normal victory/P1 issue and cycle full-share reference survive SQL without making its CR a level',async t=>{
+ let call=await engine(t,{dice:'1,1,1,20,1,20,8,8,20,8,8,1,20,8,8,1,19'}),f=await siteAndKnight(call)
+ await open(call);await qualify(call,{presentNpcIds:[f.npc.id]});const before=await call('get_game_state')
+ const input={...f.site.start,partyNpcIds:[f.npc.id]},start=ok(await call('start_encounter',input));let s=await call('get_game_state')
+ assert.ok(s.initiativeOrder.includes(f.npc.id));assert.equal(s.currentTurn,f.npc.id);assert.equal(s.combatGeneration,before.combatGeneration+1)
+ assert.deepEqual(s.npcs[f.npc.id].hp,before.npcs[f.npc.id].hp);assert.deepEqual(s.npcs[f.npc.id].conditions,before.npcs[f.npc.id].conditions)
+ const e=Object.values(s.dmTools.campaignOutcomes.engagements).find(e=>e.encounterId==='viallis_ritual');assert.ok(e)
+ assert.equal(e.participants.length,2);assert.ok(!e.participants.some(p=>p.actorId===f.npc.id));assert.ok(e.combatants.some(c=>c.actorId===f.npc.id&&c.body.hostile===false))
+ const binding=s.dmTools.adventuringCycles.bindings[e.id];assert.equal(binding.members.find(m=>m.npcId===f.npc.id).scope,'present')
+ const mage=e.participants[0].actorId,o=reactionOpportunities(s).find(o=>o.npcId===f.npc.id&&o.trigger==='turn_start');assert.ok(o)
+ const acted=ok(await call('npc_action',{npcId:f.npc.id,activationKey:o.activationKey,actions:[{kind:'attack',targetId:mage,weaponOrSpell:s.npcs[f.npc.id].attackName}]}));assert.equal(acted.completed,true)
+ s=await call('get_game_state');assert.ok(s.npcActivationLedger.includes(o.activationKey));assert.equal(s.currentTurn,'player');assert.equal(s.monsters[mage].hp.current,s.monsters[mage].hp.max)
+ await knockoutSarahOpponents(call);const ended=ok(await call('end_combat',{}));assert.equal(ended.xpAwarded,2750);assert.ok(ended.returnedPartyMembers.some(v=>v.id===f.npc.id&&v.status==='returned_to_exploration'))
+ const closure=ended.campaignClosures.find(c=>c.engagementId===e.id);assert.ok(closure)
+ ok(await call('record_campaign_outcome',{eventId:'actual-preset-ally-victory',closureId:closure.closureId,result:'victory',reason:'Les deux véritables adversaires ont été mis KO par les attaques réelles ; le compagnon vivant n’est ni vaincu ni en fuite.'}))
+ const entryInput={eventId:'actual-preset-ally-cycle-entry',cycleId:'actual-cycle',engagementId:e.id,opponents:e.participants.map(p=>({actorId:p.actorId,countsForMultiplier:true})),reason:'Référence réelle de cette rencontre qualifiée, avec part entière du compagnon présent et sans niveauPNJ inventé.'}
+ const entry=ok(await call('record_adventuring_cycle_encounter',entryInput)).entry;assert.equal(entry.assessment.rawXP,2750);assert.equal(entry.assessment.partySize,2);assert.deepEqual(entry.assessment.rawXpFullShareReference,{numerator:2750,denominator:2});assert.deepEqual(entry.assessment.unknownCharacterLevelNpcIds,[f.npc.id]);assert.equal(entry.assessment.thresholds,null)
+ s=await call('get_game_state');assert.equal(s.monsters[f.npc.id],undefined);assert.deepEqual(s.npcs[f.npc.id].hp,before.npcs[f.npc.id].hp);assert.equal(s.sceneMemory?.retiredMonsters?.[f.npc.id],undefined)
+ assert.ok(s.dmTools.campaignOutcomes.closures[closure.closureId].combatants.some(c=>c.actorId===f.npc.id&&c.body.hp.current>0))
+ call=await persistCampaign(t,call);const exact=await call('get_game_state');assert.equal(ok(await call('record_adventuring_cycle_encounter',entryInput)).replayed,true);assert.deepEqual(await call('get_game_state'),exact);assert.equal(ok(await call('roll_dice',{notation:'1d20'})).total,19)
+})
+test('explicit preset NPC selection refuses unregistered and off-map bodies plus unsupported variant combinations before any spawn, move, cost or die',async t=>{
+ const unregistered=await engine(t,{dice:'19'}),a=await siteAndKnight(unregistered,{declare:false,id:'actual-unregistered-preset-body'})
+ await unchanged(unregistered,'start_encounter',{...a.site.start,partyNpcIds:[a.npc.id]},'ENCOUNTER_PARTY_NPC_REQUIRED');assert.equal(ok(await unregistered('roll_dice',{notation:'1d20'})).total,19)
+ const remote=await engine(t,{dice:'19'}),c=await createPartyNpc(remote,{id:'actual-off-map-preset-body'});ok(await remote('declare_npc_party_role',c.declaration));const site=await reachSarahChapel(remote,{playerCell:{x:24,y:20}})
+ await unchanged(remote,'start_encounter',{...site.start,partyNpcIds:[c.npc.id]},'ENCOUNTER_PARTY_NPC_SCENE_REQUIRED');assert.equal(ok(await remote('roll_dice',{notation:'1d20'})).total,19)
+ const selected=await engine(t,{dice:'19'}),d=await siteAndKnight(selected,{id:'actual-preset-variant-ally'}),base={...d.site.start,partyNpcIds:[d.npc.id]}
+ await unchanged(selected,'start_encounter',{...base,surprise:{playerSurprised:false,surprisedMonsterIndices:[],reason:'Une décision explicite ne fournit pas les choix de surprise manquants pour ce compagnon.'}},'ENCOUNTER_PARTY_VARIANT_UNSUPPORTED')
+ await unchanged(selected,'start_encounter',{...base,ambush:{doorId:'chapel_library',attackerIndex:0,weaponOrSpell:'Dagger',suspicious:false}},'ENCOUNTER_PARTY_VARIANT_UNSUPPORTED')
+ await unchanged(selected,'start_encounter',{...base,partyNpcIds:[d.npc.id,d.npc.id]},'ENCOUNTER_PARTY_SELECTION_INVALID');assert.equal(ok(await selected('roll_dice',{notation:'1d20'})).total,19)
+})
+test('a genuinely recruited ally made magically invisible by an actual supported scroll still joins the preset, retaining its HP and real concentration effect through SQL',async t=>{
+ let call=await engine(t,{characterId:'wizard',dice:'20,1,1,1,19'}),b=await siteAndKnight(call,{id:'actual-invisible-preset-body'}),state=await call('get_game_state')
+ ok(await call('create_spell_scroll',{itemId:'actual-invisibility-source-scroll',spellId:'greater-invisibility',name:'Parchemin physique réel',description:'Une vraie source déjà supportée, lue et consommée par le magicien ; aucune condition ou réserve injectée.',cell:state.player.position}));ok(await call('pick_up_item',{itemId:'actual-invisibility-source-scroll'}))
+ ok(await call('equip_item',{itemId:'quarterstaff',operation:'unequip',slot:'main_hand'}));ok(await call('use_spell_scroll',{itemId:'actual-invisibility-source-scroll',targetId:b.npc.id}))
+ state=await call('get_game_state');assert.ok(state.npcs[b.npc.id].conditions.includes('invisible'));assert.equal(state.npcs[b.npc.id].visible,true)
+ const hp=structuredClone(state.npcs[b.npc.id].hp),effect=state.hero.effects.find(e=>e.kind==='greater-invisibility'&&e.targetIds.includes(b.npc.id));assert.ok(effect)
+ ok(await call('start_encounter',{...b.site.start,partyNpcIds:[b.npc.id]}));state=await call('get_game_state');assert.ok(state.initiativeOrder.includes(b.npc.id));assert.deepEqual(state.npcs[b.npc.id].hp,hp);assert.ok(state.npcs[b.npc.id].conditions.includes('invisible'));assert.ok(state.hero.effects.some(e=>e.id===effect.id))
+ assert.equal(ok(await call('roll_dice',{notation:'1d20'})).total,19);call=await persistCampaign(t,call);state=await call('get_game_state');assert.ok(state.hero.effects.some(e=>e.id===effect.id));assert.ok(state.npcs[b.npc.id].conditions.includes('invisible'));assert.equal(ok(await call('roll_dice',{notation:'1d20'})).total,19)
+})

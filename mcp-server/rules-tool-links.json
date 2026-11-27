@@ -1,0 +1,1655 @@
+[
+  {
+    "domain": "social_interactions",
+    "sources": [
+      {
+        "book": "dmg-2014",
+        "headings": [
+          "Social Interaction"
+        ],
+        "descendants": true
+      },
+      {
+        "book": "phb-2014",
+        "headings": [
+          "Social Interaction"
+        ],
+        "descendants": true
+      },
+      {
+        "book": "srd-5.1-2014",
+        "pages": [
+          87
+        ]
+      }
+    ],
+    "guideIds": [
+      "social-interactions-1",
+      "social-interactions-participants-recovery"
+    ]
+  },
+  {
+    "domain": "initiative",
+    "sources": [
+      {
+        "book": "phb-2014",
+        "headings": [
+          "The Order of Combat",
+          "Initiative"
+        ]
+      },
+      {
+        "book": "srd-5.1-2014",
+        "pages": [
+          90
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "surprise",
+    "sources": [
+      {
+        "book": "phb-2014",
+        "headings": [
+          "Surprise"
+        ]
+      },
+      {
+        "book": "srd-5.1-2014",
+        "pages": [
+          90
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "combat_actions",
+    "sources": [
+      {
+        "book": "phb-2014",
+        "headings": [
+          "Actions in Combat",
+          "Attack",
+          "Cast a Spell",
+          "Dash",
+          "Disengage",
+          "Dodge",
+          "Help",
+          "Hide",
+          "Ready",
+          "Search",
+          "Use an Object",
+          "Grappling",
+          "Escaping a Grapple",
+          "Shoving a Creature",
+          "Improvising an Action"
+        ]
+      },
+      {
+        "book": "srd-5.1-2014",
+        "pages": [
+          93,
+          94,
+          95
+        ]
+      }
+    ],
+    "guideIds": [
+      "combat-actions-standard",
+      "combat-actions-8",
+      "combat-actions-14",
+      "combat-actions-16"
+    ]
+  },
+  {
+    "domain": "combat_actions",
+    "sources": [
+      {
+        "book": "dmg-2014",
+        "headings": [
+          "Tumble"
+        ]
+      }
+    ],
+    "guideIds": [
+      "combat-actions-1"
+    ],
+    "tools": [
+      "combat_action",
+      "move_token",
+      "resolve_reaction"
+    ]
+  },
+  {
+    "domain": "combat_actions",
+    "sources": [
+      {
+        "book": "dmg-2014",
+        "headings": [
+          "Overrun"
+        ]
+      }
+    ],
+    "guideIds": [
+      "combat-actions-2"
+    ],
+    "tools": [
+      "combat_action",
+      "move_token",
+      "resolve_reaction"
+    ]
+  },
+  {
+    "domain": "combat_actions",
+    "sources": [
+      {
+        "book": "dmg-2014",
+        "headings": [
+          "Cleaving Through Creatures"
+        ]
+      }
+    ],
+    "guideIds": [
+      "combat-actions-3"
+    ],
+    "tools": [
+      "resolve_player_attack",
+      "resolve_cleaving",
+      "resolve_reaction"
+    ]
+  },
+  {
+    "domain": "combat_actions",
+    "sources": [
+      {
+        "book": "dmg-2014",
+        "headings": [
+          "Shove Aside"
+        ]
+      }
+    ],
+    "guideIds": [
+      "combat-actions-4"
+    ],
+    "tools": [
+      "combat_action",
+      "resolve_reaction"
+    ]
+  },
+  {
+    "domain": "weapon_properties",
+    "sources": [
+      {
+        "book": "phb-2014",
+        "headings": [
+          "Weapons",
+          "Weapon Properties"
+        ]
+      },
+      {
+        "book": "srd-5.1-2014",
+        "pages": [
+          64
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "weapon_proficiency",
+    "sources": [
+      {
+        "book": "phb-2014",
+        "headings": [
+          "Weapon Proficiency"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "ranged_weapons",
+    "sources": [
+      {
+        "book": "phb-2014",
+        "headings": [
+          "Ranged Attacks",
+          "Range",
+          "Ranged Attacks in Close Combat"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "ammunition",
+    "sources": [
+      {
+        "book": "phb-2014",
+        "lines": [
+          4082,
+          4093
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "two_weapon_fighting",
+    "sources": [
+      {
+        "book": "phb-2014",
+        "headings": [
+          "Two-Weapon Fighting"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "improvised_weapons",
+    "sources": [
+      {
+        "book": "phb-2014",
+        "headings": [
+          "Improvised Weapons"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "silvering",
+    "sources": [
+      {
+        "book": "phb-2014",
+        "headings": [
+          "Silvered Weapons"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "nets",
+    "sources": [
+      {
+        "book": "phb-2014",
+        "headings": [
+          "Special Weapons"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "nonlethal",
+    "sources": [
+      {
+        "book": "phb-2014",
+        "headings": [
+          "Knocking a Creature Out"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "cover",
+    "sources": [
+      {
+        "book": "phb-2014",
+        "headings": [
+          "Cover"
+        ]
+      },
+      {
+        "book": "srd-5.1-2014",
+        "pages": [
+          96
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "temporary_hp",
+    "sources": [
+      {
+        "book": "phb-2014",
+        "headings": [
+          "Temporary Hit Points"
+        ]
+      },
+      {
+        "book": "srd-5.1-2014",
+        "pages": [
+          98
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "grapple_transport",
+    "sources": [
+      {
+        "book": "phb-2014",
+        "headings": [
+          "Moving a Grappled Target"
+        ]
+      },
+      {
+        "book": "srd-5.1-2014",
+        "pages": [
+          95
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "spatial_opportunities",
+    "sources": [
+      {
+        "book": "phb-2014",
+        "headings": [
+          "Opportunity Attacks"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "player_life",
+    "sources": [
+      {
+        "book": "phb-2014",
+        "headings": [
+          "Dropping to 0 Hit Points",
+          "Instant Death",
+          "Falling Unconscious",
+          "Death Saving Throws",
+          "Stabilizing a Creature"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "player_recovery",
+    "sources": [
+      {
+        "book": "phb-2014",
+        "headings": [
+          "Stabilizing a Creature"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "npc_zero_hp",
+    "sources": [
+      {
+        "book": "phb-2014",
+        "headings": [
+          "Monsters and Death"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "unconscious_transitions",
+    "sources": [
+      {
+        "book": "phb-2014",
+        "headings": [
+          "Unconscious"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "exhaustion",
+    "sources": [
+      {
+        "book": "phb-2014",
+        "headings": [
+          "Exhaustion"
+        ]
+      },
+      {
+        "book": "srd-5.1-2014",
+        "pages": [
+          358
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "dm_inspiration",
+    "sources": [
+      {
+        "book": "phb-2014",
+        "headings": [
+          "Inspiration"
+        ],
+        "descendants": true
+      },
+      {
+        "book": "dmg-2014",
+        "headings": [
+          "Inspiration"
+        ],
+        "descendants": true
+      }
+    ]
+  },
+  {
+    "domain": "rests",
+    "sources": [
+      {
+        "book": "phb-2014",
+        "headings": [
+          "Resting",
+          "Short Rest",
+          "Long Rest"
+        ]
+      },
+      {
+        "book": "srd-5.1-2014",
+        "pages": [
+          87
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "travel",
+    "sources": [
+      {
+        "book": "phb-2014",
+        "headings": [
+          "Travel Pace",
+          "Difficult Terrain",
+          "Activity While Traveling",
+          "Noticing Threats",
+          "Other Activities"
+        ],
+        "within": "Movement"
+      },
+      {
+        "book": "dmg-2014",
+        "headings": [
+          "Becoming Lost"
+        ]
+      }
+    ],
+    "guideIds": [
+      "travel-overland"
+    ]
+  },
+  {
+    "domain": "special_movement",
+    "sources": [
+      {
+        "book": "phb-2014",
+        "headings": [
+          "Climbing, Swimming, and Crawling",
+          "Using Different Speeds"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "native_flight",
+    "sources": [
+      {
+        "book": "phb-2014",
+        "headings": [
+          "Flying Movement"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "jumping",
+    "sources": [
+      {
+        "book": "phb-2014",
+        "headings": [
+          "Jumping"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "falling",
+    "sources": [
+      {
+        "book": "phb-2014",
+        "headings": [
+          "Falling"
+        ]
+      },
+      {
+        "book": "srd-5.1-2014",
+        "pages": [
+          86
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "breathing",
+    "sources": [
+      {
+        "book": "phb-2014",
+        "headings": [
+          "Suffocating"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "nutrition",
+    "sources": [
+      {
+        "book": "phb-2014",
+        "headings": [
+          "Food and Water",
+          "Food",
+          "Water"
+        ]
+      },
+      {
+        "book": "srd-5.1-2014",
+        "pages": [
+          86
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "carrying",
+    "sources": [
+      {
+        "book": "phb-2014",
+        "headings": [
+          "Lifting and Carrying",
+          "Variant: Encumbrance"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "physical_handling",
+    "sources": [
+      {
+        "book": "phb-2014",
+        "headings": [
+          "Lifting and Carrying"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "check_modes",
+    "sources": [
+      {
+        "book": "phb-2014",
+        "headings": [
+          "Passive Checks",
+          "Working Together",
+          "Group Checks"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "tool_checks",
+    "sources": [
+      {
+        "book": "phb-2014",
+        "headings": [
+          "Tools"
+        ]
+      },
+      {
+        "book": "xge",
+        "headings": [
+          "Tool Proficiencies",
+          "Tools and Skills Together",
+          "Advantage",
+          "Added Benefit"
+        ]
+      },
+      {
+        "book": "srd-5.1-2014",
+        "pages": [
+          70
+        ]
+      }
+    ],
+    "guideIds": [
+      "tool-checks-procedure"
+    ]
+  },
+  {
+    "domain": "armor_penalties",
+    "sources": [
+      {
+        "book": "phb-2014",
+        "headings": [
+          "Armor and Shields",
+          "Heavy Armor",
+          "Getting Into and Out of Armor"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "items",
+    "sources": [
+      {
+        "book": "phb-2014",
+        "headings": [
+          "Adventuring Gear",
+          "Equipment"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "objects",
+    "sources": [
+      {
+        "book": "dmg-2014",
+        "headings": [
+          "Objects",
+          "Statistics for Objects",
+          "Armor Class",
+          "Hit Points",
+          "Damage Threshold"
+        ],
+        "within": "Objects"
+      },
+      {
+        "book": "phb-2014",
+        "lines": [
+          4297,
+          4297
+        ]
+      }
+    ],
+    "guideIds": [
+      "objects-procedure"
+    ]
+  },
+  {
+    "domain": "ground_gear",
+    "sources": [
+      {
+        "book": "phb-2014",
+        "lines": [
+          4253,
+          4253
+        ]
+      },
+      {
+        "book": "phb-2014",
+        "lines": [
+          4259,
+          4259
+        ]
+      },
+      {
+        "book": "phb-2014",
+        "lines": [
+          4289,
+          4289
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "weapon_consumables",
+    "sources": [
+      {
+        "book": "phb-2014",
+        "lines": [
+          4245,
+          4247
+        ]
+      },
+      {
+        "book": "phb-2014",
+        "lines": [
+          4285,
+          4287
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "basic_poison",
+    "sources": [
+      {
+        "book": "phb-2014",
+        "lines": [
+          4307,
+          4307
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "offensive_oil",
+    "sources": [
+      {
+        "book": "phb-2014",
+        "lines": [
+          4305,
+          4305
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "lighting",
+    "sources": [
+      {
+        "book": "phb-2014",
+        "headings": [
+          "Vision and Light",
+          "Blindsight",
+          "Darkvision",
+          "Truesight"
+        ]
+      },
+      {
+        "book": "phb-2014",
+        "lines": [
+          4261,
+          4261
+        ]
+      },
+      {
+        "book": "phb-2014",
+        "lines": [
+          4291,
+          4295
+        ]
+      },
+      {
+        "book": "phb-2014",
+        "lines": [
+          4333,
+          4333
+        ]
+      },
+      {
+        "book": "srd-5.1-2014",
+        "pages": [
+          86
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "water_sources",
+    "sources": [
+      {
+        "book": "phb-2014",
+        "headings": [
+          "Container Capacity"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "training",
+    "sources": [
+      {
+        "book": "phb-2014",
+        "headings": [
+          "Training"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "economy",
+    "sources": [
+      {
+        "book": "phb-2014",
+        "headings": [
+          "Crafting"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "trade_goods",
+    "sources": [
+      {
+        "book": "phb-2014",
+        "headings": [
+          "Trade Goods"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "valuable_resale",
+    "sources": [
+      {
+        "book": "phb-2014",
+        "lines": [
+          3913,
+          3913
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "merchant_resale",
+    "sources": [
+      {
+        "book": "phb-2014",
+        "headings": [
+          "Selling Treasure"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "spellbooks",
+    "sources": [
+      {
+        "book": "phb-2014",
+        "headings": [
+          "Your Spellbook"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "casting_time",
+    "sources": [
+      {
+        "book": "phb-2014",
+        "headings": [
+          "Rituals",
+          "Casting Time",
+          "Bonus Action",
+          "Reactions",
+          "Longer Casting Times"
+        ],
+        "within": "Spellcasting"
+      }
+    ]
+  },
+  {
+    "domain": "spell_components",
+    "sources": [
+      {
+        "book": "phb-2014",
+        "headings": [
+          "Components",
+          "Verbal (V)",
+          "Somatic (S)",
+          "Material (M)"
+        ]
+      },
+      {
+        "book": "srd-5.1-2014",
+        "pages": [
+          101
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "spell_areas",
+    "sources": [
+      {
+        "book": "phb-2014",
+        "headings": [
+          "A Clear Path to the Target",
+          "Areas of Effect",
+          "Cone",
+          "Cube",
+          "Cylinder",
+          "Line",
+          "Sphere"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "underwater_combat",
+    "sources": [
+      {
+        "book": "phb-2014",
+        "headings": [
+          "Underwater Combat"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "alarm_spell",
+    "sources": [
+      {
+        "book": "phb-2014",
+        "headings": [
+          "Alarm"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "light_spell",
+    "sources": [
+      {
+        "book": "phb-2014",
+        "headings": [
+          "Light"
+        ]
+      },
+      {
+        "book": "srd-5.1-2014",
+        "pages": [
+          159
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "curses",
+    "sources": [
+      {
+        "book": "phb-2014",
+        "headings": [
+          "Bestow Curse",
+          "Remove Curse"
+        ]
+      },
+      {
+        "book": "srd-5.1-2014",
+        "pages": [
+          121
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "weather",
+    "sources": [
+      {
+        "book": "dmg-2014",
+        "headings": [
+          "Weather",
+          "Extreme Cold",
+          "Extreme Heat",
+          "Strong Wind",
+          "Heavy Precipitation",
+          "High Altitude"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "hidden_doors",
+    "sources": [
+      {
+        "book": "dmg-2014",
+        "headings": [
+          "Secret Doors",
+          "Concealed Doors"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "foraging",
+    "sources": [
+      {
+        "book": "dmg-2014",
+        "headings": [
+          "Foraging"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "random_encounters",
+    "sources": [
+      {
+        "book": "dmg-2014",
+        "headings": [
+          "Random Encounters",
+          "Checking for Random Encounters",
+          "Sylvan Forest Encounters",
+          "Creating Random Encounter Tables"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "random_encounter_cadence",
+    "sources": [
+      {
+        "book": "dmg-2014",
+        "headings": [
+          "Checking for Random Encounters"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "urban_encounters",
+    "sources": [
+      {
+        "book": "dmg-2014",
+        "headings": [
+          "Random Urban Encounters"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "encounter_budget",
+    "sources": [
+      {
+        "book": "dmg-2014",
+        "headings": [
+          "Creating Encounters",
+          "Creating a Combat Encounter",
+          "Evaluating Encounter Difficulty",
+          "The Adventuring Day",
+          "Short Rests",
+          "Building Encounters on a Budget"
+        ],
+        "descendants": true
+      }
+    ]
+  },
+  {
+    "domain": "npc_party",
+    "sources": [
+      {
+        "book": "dmg-2014",
+        "headings": [
+          "NPC Party Members"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "campaign_outcomes",
+    "sources": [
+      {
+        "book": "dmg-2014",
+        "headings": [
+          "Campaign Tracking",
+          "Heroes Who Matter",
+          "Dungeon Goals"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "campaign_calendar",
+    "sources": [
+      {
+        "book": "dmg-2014",
+        "headings": [
+          "Tracking Time"
+        ],
+        "descendants": true
+      }
+    ]
+  },
+  {
+    "domain": "renown",
+    "sources": [
+      {
+        "book": "dmg-2014",
+        "headings": [
+          "Renown"
+        ],
+        "descendants": true
+      }
+    ]
+  },
+  {
+    "domain": "sacred_rites",
+    "sources": [
+      {
+        "book": "dmg-2014",
+        "headings": [
+          "Downtime Activity: Performing Sacred Rites"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "chases",
+    "sources": [
+      {
+        "book": "dmg-2014",
+        "headings": [
+          "Chases"
+        ],
+        "descendants": true
+      }
+    ]
+  },
+  {
+    "domain": "razorvine",
+    "sources": [
+      {
+        "book": "dmg-2014",
+        "headings": [
+          "Razorvine"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "slippery_ice",
+    "sources": [
+      {
+        "book": "dmg-2014",
+        "headings": [
+          "Slippery Ice"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "desecrated_ground",
+    "sources": [
+      {
+        "book": "dmg-2014",
+        "headings": [
+          "Desecrated Ground"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "frigid_water",
+    "sources": [
+      {
+        "book": "dmg-2014",
+        "headings": [
+          "Frigid Water"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "player_poisons",
+    "sources": [
+      {
+        "book": "dmg-2014",
+        "headings": [
+          "Poisons",
+          "Sample Poisons"
+        ],
+        "descendants": true
+      }
+    ]
+  },
+  {
+    "domain": "poison_nutrition",
+    "sources": [
+      {
+        "book": "dmg-2014",
+        "headings": [
+          "Ingested"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "poison_harvest",
+    "sources": [
+      {
+        "book": "dmg-2014",
+        "headings": [
+          "Crafting and Harvesting Poison"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "afflictions",
+    "sources": [
+      {
+        "book": "dmg-2014",
+        "headings": [
+          "Diseases",
+          "Sight Rot",
+          "Sewer Plague"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "cackle_fever",
+    "sources": [
+      {
+        "book": "dmg-2014",
+        "headings": [
+          "Cackle Fever"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "magic_items",
+    "sources": [
+      {
+        "book": "dmg-2014",
+        "headings": [
+          "Magic Items",
+          "Identifying a Magic Item",
+          "Attunement",
+          "Activating an Item",
+          "Command Word",
+          "Charges"
+        ]
+      },
+      {
+        "book": "srd-5.1-2014",
+        "pages": [
+          206,
+          207,
+          208,
+          209,
+          210,
+          211,
+          212,
+          213,
+          214,
+          215,
+          216,
+          217,
+          218,
+          219,
+          220,
+          221,
+          222,
+          223,
+          224,
+          225,
+          226,
+          227,
+          228,
+          229,
+          230,
+          231,
+          232,
+          233,
+          234,
+          235,
+          236,
+          237,
+          238,
+          239,
+          240,
+          241,
+          242,
+          243,
+          244,
+          245,
+          246,
+          247,
+          248,
+          249,
+          250,
+          251,
+          252,
+          253
+        ]
+      }
+    ],
+    "guideIds": [
+      "magic-items-1",
+      "magic-items-command-word"
+    ]
+  },
+  {
+    "domain": "spell_scrolls",
+    "sources": [
+      {
+        "book": "dmg-2014",
+        "headings": [
+          "Spell Scroll"
+        ]
+      },
+      {
+        "book": "srd-5.1-2014",
+        "pages": [
+          242,
+          243
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "treasure",
+    "sources": [
+      {
+        "book": "dmg-2014",
+        "headings": [
+          "Treasure",
+          "Random Treasure",
+          "Treasure Tables"
+        ]
+      },
+      {
+        "book": "dmg-2014",
+        "headings": [
+          "Using the Individual Treasure Tables",
+          "Using the Treasure Hoard Tables"
+        ],
+        "descendants": true
+      },
+      {
+        "book": "phb-2014",
+        "headings": [
+          "Coinage",
+          "Standard Exchange Rates"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "improvisation",
+    "sources": [
+      {
+        "book": "dmg-2014",
+        "headings": [
+          "Creating Nonplayer Characters",
+          "Creating Adventures"
+        ]
+      }
+    ],
+    "guideIds": [
+      "improvisation-1",
+      "improvisation-2"
+    ]
+  },
+  {
+    "domain": "dungeons",
+    "sources": [
+      {
+        "book": "dmg-2014",
+        "headings": [
+          "Appendix A: Random Dungeons"
+        ]
+      }
+    ],
+    "guideIds": [
+      "dungeons-procedure"
+    ]
+  },
+  {
+    "domain": "xge_encounter",
+    "sources": [
+      {
+        "book": "xge",
+        "headings": [
+          "Encounter Building"
+        ],
+        "descendants": true
+      }
+    ]
+  },
+  {
+    "domain": "xge_falling",
+    "sources": [
+      {
+        "book": "xge",
+        "headings": [
+          "Falling",
+          "Rate of Falling",
+          "Flying Creatures and Falling"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "sleep",
+    "sources": [
+      {
+        "book": "xge",
+        "headings": [
+          "Sleep",
+          "Waking Someone",
+          "Sleeping in Armor",
+          "Going without a Long Rest"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "adamantine",
+    "sources": [
+      {
+        "book": "xge",
+        "headings": [
+          "Adamantine Weapons"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "knots",
+    "sources": [
+      {
+        "book": "xge",
+        "headings": [
+          "Tying Knots"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "spell_perception",
+    "sources": [
+      {
+        "book": "xge",
+        "headings": [
+          "Perceiving a Caster at Work"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "invalid_spell_targets",
+    "sources": [
+      {
+        "book": "xge",
+        "headings": [
+          "Invalid Spell Targets"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "xge_recharge_calendar",
+    "sources": [
+      {
+        "book": "xge",
+        "headings": [
+          "Recharging without a Dawn"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "xge_carousing",
+    "sources": [
+      {
+        "book": "xge",
+        "headings": [
+          "Carousing"
+        ],
+        "descendants": true
+      }
+    ]
+  },
+  {
+    "domain": "xge_gambling",
+    "sources": [
+      {
+        "book": "xge",
+        "headings": [
+          "Gambling"
+        ],
+        "descendants": true
+      }
+    ]
+  },
+  {
+    "domain": "xge_pit_fighting",
+    "sources": [
+      {
+        "book": "xge",
+        "headings": [
+          "Pit Fighting"
+        ],
+        "descendants": true
+      }
+    ]
+  },
+  {
+    "domain": "xge_religious_service",
+    "sources": [
+      {
+        "book": "xge",
+        "headings": [
+          "Religious Service"
+        ],
+        "descendants": true
+      }
+    ]
+  },
+  {
+    "domain": "xge_scroll_scribing",
+    "sources": [
+      {
+        "book": "xge",
+        "headings": [
+          "Scribing a Spell Scroll"
+        ],
+        "descendants": true
+      }
+    ]
+  },
+  {
+    "domain": "xge_brewing",
+    "sources": [
+      {
+        "book": "xge",
+        "lines": [
+          2208,
+          2217
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "xge_relaxation",
+    "sources": [
+      {
+        "book": "xge",
+        "headings": [
+          "Relaxation"
+        ]
+      }
+    ]
+  },
+  {
+    "domain": "xge_research",
+    "sources": [
+      {
+        "book": "xge",
+        "headings": [
+          "Research"
+        ],
+        "descendants": true
+      }
+    ]
+  },
+  {
+    "domain": "xge_training",
+    "sources": [
+      {
+        "book": "xge",
+        "headings": [
+          "Training"
+        ],
+        "descendants": true
+      }
+    ]
+  },
+  {
+    "domain": "xge_downtime",
+    "sources": [
+      {
+        "book": "xge",
+        "headings": [
+          "Work"
+        ],
+        "descendants": true
+      }
+    ]
+  },
+  {
+    "domain": "traps",
+    "sources": [
+      {
+        "book": "xge",
+        "headings": [
+          "Bear Trap",
+          "Crossbow Trap",
+          "Pit Trap",
+          "Poison Needle Trap"
+        ],
+        "descendants": true
+      }
+    ]
+  },
+  {
+    "domain": "complex_traps",
+    "sources": [
+      {
+        "book": "xge",
+        "headings": [
+          "Sphere of Crushing Doom"
+        ],
+        "descendants": true
+      }
+    ]
+  },
+  {
+    "domain": "rules_policy",
+    "sources": [
+      {
+        "book": "mm-2014"
+      }
+    ],
+    "guideIds": [
+      "rules-policy-1"
+    ],
+    "tools": [
+      "get_monster_stat_block"
+    ]
+  },
+  {
+    "domain": "swallowing",
+    "sources": [
+      {
+        "book": "mm-2014",
+        "headings": [
+          "Purple Worm"
+        ],
+        "descendants": true
+      }
+    ]
+  }
+]

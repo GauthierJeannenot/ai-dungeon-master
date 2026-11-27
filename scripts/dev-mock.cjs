@@ -2,12 +2,7 @@ const { spawn, spawnSync } = require('node:child_process')
 const path = require('node:path')
 
 const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm'
-const concurrentlyBin = path.join(
-  process.cwd(),
-  'node_modules',
-  '.bin',
-  process.platform === 'win32' ? 'concurrently.cmd' : 'concurrently'
-)
+const nextBin = path.join(process.cwd(), 'node_modules/next/dist/bin/next')
 
 const env = {
   ...process.env,
@@ -28,13 +23,9 @@ if (build.status !== 0) {
   process.exit(build.status ?? 1)
 }
 
-const child = spawn(concurrentlyBin, [
-  'next dev',
-  'node mcp-server/dist/mcp-server/index.js',
-], {
+const child = spawn(process.execPath, [nextBin, 'dev', ...process.argv.slice(2)], {
   env,
   stdio: 'inherit',
-  shell: process.platform === 'win32',
 })
 
 child.on('error', err => {

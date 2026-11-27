@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react'
 import type { PlayerState } from '@/lib/types'
+import type { HeroState } from '@/lib/hero-state'
 import { characterSheetFromPlayerState } from '@/lib/character-sheet-view'
 import CharacterSheet from './CharacterSheet'
 
@@ -11,10 +12,14 @@ import CharacterSheet from './CharacterSheet'
 // l'overflow-hidden de la battlemap. Fermeture : Échap, croix, ou clic hors carte.
 export default function CharacterSheetModal({
   player,
+  hero,
+  worldTimeSeconds,
   open,
   onClose,
 }: {
   player: PlayerState
+  hero?:HeroState
+  worldTimeSeconds?:number
   open: boolean
   onClose: () => void
 }) {
@@ -29,7 +34,7 @@ export default function CharacterSheetModal({
 
   if (!open) return null
 
-  const data = characterSheetFromPlayerState(player)
+  const data = characterSheetFromPlayerState(player,hero,worldTimeSeconds)
 
   return (
     <div

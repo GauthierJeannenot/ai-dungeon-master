@@ -45,8 +45,8 @@ jobs:
       - name: Build Next.js
         run: npx next build
         env:
-          # Clé factice pour que le build passe — pas utilisée au build time
-          ANTHROPIC_API_KEY: sk-ant-ci-placeholder-key-not-real
+          LLM_MODE: mock
+          ALLOW_PAID_LLM: 'false'
           NODE_ENV: production
 
       - name: Upload build artifact (MCP dist)

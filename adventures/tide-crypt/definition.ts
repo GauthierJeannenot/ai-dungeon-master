@@ -54,14 +54,13 @@ export const TIDE_CRYPT_CONTENT: AdventureContent = {
     namedPlaces: 'la grève, la chaussée, le beffroi, la nef, la chapelle du Gardien, le tombeau de Morgane',
     visibleNpcExample: 'Maël sur la grève dès le départ',
     nonHostileNpcs: "Maël le gardien, l'Écho de la Gardienne",
-    revealNpcKindExample: 'reveal_npc:ghost',
-    plannerExamples: [
-      '- "je fouille le varech sur la chaussée" → requiresMechanic=true, tool=roll_ability_check, ability=wis, dc≈13, confidence=high.',
-      '- "je sonne les cloches dans l\'ordre grave, grave, aigu" → requiresMechanic=true, tool=roll_ability_check, ability=int, dc≈12, confidence=high.',
-      '- "j\'offre le médaillon en nommant Morgane" → requiresMechanic=true, tool=roll_ability_check, ability=cha, sceneMarkers=["reveal_npc:ghost"], confidence=medium.',
-      '- "j\'attaque le marin noyé" → requiresMechanic=true, tool=resolve_player_attack, target="marin noyé", confidence=high.',
-      '- "je descends l\'escalier vers la salle suivante" → requiresMechanic=true, tool=move_token, sceneMarkers=["trigger_room_event:enter"], confidence=high.',
-      '- "je contemple la mer noire / qui es-tu ?" → requiresMechanic=false, confidence=high.',
+    actionExamples: [
+      '- "je fouille le varech sur la chaussée" → appelle roll_ability_check, ability=wis, dc≈13.',
+      '- "je sonne les cloches dans l\'ordre grave, grave, aigu" → appelle roll_ability_check, ability=int, dc≈12.',
+      '- "j\'offre le médaillon en nommant Morgane" → appelle roll_ability_check, ability=cha ; après réussite confirmée, choisis reveal_npc si la scène le justifie, avec un npcId exact du profil ghost présent.',
+      '- "j\'attaque le marin noyé" → appelle resolve_player_attack, target="marin noyé".',
+      '- "je descends l\'escalier vers la salle suivante" → appelle move_token ; après arrivée confirmée, choisis trigger_room_event si un événement établi le nécessite.',
+      '- "je contemple la mer noire / qui es-tu ?" → dialogue ou description sans effet mécanique.',
     ],
   },
 }

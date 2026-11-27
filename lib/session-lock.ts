@@ -2,7 +2,10 @@ const DEFAULT_LOCK_KEY = 'default'
 
 type ReleaseLock = () => void
 
-const locks = new Map<string, Promise<void>>()
+const developmentGlobal = globalThis as typeof globalThis & { __aiDmSessionLocks?: Map<string, Promise<void>> }
+const locks = process.env.NODE_ENV === 'development'
+  ? (developmentGlobal.__aiDmSessionLocks ??= new Map<string, Promise<void>>())
+  : new Map<string, Promise<void>>()
 
 function normalizeLockKey(sessionId: string | undefined): string {
   const normalized = sessionId?.trim().replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 128)

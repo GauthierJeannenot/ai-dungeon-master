@@ -1,5 +1,196 @@
 # Personnages jouables & classes (SRD 5) — conception (IMPLÉMENTÉ)
 
+Affichage du plateau : les quatre profils fighter, wizard, cleric et bard
+disposent de figurines réalistes CC BY 4.0 (`public/miniatures/realistic/`).
+Le guerrier et le magicien utilisent les modèles Sloyd précédents ; la clerc
+avec masse et bouclier et la barde avec instrument utilisent les sculptures
+féminines de Teirale publiées sur Printables. Aucun kit ni profil n'est modifié.
+Les crédits des auteurs sont accessibles depuis le plateau. La sélection
+visuelle `lib/miniatures.ts` ne modifie pas les fiches ni les règles. Des PNG
+transparents pré-rendus évitent de charger les GLB et WebGL pendant la partie ;
+un échec d'image conserve les initiales. PV, couleurs et clics restent disponibles.
+
+État de livraison, validations exécutées et travail restant : [registre canonique des intégrations MCP](suivi-integration-mcp.md). Ce guide décrit le périmètre technique ; les anciennes matrices d’audit ne sont pas le suivi courant.
+
+## Profils de niveau 3 et répertoire narratif élargi
+
+La campagne `fey-shadow-fair` démarre au niveau 3. Les quatre profils
+`characters/<id>/level3.ts` et leurs `character-sheet-level3.md` sont sélectionnés
+par le registre et le chargeur de contexte pour ce niveau, sans identifiant de
+personnage supplémentaire. Aperçu, prompt et moteur utilisent les mêmes données.
+Les niveaux 1–2 et 7 restent distincts ; aucune sauvegarde existante n'est réécrite.
+
+| Personnage | PV solo conservés | CA | Répertoire (tours / sorts) | Capacités de niveau 3 |
+|---|---:|---:|---:|---|
+| Guerrier | 36 | 16 | — | Champion, Duel, critique 19–20, Sursaut, Second souffle ; une attaque |
+| Barde | 28 | 13 | 8 / 20 | Savoir, expertises, Mots cinglants, inspiration d6 (3 / repos long) |
+| Magicien | 22 | 12 | 8 / 25 | Évocation, sculpture, récupération de 2 niveaux d'emplacements par jour |
+| Clerc | 32 | 16 | 4 / 19 | Vie, soins renforcés, canalisation (1 / repos court ou long), réserve de 15 PV |
+
+**Règle maison demandée :** ces trois incantateurs disposent volontairement de
+plus de sorts connus/préparés et de tours de magie que le maximum SRD habituel.
+Le grimoire du magicien contient ce répertoire et tous ces sorts sont disponibles.
+Le moteur garde les emplacements normaux : **4 de niveau 1, 2 de niveau 2**,
+DD 13, attaque +5, aucun sort de niveau 3 ou plus. La préparation après repos
+respecte ce plafond de niveau et autorise à nouveau le répertoire élargi.
+Les PV gardent le calibrage solo préexistant, distinct des moyennes SRD.
+Les dés de vie et ressources suivent maintenant le niveau réel. Recharge par
+repos ; changer de carte ne restaure pas les ressources des profils SRD.
+Leur bourse commence vide, sans les 250 po du profil de niveau 7 ; les composantes
+coûteuses possédées sont indiquées individuellement dans les kits.
+
+Vingt sorts supplémentaires sont jouables via `cast_spell` : Prestidigitation,
+Message, Lumières dansantes, Alarme, Serviteur invisible, Disque flottant,
+Écriture illusoire, Image silencieuse, Bouche magique, Localisation d'objet,
+Détection du mal et du bien, Détection du poison et des maladies, Purification
+de nourriture et d'eau, Augure, Messager animal, Corde enchantée, Aura magique
+trompeuse, Détection de l'invisibilité, Flamme éternelle et Invisibilité.
+Les sorts existants complètent le répertoire selon la liste de chaque classe.
+Les rituels du barde sont aussi permis (sort connu avec étiquette rituel).
+
+Pour les sorts portant `narrativeTarget`, le modèle choisit une description
+`narrative`, ainsi qu'un `toCell` pour un effet localisé ou un `targetId` pour
+un effet sur une créature. Le moteur valide tout avant débit : connaissance,
+budget d'action, portée et chemin, cible, composantes ordinaires ou coûteuses,
+temps d'incantation, rituel et emplacement. Les matériaux consommés disparaissent ;
+perle d'identification et jetons d'augure sont conservés. Les répétitions d'Augure
+utilisent un dé moteur et un compteur remis à zéro au repos long.
+
+Les effets sont persistés dans `hero.effects` avec durée, concentration, carte,
+position et description interprétée ; ils reviennent tels quels après hydratation.
+Le texte créatif reste une donnée, jamais une instruction ou une modification
+de PV, inventaire, porte ou état. Les connaissances révélées et conséquences
+de scène restent bornées par `srdNote` et les éléments établis : aucune persuasion
+automatique, aucun secret inventé, aucune alarme déclenchée sans événement réel.
+`use_narrative_spell_effect` déplace explicitement une Image silencieuse (action),
+des Lumières dansantes ou un Serviteur invisible (action bonus), sans autre sort
+ni nouvel emplacement. Les autres mutations passent par les outils dédiés.
+Prestidigitation exige aussi `effectDurationSeconds` (0, 12 ou 3600 selon
+l'effet choisi). Trois effets durables au plus ; un quatrième est refusé
+jusqu'à expiration ou `dismiss_prestidigitation({effectId})`, qui dépense
+une action. Le moteur ne choisit jamais à la place du joueur un effet à supprimer.
+Le catalogue commun inclut le rat SRD (`rat`, bête Très Petite), utilisable
+comme messager uniquement s'il est effectivement présent et visible.
+Invisibilité applique un état mécanique et cesse lorsque la cible attaque ou
+incante ; Détection de l'invisibilité permet de la voir à travers un chemin
+visible. Aucun de ces sorts ne traverse un mur ou ne rend automatiquement caché.
+
+Sources épinglées : `lib/srd/narrative-spell-sources.json` (réponses API 2014,
+URL, empreinte SHA-256) et [SRD 5.1 officiel](https://media.wizards.com/2023/downloads/dnd/SRD_CC_v5.1.pdf).
+Attribution : `lib/srd/narrative-spells.LICENSE.txt`. Les lectures réseau ont lieu
+uniquement lors de l'ajout des données, jamais pendant le jeu ou les tests.
+
+Les objets d'aventure peuvent maintenant être placés au sol via le champ
+optionnel `AdventureMapData.groundItems`. Ils amorcent `droppedItems` dans
+le moteur et son miroir initial client ; ils ne font pas partie du kit global
+du personnage. `pick_up_item` les acquiert à portée, et les dépôts/reprises
+ultérieurs conservent leurs emplacements entre cartes et après hydratation.
+Le module `sarah-of-yellowcrest-manor` utilise ce mécanisme pour trois objets
+de quête. Son niveau 7 sélectionne maintenant les profils dédiés décrits ci-dessous.
+
+## Deuxième action exceptionnelle (règle maison)
+
+Une action du personnage par défaut n'impose aucun quota d'événements au MJ.
+Celui-ci peut exceptionnellement accorder une deuxième action avec l'outil MCP
+`grant_player_action({reason})`, après la première action, si une circonstance
+établie le justifie. Ce choix n'est jamais automatique. L'outil autorise l'action ;
+le modèle doit encore sélectionner son outil de résolution et respecter une
+décision réellement exprimée par le joueur. L'octroi est borné à une fois par
+message, et à une fois par tour de combat même après sauvegarde/rechargement.
+Il ne rétablit ni déplacement, ni action bonus, ni ressources de classe et ne
+permet pas de troisième action par répétition de cette exception. En combat,
+il renouvelle seulement le crédit d'action consommé, y compris sur les profils
+SRD 2014 ; réactions suspendues et action initiale inachevée restent bloquantes.
+L'état interne `dmActionAllowance` est initialisé à la synchronisation du message,
+puis l'octroi et sa justification sont sauvegardés par le moteur et dans le journal.
+
+## Bonus de roleplay (règle maison)
+
+Par défaut, le MJ n'accorde aucun bonus. Il peut récompenser avec parcimonie
+une idée qui aide concrètement l'action tentée à partir des faits établis :
++1 pour une idée utile, +2 pour une trouvaille particulièrement pertinente,
++3 pour une idée exceptionnelle, +4 ou +5 pour un cas extraordinaire et
+extrêmement rare. Une action ordinaire, une belle description, la politesse
+ou une précaution générique ne suffisent pas. Le MJ choisit le montant ; le
+serveur n'interprète pas le message du joueur pour l'attribuer. Il transmet
+`roleplayBonus` et une justification `roleplayReason` dans `roll_ability_check`,
+`resolve_player_attack` ou `resolve_attack` ; `resolve_player_multiattack`
+accepte ces champs par attaque, évaluée séparément. Sans récompense, les champs
+sont omis. La justification précise le bénéfice concret et le montant retenu.
+Une idée répétée exige un apport nouveau ; un bénéfice déjà traduit par un
+avantage, un DD réduit ou un autre effet mécanique ne donne pas une seconde
+récompense. Le bonus ne sert ni à compenser un mauvais jet ni à assurer un succès.
+Le moteur valide les bornes et la justification avant les dés ou les coûts,
+ajoute le bonus au jet (jamais aux dégâts) et le restitue dans le résultat et
+le journal, y compris après une réaction suspendue/sauvegardée. Ce bonus
+remplace l'avantage accordé pour le roleplay ; les avantages/désavantages des
+règles et des circonstances continuent de s'appliquer indépendamment. Une
+attaque garde ses règles de critique et d'échec sur le dé naturel.
+
+## Prétirés de niveau 7 — SRD 2014 (31 octobre 2026)
+
+Les IDs restent `fighter`, `bard`, `wizard`, `cleric`. Au niveau exactement 7,
+`getCharacterTemplate(id, level)` sélectionne `characters/<id>/level7.ts` et
+`buildPlayerState` crée un profil `ruleset: "srd2014"` avec sous-classe.
+Les autres niveaux et les sauvegardes historiques gardent leur ancien contrat.
+Les outils exigeant `GameState.hero` ne sont exposés au DM que pour les
+profils `srd2014`, y compris dans la liste de choix du planner.
+**Démarrer une nouvelle partie** pour bénéficier des nouvelles capacités ;
+aucune transformation du personnage ou de l’aventure d’une session existante.
+
+| Profil | Sous-classe | PV standard | CA | Capacités jusqu’au niveau 7 |
+|---|---|---|---|---|
+| Darian | Champion | 67 | 18 | Duel, critique 19–20, Athlète remarquable, deux attaques, Sursaut, Second souffle |
+| Lyra | Collège du Savoir | 45 | 14 | Inspiration d8 ×4, Source d’inspiration, Mots cinglants, Chant reposant, Contre-charme, expertise, trois compétences, deux Secrets magiques |
+| Aldric | Évocation | 37 | 12 | Récupération arcanique, Érudit en évocation, Sculpture des sorts, Tour de magie puissant, grimoire et rituels |
+| Séréna | Vie | 52 | 18 | Armures lourdes, huit sorts de domaine, Disciple de la Vie, Guérisseur béni, Canalisation ×2, Préservation de la vie, Renvoi et Destruction FP 1/2 |
+
+Maîtrise +3 ; attaque magique +7, DD 15, emplacements 4/3/3/1 pour les trois
+incantateurs. Les PV suivent le maximum au premier niveau puis les valeurs
+fixes SRD. Les augmentations de caractéristiques sont déjà incluses.
+Les fiches `character-sheet-level7.md` sont injectées dans le prompt et
+l’aperçu utilise les mêmes profils que le moteur.
+
+Les règles et outils sont détaillés dans [level7-srd2014.md](level7-srd2014.md).
+Le barde niveau 7 connaît également `charm-person` (Charme-personne) en bonus
+explicitement demandé : ses dix sorts ordinaires et ses deux Secrets magiques
+restent inchangés (treize sorts). Les profils historiques restent inchangés.
+`cast_spell` résout portée de 30 pieds, cibles humanoïdes explicites, sauvegarde
+SAG et surincantation, puis inscrit un `WorldFact` nommant cible et lanceur.
+Le fait survit aux changements de salle/carte et à l’hydratation ; un effet
+horodaté le met à jour après une heure, dissipation ou fin causée par le
+lanceur/ses compagnons via les outils d’attaque et de dégâts. Le fait final
+rappelle que la cible sait avoir été charmée. Aucun changement permanent de
+disposition ni révélation d’indice n’en découle. Les PNJ narratifs utilisent
+un `AdventureNpcSpec.statBlock` SRD autoré (ou leur `reactive.combatTemplate`
+ou leur `kind` s’il correspond exactement à un bloc SRD) pour la sauvegarde ;
+un PNJ sans bloc connu est refusé avant tout coût, sans statistiques inventées.
+Un pion représentant plusieurs personnes ne reçoit pas de bloc individuel :
+il faut des cibles individuelles pour éviter de charmer tout un groupe avec
+un emplacement de niveau 1.
+`GameState.hero` conserve dés de vie, réactions, concentration, effets avec
+expiration, décisions suspendues et ressources de repos. Il est validé par
+`HeroStateSchema`, hydraté par MCP et persisté avec le reste du GameState.
+Une fenêtre de réaction est une décision explicite : le serveur ne la refuse
+ni ne la joue automatiquement. Un jet suspendu n’est jamais relancé.
+
+Pour ces profils, **un changement de carte ne recharge aucune ressource**.
+`take_rest` applique les vrais repos ; `advance_time` et les durées de voyage
+autorées font expirer les effets sans conférer de repos. Les destinations,
+les cibles, les allocations de soin et les créatures protégées par Sculpture
+sont toujours choisies par l’agent, puis validées par le moteur.
+
+Sources : [SRD 5.1 officiel](https://media.wizards.com/2023/downloads/dnd/SRD_CC_v5.1.pdf),
+snapshots API 2014 avec SHA-256 dans `lib/srd/level7-sources.json` et
+`lib/srd/subclass-sources.json`, attribution dans `lib/srd/level7.LICENSE.txt`.
+Le SRD officiel prime sur les erreurs de l’API communautaire.
+
+## Référence historique des profils v1
+
+La suite de ce document décrit les profils historiques des autres niveaux.
+Ses exclusions « v1 » (repos, réactions, concentration, zones et rituels) et
+sa recharge par carte ne s’appliquent **pas** aux profils `srd2014` ci-dessus.
+
 > **Statut : IMPLÉMENTÉ (les 5 phases).** Ce document reste la référence de
 > conception ; si une décision change, METTRE À JOUR ce document dans le même
 > commit (docs/ a déjà divergé du code — ne pas recommencer). Le joueur choisit
@@ -13,6 +204,119 @@
 > et le round-trip character_id de tests/db-stores.
 
 ## Objectif
+
+### Création d'eau : interprétation narrative libre (30 octobre 2026)
+
+L'IA interprète l'utilisation de l'eau dans le contexte de la scène, puis
+décrit librement la conséquence dans l'appel `cast_spell`. Aucun menu
+`container`/`rain`/`extinguish` n'est proposé à l'agent :
+
+```json
+{"spellId":"create-water","waterEffect":{"description":"L'eau a rincé la boue des bottes et laissé une flaque brune près du banc.","cell":{"x":5,"y":13}}}
+```
+
+La case est illustrative ; l'IA choisit la localisation réelle de l'effet.
+Le moteur valide le schéma, la case dans la salle actuelle, la portée, le sort
+connu, le tour et l'emplacement AVANT tout débit. Une cible ennemie
+supplémentaire est refusée ; les autres sorts refusent `waterEffect`.
+Ni le serveur ni le moteur n'analysent le message du joueur pour choisir
+ou réécrire l'effet. L'IA reste responsable de l'interprétation sémantique
+et du respect des bornes SRD (environ 40 L, zone de 9 m, pas de dégâts ni
+de noyade). Le moteur ne prétend pas prouver ces limites à partir d'un texte
+libre : aucune nouvelle simulation de liquides ou validation LLM n'est ajoutée.
+
+Après un lancer réussi, le moteur enregistre le texte exact dans un `WorldFact`
+avec `basis: "ai_interpretation"`, `roomId`, `mapId`, `waterEffect` et
+`expires: "never"`. Le résultat fournit ce fait, les limites `srdNote`, un
+résumé et les `narrationFacts`. La conséquence n'est publiée qu'après ce retour.
+Ce texte reste une donnée narrative : il ne retire aucun objet, ne change
+aucun PV, condition ou état de porte et n'exécute aucune instruction. Ces
+mutations nécessitent les outils mécaniques dédiés ; leur état fait autorité
+en cas de conflit. Les descriptions libres sont citées comme données dans
+les prompts, et leur origine IA est explicitée au narrateur.
+
+Les faits durables survivent aux changements de salle/map, au round-trip MCP,
+à la compression de l'historique et à la sauvegarde Postgres, sans éviction
+par les huit faits transitoires. Ils sont rappelés dans « FAITS ÉTABLIS »
+uniquement dans leur salle/map, avec la case de l'effet. Ils relatent l'action
+accomplie sans garantir que de l'eau restera éternellement présente. Les
+anciens faits à modes restent lisibles dans les sauvegardes, sans conversion
+ni modification de leur texte ; ces modes ne sont plus acceptés pour un
+nouveau lancer. Les faits historiques sans `waterEffect` gardent leurs règles.
+
+### Équipement déposé (octobre 2026)
+
+L'IA décrit désormais le placement librement dans le même appel que le dépôt :
+
+```json
+{"itemId":"longsword","nearEntityId":"mac","description":"L'épée repose au pied de Mac, contre ses racines."}
+```
+
+L'exemple appartient au module où cette entité existe ; aucun nom de module
+n'est inscrit dans les couches partagées. `nearEntityId` désigne une entité
+visible exacte, dans la même salle/map et à une case au plus sans obstacle.
+Le joueur doit l'approcher via un appel IA explicite si elle est plus loin.
+L'objet reste sur la case du joueur adjacent au repère. Le moteur sauvegarde
+un instantané `anchor: { entityId, name, position }`, la `description` libre
+et la position au sol : si le PNJ se déplace, l'objet ne le suit pas et n'est
+pas transféré dans son inventaire. Pour un décor sans entité, l'IA peut fournir
+`toCell`, également à une case au plus, sans obstacle et dans la même salle.
+`toCell` et `nearEntityId` sont exclusifs. Sans ces deux champs, le dépôt reste
+aux pieds du joueur (compatibilité des anciens appels).
+
+Le dépôt enregistre aussi un `WorldFact` durable lié par `subjectItemId`.
+Lorsqu'une description est fournie, elle est conservée exactement avec
+`basis: "ai_interpretation"` et `narrativeEffect: { description, cell }`.
+Le résumé mécanique confirme séparément l'objet, sa position et son absence
+de l'inventaire. À la reprise, tous les faits liés à l'ancien dépôt sont
+supprimés, puis un fait de reprise transitoire est ajouté. Un nouveau dépôt
+remplace cette mémoire par le nouvel emplacement. Dépôt/reprise mettent à
+jour inventaire, CA et mémoire ensemble, après validation ; un refus ne
+produit aucun fait ni coût. Les descriptions/repères survivent au round-trip
+MCP et Postgres. Les anciennes sauvegardes sans ces champs restent lisibles.
+
+`drop_item` retire un objet de l'inventaire et conserve son objet complet,
+sa map, sa salle et sa case dans `GameState.droppedItems` (clé = `item.id`).
+`pick_up_item` exige la même map, la même salle et une distance d'au plus une
+case. Ces opérations consomment l'action en combat ; en exploration, un seul
+déplacement peut accompagner une interaction. Le bonus de CA d'une armure
+ou d'un bouclier est retiré au dépôt et rétabli à la reprise. Les attaques
+avec une arme connue exigent sa présence dans l'inventaire ; sans arme, une
+attaque sans arme explicitée reste possible. L'inventaire vivant prime sur
+le kit initial de la fiche, et les objets déposés restent dans le contexte
+après compression. Les anciens états sans `droppedItems` utilisent `{}`.
+
+### Mémoire des autres actions du joueur
+
+`record_scene_fact({ description, cell, replaceFactId? })` étend la mémoire narrative aux
+conséquences certaines du roleplay et aux résultats déjà résolus par leurs
+outils. Il n'impose aucun menu d'actions. L'IA choisit le texte et sa case ;
+le moteur valide la localisation dans la salle/map actuelle et enregistre
+un fait durable avec `basis: "ai_interpretation"` et `narrativeEffect`.
+Il est transmis au narrateur dans le même `tool_result`, sauvegardé avec
+l'état et rappelé seulement dans sa scène. Cet outil ne consomme pas une
+deuxième action et ne résout aucune règle : ni jet, ni PV, ni inventaire,
+ni condition, ni porte. L'IA doit attendre la résolution mécanique avant de
+mémoriser sa conséquence ; le moteur ne valide pas sémantiquement un texte
+libre. Dépôt/reprise utilisent leurs outils dédiés avec `description`, pour
+que la mémoire soit liée à l'objet et effacée lors de sa récupération.
+Une hypothèse ou une intention non résolue ne constitue pas un fait acquis.
+Si une nouvelle action modifie un fait déjà mémorisé (par exemple effacer une
+marque), l'IA fournit son ID dans `replaceFactId` ; les IDs figurent dans le
+contexte des faits. Le moteur valide que le fait existe dans cette scène,
+qu'il est narratif et sans lien d'emplacement d'objet, avant de le remplacer.
+Un identifiant invalide ou un fait d'inventaire est refusé sans mutation.
+
+L’agent choisit explicitement `weaponOrSpell` et une cible (`targetId`, nom/type
+exact, ou `targetHint` explicite pour une attaque). Un sort offensif exige une
+cible ; aucun ennemi « le plus proche » n'est choisi si elle manque. Pas de
+première arme portée ni d'attaque sans arme implicite. Les registres acceptent
+un id ou un libellé exact normalisé, jamais une phrase par inclusion. Les
+cibles ambiguës sont refusées, y compris les égalités de distance d'un hint.
+Les effets sans cible ennemie (soin personnel, utilitaire) conservent la cible
+définie par la règle SRD. Les aptitudes, maîtrises et coûts sont dérivés par le
+moteur après le choix de l'action : ce sont des règles, pas des intentions.
+
 
 Aujourd'hui il n'existe qu'UN héros : un Guerrier figé dans
 `lib/player-template.ts` (`BASE_PLAYER`), dont seuls le niveau, les PV,
@@ -48,16 +352,22 @@ classe (attaques selon l'arme, sorts, ressources) — le LLM ne fait que narrer.
    moteur à partir de faits de `GameState`
    — jamais déclaré par le LLM ni par le client (anti-triche/anti-injection,
    invariant n°1).
-5. **Rétrocompatibilité totale sur le Guerrier.** Le personnage par défaut
-   (`fighter`) reprend exactement `BASE_PLAYER` actuel : mêmes stats, mêmes
-   PV par aventure, même inventaire. Sessions legacy (GameState sans
-   `characterId`) = guerrier. Les nombres du `playtest:mock` (23 tours,
-   ratio ≈ 0,348) doivent rester comparables avant/après.
+5. **Rétrocompatibilité des profils historiques.** Le catalogue v1 reprenait
+   l’ancien `BASE_PLAYER` pour `fighter` : mêmes statistiques, PV par aventure
+   et inventaire. Les sessions legacy sans `characterId` restent associées au
+   guerrier. Ce contrat historique ne décrit pas les nouveaux
+   profils SRD de niveau 3 et 7, détaillés plus haut. Le playtest actuel doit
+   réussir selon les seuils de `scripts/CLAUDE.md`.
 6. **Les mécaniques nouvelles sont un sous-ensemble SRD fermé et vérifiable.**
-   Pas de concentration, pas de réactions, pas de repos long/court (les
-   ressources se rechargent au `travel_to_map` — repos narratif entre maps).
-   Chaque sort/capacité du registre a un effet d'une liste fermée que le
-   moteur sait résoudre. On étend par ajout de variantes, jamais par du flou.
+   Les profils SRD disposent de concentration, réactions et repos résolus par
+   leurs outils ; changer de carte ne restaure pas leurs ressources. Les
+   anciennes limitations du catalogue v1 restent de l’historique, sans migration
+   implicite des sauvegardes.
+   Chaque sort/capacité du registre utilise une résolution mécanique fermée
+   que le moteur sait appliquer. Les conséquences purement narratives de
+   Création d'eau sont interprétées librement par l'IA dans les limites du
+   sort, puis mémorisées avec cette provenance ; elles ne remplacent aucune
+   résolution mécanique.
 7. **PV rééquilibrés pour le jeu solo, déclarés par le personnage.** Le
    précédent existe : le Guerrier a 20 PV au niveau 1 (SRD : 12) car il joue
    sans groupe. Chaque personnage déclare `hp: { base, perLevel }` ; l'aventure
@@ -485,14 +795,14 @@ préparer maintenant.
    bloc dynamique via `serializeGameState`). La fiche décrit identité, stats,
    compétences, équipement, capacités de classe (avec leur mode d'emploi
    côté DM : « Second souffle = tool use_class_feature »), traits.
-4. **Cache Anthropic** : une variante de cache par (aventure × personnage ×
-   phase) est VOULUE — même logique que par module. Le prompt statique reste
-   byte-stable pour une session donnée.
-5. **Grille de décision du DM** (prompts.ts) : ajouter aux INSTRUCTIONS
-   CRITIQUES la ligne « lancer un sort → `cast_spell` ; capacité de classe
-   (second souffle, ruse) → `use_class_feature` — ne JAMAIS narrer l'effet
-   avant le tool ». Formulation générique (aucun nom de module), donc pas de
-   nouveau champ promptGuidance.
+4. **Système permanent** : le prompt dépend de l’aventure et du personnage,
+   sans état volatil. Le cache de préfixe éventuel est géré côté vLLM. Les
+   schémas disponibles suivent la phase moteur et les choix de découverte du MJ.
+5. **Procédures du DM** : placer les nouvelles consignes spécialisées dans
+   `lib/dm/rule-guides.json`, avec leurs domaines et outils exacts. Le MJ les
+   lit via `get_rules_support({domain})` et charge les schémas manquants avec
+   `discover_tools`. Aucun nouveau manuel de mécanique dans le système permanent ;
+   le contrat commun exige déjà de résoudre l’effet par outil avant narration.
 6. **Classifieur** (planner.ts) : exemples génériques « je lance un projectile
    magique sur le gobelin » → cast_spell ; l'enum des tools par phase inclut
    les nouveaux (cast_spell/use_class_feature exposés en combat ET en
@@ -501,8 +811,10 @@ préparer maintenant.
    <sort> » → cast_spell, « second souffle » → use_class_feature — pour que
    tests et playtest couvrent les nouveaux tools sans appel payant.
 8. **Playtest** : le scénario Grammy scripté joue le guerrier par défaut →
-   `npm run playtest:mock` avant/après, comparer les NOMBRES (23 tours,
-   ratio ≈ 0,348) — ils ne doivent pas bouger.
+   `npm run playtest:mock` doit réussir, avec les seuils actuels décrits dans
+   `scripts/CLAUDE.md`. Les résultats de chaque vague sont conservés dans le
+   registre canonique ; les anciens chiffres du pipeline supprimé ne sont
+   plus des critères de validation.
 
 ## Catalogue v1 (SRD 5, niveau de référence 1, équilibrage solo)
 
@@ -597,6 +909,88 @@ séparément.
    adventures/CLAUDE.md (anatomie sans player-character.md), README,
    characters/CLAUDE.md.
 
+## Équipement explicite et actions PHB complémentaires
+
+Le premier lot [outils MJ](mcp-toolkit.md) ajoute `equip_item`, `use_item` et
+les actions complémentaires de `combat_action`, dont préparation et opposition
+agrippement/bousculade. `PlayerState.toolProficiencies` conserve les maîtrises
+d'outils configurées explicitement. `Item.equipmentId` identifie le modèle
+publié d'un objet individuel. Après la première opération d'équipement explicite,
+port, mains libres, CA et armes suivent `GameState.dmTools.loadout`. Porter
+une armure dans l'inventaire ne l'équipe plus. Les anciennes sessions gardent
+leur comportement jusqu'à cette opération. Voir le document lié pour les coûts,
+sources et limites, notamment transport d'une cible agrippée, éclairage et
+activation d'objets magiques.
+
+Le deuxième lot ajoute `resolve_tool_check` et la bourse persistée dans
+`GameState.dmTools.wallet` (voir le même guide). Le registre transmet les
+`CharacterTemplate.toolProficiencies` explicites au joueur initial. Le profil
+du barde de niveau 7 précise luth, flûte et tambour ; seul le luth est possédé
+au départ. Les anciennes sauvegardes ne reçoivent aucune maîtrise ni pièce
+implicitement. Le prompt dynamique présente les maîtrises configurées.
+
+La monnaie mécanique est unique : `dmTools.wallet`. Les profils SRD de niveau 7
+y commencent avec leurs 250 po existantes. Au chargement SQL et à l'hydratation
+MCP, une ancienne réserve `hero.gold` est ajoutée une seule fois aux pièces
+déjà présentes, puis supprimée ; une bourse vide ne se recharge pas. Les autres
+profils démarrent sans monnaie nouvelle. `copy_spell_to_book` exige désormais
+`paid` (dénominations explicites) pour le coût exact de copie : validation de
+source, possession du grimoire et fonds avant tout débit ou temps écoulé.
+Paiements, trésors et étude utilisent ainsi la même bourse. Aucun rendu de
+monnaie implicite n'est effectué pour la copie.
+
+Les [grimoires physiques et leurs travaux de copie](spellbooks.md) conservent
+désormais chaque vraie instance séparément. Plusieurs livres personnels peuvent
+fournir ensemble la préparation, et un nouveau volume peut réellement fournir
+un rituel. Sauvegarde/remplacement, fournisseurs ou stocks réels d'encres,
+paiement unique et segments de travail persistés sont résolus par MCP ; les
+sorts non préparés d'un livre perdu ne sont jamais recréés depuis l'ancienne liste.
+
+Les profils SRD peuvent acquérir les 11 objets magiques pris en charge dans
+`lib/srd/magic-items.ts`. Leurs instances et connaissances sont persistées dans
+`dmTools.magicItems` : aucune modification du kit initial, ni harmonisation
+automatique. Les bonus de CA/sauvegarde passent par les effets réellement actifs
+et les armes +1 par l'instance tenue. Une baguette lance son sort sans exiger de
+sort connu ou d'emplacement du personnage ; les prérequis d'harmonisation restent
+ceux du catalogue. Voir [le troisième lot MCP](mcp-toolkit.md#troisième-lot--objets-magiques).
+
+Les extensions du même guide ajoutent les parchemins de niveaux 1–4 compatibles
+avec la liste de classe, avec DD/attaque fixes et consommation réelle ; la copie
+par le magicien conserve ses coûts, temps et test d'Arcanes. Lecture et copie
+ne préparent aucun sort. Bestow Curse et Remove Curse sont enregistrés dans le
+SRD mais ne sont jamais accordés automatiquement aux fiches : connaissance ou
+préparation réelle restent nécessaires. Les afflictions persistantes suivent le
+personnage, y compris leur limite de soins et leur traitement. L'éclairage ne
+confère aucune vision dans le noir à partir d'une classe ou d'une description.
+
+L'Inspiration du MJ 2014 est persistée séparément de l'Inspiration bardique et
+du bonus de roleplay : un seul crédit, réservé avant le prochain vrai jet de la
+catégorie explicitement choisie. Octroi et dépense ne donnent aucune action.
+Les profils SRD suivent aussi les six niveaux d'épuisement 2014, avec leurs
+désavantages, vitesse et maximum de PV réels. Aid et Drain modifient le maximum
+avant sa division ; retrouver un maximum ne soigne pas. La récupération au
+repos long reste bloquée sans suivi nourriture/eau. Un ancien état booléen sans
+niveau exige une clarification, jamais un niveau déduit. Voir
+[Inspiration du MJ](dm-inspiration.md) et [épuisement](exhaustion.md).
+
+Les [PV temporaires](temporary-hp.md) suivent une réserve séparée dans
+`dmTools.temporaryHp` ; ils ne modifient ni le kit, ni les PV maximum, ni les
+sorts connus. Leurs sorts sources ne sont pas accordés par l'outil d'octroi MJ.
+Le [combat à deux armes](two-weapon-fighting.md) utilise deux instances équipées
+et un témoin de l'action Attaquer. `two_weapon_fighting` n'est reconnu que si la
+fiche le possède, sans octroi aux profils existants ; le bonus contre des objets
+reste à raccorder. Duel, lorsqu'il est acquis, compte les armes des deux mains
+et suit leur catégorie de mêlée, même si l'arme est lancée.
+La [couverture](cover.md) reste attachée à l'origine et aux positions déclarées,
+sans déduction automatique depuis les figurines ou calcul 3D de silhouette.
+Les [prises réelles](grapple-transport.md) peuvent transporter les deux corps
+sur une carte, avec demi-vitesse, exception de taille et réactions persistées.
+Leur détenteur exact, joueur ou monstre, peut relâcher son effet sans action ni
+soin. Aucun poids général, gabarit multicases ou transfert de prise entre
+cartes n'est accordé par ce lot.
+Les [rappels joueur développés](player-rules-reference.md), avec leurs sources
+officielles, sont conservés séparément du socle compact chargé dans le prompt.
+
 ## Guide : ajouter un personnage (checklist cible pour characters/CLAUDE.md)
 
 1. Créer `characters/<id>/` : `sheet.ts` (un `CharacterTemplate` complet) et
@@ -620,3 +1014,197 @@ séparément.
 6. Ajouter le personnage au sélecteur de la landing (si le registre ne
    l'alimente pas déjà automatiquement) et vérifier une partie en
    `npm run dev` (spawn, fiche dans le prompt, sorts jouables).
+
+### Composantes et équipement effectif
+
+Les personnages conservent leur kit publié. Les incantations utilisent les mains du loadout réel et une source matérielle explicitement choisie avec focusItemId (sacoche possédée ou focaliseur de classe réellement tenu). Une arme ou un bouclier peut nécessiter d'être rangé par equip_item avant une composante somatique ; aucun objet porté dans le sac ne devient automatiquement tenu. inspect_spell_components explique ces prérequis sans incanter. Les pénalités d'armure proviennent des maîtrises de la fiche fixe ; aucune maîtrise ou exemption raciale n'est ajoutée par la classe supposée. Voir [composantes](spell-components.md) et [armure](armor-penalties.md).
+
+La nutrition standard peut être suivie explicitement avec begin_nutrition_tracking ; ce choix établit des faits connus sans créer de provisions ni reconstruire les anciens repas. Le personnage consomme les contenus exacts de rations et d'outres réellement possédées ; les besoins raciaux ne sont jamais déduits de sa classe. Le raccord temps/repos est suivi dans le [registre canonique](suivi-integration-mcp.md) et détaillé dans [nutrition](survival-nutrition.md).
+
+### Maîtrise des armes — correction W5
+
+Le bonus de maîtrise des attaques d'arme dépend de la classe fixe du registre : guerrier simple/martial, clerc armes simples, barde armes simples et exceptions publiées, magicien liste publiée. Possession et équipement ne confèrent aucune maîtrise. Les frappes sans arme gardent leur maîtrise et les profils de monstres leurs bonus source ; les attaques de sorts restent distinctes. Les anciennes fiches sans characterId conservent le profil historique de guerrier, tandis qu'un identifiant inconnu n'accorde aucune maîtrise d'arme implicite. Aucun équipement, don ou trait racial n'est ajouté. Voir [maîtrises](weapon-proficiency.md) et le [registre canonique](suivi-integration-mcp.md) pour la validation.
+
+### Portées des armes — W6
+
+Le catalogue existant distingue les portées normale et longue : arc court
+80/320 pieds, dague et hache de main lancées 20/60 pieds. Le lancer reste
+explicitement choisi ; la portée de mêlée demeure de 5 pieds. Le moteur
+résout le désavantage à longue portée et celui d'un tir à proximité d'un
+hostile capable de voir le tireur et non neutralisé. Ces règles ne donnent
+ni arme, ni munition, ni maîtrise supplémentaire. Voir
+[ranged-weapons.md](ranged-weapons.md) pour le périmètre et ses limites.
+
+### Attaque de sort de mêlée non létale — W9
+
+Le choix explicite de KO ne change ni fiche, ni sorts connus/préparés, ni kit.
+Dans le catalogue actuel, seule Arme spirituelle effectue cette attaque : frappe
+initiale ou répétée, ou vrai parchemin admissible à la classe. Ses coûts bonus,
+composantes et cibles réelles restent exigés. Aucun autre sort de mêlée ou
+pouvoir de monstre n’est activé implicitement. Voir
+[nonlethal-melee-spells.md](nonlethal-melee-spells.md) et le suivi MCP.
+
+### Prise et munitions — W10
+
+Tenir une arme occupe une main ; une véritable attaque à deux mains exige
+l'autre main libre. `weaponHands: 2` utilise le dé alternatif publié d'une
+arme polyvalente et supprime Duel pour cette attaque. Une main disponible
+peut servir aux composantes somatiques entre les attaques, sans ranger
+automatiquement l'arme.
+
+Les armes à munitions exigent désormais une pile réellement possédée, sa
+quantité et `ammunitionItemId` choisi explicitement. Le catalogue ajoute les
+arbalètes légère et de poing ; cela ne les donne à aucun personnage. Les
+anciens objets sans quantité ne reçoivent aucun stock supposé. Loading limite
+chaque instance à un tir par véritable action ou réaction, pas par tour ; une
+nouvelle action doit être effectivement disponible. Les fiches et leurs kits
+restent les sources de possession et de maîtrise.
+
+### Repos, cycle à 0 PV et transport — W11
+
+Les repos fragmentables utilisent leurs véritables segments d'activité et de
+sommeil. `finish_rest` ne repaie pas la durée déjà accomplie ; les DV peuvent
+être choisis successivement au même achèvement avec `spend_rest_hit_die`.
+Le sommeil dépose les objets réellement tenus et interrompt la concentration ;
+le réveil ne relève ni ne rééquipe le personnage. Les études et harmonisations
+utilisent aussi ce cycle. Voir [repos](rest-lifecycle.md).
+
+Un joueur vivant à 0 PV peut entrer dans le combat choisi explicitement, sans
+action physique. Sa sauvegarde contre la mort, au véritable événement dû,
+ne consomme pas son action ; une ancienne sauvegarde sans historique demande
+une observation présente. Aucun jet passé n'est inventé. Voir
+[cycle joueur](player-life.md) et [récupération stable](player-stable-recovery.md).
+
+Heavy utilise la taille Small effectivement établie, Reach la portée de l'arme
+réellement choisie ; possession et maîtrise restent distinctes. Le transport
+physique réserve ses vraies mains et déplace ensemble le joueur et une charge
+réelle vers deux destinations explicites. Il n'accorde aucun équipement ni
+modification de fiche. Voir [transport](physical-handling.md) et
+[voyage à pied](travel.md).
+
+Les longues incantations et rituels des sorts déjà accessibles conservent leur
+vraie concentration et leur travail explicite entre les messages. L'emplacement
+et l'effet n'arrivent qu'après `finish_casting` ; ni le simple démarrage ni une
+attente ne terminent le sort. Une interruption repart de zéro et un rituel
+n'autorise pas l'amélioration par emplacement supérieur. Voir
+[incantations longues](casting-time.md).
+
+### Catalogue et ressources — cohorte suivante
+
+Le catalogue standard référence les37armes physiques sans les donner au
+personnage. Finesse permet un choix explicite d'aptitude par frappe, conservé
+pendant les décisions suspendues ; une sarbacane n'invente pas de dé de dégâts.
+La lance et le filet utilisent leurs vraies portées, mains, coûts et procédures.
+Voir [armes standard](standard-weapons.md).
+
+Le forage produit des ressources réellement gagnées et collectées, puis
+consommées séparément. L'eau remplit uniquement les récipients possédés ou
+atteignables à capacité connue, avec vrais stocks, volumes et masses ; aucun
+contenant ni repas n'est créé par une déclaration. Voir [forage](foraging.md)
+et [eau située](water-sources.md). Les portes cachées ont leur découverte
+persistante, distincte d'une ouverture ou d'une neutralisation de piège ; voir
+[découverte des portes](door-discovery.md).
+
+### Exposition météo — intégration en cours
+
+Le froid et la chaleur lisent les défenses réelles, les vêtements réellement possédés et portés, et l’accès effectif à l’eau. Aucun équipement ni adaptation n’est déduit d’une classe ou d’un nom. Les sauvegardes de CON dues restent distinctes des actions du personnage et des jets de mort ; un corps vivant stable à0PV effectue encore son vrai CON. Les faits et inspections météo sont auxiliaires ; porter un vêtement et se déplacer verticalement suivent leurs vrais coûts. Ce lot ne donne aucun pouvoir de vol au joueur. Voir [météo et exposition](weather.md) et le suivi pour la validation courante.
+
+## Apprentissage standard2014 en cours de partie
+
+Le personnage et son characterId restent fixes. `start_training` et `work_training` suivent un professeur réel, le paiement effectif de1po par vrai jour enseigné et250journées distinctes comprenant chacune8heures. Seul le dernier travail réellement accompli ajoute une langue à `PlayerState.languages` ou une maîtrise à `PlayerState.toolProficiencies`, sans kit, niveau ou expertise gratuit. Les segments partiels, frais et pauses restent dans `dmTools.training` ; ils survivent à la sauvegarde SQL sans effacer les jours incomplets ni les créditer à tort. Le contexte dynamique du MJ transmet les langues et maîtrises actuelles, sans réécrire la fiche initiale mise en cache. Les conditions et bornes complètes sont décrites dans [training.md](training.md) ; la preuve de livraison intégrée est tenue par le suivi MCP canonique.
+
+### Options de sommeil et renommée de faction
+
+Les choix structurés de `configure_sleep_rules` adoptent les options Xanathar
+avant les intervalles concernés. La récupération en armure lit les portions
+réellement dormies et les dés de vie réellement dépensés. La privation utilise
+son ancre conservée et les véritables repos achevés. Voir [sommeil](xge-sleep.md).
+
+La renommée optionnelle du DMG appartient au même personnage dans la même
+session, avec un suivi séparé par organisation. Les rangs demandent les seuils,
+le niveau réel et les prérequis déclarés ; promotion et retrait sont explicites.
+Les ressources, maîtrises, avantages et attitudes suivent leurs procédures
+propres. Voir [renommée](renown.md).
+
+<!-- BEGIN:W22-GEAR-AND-OPTIONAL-PHYSICS -->
+### Équipement acquis et options W22
+
+Les lanceurs ordinaires peuvent être préparés comme stock initial réel chez un
+marchand par `prepare_phb_launcher_stock`, aux prix PHB des sept profils pris en
+charge. Offre, achat, paiement, mains et équipement restent des procédures
+explicites sur les mêmes instances ; la préparation ne donne rien au personnage.
+Les [versions en adamantium](adamantine.md) déjà fabriquées gardent leur
+provenance de matière à l'achat, au tir et à la récupération. Un coup au but
+contre un objet utilise les vrais dés critiques ; le lanceur ordinaire ne devient
+pas adamantin. La transformation d'un équipement possédé est reportée, de même
+que les tarifs de lots partiels non représentés. Aucun profil ni personnage de
+session n'est remplacé pour acquérir ces objets.
+
+Les [options de chute XGE](xge-falling.md), désactivées par défaut, n'accordent
+aucune vitesse de vol au personnage. Les départs de curseur non représentés
+restent refusés ; le catalogue de personnages et les capacités de monstres
+conservent leur périmètre publié. Le [calendrier](campaign-calendar.md) est une
+projection administrative : il ne donne ni repos, maîtrise, recharge ni ressource.
+<!-- END:W22-GEAR-AND-OPTIONAL-PHYSICS -->
+
+<!-- BEGIN:W23-SOURCED-PLAYER-PROCEDURES -->
+### Nœuds, incantations perçues et travail entre aventures
+
+Les [nœuds optionnels de Xanathar](knots.md) utilisent la vraie corde PHB
+entière acquise par le personnage. La corde narrative ancienne de sa fiche
+n'est pas convertie en équipement physique qualifié. Après adoption explicite,
+le joueur emploie INT(Escamotage) pour nouer/dénouer et DEX(Acrobaties) pour
+sortir de sa boucle qualifiée ; le DD conserve le total final du premier jet.
+Durée hors combat et action improvisée en combat sont des choix MJ explicites,
+sans durée RAW inventée ni état « entravé » automatique. La corde garde une
+seule possession et sa masse réelle ; aucun personnage de session ne change.
+
+La [perception des incantations](spell-perception.md) concerne les
+observateurs explicitement choisis sur les producteurs réellement pris en
+charge. Les composantes effectives, les sens et la géométrie qualifient un
+instantané initial, sans nom/niveau du sort ni cible cachée. Entendre seulement
+une incantation n'accorde aucune identité de voix ou position cachée. La lecture
+ultérieure ne révèle pas la réussite ou l'annulation après le départ d'un
+observateur. Identifier le sort reste bloqué faute de fiche officielle locale ;
+la proposition maison de l'export n'est pas activée.
+
+Le [travail optionnel entre aventures](xge-downtime-work.md) conserve l'emploi,
+les outils réels et cinq journées distinctes de huit heures réellement passées.
+Le budget représenté de huit heures est partagé avec artisanat/formation ;
+c'est une limite du moteur, pas un maximum universel RAW. Le règlement unique
+conserve les complications et arbitrages MJ. Le train de vie est un droit non
+monétaire sur sept jours datés, sans provisions, soins, repos ou remboursement
+rétroactifs automatiques ; sa consommation en dépenses futures reste à intégrer.
+Seul le résultat final correspondant donne les 25 po et leurs pièces choisies.
+<!-- END:W23-SOURCED-PLAYER-PROCEDURES -->
+
+<!-- BEGIN:W24-LIGHT-TRAINING-CHASES -->
+### Lumière physique, formation Xanathar et poursuites urbaines
+
+[Lumière](light-spell.md) exige un objet de scène existant, touché et mesuré,
+sans dimension supérieure à dix pieds. Sa lumière suit cet objet réel pendant
+une heure : vingt pieds vifs puis vingt pieds faibles supplémentaires. Une
+couverture opaque complète bloque la lumière sans renouveler sa durée. Refaire
+le sort ou le terminer avec son action clôt l'ancien ; une ancienne préparation
+Ready ne peut pas recréer sa source après un nouveau lancer. Les objets
+d'inventaire et ceux tenus ou portés par un hostile restent hors de cette tranche.
+
+La [formation optionnelle Xanathar](xge-training.md) conserve son adoption
+explicite, le véritable instructeur et le sujet canonique du cours. La durée
+utilise l'INT réelle initiale selon la convention MJ approuvée ; les blocs de
+cinq vraies journées d'instruction sont payés 25 po au premier effort, sans
+prorata ou remboursement automatique. Les jours de recherche d'un instructeur
+disparu sont distincts de l'instruction. La maîtrise finale nécessite ses vrais
+efforts et la résolution des complications dues ; elle ne change ni personnage,
+classe, aventure ou équipement. La formation PHB par défaut reste distincte.
+
+Les poursuites urbaines du DMG demandent un choix explicite, des participants
+existants et l'initiative réelle. Les Dash effectivement utilisés déterminent
+les tests de CON et la fatigue propre à la poursuite. Le résultat de complication
+conservé touche le participant suivant ; aucune relance ou suppression ne remplace
+sa qualification physique. L'attaque de garde de la ligne 9 reste un événement
+DMG borné sur un vrai PNJ qualifié et sa lance réelle, sans nouveau profil MM.
+La récupération DMG est certifiée après un vrai repos représenté du joueur ;
+les autres retraits de source restent des décisions MJ explicites distinctes. Le
+conflit avec le sommeil en armure XGE exige l'arbitrage explicite du MJ prévu.
+<!-- END:W24-LIGHT-TRAINING-CHASES -->

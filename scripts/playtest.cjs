@@ -1,1318 +1,309 @@
 #!/usr/bin/env node
+'use strict'
 
+const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const path = require('node:path')
-const Module = require('node:module')
-const ts = require('typescript')
-
-function hasFlag(name) {
-  return process.argv.includes(name)
-}
+const { normalizeTurn, validateTurn } = require('./playtest-contract.cjs')
 
 function option(name, fallback) {
-  const prefix = `${name}=`
-  const inline = process.argv.find(arg => arg.startsWith(prefix))
-  if (inline) return inline.slice(prefix.length)
-
+  const inline = process.argv.find(arg => arg.startsWith(`${name}=`))
+  if (inline) return inline.slice(name.length + 1)
   const index = process.argv.indexOf(name)
-  if (index >= 0 && process.argv[index + 1] && !process.argv[index + 1].startsWith('--')) {
-    return process.argv[index + 1]
-  }
-
-  return fallback
+  return index >= 0 && process.argv[index + 1] && !process.argv[index + 1].startsWith('--') ? process.argv[index + 1] : fallback
 }
 
-function numberOption(name, fallback) {
-  const value = option(name, undefined)
-  if (value === undefined) return fallback
-  const parsed = Number(value)
-  return Number.isFinite(parsed) ? parsed : fallback
+function numberOption(name, envName, fallback) {
+  const value = Number(option(name, process.env[envName] ?? fallback))
+  if (!Number.isFinite(value) || value < 0) throw new Error(`Invalid nonnegative threshold: ${name}`)
+  return value
 }
 
-const mode = option('--mode', process.env.LLM_MODE || 'mock')
-const narrationMode = option('--narration-mode', process.env.NARRATION_MODE || 'quality')
-const allowPaid = hasFlag('--allow-paid') || process.env.ALLOW_PAID_LLM === 'true'
-const jsonOutput = hasFlag('--json')
-const noFail = hasFlag('--no-fail')
-const reportPath = option('--report', undefined)
-
-if ((mode === 'live' || mode === 'record') && !allowPaid) {
-  console.error('Refus de lancer un playtest live/record sans --allow-paid ou ALLOW_PAID_LLM=true.')
-  process.exit(2)
-}
-
-process.env.ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || 'sk-ant-playtest-placeholder'
-process.env.ALLOW_PAID_LLM = allowPaid ? 'true' : 'false'
-process.env.APP_LOG_BUFFER_ENABLED = process.env.APP_LOG_BUFFER_ENABLED || 'false'
-process.env.APP_LOG_LEVEL = process.env.APP_LOG_LEVEL || 'error'
-process.env.APP_LOG_PERSIST_ENABLED = process.env.APP_LOG_PERSIST_ENABLED || 'false'
-// Backend unique Postgres, émulé en mémoire (pg-mem injecté dans run()).
-process.env.DATABASE_URL = process.env.DATABASE_URL || 'postgres://pg-mem/in-memory'
-// Harnais de mécaniques/coût hors runtime Next : pas de cookies() ni de
-// next-auth chargeable → on coupe la monétisation (le débit/quota est couvert
-// par tests/credits-store et abuse-guards).
-process.env.MONETIZATION_ENABLED = process.env.MONETIZATION_ENABLED || 'false'
-process.env.LLM_MODE = mode
-process.env.NARRATION_MODE = narrationMode
-process.env.AI_DM_TEST_DICE_SEQUENCE = process.env.AI_DM_TEST_DICE_SEQUENCE ||
-  Array.from({ length: 160 }, (_, index) => [17, 6, 14, 3, 12, 4, 18, 5][index % 8]).join(',')
-
-function installTsRequireWithAliases() {
-  const previousTs = Module._extensions['.ts']
-  const previousResolve = Module._resolveFilename
-
-  Module._resolveFilename = function resolveFilename(request, parent, isMain, options) {
-    if (request.startsWith('@/')) {
-      const mapped = path.join(process.cwd(), request.slice(2))
-      return previousResolve.call(this, mapped, parent, isMain, options)
-    }
-
-    return previousResolve.call(this, request, parent, isMain, options)
-  }
-
-  Module._extensions['.ts'] = function loadTs(mod, filename) {
-    const source = fs.readFileSync(filename, 'utf8')
-    const output = ts.transpileModule(source, {
-      compilerOptions: {
-        esModuleInterop: true,
-        module: ts.ModuleKind.CommonJS,
-        moduleResolution: ts.ModuleResolutionKind.NodeJs,
-        target: ts.ScriptTarget.ES2022,
-      },
-    }).outputText
-    mod._compile(output, filename)
-  }
-
-  return () => {
-    Module._resolveFilename = previousResolve
-    if (previousTs) Module._extensions['.ts'] = previousTs
-    else delete Module._extensions['.ts']
-  }
-}
-
-function baseGameState(overrides = {}) {
+// A legacy-rules fixture deliberately isolates agent orchestration from the
+// separate level-seven SRD class suite. No removed world/intent state is seeded.
+function baseGameState() {
   return {
-    phase: 'exploration',
+    adventureId: 'grammys-country-apple-pie', characterId: 'fighter', phase: 'exploration',
     player: {
-      id: 'player',
-      name: 'Heros',
-      class: 'Guerrier',
-      level: 1,
-      hp: { current: 20, max: 20 },
-      ac: 16,
-      stats: { str: 16, dex: 12, con: 14, int: 10, wis: 12, cha: 10 },
-      proficiencyBonus: 2,
-      position: { x: 4, y: 13 },
-      conditions: [],
+      id: 'player', name: 'Heros', class: 'Guerrier', level: 1,
+      hp: { current: 20, max: 20 }, ac: 16,
+      stats: { str: 16, dex: 12, con: 14, int: 10, wis: 12, cha: 10 }, proficiencyBonus: 2,
+      position: { x: 4, y: 13 }, conditions: [], speed: 30,
       inventory: [
         { id: 'longsword', name: 'Epee longue', type: 'weapon', damage: '1d8+3' },
         { id: 'shield', name: 'Bouclier', type: 'armor', acBonus: 2 },
         { id: 'potion1', name: 'Potion de soin', type: 'potion', description: '2d4+2 HP' },
       ],
-      speed: 30,
     },
-    monsters: {},
-    initiativeOrder: [],
-    currentTurn: null,
-    round: 0,
-    movementUsed: {},
-    actionUsed: {},
-    combatLog: [],
-    roomsVisited: ['1'],
-    currentRoomId: '1',
-    encountersTriggered: [],
-    ...overrides,
+    monsters: {}, initiativeOrder: [], currentTurn: null, round: 0,
+    movementUsed: {}, actionUsed: {}, bonusActionUsed: {}, combatLog: [],
+    roomsVisited: ['1'], currentRoomId: '1', encountersTriggered: [], worldFacts: [], droppedItems: {},
   }
-}
-
-function makeGoblin(id, overrides = {}) {
-  return {
-    id,
-    name: `Gobelin ${id.replace(/^goblin_/, '').toUpperCase()}`,
-    type: 'goblin',
-    hp: { current: 60, max: 60 },
-    ac: 13,
-    stats: { str: 8, dex: 14, con: 10, int: 10, wis: 8, cha: 8 },
-    position: { x: 5, y: 13 },
-    conditions: [],
-    xpValue: 50,
-    attackBonus: 0,
-    damageDice: '1d6+2',
-    speed: 30,
-    isAlive: true,
-    ...overrides,
-  }
-}
-
-function combatGameState() {
-  return baseGameState({
-    phase: 'combat',
-    player: {
-      ...baseGameState().player,
-      hp: { current: 18, max: 20 },
-      ac: 30,
-      position: { x: 4, y: 13 },
-    },
-    monsters: {
-      goblin_a: makeGoblin('goblin_a'),
-    },
-    initiativeOrder: ['player', 'goblin_a'],
-    currentTurn: 'player',
-    round: 1,
-  })
 }
 
 function officeGameState() {
-  return baseGameState({
-    player: {
-      ...baseGameState().player,
-      position: { x: 5, y: 9 },
-    },
-    roomsVisited: ['5'],
-    currentRoomId: '5',
-    world: {
-      objects: {
-        office_drawer: {
-          id: 'office_drawer',
-          roomId: '5',
-          name: 'tiroir du bureau',
-          kind: 'container',
-          visible: false,
-          discovered: false,
-          opened: false,
-          locked: true,
-          dc: { search: 1, unlock: 1, force: 1 },
-        },
-      },
-      npcs: {},
-      quests: {},
-      alarms: {},
-      flags: {},
-      eventLog: [],
-    },
-  })
+  const state = baseGameState()
+  state.player.position = { x: 5, y: 9 }
+  state.currentRoomId = '5'; state.roomsVisited = ['5']
+  return state
 }
 
-function apartmentRecipeGameState() {
-  return baseGameState({
-    player: {
-      ...baseGameState().player,
-      position: { x: 8, y: 9 },
-      inventory: [
-        ...baseGameState().player.inventory,
-        {
-          id: 'recipe_half_office',
-          name: 'moitie de recette du bureau',
-          type: 'misc',
-          description: 'Premier fragment de recette.',
+function combatGameState() {
+  const state = baseGameState()
+  state.phase = 'combat'; state.currentTurn = 'player'; state.round = 1
+  state.player.hp.current = 18; state.player.ac = 30
+  state.monsters.goblin_a = {
+    id: 'goblin_a', name: 'Gobelin A', type: 'goblin', hp: { current: 60, max: 60 }, ac: 13,
+    stats: { str: 8, dex: 14, con: 10, int: 10, wis: 8, cha: 8 },
+    position: { x: 5, y: 13 }, conditions: [], xpValue: 50, attackBonus: 0,
+    damageDice: '1d6+2', speed: 30, isAlive: true,
+  }
+  state.initiativeOrder = ['player', 'goblin_a']
+  return state
+}
+
+function builtInScenarios() {
+  const attackTools = ['resolve_attack', 'resolve_player_attack', 'cast_spell']
+  return [
+    {
+      name: 'exploration-movement', initialGameState: baseGameState(),
+      // More than eight requests in one session: rate limiting must not mask coverage.
+      turns: [5, 6, 7, 8, 9, 10, 9, 8, 7, 6, 5, 4].map(x => ({
+        message: `je vais en (${x},13)`, expectTools: ['move_token'], maxLlmCalls: 3,
+        expectState: { 'player.position': { x, y: 13 }, phase: 'exploration' },
+      })),
+    },
+    ...[
+      { name: 'search-success', diceSequence: '17', result: 'SUCCES' },
+      { name: 'search-failure', diceSequence: '1', result: 'ECHEC' },
+    ].map(({ name, diceSequence, result }) => ({
+      name, diceSequence, initialGameState: officeGameState(),
+      turns: [{ message: 'je fouille le bureau', expectTools: ['roll_ability_check'],
+        forbidTools: attackTools, expectLog: [`Fouille:.*${result}`], expectNarrative: [result],
+        expectUnchanged: ['player.inventory', 'worldFacts', 'player.position'], maxLlmCalls: 3,
+        verify(state, before) { assert.equal(state.combatLog.length - before.combatLog.length, 1, 'Exactly one search roll') },
+      }],
+    })),
+    {
+      name: 'standard-social-conversation-persistence', initialGameState: baseGameState(),
+      turns: [1, 2].map(attempt => ({ message: 'je parle à mac du soin des arbres',
+        expectTools: attempt === 1 ? ['begin_social_interaction','record_social_conversation'] : [], forbidTools: [...attackTools],
+        expectNarrative: attempt === 2 ? ['déjà été enregistré'] : ['Vous échangez'],
+        expectUnchanged: ['player.position', 'player.inventory'], maxLlmCalls: 3,
+        verify(state, before) {
+          assert.ok(state.socialProfileSeed, 'The engine initializes a new-game personality seed')
+          assert.equal(Object.keys(state.socialPersonalities).length, 5)
+          const conversations = Object.values(state.dmTools.socialInteractions.records)
+          assert.equal(conversations.length, 1)
+          assert.equal(conversations[0].conversations.length, 1, 'Repeated dialogue never creates another conversation')
+          if (attempt === 2) {
+            assert.deepEqual(state.dmTools.socialInteractions, before.dmTools.socialInteractions, 'Repeated dialogue never duplicates the conversation')
+            assert.equal(state.socialProfileSeed, before.socialProfileSeed)
+            assert.deepEqual(state.socialPersonalities, before.socialPersonalities, 'Personality is never redrawn between turns')
+          }
         },
+      })),
+    },
+    {
+      name: 'combat-deescalation-success', initialGameState: combatGameState(), diceSequence: '20',
+      turns: [{ message: "ok ok, arretez de m'attaquer on fait la paix",
+        expectTools: ['begin_social_interaction','record_social_conversation','resolve_social_request','end_combat'], forbidTools: [...attackTools, 'run_monster_turns'],
+        expectState: { phase: 'exploration', currentTurn: null }, expectUnchanged: ['player.hp'],
+        expectLog: ['Interaction sociale'], expectNarrative: ['combat cesse'], maxLlmCalls: 6,
+        verify(state) {
+          const requests = Object.values(state.dmTools.socialInteractions.receipts).filter(receipt => receipt.kind === 'request')
+          assert.equal(requests.length, 1)
+          assert.equal(requests[0].result.requestGranted, true)
+          assert.deepEqual(requests[0].result.check.roll.rolls, [20])
+        },
+      }],
+    },
+    {
+      name: 'combat-deescalation-failure', initialGameState: combatGameState(), diceSequence: '1,1,20,1',
+      turns: [{ message: "ok ok, arretez de m'attaquer on fait la paix",
+        expectTools: ['begin_social_interaction','record_social_conversation','resolve_social_request','next_turn','run_monster_turns'], forbidTools: [...attackTools, 'end_combat'],
+        expectState: { phase: 'combat', currentTurn: 'player', round: 2, 'monsters.goblin_a.hp.current': 60 },
+        expectLog: ['Interaction sociale'], maxLlmCalls: 7,
+        verify(state, before) {
+          assert.equal(state.combatLog.slice(before.combatLog.length).filter(entry => entry.action === 'Interaction sociale').length, 1, 'A failed negotiation is not rerolled')
+          const requests = Object.values(state.dmTools.socialInteractions.receipts).filter(receipt => receipt.kind === 'request')
+          assert.equal(requests.length, 1)
+          assert.equal(requests[0].result.requestGranted, false)
+          assert.deepEqual(requests[0].result.check.roll.rolls, [1])
+        },
+      }],
+    },
+    {
+      // Attack hit, attack miss, potion, pass; retain the encounter's initiative.
+      name: 'combat-cycle', initialGameState: combatGameState(), diceSequence: '17,4,1,1,1,4,4,1,1',
+      turns: ["j'attaque le gobelin", "j'attque le gobelin", 'je bois une potion de soin', 'je passe mon tour']
+        .map((message, index) => ({ message,
+          expectTools: [index < 2 ? 'resolve_attack' : index === 2 ? 'use_healing_potion' : 'pass_turn', 'run_monster_turns'],
+          expectState: { phase: 'combat', currentTurn: 'player', round: index + 2 }, maxLlmCalls: 5,
+          verify(state, before) {
+            if (index === 0) assert.ok(state.monsters.goblin_a.hp.current < before.monsters.goblin_a.hp.current, 'A hit must actually damage its target')
+            if (index === 1) {
+              assert.equal(state.monsters.goblin_a.hp.current, before.monsters.goblin_a.hp.current, 'A miss must not damage its target')
+              assert.match(state.combatLog.slice(before.combatLog.length).map(entry => entry.mechanicalDetail).join(' '), /ECHEC CRITIQUE/)
+            }
+            if (index === 2) {
+              assert.ok(state.player.hp.current > before.player.hp.current, 'The potion must heal')
+              assert.ok(!state.player.inventory.some(item => item.id === 'potion1'), 'The potion must be consumed')
+            }
+          },
+        })),
+    },
+    {
+      name: 'inventory-persistence-and-refusal', initialGameState: baseGameState(),
+      turns: [
+        { message: 'je depose la potion', expectTools: ['drop_item'],
+          expectState: { 'player.inventory.length': 2, 'droppedItems.potion1.item.id': 'potion1' } },
+        { message: 'je vais en (6,13)', expectTools: ['move_token'], expectState: { 'player.position': { x: 6, y: 13 } } },
+        { message: 'je reprends la potion', expectTools: ['pick_up_item'], expectNarrative: ['refusée'],
+          expectUnchanged: ['player.inventory', 'droppedItems', 'worldFacts'] },
+        { message: 'je vais en (5,13)', expectTools: ['move_token'], expectState: { 'player.position': { x: 5, y: 13 } } },
+        { message: 'je reprends la potion', expectTools: ['pick_up_item'],
+          expectState: { 'player.inventory.length': 3, 'droppedItems.potion1': undefined },
+          verify(state) { assert.equal(state.player.inventory.filter(item => item.id === 'potion1').length, 1, 'No duplicate item') } },
       ],
     },
-    roomsVisited: ['9'],
-    currentRoomId: '9',
-    world: {
-      objects: {
-        recipe_half_office: {
-          id: 'recipe_half_office',
-          roomId: '5',
-          name: 'moitie de recette du bureau',
-          kind: 'clue',
-          visible: true,
-          discovered: true,
-          taken: true,
-          tags: ['recipe_half', 'quest_item', 'readable'],
-        },
-      },
-      npcs: {
-        grukk: {
-          id: 'grukk',
-          name: 'Grukk',
-          roomId: '9',
-          disposition: 'hostile',
-          known: true,
-          tags: ['goblin', 'boss'],
-          memory: {},
-        },
-      },
-      quests: {
-        grammy_recipe: {
-          id: 'grammy_recipe',
-          name: 'Retrouver la recette de Grammy',
-          progress: 1,
-          goal: 2,
-          completed: false,
-          flags: {},
-        },
-      },
-      alarms: {},
-      flags: {},
-      eventLog: [],
+    {
+      name: 'dialogue-without-player-attack', initialGameState: combatGameState(),
+      turns: ['je ne frappe pas', "il me menace de m'attaquer", "pourquoi est-ce qu'il attaque ?"].map(message => ({
+        message, forbidTools: attackTools, expectTools: [],
+        expectUnchanged: ['player.hp', 'monsters', 'round', 'actionUsed'], maxLlmCalls: 2,
+      })),
     },
-  })
+  ]
 }
 
-function bakeryHazardGameState() {
-  return baseGameState({
-    player: {
-      ...baseGameState().player,
-      position: { x: 8, y: 6 },
-    },
-    roomsVisited: ['8'],
-    currentRoomId: '8',
-  })
-}
-
-function bakeryEntranceGameState() {
-  return baseGameState({
-    player: {
-      ...baseGameState().player,
-      position: { x: 12, y: 11 },
-    },
-    roomsVisited: ['1', '4'],
-    currentRoomId: '4',
-  })
-}
-
-function orchardGameState() {
-  return baseGameState({
-    player: {
-      ...baseGameState().player,
-      position: { x: 9, y: 2 },
-    },
-    roomsVisited: ['1', '2'],
-    currentRoomId: '2',
-  })
-}
-
-function bakeryFloorGameState() {
-  return baseGameState({
-    player: {
-      ...baseGameState().player,
-      position: { x: 9, y: 7 },
-    },
-    roomsVisited: ['1', '4', '8'],
-    currentRoomId: '8',
-  })
-}
-
-function grukkCombatGameState() {
-  return baseGameState({
-    phase: 'combat',
-    player: {
-      ...baseGameState().player,
-      hp: { current: 12, max: 20 },
-      ac: 24,
-      position: { x: 8, y: 10 },
-    },
-    monsters: {
-      grukk: makeGoblin('grukk', {
-        name: 'Chef Grukk',
-        type: 'hobgoblin',
-        hp: { current: 80, max: 80 },
-        ac: 18,
-        attackBonus: 0,
-        damageDice: '1d8+1',
-        position: { x: 8, y: 11 },
-      }),
-    },
-    initiativeOrder: ['player', 'grukk'],
-    currentTurn: 'player',
-    round: 1,
-    roomsVisited: ['9'],
-    currentRoomId: '9',
-  })
-}
-
-function potionKoCombatGameState() {
-  const state = combatGameState()
-  return {
-    ...state,
-    player: {
-      ...state.player,
-      hp: { current: 1, max: 20 },
-      ac: 5,
-    },
-    monsters: {
-      goblin_a: makeGoblin('goblin_a', {
-        attackBonus: 10,
-        damageDice: '1d6+2',
-      }),
-    },
-  }
-}
-
-function downedCombatGameState() {
-  const state = combatGameState()
-  return {
-    ...state,
-    player: {
-      ...state.player,
-      hp: { current: 0, max: 20 },
-      conditions: ['unconscious'],
-      deathSaves: { successes: 1, failures: 1 },
-    },
-  }
-}
-
-function fleeingCombatGameState() {
-  const state = combatGameState()
-  return {
-    ...state,
-    player: {
-      ...state.player,
-      hp: { current: 5, max: 20 },
-    },
-  }
-}
-
-function fixtureGameState(name) {
-  switch (name) {
-    case 'base':
-    case 'entrance':
-      return baseGameState()
-    case 'office':
-      return officeGameState()
-    case 'apartment':
-      return apartmentRecipeGameState()
-    case 'bakery-hazard':
-      return bakeryHazardGameState()
-    case 'bakery-entrance':
-      return bakeryEntranceGameState()
-    case 'orchard':
-      return orchardGameState()
-    case 'bakery-floor':
-      return bakeryFloorGameState()
-    case 'grukk-combat':
-      return grukkCombatGameState()
-    case 'potion-ko-combat':
-      return potionKoCombatGameState()
-    case 'combat':
-      return combatGameState()
-    case 'downed-combat':
-      return downedCombatGameState()
-    case 'fleeing-combat':
-      return fleeingCombatGameState()
-    default:
-      throw new Error(`Fixture initialGameState inconnu: ${name}`)
-  }
-}
-
-function normalizeFixtureTurn(turn) {
-  const normalized = typeof turn === 'string' ? { message: turn } : { ...turn }
-  if (!normalized.message || typeof normalized.message !== 'string') {
-    throw new Error('Fixture turn invalide: chaque tour doit contenir message.')
-  }
-  return {
-    expectNoLlm: normalized.expectNoLlm ?? (normalized.category === 'regression' || normalized.category === 'world'
-      ? narrationMode === 'budget'
-      : false),
-    category: normalized.category ?? 'regression',
-    ...normalized,
-  }
-}
-
-function loadSessionRegressionScenarios() {
-  const requestedFixturePath = option('--session-fixture', undefined)
-  const fixturePaths = requestedFixturePath
-    ? [requestedFixturePath]
-    : [
-        path.join(process.cwd(), 'tests', 'fixtures', 'real-session-regression.json'),
-        path.join(process.cwd(), 'tests', 'fixtures', 'prod-log-regression.json'),
-        path.join(process.cwd(), 'tests', 'fixtures', 'front-door-regression.json'),
-      ]
-
-  const scenarios = []
-  for (const fixturePath of fixturePaths) {
-    if (!fixturePath || !fs.existsSync(fixturePath)) continue
-
-    const fixture = JSON.parse(fs.readFileSync(fixturePath, 'utf8'))
-    const fixtures = Array.isArray(fixture) ? fixture : [fixture]
-    scenarios.push(...fixtures.map((entry, index) => ({
-      name: entry.name ?? `${path.basename(fixturePath, '.json')}-${index + 1}`,
-      initialGameState: typeof entry.initialGameState === 'string'
-        ? fixtureGameState(entry.initialGameState)
-        : entry.initialGameState ?? baseGameState(),
-      turns: (entry.turns ?? entry.messages ?? []).map(normalizeFixtureTurn),
-    })))
-  }
-  return scenarios
-}
-
-const builtInScenarios = [
-  {
-    name: 'exploration-local',
-    initialGameState: baseGameState(),
-    turns: [
-      'je vais en (5,13)',
-      'je vais en (6,13)',
-      'je vais en (7,13)',
-      'je vais en (8,13)',
-      'je vais en (9,13)',
-      'je vais en (10,13)',
-      'je vais en (11,13)',
-      'je vais en (11,12)',
-      'je vais en (11,11)',
-      'je vais en (10,11)',
-      'je vais en (9,11)',
-      'je vais en (8,11)',
-    ].map(message => ({ message, expectNoLlm: narrationMode === 'budget', category: 'simple' })),
-  },
-  {
-    name: 'world-stateful',
-    initialGameState: officeGameState(),
-    turns: [
-      {
-        message: 'je fouille le bureau',
-        expectNoLlm: narrationMode === 'budget',
-        category: 'world',
-        expectTools: ['resolve_player_action'],
-        expectEvents: ['room.object_discovered'],
-        expectAffordances: ['unlock', 'force'],
-      },
-      {
-        message: "je l'ouvre",
-        expectNoLlm: narrationMode === 'budget',
-        category: 'world',
-        expectTools: ['resolve_player_action'],
-        expectEvents: ['action.blocked'],
-        expectAffordances: ['unlock', 'force'],
-      },
-      {
-        message: 'je force le tiroir',
-        expectNoLlm: narrationMode === 'budget',
-        category: 'world',
-        expectTools: ['resolve_player_action'],
-        expectEvents: ['alarm.raised', 'object.opened', 'room.object_discovered'],
-        expectAffordances: ['take'],
-      },
-      {
-        message: 'je prends le fragment de recette',
-        expectNoLlm: narrationMode === 'budget',
-        category: 'world',
-        expectTools: ['resolve_player_action'],
-        expectEvents: ['object.taken', 'quest.item_found'],
-      },
-      {
-        message: 'je le lis',
-        expectNoLlm: narrationMode === 'budget',
-        category: 'world',
-        expectTools: ['resolve_player_action'],
-        expectEvents: ['clue.read'],
-      },
-      {
-        message: 'je prends la recette encore',
-        expectNoLlm: narrationMode === 'budget',
-        category: 'world',
-        expectTools: ['resolve_player_action'],
-        expectEvents: ['action.blocked'],
-      },
-      {
-        message: 'je demande au systeme si la recette est vraiment dans mon inventaire',
-        expectNoLlm: false,
-        category: 'meta',
-      },
-    ],
-  },
-  {
-    name: 'creative-fiction-ledger',
-    initialGameState: bakeryEntranceGameState(),
-    turns: [
-      {
-        message: "je lance creation d'eau sous la porte pour mouiller le sol",
-        expectNoLlm: narrationMode === 'budget',
-        category: 'world',
-        expectTools: ['resolve_player_action', 'world.improvise'],
-        expectEvents: ['fiction.fact_created', 'improvisation.resolved'],
-        expectAffordances: ['improvise'],
-        expectIntentInterpreter: true,
-        expectIntentKind: 'improvise',
-      },
-      {
-        message: 'je prends un tabouret pour bloquer la porte',
-        expectNoLlm: narrationMode === 'budget',
-        category: 'world',
-        expectTools: ['resolve_player_action', 'world.improvise'],
-        expectEvents: ['fiction.fact_created', 'improvisation.resolved'],
-        expectAffordances: ['improvise'],
-        expectIntentInterpreter: true,
-        expectIntentKind: 'improvise',
-      },
-      {
-        message: 'je fais diversion',
-        expectNoLlm: narrationMode === 'budget',
-        category: 'world',
-        expectTools: ['resolve_player_action', 'world.improvise'],
-        expectEvents: ['fiction.fact_created', 'improvisation.resolved'],
-        expectAffordances: ['improvise'],
-        expectIntentInterpreter: true,
-        expectIntentKind: 'improvise',
-      },
-      {
-        message: 'je lui fais un croche-patte',
-        expectNoLlm: narrationMode === 'budget',
-        category: 'world',
-        expectTools: ['resolve_player_action', 'world.improvise'],
-        expectEvents: ['fiction.fact_created', 'improvisation.resolved'],
-        expectAffordances: ['improvise'],
-        expectIntentInterpreter: true,
-        expectIntentKind: 'improvise',
-      },
-    ],
-  },
-  {
-    name: 'transgressive-npc-improvise',
-    initialGameState: baseGameState(),
-    turns: [
-      {
-        message: 'je fais pipi sur mac',
-        expectNoLlm: narrationMode === 'budget',
-        category: 'world',
-        expectTools: ['resolve_player_action', 'world.improvise'],
-        expectEvents: ['fiction.fact_created', 'npc.disposition_changed', 'state.changed', 'improvisation.resolved'],
-        expectAffordances: ['improvise'],
-        expectIntentInterpreter: true,
-        expectIntentKind: 'improvise',
-      },
-    ],
-  },
-  {
-    name: 'implicit-npc-speech',
-    initialGameState: orchardGameState(),
-    turns: [
-      {
-        message: 'salut, je suis la pour recuperer la recette de grammy',
-        expectNoLlm: narrationMode === 'budget',
-        category: 'social',
-        expectTools: ['resolve_player_action'],
-        expectEvents: ['npc.information_revealed'],
-        expectAffordances: ['ask'],
-        forbidEvents: ['combat.started'],
-        expectIntentInterpreter: true,
-        expectIntentKind: 'ask',
-      },
-      {
-        message: 'ou sont les gobelins',
-        expectNoLlm: narrationMode === 'budget',
-        category: 'social',
-        expectTools: ['resolve_player_action'],
-        expectEvents: ['npc.information_revealed'],
-        expectAffordances: ['ask'],
-        forbidEvents: ['combat.started'],
-        expectIntentInterpreter: true,
-        expectIntentKind: 'ask',
-      },
-    ],
-  },
-  {
-    name: 'apartment-recipe',
-    initialGameState: apartmentRecipeGameState(),
-    turns: [
-      {
-        message: "j'ouvre l'armoire",
-        expectNoLlm: narrationMode === 'budget',
-        category: 'world',
-        expectTools: ['resolve_player_action'],
-        expectEvents: ['object.opened', 'room.object_discovered'],
-        expectAffordances: ['take'],
-      },
-      {
-        message: 'je prends le papier',
-        expectNoLlm: narrationMode === 'budget',
-        category: 'world',
-        expectTools: ['resolve_player_action'],
-        expectEvents: ['object.taken', 'quest.item_found'],
-        expectAffordances: ['combine_recipe'],
-      },
-      {
-        message: 'je le lis',
-        expectNoLlm: narrationMode === 'budget',
-        category: 'world',
-        expectTools: ['resolve_player_action'],
-        expectEvents: ['clue.read'],
-      },
-      {
-        message: 'j assemble les deux fragments de recette',
-        expectNoLlm: narrationMode === 'budget',
-        category: 'world',
-        expectTools: ['resolve_player_action'],
-        expectEvents: ['quest.completed'],
-      },
-      {
-        message: 'je demande a Grukk pourquoi il voulait la recette',
-        expectNoLlm: narrationMode === 'budget',
-        category: 'social',
-        expectTools: ['resolve_player_action'],
-        expectEvents: ['npc.information_revealed'],
-      },
-    ],
-  },
-  {
-    name: 'hazards-and-refusals',
-    initialGameState: bakeryHazardGameState(),
-    turns: [
-      {
-        message: 'je desamorce les couteaux',
-        expectNoLlm: narrationMode === 'budget',
-        category: 'world',
-        expectTools: ['resolve_player_action'],
-        expectEvents: ['trap.disarmed'],
-        expectAffordances: ['use_object'],
-      },
-      {
-        message: 'je manipule le ratelier',
-        expectNoLlm: narrationMode === 'budget',
-        category: 'world',
-        expectTools: ['resolve_player_action'],
-        expectEvents: ['object.used'],
-      },
-      {
-        message: "j'ouvre les sacs de farine",
-        expectNoLlm: narrationMode === 'budget',
-        category: 'world',
-        expectTools: ['resolve_player_action'],
-        expectEvents: ['object.opened', 'room.object_discovered'],
-      },
-      {
-        message: 'je declenche le four enchante',
-        expectNoLlm: narrationMode === 'budget',
-        category: 'world',
-        expectTools: ['resolve_player_action'],
-        expectEvents: ['object.used', 'alarm.raised'],
-      },
-      {
-        message: 'je prends la recette invisible',
-        expectNoLlm: narrationMode === 'budget',
-        category: 'world',
-        expectTools: ['resolve_player_action'],
-        expectEvents: ['action.blocked'],
-      },
-    ],
-  },
-  {
-    name: 'combat-local',
-    initialGameState: combatGameState(),
-    turns: [
-      "j'attaque le gobelin",
-      "je l'attaque encore",
-      'je bois une potion de soin',
-      "j'attaque le gobelin",
-      'vas-y encore',
-      "je l'attaque encore",
-      'je passe mon tour',
-      "j'attaque le gobelin",
-      "je l'attaque encore",
-      'vas-y encore',
-    ].map(message => ({ message, expectNoLlm: narrationMode === 'budget', category: 'simple' })),
-  },
-  {
-    name: 'combat-language-regressions',
-    initialGameState: combatGameState(),
-    turns: [
-      {
-        message: "j'attque le gobelin 1",
-        expectNoLlm: narrationMode === 'budget',
-        category: 'combat',
-        expectTools: ['resolve_player_action'],
-        expectEvents: ['combat.attack'],
-      },
-    ],
-  },
-  {
-    name: 'combat-deescalation',
-    initialGameState: combatGameState(),
-    turns: [
-      {
-        message: "ok ok, arretez de m'attaquer on fait la paix",
-        expectNoLlm: narrationMode === 'budget',
-        category: 'combat',
-        expectTools: ['resolve_player_action', 'roll_ability_check'],
-        forbidEvents: ['combat.attack'],
-        expectIntentInterpreter: true,
-        expectIntentKind: 'social_deescalation',
-      },
-    ],
-  },
-  {
-    name: 'open-scenes',
-    initialGameState: baseGameState(),
-    turns: [
-      'je parle gentiment a Mac pour lui demander ce qu il sait',
-      "j'observe les marques autour de la porte",
-      'je demande a Mac si Grammy est encore la',
-      'je tente de convaincre Mac de nous aider',
-      'je fouille prudemment le seuil sans entrer',
-      'je raconte a Mac que je viens aider',
-      'je cherche une odeur ou une piste utile',
-      'je demande quelle entree semble la moins dangereuse',
-      'je reviens vers l entree pour comparer les options',
-    ].map(message => ({ message, expectNoLlm: false, category: 'open' })),
-  },
-  {
-    name: 'social-natural',
-    initialGameState: baseGameState(),
-    turns: [
-      {
-        message: 'je lui demande ou est la recette',
-        expectNoLlm: narrationMode === 'budget',
-        category: 'social',
-        expectTools: ['resolve_player_action'],
-        expectEvents: ['npc.information_revealed'],
-      },
-      {
-        message: 'je persuade Mac de nous aider',
-        expectNoLlm: narrationMode === 'budget',
-        category: 'social',
-        expectTools: ['resolve_player_action'],
-        expectEvents: ['npc.disposition_changed'],
-      },
-      {
-        message: 'je montre la potion a Mac',
-        expectNoLlm: narrationMode === 'budget',
-        category: 'social',
-        expectTools: ['resolve_player_action'],
-        expectEvents: ['item.shown'],
-      },
-      {
-        message: 'j aide Mac a surveiller le seuil',
-        expectNoLlm: narrationMode === 'budget',
-        category: 'social',
-        expectTools: ['resolve_player_action'],
-        expectEvents: ['state.changed'],
-      },
-    ],
-  },
-  {
-    name: 'downed-and-flee',
-    initialGameState: downedCombatGameState(),
-    turns: [
-      {
-        message: 'donc je suis mort ou je peux agir?',
-        expectNoLlm: false,
-        category: 'meta',
-        expectAffordances: ['death_save'],
-      },
-      {
-        message: 'ok je tente de tenir',
-        expectNoLlm: narrationMode === 'budget',
-        category: 'combat',
-        expectTools: ['resolve_player_action'],
-        expectEvents: ['combat.death_save'],
-      },
-    ],
-  },
-  {
-    name: 'flee-action',
-    initialGameState: fleeingCombatGameState(),
-    turns: [
-      {
-        message: 'je fuis vers la sortie',
-        expectNoLlm: narrationMode === 'budget',
-        category: 'combat',
-        expectTools: ['resolve_player_action'],
-        expectEvents: ['escape.attempted'],
-      },
-    ],
-  },
-  {
-    name: 'natural-fuzz-world',
-    initialGameState: officeGameState(),
-    turns: [
-      {
-        message: 'je regarde',
-        expectNoLlm: false,
-        category: 'fuzz',
-      },
-      {
-        message: 'je fouille partout',
-        expectNoLlm: narrationMode === 'budget',
-        category: 'fuzz',
-        expectTools: ['resolve_player_action'],
-        expectEvents: ['room.object_discovered'],
-        expectAffordances: ['unlock', 'force'],
-      },
-      {
-        message: "je l'ouvre",
-        expectNoLlm: narrationMode === 'budget',
-        category: 'fuzz',
-        expectTools: ['resolve_player_action'],
-        expectEvents: ['action.blocked'],
-        expectAffordances: ['unlock', 'force'],
-      },
-      {
-        message: 'je crochette',
-        expectNoLlm: narrationMode === 'budget',
-        category: 'fuzz',
-        expectTools: ['resolve_player_action'],
-        expectEvents: ['object.opened', 'room.object_discovered'],
-        expectAffordances: ['take'],
-      },
-      {
-        message: 'je le prends',
-        expectNoLlm: narrationMode === 'budget',
-        category: 'fuzz',
-        expectTools: ['resolve_player_action'],
-        expectEvents: ['object.taken', 'quest.item_found'],
-      },
-      {
-        message: "j'essaie autre chose, attends quoi?",
-        expectNoLlm: false,
-        category: 'meta',
-      },
-    ],
-  },
-]
-
-const scenarios = [
-  ...builtInScenarios,
-  ...loadSessionRegressionScenarios(),
-]
-
-function emptyUsage() {
-  return {
-    calls: 0,
-    inputTokens: 0,
-    outputTokens: 0,
-    cacheCreationInputTokens: 0,
-    cacheReadInputTokens: 0,
-    totalInputTokens: 0,
-    estimatedCostUsd: 0,
-  }
-}
-
-function addUsage(total, next) {
-  if (!next) return total
-  total.calls += next.calls ?? 0
-  total.inputTokens += next.inputTokens ?? 0
-  total.outputTokens += next.outputTokens ?? 0
-  total.cacheCreationInputTokens += next.cacheCreationInputTokens ?? 0
-  total.cacheReadInputTokens += next.cacheReadInputTokens ?? 0
-  total.totalInputTokens += next.totalInputTokens ?? 0
-  total.estimatedCostUsd = Number((total.estimatedCostUsd + (next.estimatedCostUsd ?? 0)).toFixed(8))
-  return total
-}
-
-function increment(map, key) {
-  map[key] = (map[key] ?? 0) + 1
-}
-
-function ratio(numerator, denominator) {
-  return denominator > 0 ? Number((numerator / denominator).toFixed(4)) : 0
-}
-
-const roboticNarrativePatterns = [
-  /\[Mock\]/i,
-  /\bcase\s+\d/i,
-  /decor se replace/i,
-  /la piece gronde/i,
-  /la piste se brouille/i,
-  /facade de la boulangerie grince/i,
-  /scene progresse/i,
-  /detail exploitable/i,
-  /prise claire/i,
-  /Que faites-vous/i,
-  /choisir ton prochain risque/i,
-]
-
-function findRoboticNarrativeReason(narrative) {
-  if (typeof narrative !== 'string') return null
-  const pattern = roboticNarrativePatterns.find(item => item.test(narrative))
-  return pattern ? String(pattern) : null
-}
-
-function normalizeFrenchText(value) {
-  return String(value ?? '')
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/\p{Diacritic}/gu, '')
-    .replace(/[’‘`´]/g, "'")
-}
-
-function hasMixedSecondPersonNarration(narrative) {
-  const text = normalizeFrenchText(narrative)
-  return (/\b(tu|te|toi|ton|ta|tes)\b|t'/.test(text)) &&
-    /\b(vous|votre|vos)\b/.test(text)
-}
-
-async function postDm(POST, body) {
-  const response = await POST(new Request('http://localhost/api/dm', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
+function loadFixtures(filename) {
+  if (!filename) return []
+  const value = JSON.parse(fs.readFileSync(filename, 'utf8'))
+  return (Array.isArray(value) ? value : [value]).map((scenario, index) => ({
+    ...scenario, name: scenario.name ?? `fixture-${index + 1}`,
+    initialGameState: typeof scenario.initialGameState === 'object' ? scenario.initialGameState
+      : scenario.initialGameState === 'office' ? officeGameState()
+      : scenario.initialGameState === 'combat' ? combatGameState()
+      : !scenario.initialGameState || ['base', 'entrance'].includes(scenario.initialGameState) ? baseGameState()
+      : (() => { throw new Error(`Unsupported current-state fixture: ${scenario.initialGameState}`) })(),
+    turns: (scenario.turns ?? scenario.messages ?? []).map(normalizeTurn),
   }))
-  return {
-    status: response.status,
-    data: await response.json(),
-  }
 }
 
 async function run() {
-  const restoreTsRequire = installTsRequireWithAliases()
-  // Postgres unique : on injecte pg-mem AVANT de requérir la route (qui tire
-  // session-store → lib/db). Même rituel que tests/helpers/pg-mem.cjs, en CJS
-  // direct car le playtest a son propre hook ts-require.
-  const { newDb } = require('pg-mem')
-  const db = require(path.join(process.cwd(), 'lib/db.ts'))
-  db.__setDbPoolForTests(new (newDb().adapters.createPg().Pool)())
-  const { POST } = require(path.join(process.cwd(), 'app/api/dm/route.ts'))
-  const { closeMCPClient } = require(path.join(process.cwd(), 'lib/mcp-client.ts'))
-  const { deleteSession } = require(path.join(process.cwd(), 'lib/session-store.ts'))
-
-  const report = {
-    mode,
-    narrationMode,
-    allowPaid,
-    startedAt: new Date().toISOString(),
-    targets: {
-      maxEstimatedCostUsd: numberOption('--max-cost-usd', Number(process.env.PLAYTEST_MAX_COST_USD ?? 0.05)),
-      minDirectorLocalRatio: numberOption('--min-director-local-ratio', Number(process.env.PLAYTEST_MIN_DIRECTOR_LOCAL_RATIO ?? 0)),
-      minLlmNarratorRatio: numberOption('--min-llm-narrator-ratio', Number(process.env.PLAYTEST_MIN_LLM_NARRATOR_RATIO ?? (narrationMode === 'quality' ? 0.75 : 0))),
-      maxAverageLlmCallsPerTurn: numberOption('--max-average-llm-calls', Number(process.env.PLAYTEST_MAX_AVERAGE_LLM_CALLS ?? 1.2)),
-      maxSimpleTurnLlmCalls: numberOption('--max-simple-turn-llm-calls', Number(process.env.PLAYTEST_MAX_SIMPLE_TURN_LLM_CALLS ?? 2)),
-    },
-    summary: {
-      turns: 0,
-      durationMs: 0,
-      usage: emptyUsage(),
-      narratorCounts: {},
-      llmRouteCounts: {},
-      operationCounts: {},
-      toolCounts: {},
-      directorLocalRatio: 0,
-      llmNarratorRatio: 0,
-      averageLlmCallsPerTurn: 0,
-    },
-    turns: [],
-    quality: {
-      errors: [],
-      simpleTurnLlmViolations: [],
-      emptyNarratives: [],
-      mockLeaksOnSimpleTurns: [],
-      roboticNarratives: [],
-      missingEngineViews: [],
-      missingExpectedTools: [],
-      missingExpectedEvents: [],
-      missingExpectedAffordances: [],
-      missingDebugViews: [],
-      missingTurnTraces: [],
-      contradictoryTurnTraces: [],
-      missingWorldDebugDiffs: [],
-      missingTargetResolutions: [],
-      missingIntentInterpreter: [],
-      unexpectedIntentKinds: [],
-      unexpectedTools: [],
-      unexpectedEvents: [],
-      mixedSecondPersonNarratives: [],
-    },
-    targetViolations: [],
+  const mode = option('--mode', process.env.LLM_MODE || 'mock')
+  if (!['mock', 'live'].includes(mode)) throw new Error('Supported playtest modes: mock, live.')
+  if (process.argv.some(arg => /^--(?:narration-mode|min-director-local-ratio|max-simple-turn-llm-calls)(?:=|$)/.test(arg))) {
+    throw new Error('Removed playtest option: the current pipeline always uses the AI agent and LLM narration.')
   }
-
+  const allowPaid = process.argv.includes('--allow-paid') || process.env.ALLOW_PAID_LLM === 'true'
+  if (mode === 'live' && !allowPaid) throw new Error('Refus de lancer un playtest live sans --allow-paid.')
+  // Dedicated process only. Production guards are unchanged, even if a local
+  // shell has configured a smaller nonzero limit or enabled monetization.
+  Object.assign(process.env, {
+    LLM_MODE: mode, ALLOW_PAID_LLM: allowPaid ? 'true' : 'false',
+    MONETIZATION_ENABLED: 'false', DM_RATE_LIMIT_PER_MINUTE: '0', DM_DAILY_GLOBAL_MESSAGE_LIMIT: '0',
+    APP_LOG_BUFFER_ENABLED: 'false', APP_LOG_PERSIST_ENABLED: 'false', APP_LOG_LEVEL: 'error',
+  })
+  process.env.AI_DM_TEST_DICE_SEQUENCE ||= Array(80).fill('17,6,14,3,12,4,18,5').join(',')
+  const { installPgMem } = require('../tests/helpers/pg-mem.cjs')
+  const pg = installPgMem()
+  const { POST } = require('../app/api/dm/route.ts')
+  const { closeMCPClient } = require('../lib/mcp-client.ts')
+  const { saveSession, loadSession, deleteSession } = require('../lib/session-store.ts')
+  const { pendingCombatContinuation } = require('../lib/dm/combat-flow.ts')
+  const scenarios = [...builtInScenarios(), ...loadFixtures(option('--session-fixture'))]
+  for (const scenario of scenarios) scenario.turns = scenario.turns.map(normalizeTurn)
+  const report = {
+    mode, allowPaid, startedAt: new Date().toISOString(),
+    targets: {
+      maxEstimatedCostUsd: numberOption('--max-cost-usd', 'PLAYTEST_MAX_COST_USD', 0.05),
+      // Action + narration = 2 calls; a complete combat cycle = 4.
+      maxAverageLlmCallsPerTurn: numberOption('--max-average-llm-calls', 'PLAYTEST_MAX_AVERAGE_LLM_CALLS', 4),
+      minLlmNarratorRatio: numberOption('--min-llm-narrator-ratio', 'PLAYTEST_MIN_LLM_NARRATOR_RATIO', 1),
+    },
+    summary: { scenarios: scenarios.length, plannedTurns: scenarios.reduce((sum, scenario) => sum + scenario.turns.length, 0),
+      turns: 0, durationMs: 0, usage: { calls: 0, estimatedCostUsd: 0 },
+      narratorCounts: {}, operationCounts: {}, toolCounts: {}, averageLlmCallsPerTurn: 0, llmNarratorRatio: 0 },
+    turns: [], failures: [], targetViolations: [],
+  }
+  const increment = (counts, key) => { counts[key] = (counts[key] ?? 0) + 1 }
   const startedAt = Date.now()
-
   try {
     for (const scenario of scenarios) {
       const sessionId = `playtest-${mode}-${scenario.name}-${process.pid}-${Date.now()}`
-      let gameState = scenario.initialGameState
-      let history = []
-      let summaryContext
-
+      const previousDice = process.env.AI_DM_TEST_DICE_SEQUENCE
+      if (scenario.diceSequence) process.env.AI_DM_TEST_DICE_SEQUENCE = scenario.diceSequence
+      let before = structuredClone(scenario.initialGameState)
       try {
+        // Seed once, then send messages only. Every subsequent turn must load
+        // the actual saved session; no stale client snapshot can overwrite it.
+        await saveSession(sessionId, { gameState: before, history: [], adventureId: before.adventureId, characterId: before.characterId })
         for (let index = 0; index < scenario.turns.length; index++) {
           const turn = scenario.turns[index]
-          const turnStartedAt = Date.now()
-          const previousDiceSequence = process.env.AI_DM_TEST_DICE_SEQUENCE
-          if (turn.diceSequence) process.env.AI_DM_TEST_DICE_SEQUENCE = String(turn.diceSequence)
-          let status
-          let data
-          try {
-            const result = await postDm(POST, {
-              message: turn.message,
-              clientRequestId: `playtest-${scenario.name}-${index + 1}`,
-              sessionId,
-              gameState,
-              history,
-              summaryContext,
-              clientMeta: { inputMode: 'text' },
-            })
-            status = result.status
-            data = result.data
-          } finally {
-            if (turn.diceSequence) {
-              if (previousDiceSequence === undefined) delete process.env.AI_DM_TEST_DICE_SEQUENCE
-              else process.env.AI_DM_TEST_DICE_SEQUENCE = previousDiceSequence
-            }
-          }
-
-          const durationMs = Date.now() - turnStartedAt
-          const usage = data.usage
-          const turnReport = {
-            scenario: scenario.name,
-            index: index + 1,
-            message: turn.message,
-            category: turn.category,
-            expectNoLlm: turn.expectNoLlm,
-            status,
-            durationMs,
-            toolsUsed: data.toolsUsed ?? [],
-            engineEvents: data.engine?.events?.map(event => ({
-              type: event.type,
-              outcome: event.outcome,
-              targetId: event.targetId,
-              summary: event.summary,
-            })) ?? [],
-            engineEventTypes: data.engine?.events?.map(event => event.type) ?? [],
-            enabledAffordances: data.engine?.affordances
-              ?.filter(action => action.enabled)
-              .map(action => action.kind) ?? [],
-            blockedAffordances: data.engine?.affordances
-              ?.filter(action => !action.enabled)
-              .map(action => ({ kind: action.kind, reason: action.reason })) ?? [],
-            debug: data.debug ? {
-              actionKind: data.debug.actionIntent?.kind,
-              parsedKind: data.debug.parsedAction?.kind,
-              targetResolution: data.debug.targetResolution,
-              actionPlan: data.debug.actionPlan,
-              intentInterpreterUsed: data.debug.intentInterpreterUsed,
-              intentInterpreterModel: data.debug.intentInterpreterModel,
-              intentInterpreterKind: data.debug.intentInterpreterOutput?.intentKind,
-              intentInterpreterFallbackReason: data.debug.intentInterpreterFallbackReason,
-              sceneSurfaceObjectIds: data.debug.sceneSurface?.objects?.map?.(object => object.id) ?? [],
-              sceneSurfaceExits: data.debug.sceneSurface?.exits?.map?.(exit => exit.roomId) ?? [],
-              refusalCode: data.debug.refusalCode,
-              changedObjects: Object.keys(data.debug.worldDiff?.objects ?? {}),
-              changedNpcs: Object.keys(data.debug.worldDiff?.npcs ?? {}),
-              changedQuests: Object.keys(data.debug.worldDiff?.quests ?? {}),
-              changedAlarms: Object.keys(data.debug.worldDiff?.alarms ?? {}),
-            } : undefined,
-            turnTrace: data.turnTrace ? {
-              traceId: data.turnTrace.traceId,
-              actionCount: data.turnTrace.actions?.length ?? 0,
-              intentInterpreterUsed: data.turnTrace.intentInterpreterUsed,
-              intentInterpreterKind: data.turnTrace.intentInterpreterOutput?.intentKind,
-              intentInterpreterFallbackReason: data.turnTrace.intentInterpreterFallbackReason,
-              contradictionReasons: data.turnTrace.contradictions?.map?.(issue => issue.reason) ?? [],
-              narrativeFactKinds: data.turnTrace.narrativeFacts?.map?.(fact => fact.kind) ?? [],
-              enemyReactionCount: data.turnTrace.enemyReactions?.length ?? 0,
-            } : undefined,
-            narrator: usage?.narrator ?? 'unknown',
-            llmRoute: usage?.llmRoute ?? 'unknown',
-            llmCalls: usage?.llm?.calls ?? 0,
-            estimatedCostUsd: usage?.llm?.estimatedCostUsd ?? 0,
-            operations: usage?.operations ?? [],
-            narrativeLength: typeof data.narrative === 'string' ? data.narrative.length : 0,
-            narrativeSample: typeof data.narrative === 'string' ? data.narrative.slice(0, 240) : '',
-            phase: data.newGameState?.phase,
-            alertLevel: data.newGameState?.sceneMemory?.alertLevel ?? 0,
-          }
-          report.turns.push(turnReport)
-          report.summary.turns += 1
-          addUsage(report.summary.usage, usage?.llm)
-          increment(report.summary.narratorCounts, turnReport.narrator)
-          increment(report.summary.llmRouteCounts, turnReport.llmRoute)
-          for (const operation of turnReport.operations) increment(report.summary.operationCounts, operation)
-          for (const toolName of turnReport.toolsUsed) increment(report.summary.toolCounts, toolName)
-
-          if (status >= 400 || data.error) {
-            report.quality.errors.push({ scenario: scenario.name, index: index + 1, status, error: data.error })
-          }
-          if (!data.narrative) {
-            report.quality.emptyNarratives.push({ scenario: scenario.name, index: index + 1 })
-          }
-          if (status < 400 && !data.engine) {
-            report.quality.missingEngineViews.push(turnReport)
-          }
-          if (status < 400 && !data.debug) {
-            report.quality.missingDebugViews.push(turnReport)
-          }
-          if (status < 400 && (turn.category === 'world' || turn.category === 'regression' || turn.category === 'fuzz' || turn.category === 'social') && !data.turnTrace) {
-            report.quality.missingTurnTraces.push(turnReport)
-          }
-          if (status < 400 && data.turnTrace?.contradictions?.length > 0) {
-            report.quality.contradictoryTurnTraces.push(turnReport)
-          }
-          if (status < 400 && (turn.category === 'world' || turn.category === 'regression' || turn.category === 'fuzz') && !data.debug?.worldDiff) {
-            report.quality.missingWorldDebugDiffs.push(turnReport)
-          }
-          if (
-            status < 400 &&
-            (turn.category === 'world' || turn.category === 'regression' || turn.category === 'fuzz' || turn.category === 'social') &&
-            (turn.expectTools ?? []).includes('resolve_player_action') &&
-            turn.expectTargetResolution !== false &&
-            !data.debug?.targetResolution
-          ) {
-            report.quality.missingTargetResolutions.push(turnReport)
-          }
-          for (const expectedTool of turn.expectTools ?? []) {
-            if (!turnReport.toolsUsed.includes(expectedTool)) {
-              report.quality.missingExpectedTools.push({ ...turnReport, expectedTool })
-            }
-          }
-          for (const forbiddenTool of turn.forbidTools ?? []) {
-            if (turnReport.toolsUsed.includes(forbiddenTool)) {
-              report.quality.unexpectedTools.push({ ...turnReport, forbiddenTool })
-            }
-          }
-          for (const expectedEvent of turn.expectEvents ?? []) {
-            if (!turnReport.engineEventTypes.includes(expectedEvent)) {
-              report.quality.missingExpectedEvents.push({ ...turnReport, expectedEvent })
-            }
-          }
-          for (const forbiddenEvent of turn.forbidEvents ?? []) {
-            if (turnReport.engineEventTypes.includes(forbiddenEvent)) {
-              report.quality.unexpectedEvents.push({ ...turnReport, forbiddenEvent })
-            }
-          }
-          for (const expectedAffordance of turn.expectAffordances ?? []) {
-            if (!turnReport.enabledAffordances.includes(expectedAffordance)) {
-              report.quality.missingExpectedAffordances.push({ ...turnReport, expectedAffordance })
-            }
-          }
-          if (turn.expectIntentInterpreter && !data.turnTrace?.intentInterpreterUsed) {
-            report.quality.missingIntentInterpreter.push(turnReport)
-          }
-          if (turn.expectIntentKind && data.turnTrace?.intentInterpreterOutput?.intentKind !== turn.expectIntentKind) {
-            report.quality.unexpectedIntentKinds.push({
-              ...turnReport,
-              expectedIntentKind: turn.expectIntentKind,
-              actualIntentKind: data.turnTrace?.intentInterpreterOutput?.intentKind,
-            })
-          }
-          if (turn.expectNoLlm && turnReport.llmCalls > report.targets.maxSimpleTurnLlmCalls) {
-            report.quality.simpleTurnLlmViolations.push(turnReport)
-          }
-          if (turn.expectNoLlm && /\[Mock\]/.test(data.narrative ?? '')) {
-            report.quality.mockLeaksOnSimpleTurns.push(turnReport)
-          }
-          const roboticReason = findRoboticNarrativeReason(data.narrative)
-          if (roboticReason) {
-            report.quality.roboticNarratives.push({ ...turnReport, reason: roboticReason })
-          }
-          if (hasMixedSecondPersonNarration(data.narrative)) {
-            report.quality.mixedSecondPersonNarratives.push(turnReport)
-          }
-
-          if (status >= 400) break
-          if (data.newGameState) gameState = data.newGameState
-          if (data.summaryContext) summaryContext = data.summaryContext
-          history = [
-            ...history,
-            { role: 'player', content: turn.message },
-            { role: 'dm', content: data.narrative || '' },
-          ]
+          const response = await POST(new Request('http://localhost/api/dm', {
+            method: 'POST', headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ message: turn.message, sessionId, clientRequestId: `${sessionId}-${index + 1}`, clientMeta: { inputMode: 'text' } }),
+          }))
+          const data = await response.json()
+          const persisted = await loadSession(sessionId)
+          const failures = validateTurn({ turn, before, status: response.status, data, persisted,
+            pending: data.newGameState ? pendingCombatContinuation(data.newGameState) : null })
+          const entry = { scenario: scenario.name, index: index + 1, message: turn.message,
+            status: response.status, toolsUsed: data.toolsUsed ?? [], llmCalls: data.usage?.llm?.calls ?? 0,
+            narrativeSample: data.narrative, phase: data.newGameState?.phase, round: data.newGameState?.round, failures }
+          report.turns.push(entry); report.summary.turns++
+          report.failures.push(...failures.map(failure => ({ scenario: scenario.name, index: index + 1, ...failure })))
+          report.summary.usage.calls += entry.llmCalls
+          report.summary.usage.estimatedCostUsd += data.usage?.llm?.estimatedCostUsd ?? 0
+          increment(report.summary.narratorCounts, data.usage?.narrator ?? 'unknown')
+          for (const operation of data.usage?.operations ?? []) increment(report.summary.operationCounts, operation)
+          for (const tool of entry.toolsUsed) increment(report.summary.toolCounts, tool)
+          if (data.newGameState) before = data.newGameState
+          // Keep collecting independent failures; an HTTP error cannot supply
+          // a valid continuation for the remaining turns in this scenario.
+          if (response.status >= 400) break
         }
       } finally {
         await closeMCPClient(sessionId).catch(() => undefined)
         await deleteSession(sessionId).catch(() => undefined)
+        if (previousDice === undefined) delete process.env.AI_DM_TEST_DICE_SEQUENCE
+        else process.env.AI_DM_TEST_DICE_SEQUENCE = previousDice
       }
     }
   } finally {
-    restoreTsRequire()
+    pg.restore()
+    await pg.pool.end()
   }
-
-  report.summary.durationMs = Date.now() - startedAt
-  const directorLocalTurns = (report.summary.narratorCounts.director ?? 0) + (report.summary.narratorCounts.local ?? 0)
-  report.summary.directorLocalRatio = ratio(directorLocalTurns, report.summary.turns)
-  report.summary.llmNarratorRatio = ratio(report.summary.narratorCounts.llm ?? 0, report.summary.turns)
-  report.summary.averageLlmCallsPerTurn = ratio(report.summary.usage.calls, report.summary.turns)
+  const summary = report.summary
+  summary.durationMs = Date.now() - startedAt
+  summary.averageLlmCallsPerTurn = Number((summary.usage.calls / summary.turns).toFixed(4))
+  summary.llmNarratorRatio = (summary.narratorCounts.llm ?? 0) / summary.turns
+  if (summary.turns !== summary.plannedTurns) report.targetViolations.push(`Only ${summary.turns}/${summary.plannedTurns} turns executed`)
+  if (summary.usage.estimatedCostUsd > report.targets.maxEstimatedCostUsd) report.targetViolations.push('Estimated cost exceeds threshold')
+  if (summary.averageLlmCallsPerTurn > report.targets.maxAverageLlmCallsPerTurn) report.targetViolations.push(`averageLlmCallsPerTurn ${summary.averageLlmCallsPerTurn} > ${report.targets.maxAverageLlmCallsPerTurn}`)
+  if (summary.llmNarratorRatio < report.targets.minLlmNarratorRatio) report.targetViolations.push('LLM narration ratio below threshold')
+  if (report.failures.length) report.targetViolations.push(`${report.failures.length} current-pipeline checks failed`)
   report.finishedAt = new Date().toISOString()
-
-  if (report.summary.usage.estimatedCostUsd > report.targets.maxEstimatedCostUsd) {
-    report.targetViolations.push(`estimatedCostUsd ${report.summary.usage.estimatedCostUsd} > ${report.targets.maxEstimatedCostUsd}`)
+  const filename = option('--report')
+  if (filename) {
+    fs.mkdirSync(path.dirname(path.resolve(filename)), { recursive: true })
+    fs.writeFileSync(filename, JSON.stringify(report, null, 2), 'utf8')
   }
-  if (report.targets.minDirectorLocalRatio > 0 && report.summary.directorLocalRatio < report.targets.minDirectorLocalRatio) {
-    report.targetViolations.push(`directorLocalRatio ${report.summary.directorLocalRatio} < ${report.targets.minDirectorLocalRatio}`)
+  if (process.argv.includes('--json')) console.log(JSON.stringify(report, null, 2))
+  else {
+    console.log(`Playtest ${mode}: ${summary.turns}/${summary.plannedTurns} tours, ${summary.scenarios} scénarios, ${summary.durationMs} ms`)
+    console.log(`LLM: ${summary.usage.calls} appels, moyenne ${summary.averageLlmCallsPerTurn}/tour, coût estimé $${summary.usage.estimatedCostUsd.toFixed(8)}`)
+    console.log(`Tools: ${JSON.stringify(summary.toolCounts)}`)
+    for (const failure of report.failures) console.log(`- ${failure.scenario} #${failure.index} [${failure.check}]: ${failure.detail}`)
+    for (const violation of report.targetViolations) console.log(`- ${violation}`)
+    if (!report.targetViolations.length) console.log('Objectifs: OK')
+    if (filename) console.log(`Rapport: ${path.resolve(filename)}`)
   }
-  if (report.targets.minLlmNarratorRatio > 0 && report.summary.llmNarratorRatio < report.targets.minLlmNarratorRatio) {
-    report.targetViolations.push(`llmNarratorRatio ${report.summary.llmNarratorRatio} < ${report.targets.minLlmNarratorRatio}`)
-  }
-  if (report.summary.averageLlmCallsPerTurn > report.targets.maxAverageLlmCallsPerTurn) {
-    report.targetViolations.push(`averageLlmCallsPerTurn ${report.summary.averageLlmCallsPerTurn} > ${report.targets.maxAverageLlmCallsPerTurn}`)
-  }
-  if (report.quality.simpleTurnLlmViolations.length > 0) {
-    report.targetViolations.push(`${report.quality.simpleTurnLlmViolations.length} simple turns used too many LLM calls`)
-  }
-  if (report.quality.errors.length > 0) {
-    report.targetViolations.push(`${report.quality.errors.length} turns returned errors`)
-  }
-  if (report.quality.emptyNarratives.length > 0) {
-    report.targetViolations.push(`${report.quality.emptyNarratives.length} turns returned empty narratives`)
-  }
-  if (report.quality.roboticNarratives.length > 0) {
-    report.targetViolations.push(`${report.quality.roboticNarratives.length} turns matched robotic narration patterns`)
-  }
-  if (report.quality.mixedSecondPersonNarratives.length > 0) {
-    report.targetViolations.push(`${report.quality.mixedSecondPersonNarratives.length} turns mixed tu/vous narration`)
-  }
-  if (report.quality.missingEngineViews.length > 0) {
-    report.targetViolations.push(`${report.quality.missingEngineViews.length} turns missed engine debug views`)
-  }
-  if (report.quality.missingDebugViews.length > 0) {
-    report.targetViolations.push(`${report.quality.missingDebugViews.length} turns missed structured debug views`)
-  }
-  if (report.quality.missingTurnTraces.length > 0) {
-    report.targetViolations.push(`${report.quality.missingTurnTraces.length} turns missed canonical turn traces`)
-  }
-  if (report.quality.contradictoryTurnTraces.length > 0) {
-    report.targetViolations.push(`${report.quality.contradictoryTurnTraces.length} turns kept unsupported narrated facts in turn traces`)
-  }
-  if (report.quality.missingWorldDebugDiffs.length > 0) {
-    report.targetViolations.push(`${report.quality.missingWorldDebugDiffs.length} world turns missed world debug diffs`)
-  }
-  if (report.quality.missingTargetResolutions.length > 0) {
-    report.targetViolations.push(`${report.quality.missingTargetResolutions.length} canonical actions missed target resolution debug`)
-  }
-  if (report.quality.missingExpectedTools.length > 0) {
-    report.targetViolations.push(`${report.quality.missingExpectedTools.length} expected tools were not used`)
-  }
-  if (report.quality.unexpectedTools.length > 0) {
-    report.targetViolations.push(`${report.quality.unexpectedTools.length} forbidden tools were used`)
-  }
-  if (report.quality.missingExpectedEvents.length > 0) {
-    report.targetViolations.push(`${report.quality.missingExpectedEvents.length} expected engine events were not emitted`)
-  }
-  if (report.quality.unexpectedEvents.length > 0) {
-    report.targetViolations.push(`${report.quality.unexpectedEvents.length} forbidden engine events were emitted`)
-  }
-  if (report.quality.missingExpectedAffordances.length > 0) {
-    report.targetViolations.push(`${report.quality.missingExpectedAffordances.length} expected affordances were not enabled`)
-  }
-  if (report.quality.missingIntentInterpreter.length > 0) {
-    report.targetViolations.push(`${report.quality.missingIntentInterpreter.length} turns did not use the intent interpreter`)
-  }
-  if (report.quality.unexpectedIntentKinds.length > 0) {
-    report.targetViolations.push(`${report.quality.unexpectedIntentKinds.length} turns returned an unexpected interpreted intent kind`)
-  }
-
-  if (reportPath) {
-    const absolutePath = path.resolve(reportPath)
-    fs.mkdirSync(path.dirname(absolutePath), { recursive: true })
-    fs.writeFileSync(absolutePath, JSON.stringify(report, null, 2), 'utf8')
-  }
-
-  if (jsonOutput) {
-    console.log(JSON.stringify(report, null, 2))
-  } else {
-    console.log(`Playtest ${mode}/${narrationMode}: ${report.summary.turns} tours en ${report.summary.durationMs} ms`)
-    console.log(`LLM: ${report.summary.usage.calls} appels, cout estime $${report.summary.usage.estimatedCostUsd.toFixed(8)}, moyenne ${report.summary.averageLlmCallsPerTurn} appel/tour`)
-    console.log(`Director/local: ${(report.summary.directorLocalRatio * 100).toFixed(1)}%`)
-    console.log(`Narrateur LLM: ${(report.summary.llmNarratorRatio * 100).toFixed(1)}%`)
-    console.log(`Narrateurs: ${JSON.stringify(report.summary.narratorCounts)}`)
-    console.log(`Routes LLM: ${JSON.stringify(report.summary.llmRouteCounts)}`)
-    console.log(`Tools: ${JSON.stringify(report.summary.toolCounts)}`)
-    if (reportPath) console.log(`Rapport: ${path.resolve(reportPath)}`)
-    if (report.targetViolations.length > 0) {
-      console.log('Violations:')
-      for (const violation of report.targetViolations) console.log(`- ${violation}`)
-    } else {
-      console.log('Objectifs: OK')
-    }
-  }
-
-  if (report.targetViolations.length > 0 && !noFail) {
-    process.exitCode = 1
-  }
+  if (report.targetViolations.length && !process.argv.includes('--no-fail')) process.exitCode = 1
+  return report
 }
 
-run().catch(err => {
-  console.error(err)
-  process.exit(1)
-})
+if (require.main === module) run().catch(error => { console.error(error); process.exitCode = 1 })
+module.exports = { run, baseGameState, combatGameState, officeGameState, builtInScenarios, loadFixtures }

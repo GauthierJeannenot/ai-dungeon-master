@@ -18,6 +18,13 @@ Le vieux sorcier Tyndareus le Vert a envoyé le joueur récupérer la recette se
 
 ## Carte des salles
 
+### Personnalités de cette partie — référence confidentielle du MJ
+
+- **Mac et les trois dryades** : buts, idéaux, attaches et traits de personnalité fixes, définis dans `social.ts` et fournis dans les profils sociaux locaux. Aucun nouveau tirage à leur sujet.
+- **Chaque gobelin** : but fixe **manger des tartes**. Ses idéaux, attaches, traits de personnalité, sujets appréciés et sujets sensibles sont tirés dans les tables maison du module, individuellement à chaque nouvelle partie.
+- **Chef Grukk** : buts fixes, dans cet ordre : **survivre**, puis **manger des tartes**. Le reste de sa personnalité suit les mêmes tables aléatoires. Aucune fierté, attache ou envie de tarte ne doit le pousser à sacrifier sa survie.
+- Le moteur sauvegarde ces tirages pour toute la partie : même personnalité au fil des échanges, à l’entrée en combat et à la reprise d’une sauvegarde. Une nouvelle partie utilise une nouvelle graine ; ne jamais relancer un profil pour obtenir une réaction plus commode. Ces données restent confidentielles et ne constituent pas des confidences obtenues par le joueur.
+
 GRILLE : 17 colonnes (x:0-16) × 15 rangées (y:0-14).
 
 La carte de la scène — zones des salles, communications (salles voisines accessibles directement) et cloisons (voisines sur la grille mais séparées par un mur), points d'entrée, positions à jour du joueur, des PNJ révélés et des monstres, plus la grille tactique en combat — est fournie à chaque tour dans le bloc dynamique (« CARTE DE LA SCÈNE »). Fie-toi à elle pour situer la scène ; les coordonnées y sont exprimées en (x, y).
@@ -29,18 +36,34 @@ La carte de la scène — zones des salles, communications (salles voisines acce
 | Depuis → Vers | Coordonnée d'arrivée | Condition |
 |---------------|---------------------|-----------|
 | Départ (extérieur) | (4, 13) | Position initiale — chemin d'entrée, à côté de Mac |
-| Extérieur → Entrée | (11, 12) | double porte vers l'entrée |
+| Extérieur → Entrée | (11, 12) | front fermée et barrée : forcer puis franchir explicitement |
 | Extérieur → Verger | (14, 2) | Contourner le bâtiment par l'extérieur — le verger est derrière (au nord) |
 | Extérieur → Tas de déchets | (13, 6) | Composteurs à l'arrière est, accessibles par l'extérieur |
-| Entrée → Sol boulangerie | (11, 8) | double porte au nord de l'entrée |
+| Entrée → Sol boulangerie | (10, 8) | porte au nord de l'entrée, seuil entry-floor |
 | Entrée → Appartement Grammy | (9, 10) | porte à gauche de l'entrée |
-| Extérieur → Quai chargement | (3, 6) | Porte latérale coulissante |
+| Extérieur → Quai chargement | — | aucun passage direct : mur extérieur fermé |
 | Quai chargement → Sol boulangerie | (6, 6) | porte latérale coulissante ouverte en grand |
-| Sol boulangerie → Boutique | (6, 8) | Porte intérieure |
-| Sol boulangerie → Appartement | (8, 9) | Porte intérieure |
-| Boutique → Bureau | (6, 11) | Porte intérieure |
+| Sol boulangerie → Bureau | (6, 8) | porte floor-office |
+| Sol boulangerie → Appartement | (8, 8) | porte floor-apartment |
+| Bureau → Sol boulangerie | (6, 7) | même porte floor-office, aucun passage vers le quai ou l’appartement |
 
 **Le joueur commence à : (4, 13) — chemin d'entrée, à côté de Mac le Tréant**
+
+### Approcher les portes sans entrer
+
+Les coordonnées d'arrivée ci-dessus servent à ENTRER. Une approche reste du
+côté actuel : `front` = extérieur (11,13) / entrée (11,12) ;
+`entry-apartment` = entrée (10,10) / appartement (9,10) ;
+`entry-floor` = entrée (10,9) / boulangerie (10,8) ;
+`dock-floor` = quai (5,6) / boulangerie (6,6) ;
+`floor-office` = boulangerie (6,7) / bureau (6,8) ;
+`floor-apartment` = boulangerie (8,7) / appartement (8,8).
+Ces seuils et les emprises exactes de salles sont alignés sur la géométrie corrigée fournie par le joueur (61 frontières) ; `map.ts` et la carte dynamique les exposent. Le JSON mécanique de `geometry.json` fait autorité pour la circulation.
+Les portes extérieures sont barrées côté intérieur (Force DD 14 pour briser).
+La porte intérieure quai/boulangerie et celle entre entrée et boulangerie sont ouvertes ; les
+autres portes intérieures sont fermées et peuvent s'ouvrir à portée. L'état
+moteur courant prévaut ensuite. Ouvrir ou fracasser une porte ne fait jamais
+franchir son seuil et ne déclenche pas la rencontre de la pièce voisine.
 
 ---
 
@@ -62,7 +85,7 @@ Le chemin de gravier serpente à travers une pelouse envahie par les mauvaises h
 
 **Grandes portes** : barre de bois côté intérieur
 - DD 14 Force pour enfoncer le bois pourri
-- Ou contourner par le quai de chargement (salle 7)
+- Aucun contournement par le quai : son mur extérieur est fermé dans la géométrie corrigée. Approcher front puis utiliser interact_door(action="force") ; ce résultat ne fait pas franchir la porte.
 
 **Patrouilles extérieures** : toutes les 10 minutes, jet d20 :
 - 20 naturel → 1d4 gobelins sortent (fuient si repérés en premier)
@@ -89,7 +112,7 @@ Les pommiers plus anciens sont disposés en rangées ordonnées, mais les jeunes
 - Ne se montrent pas sans offrande ou DD 13 Persuasion
 - Une fois amadouées (offrande acceptée ou DD 13 réussi) → racontent en gloussant que les gobelins essaient de faire des tartes depuis des semaines sans jamais y arriver — leurs fournées ratées empestent jusqu'au verger
 - DD 17 Persuasion ou Investigation → révèlent que la moitié de la recette est dans le bureau (salle 5) et l'autre dans l'appartement (salle 9)
-- Bonus : entrée par le quai de chargement (salle 7) permet de surprendre les gobelins
+- Bonus : une approche discrète depuis le quai intérieur (salle 7) peut surprendre les gobelins ; le quai ne constitue pas une entrée depuis l’extérieur.
 - Si offensées : lancent des pommes pourries jusqu'à ce que le joueur parte
 
 ### Trigger — Visite
@@ -139,7 +162,8 @@ L'entrée' était le visage public de la boulangerie. Un comptoir en chêne occu
 ---
 
 ## Salle 5 — Le Bureau
-**Zone** : x:5-6, y:8-11 
+**Zone** : x:5-6, y:8-12
+
 **Point d'entrée** : (6, 8)
 
 ### Description
@@ -171,24 +195,21 @@ trigger_room_event({ roomId: "5", eventType: "trap",
 ---
 
 ## Salle 7 — Quai de Chargement
-**Zone** : x:3-5, y:5-7  
+**Zone** : x:3-5, y:4-7
+
 **Point d'entrée** : (3, 6)
 
 ### Description
-Une porte coulissante en bois donne accès à cette salle aux murs de pierre bruts et au sol nu. Un vieux chariot en bois abandonné prend la poussière dans un coin. On peut voir, depuis ici, l'intérieur de la boulangerie : une patrouille de deux gobelins passe devant l'ouverture, l'air de rien.
+Une porte intérieure coulissante ouverte relie cette salle au sol de la boulangerie ; aucun accès ne traverse son mur extérieur. Ses murs sont en pierre brute et son sol est nu. Un vieux chariot en bois abandonné prend la poussière dans un coin. Le quai est vide de créatures. À travers la porte ouverte, dans la ligne de vue réelle, on voit deux gobelins aux plans de travail de la salle 8 : ils essaient de faire des tartes aux pommes et se chamaillent sur la pâte, les pommes et la cuisson. Ils sont à découvert et ne préparent aucune embuscade. Les observer depuis le quai ne demande pas d'entrer dans la boulangerie et ne déclenche aucun combat.
 
 ### Contenu
-**Patrouille de gobelins** (2) — tokens déjà visibles sur la carte en (4, 5) et (4, 7) dès l'entrée dans la salle (PNJ scénarisés, pas encore des combattants — ne pas appeler `reveal_npc`) :
-- DD 13 Discrétion pour ne pas être repéré
-- Échec → l'un des gobelins renifle : *"Ça sent bizarre ici..."* — ils s'approchent pour inspecter
+**Entrée discrète** — aucun PNJ ni rencontre dans le quai :
+- Appeler `move_token` avec `stealth: true` vers (3, 6) : le moteur résout le trajet ET le jet de Discrétion (DEX, DD 13). Lire `stealthCheck` avant de narrer l'issue ; ne pas relancer un jet séparé.
+- Réussite → le joueur passe inaperçu et bénéficie de la surprise sur les gobelins du sol de la boulangerie (salle 8).
+- Échec → le bruit alerte les gobelins de la salle 8 : le joueur ne bénéficie pas de la surprise.
+- Ne pas faire apparaître de gobelins dans le quai, même en cas d'échec.
 
-**Si repéré :**
-```
-start_encounter({ encounterId: "loading_dock_patrol" })
-```
-Les combattants spawnes remplacent les tokens PNJ de la patrouille.
-
-**Avantage tactique** : entrer par ici donne le **round de surprise** sur les gobelins du sol de la boulangerie.
+**Avantage tactique** : la surprise sur les gobelins du sol de la boulangerie dépend de la réussite du jet, jamais de la seule entrée dans le quai.
 
 ### Trigger — Entrée discrète
 ```
@@ -199,8 +220,9 @@ trigger_room_event({ roomId: "7", eventType: "enter",
 ---
 
 ## Salle 8 — Sol de la Boulangerie
-**Zone** : x:6-11, y:5-8  
-**Point d'entrée** : (11, 8) et (6, 6)
+**Zone** : x:6-11, y:4-7, plus x:10-11, y:8 (emprise en L ; les autres cases de la rangée 8 appartiennent au bureau ou à l’appartement)
+
+**Point d'entrée** : arrivée de salle (11, 8) ; seuil depuis l’entrée (10, 8), depuis le quai (6, 6)
 
 ### Description
 Le sol de la boulangerie est un vaste espace aux plafonds hauts avec des poutres en bois apparentes. Six longs plans de travail occupent le centre de la salle, couverts de moules à tarte, rouleaux à pâtisserie et autres ustensiles. Certains rouleaux roulent encore paresseusement — un enchantement les maintient en mouvement perpétuel. Des couteaux émoussés hachent en l'air des pommes depuis longtemps disparues. Six immenses fours sont alignés contre le mur droit, leurs portes s'ouvrant et se refermant périodiquement comme s'ils attendaient toujours une fournée. L'ensemble est dans un désordre total — quelqu'un a manifestement essayé, et échoué, de recréer les tartes de Grammy.
@@ -229,14 +251,13 @@ Le sol de la boulangerie est un vaste espace aux plafonds hauts avec des poutres
 
 *Pour simuler : utiliser `spawn_monster({ monsterType: "goblin" })` et narrer comme créature de feu — le MCP traitera les stats de base.*
 
-### ENCOUNTER PRINCIPAL — 3 gobelins dans les poutres
+### Rencontre — Deux gobelins pâtissiers à découvert
 
-**Trigger** : Si le joueur interagit avec les objets magiques (rouleaux, couteaux enchantés, ouvrir un four) :
+Deux gobelins essaient maladroitement de faire des tartes aux pommes aux plans de travail (7,5) et (7,6). L'un étale une pâte trop collante pendant que l'autre découpe les pommes ; chacun accuse l'autre de rater la recette. Ils se chamaillent à voix haute, bien visibles depuis le quai de chargement par la porte ouverte selon la ligne de vue réelle. Ils ne sont ni cachés dans les poutres ni en embuscade.
+
+Observer les gobelins, entrer dans la salle ou toucher les ustensiles magiques ne déclenche pas de combat automatique. Le joueur peut leur parler ou proposer son aide. **Si la scène devient réellement hostile**, le MJ choisit explicitement la rencontre existante ; aucune surprise n'est accordée aux gobelins par défaut :
 ```
-spawn_monster({ monsterType: "goblin", cell: {x:10, y:5}, name: "Gobelin Charpentier" })
-spawn_monster({ monsterType: "goblin", cell: {x:10, y:8}, name: "Gobelin Charpentier" })
-spawn_monster({ monsterType: "goblin", cell: {x:7, y:7}, name: "Gobelin Charpentier" })
-enter_combat({ combatants: ["player", "[ids]"] })
+start_encounter({ encounterId: "bakery_floor_goblins" })
 ```
 
 **Négociation possible** (DD 14 CHA/Persuasion/Intimidation) :
@@ -250,41 +271,53 @@ enter_combat({ combatants: ["player", "[ids]"] })
 | Table 1 | (9, 6) |
 | Table 2 | (11, 6) |
 | Table 3 | (7, 6) |
-| Table 4 | (7, 8) |
+| Table 4 | (7, 5) |
 | Table 5 | (11, 8) |
-| Table 6 | (9, 8) |
-| Fours (rangée) | (12-12, 5-9) |
+| Table 6 | (9, 7) |
+| Fours (rangée) | (11, 4-7) |
 | Armoire en verre | (6, 7) |
 
-### Trigger — Déclenchement des gobelins
+### Événement de scène — Rencontre avec les pâtissiers
 ```
-trigger_room_event({ roomId: "8", eventType: "ambush",
-  description: "3 gobelins tombent des poutres suite à l'interaction avec les objets magiques" })
+trigger_room_event({ roomId: "8", eventType: "custom",
+  description: "Deux gobelins à découvert essaient de faire des tartes aux pommes en se chamaillant" })
 ```
 
 ---
 
 ## Salle 9 — L'Appartement de Grammy *(SALLE FINALE)*
-**Zone** : x:7-9, y:8-11  
+**Zone** : x:7-9, y:8-12
+
 **Point d'entrée** : (8, 9)
 
 ### Description
-Cet appartement douillet a été transformé en véritable tanière de gobelins. Un mobilier en acajou ancien trône encore dans la pièce — trop lourd pour être déplacé. Un lit sans matelas, une armoire remplie d'armes grossières, et contre un mur, un bureau couvert de fourrures et trophées de chasse. Au centre de la pièce, deux gobelins et leur chef vous dévisagent avec des sourires mauvais. *"Encore un vermisseau dans NOS couloirs. Tuez-le."*
+Cet appartement douillet a été transformé en véritable tanière de gobelins. Un mobilier en acajou ancien trône encore dans la pièce — trop lourd pour être déplacé. Un lit sans matelas, une armoire remplie d'armes grossières, et contre un mur, un bureau couvert de fourrures et trophées de chasse. Sans alerte préalable, deux gobelins et leur chef vous dévisagent avec des sourires mauvais. *"Encore un vermisseau dans NOS couloirs. Tuez-le."* S'ils ont entendu du bruit, appliquer l'embuscade ci-dessous ; ne pas révéler leur cachette avant sa découverte ou leur frappe.
 
 ### ENCOUNTER — Chef des gobelins + 2 gobelins
 
-**Trigger — Entrée dans la salle :**
+**Trigger — Entrée dans la salle sans embuscade préparée :**
 ```
-spawn_monster({ monsterType: "goblin", cell: {x:9, y:11}, name: "Gobelin Garde" })
-spawn_monster({ monsterType: "goblin", cell: {x:9, y:10}, name: "Gobelin Garde" })
-spawn_monster({ monsterType: "hobgoblin", cell: {x:7, y:11}, name: "Chef Grukk", hpOverride: 18 })
-enter_combat({ combatants: ["player", "[id_gobelin_1]", "[id_gobelin_2]", "[id_chef]"] })
+start_encounter({ encounterId: "grammy_apartment_guards", playerCell: "[case actuelle du joueur]" })
 ```
 
+### Bruit entendu : embuscade dans la chambre
+
+Même s'ils entendent beaucoup de bruit ou un combat, **Grukk et ses deux gardes ne sortent pas de l'appartement**. Ils attendent derrière la porte d'où vient le bruit : `floor-apartment` depuis la salle 8, `entry-apartment` depuis la salle 4. Seul le MJ interprète l'audibilité depuis les actions réellement résolues ; une intention, une citation ou une hypothèse ne constitue pas un bruit.
+
+Appeler `react_to_noise` avec `response: "ambush"`, l'`encounterId`, la `sourceRoomId`, la `doorId` et les `moves` explicites par `monsterIndex`. Tous restent en salle 9 ; laisser libre la case intérieure du seuil. Exemples de positions derrière `floor-apartment` : garde 0 en (9,8), garde 1 en (9,9), Grukk en (7,9). Derrière `entry-apartment` : garde 0 en (8,10), garde 1 en (9,11), Grukk en (7,11). Le moteur valide chaque chemin et la vitesse ; attendre sa confirmation. Ne jamais choisir `investigate` ni `join_combat` pour ce groupe. L'embuscade et ses préparatifs restent confidentiels.
+
+Ouvrir la porte ne déclenche aucune attaque. Au **franchissement effectif du seuil préparé**, le déplacement s'arrête dans la salle. Le MJ appelle alors `start_encounter` avec `encounterId` et `ambush: { doorId, attackerIndex, weaponOrSpell, suspicious }`, sans `playerCell` ni `monsters`. Choisir explicitement un attaquant à portée et son arme SRD exacte (par exemple garde 0, `Scimitar`). `suspicious` reflète les précautions exprimées par le joueur, interprétées par l'IA ; aucun mot-clé serveur.
+
+- Joueur qui ne suspecte rien : une **frappe de réaction d'embuscade**, jet d'attaque normal contre sa CA, dégâts SRD uniquement si elle touche.
+- Joueur méfiant : **Sagesse (Perception) DD 13**. En cas de réussite seulement, **sauvegarde de Dextérité DD 13** pour esquiver la frappe et s'en sortir **sans aucun dégât**.
+- Perception ou sauvegarde échouée : la même frappe est résolue normalement contre la CA, sans dégâts automatiques ni deuxième chance de sauvegarde.
+
+Cette règle d'embuscade propre au module permet une seule frappe à l'entrée ; elle ne donne pas une attaque gratuite à chacun des trois ennemis. Les jets, réactions éventuelles et dégâts sont résolus par `start_encounter` : ne pas les relancer séparément. Ensuite, reprendre le combat normal ou la négociation. Une entrée par l'autre porte ne déclenche pas cette embuscade. Sans alerte réellement enregistrée, aucune frappe gratuite.
+
 **Tactique du Chef Grukk** :
-- Reste derrière son bureau (couverture partielle)
-- Chaque tour : ordonne à un gobelin d'attaquer avec avantage
-- Si < 30% HP : tente de fuir vers la salle 8
+- Avant l'entrée du joueur, reste dans la chambre avec ses gardes ; le bruit ne les en fait jamais sortir.
+- Après l'embuscade, utilise son profil de hobgobelin et les tours normaux ; ses ordres n'accordent pas d'attaque ni d'avantage supplémentaires.
+- Si < 30% HP après engagement : peut tenter de fuir vers la salle 8, uniquement après résolution du déplacement.
 
 **Négociation possible** (DD 14 CHA) :
 - Grukk veut de la nourriture, de l'or, ou la promesse d'être laissé tranquille
@@ -303,14 +336,14 @@ enter_combat({ combatants: ["player", "[id_gobelin_1]", "[id_gobelin_2]", "[id_c
 | Bureau de Grammy | (7, 11) |
 | Lit sans matelas | (7, 10) |
 | Armoire à armes | (9, 11) |
-| Chef Grukk (spawn) | (12, 10) |
-| Gobelin 1 (spawn) | (11, 11) |
-| Gobelin 2 (spawn) | (13, 11) |
+| Chef Grukk (spawn sans alerte) | (7, 11) |
+| Gobelin 1 (spawn sans alerte) | (9, 11) |
+| Gobelin 2 (spawn sans alerte) | (9, 10) |
 
 ### Trigger — Entrée salle finale
 ```
 trigger_room_event({ roomId: "9", eventType: "ambush",
-  description: "Chef Grukk et ses deux gardes font face au joueur" })
+  description: "Entrée effective dans l'appartement ; la rencontre et toute frappe d'embuscade doivent être résolues séparément par start_encounter" })
 ```
 
 ---
@@ -319,14 +352,13 @@ trigger_room_event({ roomId: "9", eventType: "ambush",
 
 | Accomplissement | XP |
 |----------------|-----|
-| Gobelins patrouille (×2) | 50 XP chacun |
-| Gobelins boulangerie (×3) | 50 XP chacun |
+| Gobelins boulangerie (×2) | 50 XP chacun |
 | Gobelins appartement (×2) | 50 XP chacun |
 | Chef Grukk | 100 XP |
 | Négociation réussie (éviter un combat) | 50 XP par combat évité |
 | Trouver les deux moitiés de recette | 100 XP bonus |
 | Trouver les épices cachées | 25 XP bonus |
-| **Total maximum** | **~625 XP** |
+| **Total maximum** | **~525 XP** |
 
 *Seuil niveau 2 : 300 XP*
 
@@ -349,11 +381,10 @@ Si seulement une moitié de recette : Tyndareus demande d'aller chercher l'autre
 
 | Monstre | Type MCP | HP | AC | Salle |
 |---------|----------|----|----|-------|
-| Gobelin Patrouille | `goblin` | 7 | 15 | 7 |
-| Gobelin Charpentier | `goblin` | 7 | 15 | 8 |
+| Gobelin Pâtissier | `goblin` | 7 | 15 | 8 |
 | Gobelin Garde | `goblin` | 7 | 15 | 9 |
-| Chef Grukk | `hobgoblin` | 18 | 18 | 9 |
-| Champignon Violet | `zombie` | 18 | 5 | 3 |
+| Chef Grukk | `hobgoblin` | 11 | 18 | 9 |
+| Champignon Violet | `violet_fungus` | 18 | 5 | 3 |
 
 ---
 

@@ -1,0 +1,1156 @@
+{
+  "ruleset": "2014",
+  "retrievedAt": "2026-10-31T11:34:25.515784+00:00",
+  "license": "CC-BY-4.0",
+  "primarySource": "https://media.wizards.com/2023/downloads/dnd/SRD_CC_v5.1.pdf",
+  "records": {
+    "spells/prestidigitation": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/prestidigitation",
+      "sha256": "6aea4908b57a3ac9065a74c9f17f7a1457dd96cf18e968f67d2b85ec997915b9",
+      "source": {
+        "higher_level": [],
+        "index": "prestidigitation",
+        "name": "Prestidigitation",
+        "desc": [
+          "This spell is a minor magical trick that novice spellcasters use for practice. You create one of the following magical effects within 'range':",
+          "You create an instantaneous, harmless sensory effect, such as a shower of sparks, a puff of wind, faint musical notes, or an odd odor.",
+          "You instantaneously light or snuff out a candle, a torch, or a small campfire.",
+          "You instantaneously clean or soil an object no larger than 1 cubic foot.",
+          "You chill, warm, or flavor up to 1 cubic foot of nonliving material for 1 hour.",
+          "You make a color, a small mark, or a symbol appear on an object or a surface for 1 hour.",
+          "You create a nonmagical trinket or an illusory image that can fit in your hand and that lasts until the end of your next turn.",
+          "If you cast this spell multiple times, you can have up to three of its non-instantaneous effects active at a time, and you can dismiss such an effect as an action."
+        ],
+        "range": "10 feet",
+        "components": [
+          "V",
+          "S"
+        ],
+        "ritual": false,
+        "duration": "1 hour",
+        "concentration": false,
+        "casting_time": "1 action",
+        "level": 0,
+        "school": {
+          "index": "transmutation",
+          "name": "Transmutation",
+          "url": "/api/2014/magic-schools/transmutation"
+        },
+        "classes": [
+          {
+            "index": "bard",
+            "name": "Bard",
+            "url": "/api/2014/classes/bard"
+          },
+          {
+            "index": "sorcerer",
+            "name": "Sorcerer",
+            "url": "/api/2014/classes/sorcerer"
+          },
+          {
+            "index": "warlock",
+            "name": "Warlock",
+            "url": "/api/2014/classes/warlock"
+          },
+          {
+            "index": "wizard",
+            "name": "Wizard",
+            "url": "/api/2014/classes/wizard"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          }
+        ],
+        "url": "/api/2014/spells/prestidigitation",
+        "updated_at": "2026-04-01T20:35:39.217Z",
+        "damage": []
+      }
+    },
+    "spells/message": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/message",
+      "sha256": "05dd6d3bea33d7df9ebe90cac0c036cf2e95ec586cd86f3da12cc1fc266b0e23",
+      "source": {
+        "higher_level": [],
+        "index": "message",
+        "name": "Message",
+        "desc": [
+          "You point your finger toward a creature within range and whisper a message. The target (and only the target) hears the message and can reply in a whisper that only you can hear.",
+          "You can cast this spell through solid objects if you are familiar with the target and know it is beyond the barrier. Magical silence, 1 foot of stone, 1 inch of common metal, a thin sheet of lead, or 3 feet of wood blocks the spell. The spell doesn't have to follow a straight line and can travel freely around corners or through openings."
+        ],
+        "range": "120 feet",
+        "components": [
+          "V",
+          "S",
+          "M"
+        ],
+        "material": "A short piece of copper wire.",
+        "ritual": false,
+        "duration": "1 round",
+        "concentration": false,
+        "casting_time": "1 action",
+        "level": 0,
+        "school": {
+          "index": "transmutation",
+          "name": "Transmutation",
+          "url": "/api/2014/magic-schools/transmutation"
+        },
+        "classes": [
+          {
+            "index": "bard",
+            "name": "Bard",
+            "url": "/api/2014/classes/bard"
+          },
+          {
+            "index": "sorcerer",
+            "name": "Sorcerer",
+            "url": "/api/2014/classes/sorcerer"
+          },
+          {
+            "index": "wizard",
+            "name": "Wizard",
+            "url": "/api/2014/classes/wizard"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          }
+        ],
+        "url": "/api/2014/spells/message",
+        "updated_at": "2026-04-01T20:35:39.217Z",
+        "damage": []
+      }
+    },
+    "spells/dancing-lights": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/dancing-lights",
+      "sha256": "4dde226f9229f8a0173dcf4282e7e7ed3c35ea9fe1b83dc72f6af5d014cac6e8",
+      "source": {
+        "higher_level": [],
+        "index": "dancing-lights",
+        "name": "Dancing Lights",
+        "desc": [
+          "You create up to four torch-sized lights within range, making them appear as torches, lanterns, or glowing orbs that hover in the air for the duration. You can also combine the four lights into one glowing vaguely humanoid form of Medium size. Whichever form you choose, each light sheds dim light in a 10-foot radius.",
+          "As a bonus action on your turn, you can move the lights up to 60 feet to a new spot within range. A light must be within 20 feet of another light created by this spell, and a light winks out if it exceeds the spell's range."
+        ],
+        "range": "120 feet",
+        "components": [
+          "V",
+          "S",
+          "M"
+        ],
+        "material": "A bit of phosphorus or wychwood, or a glowworm.",
+        "ritual": false,
+        "duration": "Up to 1 minute",
+        "concentration": true,
+        "casting_time": "1 action",
+        "level": 0,
+        "school": {
+          "index": "evocation",
+          "name": "Evocation",
+          "url": "/api/2014/magic-schools/evocation"
+        },
+        "classes": [
+          {
+            "index": "bard",
+            "name": "Bard",
+            "url": "/api/2014/classes/bard"
+          },
+          {
+            "index": "sorcerer",
+            "name": "Sorcerer",
+            "url": "/api/2014/classes/sorcerer"
+          },
+          {
+            "index": "wizard",
+            "name": "Wizard",
+            "url": "/api/2014/classes/wizard"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          }
+        ],
+        "url": "/api/2014/spells/dancing-lights",
+        "updated_at": "2026-04-01T20:35:39.217Z",
+        "damage": []
+      }
+    },
+    "spells/alarm": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/alarm",
+      "sha256": "03ae40a49510a1aa9442e83e34aad1d2c51d12ef35cbc9c14ae6fe2c47ec7c1c",
+      "source": {
+        "higher_level": [],
+        "index": "alarm",
+        "name": "Alarm",
+        "desc": [
+          "You set an alarm against unwanted intrusion. Choose a door, a window, or an area within range that is no larger than a 20-foot cube. Until the spell ends, an alarm alerts you whenever a Tiny or larger creature touches or enters the warded area. When you cast the spell, you can designate creatures that won't set off the alarm. You also choose whether the alarm is mental or audible.",
+          "A mental alarm alerts you with a ping in your mind if you are within 1 mile of the warded area. This ping awakens you if you are sleeping.",
+          "An audible alarm produces the sound of a hand bell for 10 seconds within 60 feet."
+        ],
+        "range": "30 feet",
+        "components": [
+          "V",
+          "S",
+          "M"
+        ],
+        "material": "A tiny bell and a piece of fine silver wire.",
+        "ritual": true,
+        "duration": "8 hours",
+        "concentration": false,
+        "casting_time": "1 minute",
+        "level": 1,
+        "area_of_effect": {
+          "type": "cube",
+          "size": 20
+        },
+        "school": {
+          "index": "abjuration",
+          "name": "Abjuration",
+          "url": "/api/2014/magic-schools/abjuration"
+        },
+        "classes": [
+          {
+            "index": "ranger",
+            "name": "Ranger",
+            "url": "/api/2014/classes/ranger"
+          },
+          {
+            "index": "wizard",
+            "name": "Wizard",
+            "url": "/api/2014/classes/wizard"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          }
+        ],
+        "url": "/api/2014/spells/alarm",
+        "updated_at": "2026-04-01T20:35:39.217Z",
+        "damage": []
+      }
+    },
+    "spells/unseen-servant": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/unseen-servant",
+      "sha256": "9d4ca7ade0239d318a407369622d6472a42300ab71be3db886d95aca284e7497",
+      "source": {
+        "higher_level": [],
+        "index": "unseen-servant",
+        "name": "Unseen Servant",
+        "desc": [
+          "This spell creates an invisible, mindless, shapeless force that performs simple tasks at your command until the spell ends. The servant springs into existence in an unoccupied space on the ground within range. It has AC 10, 1 hit point, and a Strength of 2, and it can't attack. If it drops to 0 hit points, the spell ends.",
+          "Once on each of your turns as a bonus action, you can mentally command the servant to move up to 15 feet and interact with an object. The servant can perform simple tasks that a human servant could do, such as fetching things, cleaning, mending, folding clothes, lighting fires, serving food, and pouring wine. Once you give the command, the servant performs the task to the best of its ability until it completes the task, then waits for your next command.",
+          "If you command the servant to perform a task that would move it more than 60 feet away from you, the spell ends."
+        ],
+        "range": "60 feet",
+        "components": [
+          "V",
+          "S",
+          "M"
+        ],
+        "material": "A piece of string and a bit of wood.",
+        "ritual": true,
+        "duration": "1 hour",
+        "concentration": false,
+        "casting_time": "1 action",
+        "level": 1,
+        "school": {
+          "index": "conjuration",
+          "name": "Conjuration",
+          "url": "/api/2014/magic-schools/conjuration"
+        },
+        "classes": [
+          {
+            "index": "bard",
+            "name": "Bard",
+            "url": "/api/2014/classes/bard"
+          },
+          {
+            "index": "warlock",
+            "name": "Warlock",
+            "url": "/api/2014/classes/warlock"
+          },
+          {
+            "index": "wizard",
+            "name": "Wizard",
+            "url": "/api/2014/classes/wizard"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          }
+        ],
+        "url": "/api/2014/spells/unseen-servant",
+        "updated_at": "2026-04-01T20:35:39.218Z",
+        "damage": []
+      }
+    },
+    "spells/floating-disk": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/floating-disk",
+      "sha256": "481c7a854c4d9520e4274c6081b55f1579d61f164284b95ab26034a97053ceea",
+      "source": {
+        "higher_level": [],
+        "index": "floating-disk",
+        "name": "Floating Disk",
+        "desc": [
+          "This spell creates a circular, horizontal plane of force, 3 feet in diameter and 1 inch thick, that floats 3 feet above the ground in an unoccupied space of your choice that you can see within range. The disk remains for the duration, and can hold up to 500 pounds. If more weight is placed on it, the spell ends, and everything on the disk falls to the ground.",
+          "The disk is immobile while you are within 20 feet of it. If you move more than 20 feet away from it, the disk follows you so that it remains within 20 feet of you. If can move across uneven terrain, up or down stairs, slopes and the like, but it can't cross an elevation change of 10 feet or more. For example, the disk can't move across a 10-foot-deep pit, nor could it leave such a pit if it was created at the bottom.",
+          "If you move more than 100 feet away from the disk (typically because it can't move around an obstacle to follow you), the spell ends."
+        ],
+        "range": "30 feet",
+        "components": [
+          "V",
+          "S",
+          "M"
+        ],
+        "material": "A drop of mercury.",
+        "ritual": true,
+        "duration": "1 hour",
+        "concentration": false,
+        "casting_time": "1 action",
+        "level": 1,
+        "school": {
+          "index": "conjuration",
+          "name": "Conjuration",
+          "url": "/api/2014/magic-schools/conjuration"
+        },
+        "classes": [
+          {
+            "index": "wizard",
+            "name": "Wizard",
+            "url": "/api/2014/classes/wizard"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          }
+        ],
+        "url": "/api/2014/spells/floating-disk",
+        "updated_at": "2026-04-01T20:35:39.217Z",
+        "damage": []
+      }
+    },
+    "spells/illusory-script": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/illusory-script",
+      "sha256": "9d48dd4c05f1708692d6d6585b6ab49198510d1a486c7b36ade12fbbd53fcde5",
+      "source": {
+        "higher_level": [],
+        "index": "illusory-script",
+        "name": "Illusory Script",
+        "desc": [
+          "You write on parchment, paper, or some other suitable writing material and imbue it with a potent illusion that lasts for the duration.",
+          "To you and any creatures you designate when you cast the spell, the writing appears normal, written in your hand, and conveys whatever meaning you intended when you wrote the text. To all others, the writing appears as if it were written in an unknown or magical script that is unintelligible. Alternatively, you can cause the writing to appear to be an entirely different message, written in a different hand and language, though the language must be one you know.",
+          "Should the spell be dispelled, the original script and the illusion both disappear.",
+          "A creature with truesight can read the hidden message."
+        ],
+        "range": "Touch",
+        "components": [
+          "S",
+          "M"
+        ],
+        "material": "A lead-based ink worth at least 10gp, which this spell consumes.",
+        "ritual": true,
+        "duration": "10 days",
+        "concentration": false,
+        "casting_time": "1 minute",
+        "level": 1,
+        "school": {
+          "index": "illusion",
+          "name": "Illusion",
+          "url": "/api/2014/magic-schools/illusion"
+        },
+        "classes": [
+          {
+            "index": "bard",
+            "name": "Bard",
+            "url": "/api/2014/classes/bard"
+          },
+          {
+            "index": "warlock",
+            "name": "Warlock",
+            "url": "/api/2014/classes/warlock"
+          },
+          {
+            "index": "wizard",
+            "name": "Wizard",
+            "url": "/api/2014/classes/wizard"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          }
+        ],
+        "url": "/api/2014/spells/illusory-script",
+        "updated_at": "2026-04-01T20:35:39.217Z",
+        "damage": []
+      }
+    },
+    "spells/silent-image": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/silent-image",
+      "sha256": "e1b376e059185a5b9a24b961398e3c8253cfb0f4c0d513ee3fd9e14763d3e54c",
+      "source": {
+        "higher_level": [],
+        "index": "silent-image",
+        "name": "Silent Image",
+        "desc": [
+          "You create the image of an object, a creature, or some other visible phenomenon that is no larger than a 15-foot cube. The image appears at a spot within range and lasts for the duration. The image is purely visual; it isn't accompanied by sound, smell, or other sensory effects.",
+          "You can use your action to cause the image to move to any spot within range. As the image changes location, you can alter its appearance so that its movements appear natural for the image. For example, if you create an image of a creature and move it, you can alter the image so that it appears to be walking.",
+          "Physical interaction with the image reveals it to be an illusion, because things can pass through it. A creature that uses its action to examine the image can determine that it is an illusion with a successful Intelligence (Investigation) check against your spell save DC. If a creature discerns the illusion for what it is, the creature can see through the image."
+        ],
+        "range": "60 feet",
+        "components": [
+          "V",
+          "S",
+          "M"
+        ],
+        "material": "A bit of fleece.",
+        "ritual": false,
+        "duration": "Up to 10 minutes",
+        "concentration": true,
+        "casting_time": "1 action",
+        "level": 1,
+        "area_of_effect": {
+          "type": "cube",
+          "size": 15
+        },
+        "school": {
+          "index": "illusion",
+          "name": "Illusion",
+          "url": "/api/2014/magic-schools/illusion"
+        },
+        "classes": [
+          {
+            "index": "bard",
+            "name": "Bard",
+            "url": "/api/2014/classes/bard"
+          },
+          {
+            "index": "sorcerer",
+            "name": "Sorcerer",
+            "url": "/api/2014/classes/sorcerer"
+          },
+          {
+            "index": "wizard",
+            "name": "Wizard",
+            "url": "/api/2014/classes/wizard"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          }
+        ],
+        "url": "/api/2014/spells/silent-image",
+        "updated_at": "2026-04-01T20:35:39.218Z",
+        "damage": []
+      }
+    },
+    "spells/magic-mouth": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/magic-mouth",
+      "sha256": "3b2840e60157d476f7ed194ed951040de8bcad4bdc0a0e64adefb3713cb957c2",
+      "source": {
+        "higher_level": [],
+        "index": "magic-mouth",
+        "name": "Magic Mouth",
+        "desc": [
+          "You plant a message to an object in the range of the spell. The message is verbalized when the trigger conditions are met. Choose an object that you see, and that is not worn or carried by another creature. Then say the message, which should not exceed 25 words but listening can take up to 10 minutes. Finally, establish the circumstances that trigger the spell to deliver your message.",
+          "When these conditions are satisfied, a magical mouth appears on the object and it articulates the message imitating your voice, the same tone used during implantation of the message. If the selected object has a mouth or something that approaches such as the mouth of a statue, the magic mouth come alive at this point, giving the illusion that the words come from the mouth of the object.",
+          "When you cast this spell, you may decide that the spell ends when the message is delivered or it can persist and repeat the message whenever circumstances occur.",
+          "The triggering circumstance can be as general or as detailed as you like, though it must be based on visual or audible conditions that occur within 30 feet of the object. For example, you could instruct the mouth to speak when any creature moves within 30 feet of the object or when a silver bell rings within 30 feet of it."
+        ],
+        "range": "30 feet",
+        "components": [
+          "V",
+          "S",
+          "M"
+        ],
+        "material": "A honeycomb and jade dust of at least 10 inches, the spell consumes.",
+        "ritual": true,
+        "duration": "Until dispelled",
+        "concentration": false,
+        "casting_time": "1 minute",
+        "level": 2,
+        "school": {
+          "index": "illusion",
+          "name": "Illusion",
+          "url": "/api/2014/magic-schools/illusion"
+        },
+        "classes": [
+          {
+            "index": "bard",
+            "name": "Bard",
+            "url": "/api/2014/classes/bard"
+          },
+          {
+            "index": "wizard",
+            "name": "Wizard",
+            "url": "/api/2014/classes/wizard"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          }
+        ],
+        "url": "/api/2014/spells/magic-mouth",
+        "updated_at": "2026-04-01T20:35:39.217Z",
+        "damage": []
+      }
+    },
+    "spells/locate-object": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/locate-object",
+      "sha256": "33622d312826ada78c13ab947e2bcd0275ffa7f16ea28192f4e363164a3ccf30",
+      "source": {
+        "higher_level": [],
+        "index": "locate-object",
+        "name": "Locate Object",
+        "desc": [
+          "Describe or name an object that is familiar to you. You sense the direction to the object's location, as long as that object is within 1,000 feet of you. If the object is in motion, you know the direction of its movement.",
+          "The spell can locate a specific object known to you, as long as you have seen it up close--within 30 feet--at least once. Alternatively, the spell can locate the nearest object of a particular kind, such as a certain kind of apparel, jewelry, furniture, tool, or weapon.",
+          "This spell can't locate an object if any thickness of lead, even a thin sheet, blocks a direct path between you and the object."
+        ],
+        "range": "Self",
+        "components": [
+          "V",
+          "S",
+          "M"
+        ],
+        "material": "A forked twig.",
+        "ritual": false,
+        "duration": "Up to 10 minutes",
+        "concentration": true,
+        "casting_time": "1 action",
+        "level": 2,
+        "school": {
+          "index": "divination",
+          "name": "Divination",
+          "url": "/api/2014/magic-schools/divination"
+        },
+        "classes": [
+          {
+            "index": "bard",
+            "name": "Bard",
+            "url": "/api/2014/classes/bard"
+          },
+          {
+            "index": "cleric",
+            "name": "Cleric",
+            "url": "/api/2014/classes/cleric"
+          },
+          {
+            "index": "druid",
+            "name": "Druid",
+            "url": "/api/2014/classes/druid"
+          },
+          {
+            "index": "paladin",
+            "name": "Paladin",
+            "url": "/api/2014/classes/paladin"
+          },
+          {
+            "index": "ranger",
+            "name": "Ranger",
+            "url": "/api/2014/classes/ranger"
+          },
+          {
+            "index": "wizard",
+            "name": "Wizard",
+            "url": "/api/2014/classes/wizard"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          }
+        ],
+        "url": "/api/2014/spells/locate-object",
+        "updated_at": "2026-04-01T20:35:39.217Z",
+        "damage": []
+      }
+    },
+    "spells/detect-evil-and-good": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/detect-evil-and-good",
+      "sha256": "8083f10f8c10bcef3b1b417d2c06a0bfde7488da7144486761560de2ad2fb3eb",
+      "source": {
+        "higher_level": [],
+        "index": "detect-evil-and-good",
+        "name": "Detect Evil and Good",
+        "desc": [
+          "For the duration, you know if there is an aberration, celestial, elemental, fey, fiend, or undead within 30 feet of you, as well as where the creature is located. Similarly, you know if there is a place or object within 30 feet of you that has been magically consecrated or desecrated.",
+          "The spell can penetrate most barriers, but it is blocked by 1 foot of stone, 1 inch of common metal, a thin sheet of lead, or 3 feet of wood or dirt."
+        ],
+        "range": "Self",
+        "components": [
+          "V",
+          "S"
+        ],
+        "ritual": false,
+        "duration": "Up to 10 minutes",
+        "concentration": true,
+        "casting_time": "1 action",
+        "level": 1,
+        "area_of_effect": {
+          "type": "sphere",
+          "size": 30
+        },
+        "school": {
+          "index": "divination",
+          "name": "Divination",
+          "url": "/api/2014/magic-schools/divination"
+        },
+        "classes": [
+          {
+            "index": "cleric",
+            "name": "Cleric",
+            "url": "/api/2014/classes/cleric"
+          },
+          {
+            "index": "paladin",
+            "name": "Paladin",
+            "url": "/api/2014/classes/paladin"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          }
+        ],
+        "url": "/api/2014/spells/detect-evil-and-good",
+        "updated_at": "2026-04-01T20:35:39.217Z",
+        "damage": []
+      }
+    },
+    "spells/detect-poison-and-disease": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/detect-poison-and-disease",
+      "sha256": "5111c1c4c142598e186b3b21ee54598c4cbd3cac59f0199a882432decb151914",
+      "source": {
+        "higher_level": [],
+        "index": "detect-poison-and-disease",
+        "name": "Detect Poison and Disease",
+        "desc": [
+          "For the duration, you can sense the presence and location of poisons, poisonous creatures, and diseases within 30 feet of you. You also identify the kind of poison, poisonous creature, or disease in each case.",
+          "The spell can penetrate most barriers, but it is blocked by 1 foot of stone, 1 inch of common metal, a thin sheet of lead, or 3 feet of wood or dirt."
+        ],
+        "range": "Self",
+        "components": [
+          "V",
+          "S",
+          "M"
+        ],
+        "material": "A yew leaf.",
+        "ritual": true,
+        "duration": "Up to 10 minutes",
+        "concentration": true,
+        "casting_time": "1 action",
+        "level": 1,
+        "area_of_effect": {
+          "type": "sphere",
+          "size": 30
+        },
+        "school": {
+          "index": "divination",
+          "name": "Divination",
+          "url": "/api/2014/magic-schools/divination"
+        },
+        "classes": [
+          {
+            "index": "cleric",
+            "name": "Cleric",
+            "url": "/api/2014/classes/cleric"
+          },
+          {
+            "index": "druid",
+            "name": "Druid",
+            "url": "/api/2014/classes/druid"
+          },
+          {
+            "index": "paladin",
+            "name": "Paladin",
+            "url": "/api/2014/classes/paladin"
+          },
+          {
+            "index": "ranger",
+            "name": "Ranger",
+            "url": "/api/2014/classes/ranger"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          }
+        ],
+        "url": "/api/2014/spells/detect-poison-and-disease",
+        "updated_at": "2026-04-01T20:35:39.217Z",
+        "damage": []
+      }
+    },
+    "spells/purify-food-and-drink": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/purify-food-and-drink",
+      "sha256": "4989fa4b0464d76383a236b8b8021aa425042d7cadfdeaf4f1e086518f20840b",
+      "source": {
+        "higher_level": [],
+        "index": "purify-food-and-drink",
+        "name": "Purify Food and Drink",
+        "desc": [
+          "All nonmagical food and drink within a 5-foot radius sphere centered on a point of your choice within range is purified and rendered free of poison and disease."
+        ],
+        "range": "10 feet",
+        "components": [
+          "V",
+          "S"
+        ],
+        "ritual": true,
+        "duration": "Instantaneous",
+        "concentration": false,
+        "casting_time": "1 action",
+        "level": 1,
+        "school": {
+          "index": "transmutation",
+          "name": "Transmutation",
+          "url": "/api/2014/magic-schools/transmutation"
+        },
+        "classes": [
+          {
+            "index": "cleric",
+            "name": "Cleric",
+            "url": "/api/2014/classes/cleric"
+          },
+          {
+            "index": "druid",
+            "name": "Druid",
+            "url": "/api/2014/classes/druid"
+          },
+          {
+            "index": "paladin",
+            "name": "Paladin",
+            "url": "/api/2014/classes/paladin"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          }
+        ],
+        "url": "/api/2014/spells/purify-food-and-drink",
+        "updated_at": "2026-04-01T20:35:39.217Z",
+        "damage": []
+      }
+    },
+    "spells/augury": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/augury",
+      "sha256": "c4c624ec35ff72650f94a5469705a9af988e5d1faffe001a93958680ef38d6f4",
+      "source": {
+        "higher_level": [],
+        "index": "augury",
+        "name": "Augury",
+        "desc": [
+          "By casting gem-inlaid sticks, rolling dragon bones, laying out ornate cards, or employing some other divining tool, you receive an omen from an otherworldly entity about the results of a specific course of action that you plan to take within the next 30 minutes. The GM chooses from the following possible omens:",
+          "- Weal, for good results",
+          "- Woe, for bad results",
+          "- Weal and woe, for both good and bad results",
+          "- Nothing, for results that aren't especially good or bad",
+          "The spell doesn't take into account any possible circumstances that might change the outcome, such as the casting of additional spells or the loss or gain of a companion.",
+          "If you cast the spell two or more times before completing your next long rest, there is a cumulative 25 percent chance for each casting after the first that you get a random reading. The GM makes this roll in secret."
+        ],
+        "range": "Self",
+        "components": [
+          "V",
+          "S",
+          "M"
+        ],
+        "material": "Specially marked sticks, bones, or similar tokens worth at least 25gp.",
+        "ritual": true,
+        "duration": "Instantaneous",
+        "concentration": false,
+        "casting_time": "1 minute",
+        "level": 2,
+        "school": {
+          "index": "divination",
+          "name": "Divination",
+          "url": "/api/2014/magic-schools/divination"
+        },
+        "classes": [
+          {
+            "index": "cleric",
+            "name": "Cleric",
+            "url": "/api/2014/classes/cleric"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          }
+        ],
+        "url": "/api/2014/spells/augury",
+        "updated_at": "2026-04-01T20:35:39.217Z",
+        "damage": []
+      }
+    },
+    "spells/animal-messenger": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/animal-messenger",
+      "sha256": "1a44af3c40e56ba6a902c48afeadf8ba3ed90e9c1366923cb08928c69dbf6448",
+      "source": {
+        "index": "animal-messenger",
+        "name": "Animal Messenger",
+        "desc": [
+          "By means of this spell, you use an animal to deliver a message. Choose a Tiny beast you can see within range, such as a squirrel, a blue jay, or a bat. You specify a location, which you must have visited, and a recipient who matches a general description, such as \"a man or woman dressed in the uniform of the town guard\" or \"a red-haired dwarf wearing a pointed hat.\" You also speak a message of up to twenty-five words. The target beast travels for the duration of the spell toward the specified location, covering about 50 miles per 24 hours for a flying messenger, or 25 miles for other animals.",
+          "When the messenger arrives, it delivers your message to the creature that you described, replicating the sound of your voice. The messenger speaks only to a creature matching the description you gave. If the messenger doesn't reach its destination before the spell ends, the message is lost, and the beast makes its way back to where you cast this spell."
+        ],
+        "higher_level": [
+          "If you cast this spell using a spell slot of 3nd level or higher, the duration of the spell increases by 48 hours for each slot level above 2nd."
+        ],
+        "range": "30 feet",
+        "components": [
+          "V",
+          "S",
+          "M"
+        ],
+        "material": "A morsel of food.",
+        "ritual": true,
+        "duration": "24 hours",
+        "concentration": false,
+        "casting_time": "1 action",
+        "level": 2,
+        "school": {
+          "index": "enchantment",
+          "name": "Enchantment",
+          "url": "/api/2014/magic-schools/enchantment"
+        },
+        "classes": [
+          {
+            "index": "bard",
+            "name": "Bard",
+            "url": "/api/2014/classes/bard"
+          },
+          {
+            "index": "druid",
+            "name": "Druid",
+            "url": "/api/2014/classes/druid"
+          },
+          {
+            "index": "ranger",
+            "name": "Ranger",
+            "url": "/api/2014/classes/ranger"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          }
+        ],
+        "url": "/api/2014/spells/animal-messenger",
+        "updated_at": "2026-04-01T20:35:39.217Z",
+        "damage": []
+      }
+    },
+    "spells/rope-trick": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/rope-trick",
+      "sha256": "72bcbc7e80d3b60f8500e115ecd27ff79f30bd74c5af502ee8482b88f02a412a",
+      "source": {
+        "higher_level": [],
+        "index": "rope-trick",
+        "name": "Rope Trick",
+        "desc": [
+          "You touch a length of rope that is up to 60 feet long. One end of the rope then rises into the air until the whole rope hangs perpendicular to the ground. At the upper end of the rope, an invisible entrance opens to an extradimensional space that lasts until the spell ends.",
+          "The extradimensional space can be reached by climbing to the top of the rope. The space can hold as many as eight Medium or smaller creatures. The rope can be pulled into the space, making the rope disappear from view outside the space.",
+          "Attacks and spells can't cross through the entrance into or out of the extradimensional space, but those inside can see out of it as if through a 3-foot-by-5-foot window centered on the rope.",
+          "Anything inside the extradimensional space drops out when the spell ends."
+        ],
+        "range": "Touch",
+        "components": [
+          "V",
+          "S",
+          "M"
+        ],
+        "material": "Powdered corn extract and a twisted loop of parchment.",
+        "ritual": false,
+        "duration": "1 hour",
+        "concentration": false,
+        "casting_time": "1 action",
+        "level": 2,
+        "school": {
+          "index": "transmutation",
+          "name": "Transmutation",
+          "url": "/api/2014/magic-schools/transmutation"
+        },
+        "classes": [
+          {
+            "index": "wizard",
+            "name": "Wizard",
+            "url": "/api/2014/classes/wizard"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          }
+        ],
+        "url": "/api/2014/spells/rope-trick",
+        "updated_at": "2026-04-01T20:35:39.217Z",
+        "damage": []
+      }
+    },
+    "spells/arcanists-magic-aura": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/arcanists-magic-aura",
+      "sha256": "944bd730bc399d453f6b40a11a30deb167d8ab8500da022b14e9631cd0505679",
+      "source": {
+        "higher_level": [],
+        "index": "arcanists-magic-aura",
+        "name": "Arcanist's Magic Aura",
+        "desc": [
+          "You place an illusion on a creature or an object you touch so that divination spells reveal false information about it. The target can be a willing creature or an object that isn't being carried or worn by another creature.",
+          "When you cast the spell, choose one or both of the following effects. The effect lasts for the duration. If you cast this spell on the same creature or object every day for 30 days, placing the same effect on it each time, the illusion lasts until it is dispelled.",
+          "***False Aura.*** You change the way the target appears to spells and magical effects, such as detect magic, that detect magical auras. You can make a nonmagical object appear magical, a magical object appear nonmagical, or change the object's magical aura so that it appears to belong to a specific school of magic that you choose. When you use this effect on an object, you can make the false magic apparent to any creature that handles the item.",
+          "***Mask.*** You change the way the target appears to spells and magical effects that detect creature types, such as a paladin's Divine Sense or the trigger of a symbol spell. You choose a creature type and other spells and magical effects treat the target as if it were a creature of that type or of that alignment."
+        ],
+        "range": "Touch",
+        "components": [
+          "V",
+          "S",
+          "M"
+        ],
+        "material": "A small square of silk.",
+        "ritual": false,
+        "duration": "24 hours",
+        "concentration": false,
+        "casting_time": "1 action",
+        "level": 2,
+        "school": {
+          "index": "illusion",
+          "name": "Illusion",
+          "url": "/api/2014/magic-schools/illusion"
+        },
+        "classes": [
+          {
+            "index": "wizard",
+            "name": "Wizard",
+            "url": "/api/2014/classes/wizard"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          }
+        ],
+        "url": "/api/2014/spells/arcanists-magic-aura",
+        "updated_at": "2026-04-01T20:35:39.217Z",
+        "damage": []
+      }
+    },
+    "spells/invisibility": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/invisibility",
+      "sha256": "45fda3efa139eb311cf62b25be05a38816ac3767edbe633bcf1f9982b1bf4f0a",
+      "source": {
+        "index": "invisibility",
+        "name": "Invisibility",
+        "desc": [
+          "A creature you touch becomes invisible until the spell ends. Anything the target is wearing or carrying is invisible as long as it is on the target's person. The spell ends for a target that attacks or casts a spell."
+        ],
+        "higher_level": [
+          "When you cast this spell using a spell slot of 3rd level or higher, you can target one additional creature for each slot level above 2nd."
+        ],
+        "range": "Touch",
+        "components": [
+          "V",
+          "S",
+          "M"
+        ],
+        "material": "An eyelash encased in gum arabic.",
+        "ritual": false,
+        "duration": "Up to 1 hour",
+        "concentration": true,
+        "casting_time": "1 action",
+        "level": 2,
+        "school": {
+          "index": "illusion",
+          "name": "Illusion",
+          "url": "/api/2014/magic-schools/illusion"
+        },
+        "classes": [
+          {
+            "index": "bard",
+            "name": "Bard",
+            "url": "/api/2014/classes/bard"
+          },
+          {
+            "index": "sorcerer",
+            "name": "Sorcerer",
+            "url": "/api/2014/classes/sorcerer"
+          },
+          {
+            "index": "warlock",
+            "name": "Warlock",
+            "url": "/api/2014/classes/warlock"
+          },
+          {
+            "index": "wizard",
+            "name": "Wizard",
+            "url": "/api/2014/classes/wizard"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          },
+          {
+            "index": "land",
+            "name": "Land",
+            "url": "/api/2014/subclasses/land"
+          }
+        ],
+        "url": "/api/2014/spells/invisibility",
+        "updated_at": "2026-04-01T20:35:39.217Z",
+        "damage": []
+      }
+    },
+    "spells/see-invisibility": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/see-invisibility",
+      "sha256": "9f6baf16e43585f1767410efd037f98136605f627991e54a41cc28d47896cd06",
+      "source": {
+        "higher_level": [],
+        "index": "see-invisibility",
+        "name": "See Invisibility",
+        "desc": [
+          "For the duration of the spell, you see invisible creatures and objects as if they were visible, and you can see through Ethereal. The ethereal objects and creatures appear ghostly translucent."
+        ],
+        "range": "Self",
+        "components": [
+          "V",
+          "S",
+          "M"
+        ],
+        "material": "A dash of talc and a small amount of silver powder.",
+        "ritual": false,
+        "duration": "1 hour",
+        "concentration": false,
+        "casting_time": "1 action",
+        "level": 2,
+        "school": {
+          "index": "divination",
+          "name": "Divination",
+          "url": "/api/2014/magic-schools/divination"
+        },
+        "classes": [
+          {
+            "index": "bard",
+            "name": "Bard",
+            "url": "/api/2014/classes/bard"
+          },
+          {
+            "index": "sorcerer",
+            "name": "Sorcerer",
+            "url": "/api/2014/classes/sorcerer"
+          },
+          {
+            "index": "wizard",
+            "name": "Wizard",
+            "url": "/api/2014/classes/wizard"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          }
+        ],
+        "url": "/api/2014/spells/see-invisibility",
+        "updated_at": "2026-04-01T20:35:39.217Z",
+        "damage": []
+      }
+    },
+    "spells/continual-flame": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/continual-flame",
+      "sha256": "4e6599729fc235cabfb3690b894bd4c249fc49422653ab377fb4f96559bebfdf",
+      "source": {
+        "higher_level": [],
+        "index": "continual-flame",
+        "name": "Continual Flame",
+        "desc": [
+          "A flame, equivalent in brightness to a torch, springs forth from an object that you touch. The effect looks like a regular flame, but it creates no heat and doesn't use oxygen. A continual flame can be covered or hidden but not smothered or quenched."
+        ],
+        "range": "Touch",
+        "components": [
+          "V",
+          "S",
+          "M"
+        ],
+        "material": "Ruby dust worth 50 gp, which the spell consumes.",
+        "ritual": false,
+        "duration": "Until dispelled",
+        "concentration": false,
+        "casting_time": "1 action",
+        "level": 2,
+        "school": {
+          "index": "evocation",
+          "name": "Evocation",
+          "url": "/api/2014/magic-schools/evocation"
+        },
+        "classes": [
+          {
+            "index": "cleric",
+            "name": "Cleric",
+            "url": "/api/2014/classes/cleric"
+          },
+          {
+            "index": "wizard",
+            "name": "Wizard",
+            "url": "/api/2014/classes/wizard"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          }
+        ],
+        "url": "/api/2014/spells/continual-flame",
+        "updated_at": "2026-04-01T20:35:39.217Z",
+        "damage": []
+      }
+    }
+  }
+}

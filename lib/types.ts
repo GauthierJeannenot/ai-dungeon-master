@@ -1,10 +1,47 @@
 export interface Item {
+  adventureRewardId?: string // Reciprocal source receipt; never grants ownership or identification.
+  adamantine?: import('./adamantine-witness').AdamantineWitness
+  quantity?: number
+  ammunitionType?: import('./srd/ammunition').AmmunitionType
+  equipmentId?: string
+  spellIds?: string[]
   id: string
   name: string
   type: 'weapon' | 'armor' | 'potion' | 'misc'
   damage?: string    // e.g. "1d8+3"
   acBonus?: number
   description?: string
+  magical?: boolean
+  silvered?: boolean
+}
+
+export type DamageType = 'acid' | 'bludgeoning' | 'cold' | 'fire' | 'force' | 'lightning' |
+  'necrotic' | 'piercing' | 'poison' | 'psychic' | 'radiant' | 'slashing' | 'thunder'
+
+export interface MonsterEffect {
+  id: string
+  sourceId: string
+  targetId: string
+  kind: string
+  conditions: Condition[]
+  expiresAt?: number
+  endsOnDamage?: boolean
+  dc?: number
+  repeatSave?: keyof EntityStats
+  hpMaxReduction?: number
+  agingYears?: number
+  /** Exact sprite poison symptoms suspended by a real petrification entry. */
+  petrificationPause?: { pausedAt: number; conditions: Condition[] }
+  /** The actual poison created by the same sprite hit, when known. */
+  spritePoisonId?: string
+}
+
+export interface MonsterRuntime {
+  spellSlots?: Record<string,{current:number;max:number}>
+  startedTurn?: string
+  martialAdvantageTurn?: string
+  recharge?: Record<string, boolean>
+  invisibleConcentration?: boolean
 }
 
 export interface EntityStats {
@@ -14,6 +51,16 @@ export interface EntityStats {
   int: number
   wis: number
   cha: number
+}
+
+export interface DroppedItem {
+  item: Item
+  mapId: string
+  roomId: string | null
+  position: { x: number; y: number }
+  description?: string
+  // Snapshot of a nearby landmark. The item stays put if that actor moves.
+  anchor?: { entityId: string; name: string; position: { x: number; y: number } }
 }
 
 export type Condition =
@@ -36,9 +83,23 @@ export type Condition =
 // Capacités de classe appliquées par le moteur (miroir du type de
 // lib/character-registry.ts, redéclaré ici pour éviter une dépendance de types
 // depuis mcp-server vers le registre). Liste fermée.
-export type ClassFeatureId = 'second_wind' | 'spellcasting'
+export const CLASS_FEATURE_IDS = ['second_wind', 'spellcasting', 'extra_attack', 'action_surge', 'jack_of_all_trades',
+  'dueling', 'two_weapon_fighting', 'improved_critical', 'remarkable_athlete', 'bardic_inspiration', 'song_of_rest', 'font_of_inspiration',
+  'countercharm', 'cutting_words', 'additional_magical_secrets', 'arcane_recovery', 'evocation_savant',
+  'sculpt_spells', 'potent_cantrip', 'disciple_of_life', 'channel_divinity', 'destroy_undead', 'blessed_healer'] as const
+export type ClassFeatureId = typeof CLASS_FEATURE_IDS[number]
+
+export type SpellSlotLevel = 1 | 2 | 3 | 4
+export type SpellSlots = { level1: { current: number; max: number } } &
+  Partial<Record<'level2' | 'level3' | 'level4', { current: number; max: number }>>
 
 export interface PlayerState {
+  toolProficiencies?: string[]
+  ruleset?: 'srd2014'
+  subclassId?: 'champion' | 'lore' | 'evocation' | 'life'
+  spellbook?: string[]
+  domainSpells?: string[]
+  languages?: string[]
   id: 'player'
   name: string
   class: string
@@ -61,13 +122,17 @@ export interface PlayerState {
   skillProficiencies?: string[]                         // ids canoniques (lib/srd/skills)
   expertise?: string[]                                  // compétences à double maîtrise
   features?: ClassFeatureId[]
-  spellSlots?: { level1: { current: number; max: number } }
+  spellSlots?: SpellSlots
   knownSpells?: string[]                                // cantrips + niveau 1 confondus (ids)
   spellcastingAbility?: keyof EntityStats               // int (magicien), wis (clerc), cha (barde)
   resources?: Record<string, { current: number; max: number }>  // ex. { second_wind: {…} }
 }
 
 export interface MonsterState {
+  statBlock?: NpcStatBlockState
+  group?: NpcGroupState
+  socialIdentity?: string // Stable authored encounter actor across exploration/combat.
+  controller?: 'reactive_npc'
   id: string
   name: string
   type: string          // e.g. "goblin", "orc"
@@ -80,8 +145,16 @@ export interface MonsterState {
   attackBonus: number
   damageDice: string    // e.g. "1d6+2"
   speed: number
+  attackName?: string
+  attackRangeCells?: number
+  damageType?: string
+  movementModes?: { walk?: number; fly?: number; swim?: number; climb?: number; burrow?: number; hover?: boolean }
+  srd?: { index: string; ruleset: '2014'; url: string; hpOverride?: number }
+  monsterRuntime?: MonsterRuntime
   initiative?: number
   isAlive: boolean
+  knockout?: import('./nonlethal-state').KnockoutState
+  npcLife?: import('./npc-life-state').NpcLifeState
   xpAwarded?: boolean
   hostile?: boolean     // false = allié/neutre : ne joue pas de tour offensif (défaut: hostile)
 }
@@ -98,8 +171,9 @@ export interface CombatLogEntry {
 export type GamePhase = 'exploration' | 'combat' | 'dialogue'
 
 // Mémoire de scène libre, propre au module (clés non typées : le contenu
-// appartient à adventures/<id>/, le code partagé ne fait que la transporter et
-// la round-tripper — pas de vocabulaire de module dans lib/). Le champ reste
+// appartient à adventures/<id>/ ; la clé générique doorStates conserve aussi
+// l'état moteur des portes autorées. Aucun vocabulaire de module dans lib/.
+// Le champ reste
 // déclaré sur GameState pour survivre à replace_game_state (états legacy JSONB).
 export type SceneMemory = Record<string, unknown>
 
@@ -219,7 +293,30 @@ export interface WorldState {
 // PNJ de premier ordre, rendu sur la battlemap par son propre token. Distinct des
 // MonsterState (combattants) et du WorldNpcState (moteur "world" retiré). Un PNJ peut
 // être présent mais invisible (visible:false) tant qu'il ne s'est pas révélé au joueur.
-export interface NpcState {
+export interface NpcStatBlockState {
+  type: string
+  name: string
+  ruleset: '2014'
+  sourceUrl: string
+  sourceSha256: string
+  published: Record<string, unknown>
+  homebrew?: string
+}
+
+export interface NpcGroupState {
+  rule: 'shared-hp-attrition-v1'
+  name: string
+  members: Array<{ id: string; name: string }>
+  initialCount: number
+  remainingCount: number
+  memberMaxHp: number
+  // A loss removes an able member, without selecting a named victim or asserting death.
+  incapacitatedCount: number
+  cannotRegainHp: true
+  cannotGainTemporaryHp: true
+}
+
+export interface NpcState extends Partial<MonsterState> {
   id: string
   name: string
   kind: string                       // 'awakened_tree', 'dryad', …
@@ -229,9 +326,15 @@ export interface NpcState {
   // « compagnon » change de map via travel_to_map (transition.companions) —
   // uniquement s'il est disposition helpful au moment du départ.
   mapId?: string
+  partyEvents?: Record<string,string> // Exact reciprocal movement/transfer/arrival witnesses.
+  partyHistory?: string[] // Reciprocal explicit NPC party declarations.
+  continuityHistory?: string[] // Exact committed NPC separation owners; never inferred from narration.
   disposition: WorldNpcDisposition
   visible: boolean                   // false = présent mais pas encore révélé au joueur
   description?: string
+  // Optional injuries from authored environmental effects; no combat is spawned.
+  hp?: { current: number; max: number }
+  conditions?: Condition[]
 }
 
 // Issue d'une map quittée, enregistrée PAR LE MOTEUR au moment du travel_to_map.
@@ -239,23 +342,64 @@ export interface NpcState {
 export interface MapOutcome {
   completion: 'partial' | 'total'   // partielle = objectifs requis ; totale = tous
   objectivesDone: string[]          // ids des MapObjective remplis au départ
+  campaignOutcomeIds?: string[]     // classified real encounter receipts; absent on legacy maps
 }
 
-// Fait de monde établi mécaniquement (v1 : uniquement par cast_spell utility).
-// Champ DÉDIÉ et volontairement maigre : ne PAS ressusciter world.fictionFacts
-// (le moteur « world » a été retiré ; fictionFacts est typé mais rien ne le
-// produit — AGENTS.md). Porté par l'état, donc immunisé contre la compression
-// d'historique par construction. Voir docs/playable-characters.md.
+// The AI describes an established consequence freely, within the action's rules.
+// The engine validates location/costs and stores this narrative interpretation.
+export interface NarrativeEffect {
+  description: string
+  cell: { x: number; y: number }
+}
+
+export type WaterEffect = NarrativeEffect
+
+// Read older saved facts without presenting their former menu to the agent.
+export type LegacyWaterEffect =
+  | { mode: 'container'; targetLabel: string; cell: { x: number; y: number }; liters: number }
+  | { mode: 'rain' | 'extinguish'; targetLabel: string; cell: { x: number; y: number } }
+
+// Fait établi par un outil moteur (sort utilitaire, déplacement furtif…).
+// Champ DÉDIÉ : ne PAS ressusciter world.fictionFacts (sans producteur actif).
+// Porté par l'état, donc préservé lors de la compression d'historique.
 export interface WorldFact {
+  improvisedHazardEventId?: string
+  improvisedHazardResultWitness?: string
   id: string
+  clueId?: string                // authored information explicitly revealed by the agent
   text: string                   // injectable tel quel dans le prompt dynamique
   source: string                 // ex. 'cast_spell:create-water'
   mapId: string
-  roomId?: string                // requis si expires === 'room'
+  roomId?: string                // localise le fait ; requis si expires === 'room'
   expires: 'room' | 'map' | 'never'
+  waterEffect?: WaterEffect | LegacyWaterEffect
+  narrativeEffect?: NarrativeEffect
+  subjectItemId?: string
+  basis?: 'ai_interpretation'
 }
 
 export interface GameState {
+  objectiveJournal?: import('./objective-journal').ObjectiveJournal
+  socialProfileSeed?: string
+  socialPersonalities?: Record<string, import('./social').SocialPersonality>
+  dmTools?: import('./dm-tool-state').DmToolState
+  hero?: import('./hero-state').HeroState
+  worldTimeSeconds?: number
+  turnCounter?: number
+  monsterEffects?: MonsterEffect[]
+  monsterPowerImmunities?: Array<{ sourceId: string; targetId: string; power: string; expiresAt: number }>
+  playerActionRevision?: number
+  combatGeneration?: number
+  npcActivationLedger?: string[]
+  handledRequestIds?: string[]
+  // Contexte interne du message courant ; seule une décision MCP du MJ accorde l'exception.
+  dmActionAllowance?: {
+    requestId: string
+    actionRevisionAtStart: number
+    granted: boolean
+    reason?: string
+    combatTurnKey?: string
+  }
   // Module d'aventure de la partie. Fixé à la création (défaut : module par
   // défaut) et préservé au round-trip replace_game_state. Le moteur MCP le
   // reçoit aussi via ADVENTURE_ID au spawn du process (mcp-server/adventure.ts).
@@ -267,9 +411,11 @@ export interface GameState {
   player: PlayerState
   monsters: Record<string, MonsterState>   // serializable (no Map)
   npcs?: Record<string, NpcState>          // PNJ avec token (hors combattants)
+  droppedItems?: Record<string, DroppedItem> // objets déposés, indexés par item.id
   initiativeOrder: string[]
   currentTurn: string | null
   round: number
+  diagonalMovementUsed?: Record<string, number> // diagonal steps by actor during its current turn
   movementUsed: Record<string, number>  // grid cells spent by entity during its current turn
   actionUsed: Record<string, boolean>   // action economy consumed by entity during its current turn
   bonusActionUsed?: Record<string, boolean>  // action bonus consommée (second souffle) — absent = legacy
@@ -283,9 +429,11 @@ export interface GameState {
   // ne peut plus être re-visitée. Préservé au round-trip replace_game_state.
   mapOutcomes?: Record<string, MapOutcome>
   encountersTriggered?: string[]
-  // Faits de monde produits par le moteur (sorts utilitaires). Injectés au
-  // prompt dynamique tant qu'ils vivent ; purgés par le moteur (sortie de salle,
-  // changement de carte, plafond FIFO). Absent = legacy/aucun.
+  adventuringCycleEvents?: Record<string,string> // reciprocal immutable cycle events, no legacy default
+  campaignOutcomeHistory?: string[] // reciprocal actual engagement owners, no legacy default
+  // Faits produits ou mémorisés par les outils moteur. Injectés au
+  // prompt dynamique dans leur scène ; les faits transitoires sont purgés
+  // (sortie de salle/carte, plafond FIFO), les faits durables sont conservés.
   worldFacts?: WorldFact[]
   sceneMemory?: SceneMemory
   world?: WorldState
@@ -299,7 +447,17 @@ export interface DiceRollResult {
   detail: string        // e.g. "1d20+5: [14]+5 = 19"
 }
 
-export interface AttackResult {
+export interface RoleplayBonus {
+  // Récompense ponctuelle choisie par le MJ : entier de +1 à +5, justification requise.
+  roleplayBonus?: number
+  roleplayReason?: string
+}
+
+export interface AttackResult extends RoleplayBonus {
+  damageType?: DamageType
+  rawDamage?: number
+  damageAdjustment?: string[]
+  riderEffects?: unknown[]
   attackerId: string
   targetId: string
   weaponOrSpell: string
@@ -313,6 +471,8 @@ export interface AttackResult {
   damageDealt?: number
   targetHpAfter?: number
   targetDied?: boolean
+  nonlethal?: boolean
+  targetKnockedOut?: boolean
   mechanicalSummary: string
 }
 
@@ -325,15 +485,19 @@ export interface SavingThrowResult {
   mechanicalSummary: string
 }
 
-export interface AbilityCheckResult {
+export interface AbilityCheckResult extends RoleplayBonus {
+  perceptionSense?:import('./weather-state').PerceptionSense
+  weatherDisadvantage?:boolean
+  automaticFailure?:boolean
+  social?: { targetId: string; baseDc: number; dcModifier: number; policy: 'standard2014' }
   entityId: string
   ability: keyof EntityStats
   label?: string
   dc?: number
   proficient: boolean
   expertise: boolean
-  // Avantage/désavantage accordé par le DM (RP de qualité, approche incohérente
-  // avec la fiction) — la raison est exigée par le moteur quand un flag est posé.
+  // Avantage/désavantage de situation, distinct du bonus RP.
+  // La raison est exigée par le moteur quand un flag est posé.
   advantage?: boolean
   disadvantage?: boolean
   advantageReason?: string
@@ -501,7 +665,6 @@ export interface DMLlmUsageSummary {
   calls: number
   inputTokens: number
   outputTokens: number
-  cacheCreationInputTokens: number
   cacheReadInputTokens: number
   totalInputTokens: number
   estimatedCostUsd: number

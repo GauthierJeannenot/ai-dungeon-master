@@ -1,0 +1,616 @@
+{
+  "ruleset": "D&D 5e 2014",
+  "repository": "https://github.com/5etools-mirror-3/5etools-2014-src",
+  "revision": "v1.221.2",
+  "adventureSource": "CM",
+  "chapter": "Sarah of Yellowcrest Manor",
+  "chapterIndex": 9,
+  "document": "adventure-module.md",
+  "people": [
+    {
+      "name": "Sarah",
+      "profile": "Ghost|MM",
+      "sections": [
+        "280",
+        "281",
+        "2da"
+      ],
+      "summary": "Servante assassinée, muette ; comprend le commun. Liée au journal dans un rayon de 30 pieds. Cherche le repos de Maria et des enfants."
+    },
+    {
+      "name": "Faerl",
+      "profile": "Faerl|CM",
+      "sections": [
+        "288",
+        "29f"
+      ],
+      "summary": "Elfe des bois, neutre mauvais ; ambitieux, loyal au culte, convaincu de sa supériorité, prêt à sacrifier autrui pour sa sécurité.",
+      "fluff": "Faerl|CM",
+      "fluffSummary": "Orgueilleux et cruel, il veut tout contrôler. Tenue ostentatoire, grand chapeau rouge ; voix précise et très basse, obligeant ses interlocuteurs à écouter attentivement."
+    },
+    {
+      "name": "Sir Vecken de la Corne brisée",
+      "profile": "Knight|MM",
+      "sections": [
+        "290",
+        "291",
+        "297",
+        "2d0"
+      ],
+      "summary": "Chevalier humain loyal bon, ancien amour de Sarah ; protège les faibles et soigne son père Yacken. Colère et deuil le débordent. Captif : 25 PV actuels."
+    },
+    {
+      "name": "Lord Viallis Yellowcrest",
+      "profile": "Mage|MM",
+      "sections": [
+        "2bb",
+        "2bd",
+        "2be"
+      ],
+      "summary": "Humain chaotique mauvais, dévoué à Gaernoo, arrogant et indécis. Armure du mage déjà lancée ; emplacement de niveau 5 dépensé. Robe aux couleurs scintillantes, parchemin de téléportation pour fuir."
+    },
+    {
+      "name": "Arnulf",
+      "profile": "Commoner|MM",
+      "sections": [
+        "285"
+      ],
+      "summary": "Majordome des occupants actuels du manoir."
+    },
+    {
+      "name": "Kara Firenni",
+      "profile": "Commoner|MM",
+      "sections": [
+        "29a",
+        "29b"
+      ],
+      "summary": "Maire humaine neutre bonne, compatissante ; inquiète pour sa sœur Yaeda."
+    },
+    {
+      "name": "Vieux Fargo",
+      "profile": "Commoner|MM",
+      "sections": [
+        "29c",
+        "29d"
+      ],
+      "summary": "Aubergiste humain chaotique bon ; soupçonne Viallis et cherche son fils."
+    },
+    {
+      "name": "Jeune Fargo",
+      "profile": "Cultist|MM",
+      "sections": [
+        "2d1",
+        "2d2",
+        "2d9"
+      ],
+      "summary": "Recrue manipulée ; peut renoncer au culte."
+    },
+    {
+      "name": "Yaeda Firenni",
+      "profile": "Commoner|MM",
+      "sections": [
+        "2d0"
+      ],
+      "summary": "Prisonnière désarmée ; quatre niveaux d’épuisement."
+    },
+    {
+      "name": "Jalrax, Durz et Seffra",
+      "profile": "Commoner|MM",
+      "sections": [
+        "2d0"
+      ],
+      "summary": "Captifs désarmés d’une caravane attaquée."
+    },
+    {
+      "name": "Ashlan",
+      "sections": [
+        "2d0"
+      ],
+      "summary": "Enfant non combattant ; aucun bloc chiffré attribué."
+    }
+  ],
+  "compactProfiles": {
+    "Faerl|CM": "Fey Ancestry : avantage contre le charme ; immunité au sommeil magique. Rapier : attaque de mêlée +3, portée 5 pieds, une cible ; 5 (1d8 + 1) perforants. Parry (réaction) : +2 CA contre une attaque de mêlée qui toucherait ; attaquant visible et arme de mêlée en main.",
+    "Grell|MM": "Multiattack : une attaque de tentacules et une de bec. Tentacles : mêlée +4, allonge 10 pieds, une créature ; 7 (1d10 + 2) perforants. Constitution DD 11 : échec = empoisonné 1 minute et paralysé tant que ce poison agit ; nouveau jet à chaque fin de tour, fin sur réussite. Cible aussi agrippée (évasion DD 15), et entravée si taille M ou inférieure. Pendant l’agrippement, avantage aux attaques du grell contre cette cible ; les tentacules ne peuvent viser autrui. Une cible agrippée de taille M ou inférieure accompagne ses déplacements. Beak : mêlée +4, allonge 5 pieds, une cible ; 7 (2d4 + 2) perforants."
+  },
+  "npcLore": {
+    "profiles": {
+      "sarah": {
+        "name": "Sarah",
+        "aliases": [
+          "Sarah"
+        ],
+        "sections": [
+          "27a",
+          "27b",
+          "27c",
+          "27d",
+          "27f",
+          "280",
+          "281",
+          "2da"
+        ],
+        "fluff": [
+          "Ghost|MM"
+        ],
+        "adaptationNotes": [
+          "Référence MJ seulement : les descriptions de jets, effets, équipement, déplacements et événements de la source ne résolvent aucune mécanique. Les données et outils actuels de la partie font autorité.",
+          "La copie du journal transportée par le héros ne contient pas Sarah. Elle reste liée au journal original à Candlekeep ; aucune possession, attaque ou voix retrouvée avant le dénouement n’est acquise."
+        ]
+      },
+      "faerl": {
+        "name": "Faerl",
+        "aliases": [
+          "Faerl"
+        ],
+        "sections": [
+          "288",
+          "28d",
+          "28e",
+          "28f",
+          "29f"
+        ],
+        "fluff": [
+          "Faerl|CM",
+          "Noble|MM"
+        ],
+        "adaptationNotes": [
+          "Référence MJ seulement : les descriptions de jets, effets, équipement, déplacements et événements de la source ne résolvent aucune mécanique. Les données et outils actuels de la partie font autorité.",
+          "Faerl est le même individu à Waterdeep et Greenfast. Ne pas dupliquer sa présence. Les effectifs du coche restent ceux du preset solo. Les langues et traits elfiques cités ne créent pas de nouveaux effets moteur.",
+          "Décision utilisateur du 23 novembre 2026 : Faerl peut céder à une intimidation crédible, notamment après la mort de ses gardes. Cette exception à Waterdeep et Greenfast prévaut sur les passages source décrivant une loyauté absolue ou une immunité aux menaces. Résoudre la demande sociale avec intimidation si l’issue est incertaine avant toute confidence, sans réussite automatique ni savoir nouveau. L’argent seul n’achète pas sa trahison."
+        ],
+        "personalitySection": "288"
+      },
+      "vecken": {
+        "name": "Sir Vecken de la Corne brisée",
+        "aliases": [
+          "Vecken",
+          "Yacken"
+        ],
+        "sections": [
+          "290",
+          "291",
+          "296",
+          "297",
+          "2d0",
+          "2da"
+        ],
+        "fluff": [
+          "Knight|MM"
+        ],
+        "adaptationNotes": [
+          "Référence MJ seulement : les descriptions de jets, effets, équipement, déplacements et événements de la source ne résolvent aucune mécanique. Les données et outils actuels de la partie font autorité.",
+          "La capture ou l’arrivée tardive de Vecken dépend des faits établis ; ne pas la déclarer automatiquement. La version blessée conserve ses PV réellement suivis. Aucun tour allié ni escorte ne sont exécutés par cette référence."
+        ],
+        "personalitySection": "291"
+      },
+      "viallis": {
+        "name": "Lord Viallis Yellowcrest",
+        "aliases": [
+          "Viallis",
+          "Lord Yellowcrest"
+        ],
+        "sections": [
+          "282",
+          "2bd",
+          "2be",
+          "2d7"
+        ],
+        "fluff": [
+          "Mage|MM"
+        ],
+        "adaptationNotes": [
+          "Référence MJ seulement : les descriptions de jets, effets, équipement, déplacements et événements de la source ne résolvent aucune mécanique. Les données et outils actuels de la partie font autorité.",
+          "Dans cette adaptation solo, aucun renfort automatique ni nouveau grell au round 2. Armure du mage, emplacement de niveau 5 dépensé, robe et parchemin de fuite restent des références tant que leur état ou outil ne les établit pas. Les sorts et pouvoirs non pris en charge restent indisponibles."
+        ],
+        "personalitySection": "2be"
+      },
+      "arnulf": {
+        "name": "Arnulf",
+        "aliases": [
+          "Arnulf",
+          "Falgarst"
+        ],
+        "sections": [
+          "285",
+          "286"
+        ],
+        "fluff": [
+          "Commoner|MM"
+        ],
+        "adaptationNotes": [
+          "Référence MJ seulement : les descriptions de jets, effets, équipement, déplacements et événements de la source ne résolvent aucune mécanique. Les données et outils actuels de la partie font autorité.",
+          "L’alcool et Charme-personne cités dans le texte sont des références de scénario. Ils ne produisent ni avantage ni succès automatique sans résolution des règles par les outils."
+        ]
+      },
+      "cobbler": {
+        "name": "Le cordonnier des Yellowcrest",
+        "aliases": [],
+        "sections": [
+          "287"
+        ],
+        "fluff": [
+          "Commoner|MM"
+        ],
+        "adaptationNotes": [
+          "Référence MJ seulement : les descriptions de jets, effets, équipement, déplacements et événements de la source ne résolvent aucune mécanique. Les données et outils actuels de la partie font autorité.",
+          "La source décrit plusieurs cordonniers et responsables sans nom propre. Le pion unique est une adaptation ; la piste de Greenfast ne doit pas être bloquée par un échec social."
+        ],
+        "status": "generic-role"
+      },
+      "kara": {
+        "name": "Kara Firenni",
+        "aliases": [
+          "Kara",
+          "Yaeda"
+        ],
+        "sections": [
+          "29a",
+          "29b"
+        ],
+        "fluff": [
+          "Commoner|MM"
+        ],
+        "adaptationNotes": [
+          "Référence MJ seulement : les descriptions de jets, effets, équipement, déplacements et événements de la source ne résolvent aucune mécanique. Les données et outils actuels de la partie font autorité.",
+          "Kara croit sa sœur employée ou liée sentimentalement à Viallis. Le dossier confidentiel du MJ ne lui donne pas la connaissance de la captivité ou de toute l’intrigue."
+        ]
+      },
+      "old_fargo": {
+        "name": "Le vieux Fargo",
+        "aliases": [
+          "Old Fargo"
+        ],
+        "sections": [
+          "29c",
+          "29d",
+          "2d9"
+        ],
+        "fluff": [
+          "Commoner|MM"
+        ],
+        "adaptationNotes": [
+          "Référence MJ seulement : les descriptions de jets, effets, équipement, déplacements et événements de la source ne résolvent aucune mécanique. Les données et outils actuels de la partie font autorité.",
+          "L’hospitalité promise dans la conclusion dépend du sauvetage effectif de son fils ; aucune récompense ni gratuité n’est créditée automatiquement."
+        ]
+      },
+      "young_fargo": {
+        "name": "Le jeune Fargo",
+        "aliases": [
+          "Young Fargo"
+        ],
+        "sections": [
+          "2d1",
+          "2d2",
+          "2d9"
+        ],
+        "fluff": [
+          "Cultist|MM"
+        ],
+        "adaptationNotes": [
+          "Référence MJ seulement : les descriptions de jets, effets, équipement, déplacements et événements de la source ne résolvent aucune mécanique. Les données et outils actuels de la partie font autorité.",
+          "Le jeune Fargo est un pion distinct, exclu du preset hostile solo. Il peut être épargné et renoncer au culte ; un gain social seul ne résout ni cette décision ni son sauvetage."
+        ]
+      },
+      "yaeda": {
+        "name": "Yaeda Firenni",
+        "aliases": [
+          "Yaeda"
+        ],
+        "sections": [
+          "2d0"
+        ],
+        "fluff": [
+          "Commoner|MM"
+        ],
+        "adaptationNotes": [
+          "Référence MJ seulement : les descriptions de jets, effets, équipement, déplacements et événements de la source ne résolvent aucune mécanique. Les données et outils actuels de la partie font autorité.",
+          "Yaeda partage un pion collectif avec Jalrax, Durz, Seffra et Ashlan. Les quatre niveaux d’épuisement de la source sont une référence individuelle, pas une condition automatiquement appliquée à tout le groupe."
+        ]
+      },
+      "jalrax": {
+        "name": "Jalrax",
+        "aliases": [
+          "Jalrax"
+        ],
+        "sections": [
+          "2d0"
+        ],
+        "fluff": [
+          "Commoner|MM"
+        ],
+        "adaptationNotes": [
+          "Référence MJ seulement : les descriptions de jets, effets, équipement, déplacements et événements de la source ne résolvent aucune mécanique. Les données et outils actuels de la partie font autorité.",
+          "Membre du groupe collectif des captifs ; aucune biographie individuelle supplémentaire n’est fournie dans la source."
+        ]
+      },
+      "durz": {
+        "name": "Durz",
+        "aliases": [
+          "Durz"
+        ],
+        "sections": [
+          "2d0"
+        ],
+        "fluff": [
+          "Commoner|MM"
+        ],
+        "adaptationNotes": [
+          "Référence MJ seulement : les descriptions de jets, effets, équipement, déplacements et événements de la source ne résolvent aucune mécanique. Les données et outils actuels de la partie font autorité.",
+          "Membre du groupe collectif des captifs ; aucune biographie individuelle supplémentaire n’est fournie dans la source."
+        ]
+      },
+      "seffra": {
+        "name": "Seffra",
+        "aliases": [
+          "Seffra"
+        ],
+        "sections": [
+          "2d0"
+        ],
+        "fluff": [
+          "Commoner|MM"
+        ],
+        "adaptationNotes": [
+          "Référence MJ seulement : les descriptions de jets, effets, équipement, déplacements et événements de la source ne résolvent aucune mécanique. Les données et outils actuels de la partie font autorité.",
+          "Membre du groupe collectif des captifs ; aucune biographie individuelle supplémentaire n’est fournie dans la source."
+        ]
+      },
+      "ashlan": {
+        "name": "Ashlan",
+        "aliases": [
+          "Ashlan"
+        ],
+        "sections": [
+          "2d0"
+        ],
+        "fluff": [
+          "Commoner|MM"
+        ],
+        "adaptationNotes": [
+          "Référence MJ seulement : les descriptions de jets, effets, équipement, déplacements et événements de la source ne résolvent aucune mécanique. Les données et outils actuels de la partie font autorité.",
+          "La source décrit Ashlan comme enfant non combattant sans bloc propre. Le profil Commoner du groupe est une adaptation demandée ; ne pas en déduire qu’Ashlan est armé ou combattant volontaire."
+        ]
+      },
+      "maria": {
+        "name": "Maria Yellowcrest",
+        "aliases": [
+          "Maria"
+        ],
+        "sections": [
+          "27c",
+          "27f",
+          "282",
+          "2c9",
+          "2da"
+        ],
+        "fluff": [
+          "Ghost|MM"
+        ],
+        "adaptationNotes": [
+          "Référence MJ seulement : les descriptions de jets, effets, équipement, déplacements et événements de la source ne résolvent aucune mécanique. Les données et outils actuels de la partie font autorité.",
+          "L’esprit final est représenté dans le groupe des esprits libérés. Sa manifestation et son repos dépendent de l’inhumation effective, pas de la seule présence de ce dossier."
+        ]
+      },
+      "malik": {
+        "name": "Malik Yellowcrest",
+        "aliases": [
+          "Malik"
+        ],
+        "sections": [
+          "27f",
+          "2da"
+        ],
+        "fluff": [
+          "Ghost|MM"
+        ],
+        "adaptationNotes": [
+          "Référence MJ seulement : les descriptions de jets, effets, équipement, déplacements et événements de la source ne résolvent aucune mécanique. Les données et outils actuels de la partie font autorité.",
+          "Enfant Yellowcrest représenté dans le groupe final ; aucune personnalité individuelle supplémentaire n’est fournie par la source."
+        ]
+      },
+      "janus": {
+        "name": "Janus Yellowcrest",
+        "aliases": [
+          "Janus"
+        ],
+        "sections": [
+          "27f",
+          "2da"
+        ],
+        "fluff": [
+          "Ghost|MM"
+        ],
+        "adaptationNotes": [
+          "Référence MJ seulement : les descriptions de jets, effets, équipement, déplacements et événements de la source ne résolvent aucune mécanique. Les données et outils actuels de la partie font autorité.",
+          "Enfant Yellowcrest représenté dans le groupe final ; aucune personnalité individuelle supplémentaire n’est fournie par la source."
+        ]
+      },
+      "tianna": {
+        "name": "Tianna Yellowcrest",
+        "aliases": [
+          "Tianna"
+        ],
+        "sections": [
+          "27f",
+          "2da"
+        ],
+        "fluff": [
+          "Ghost|MM"
+        ],
+        "adaptationNotes": [
+          "Référence MJ seulement : les descriptions de jets, effets, équipement, déplacements et événements de la source ne résolvent aucune mécanique. Les données et outils actuels de la partie font autorité.",
+          "Enfant Yellowcrest représentée dans le groupe final ; aucune personnalité individuelle supplémentaire n’est fournie par la source."
+        ]
+      },
+      "avowed": {
+        "name": "L’archiviste des Avoués",
+        "aliases": [
+          "Sirok"
+        ],
+        "sections": [
+          "27f",
+          "283",
+          "2d8"
+        ],
+        "fluff": [
+          "Commoner|MM"
+        ],
+        "adaptationNotes": [
+          "Référence MJ seulement : les descriptions de jets, effets, équipement, déplacements et événements de la source ne résolvent aucune mécanique. Les données et outils actuels de la partie font autorité.",
+          "La source décrit les Avoués et des érudits anonymes, pas une fiche propre à cet archiviste. Le pion est une adaptation. La connaissance du livre par réputation ne signifie pas que les archives possèdent le tome."
+        ],
+        "status": "generic-role"
+      },
+      "cemetery_keeper": {
+        "name": "La gardienne des sépultures",
+        "aliases": [],
+        "sections": [],
+        "fluff": [
+          "Commoner|MM"
+        ],
+        "adaptationNotes": [
+          "Ce personnage est propre à l’adaptation : aucune fiche ni information individuelle n’est attribuée à 5e.tools. Conserver son profil de campagne, son accueil des familles et le mausolée consacré sans inventer un supplément officiel."
+        ],
+        "status": "adaptation-only"
+      },
+      "mercenaries": {
+        "name": "Mercenaires du coche",
+        "aliases": [
+          "bodyguards"
+        ],
+        "sections": [
+          "287",
+          "28e"
+        ],
+        "fluff": [
+          "Thug|MM"
+        ],
+        "adaptationNotes": [
+          "Référence MJ seulement : les descriptions de jets, effets, équipement, déplacements et événements de la source ne résolvent aucune mécanique. Les données et outils actuels de la partie font autorité.",
+          "Dans le module solo, les effectifs et positions sont ceux du moteur. Les mercenaires du coche ne connaissent pas le culte ; ne pas leur attribuer les secrets du dossier de Viallis ou les contraintes des fidèles. La reddition doit être établie dans la scène."
+        ]
+      },
+      "cultists": {
+        "name": "Fidèles du culte",
+        "aliases": [
+          "cultist",
+          "cultists"
+        ],
+        "sections": [
+          "2d1"
+        ],
+        "fluff": [
+          "Cultist|MM"
+        ],
+        "adaptationNotes": [
+          "Référence MJ seulement : les descriptions de jets, effets, équipement, déplacements et événements de la source ne résolvent aucune mécanique. Les données et outils actuels de la partie font autorité.",
+          "La politique propre à cette campagne interdit de détourner les fidèles de leur loyauté par persuasion, intimidation ou tromperie. Le jeune Fargo garde son profil individuel distinct. Les renforts et rites du scénario papier ne se déclenchent pas sans choix explicite du MJ et résultat moteur."
+        ]
+      },
+      "cult_fanatics": {
+        "name": "Officiants du culte",
+        "aliases": [
+          "cult fanatic",
+          "cult fanatics"
+        ],
+        "sections": [
+          "2bd"
+        ],
+        "fluff": [
+          "Cult Fanatic|MM"
+        ],
+        "adaptationNotes": [
+          "Référence MJ seulement : les descriptions de jets, effets, équipement, déplacements et événements de la source ne résolvent aucune mécanique. Les données et outils actuels de la partie font autorité.",
+          "Respecter le nombre de figurants autorés et les pouvoirs effectivement pris en charge. Aucun sort ou sacrifice automatique issu de la source n’est ajouté à la partie."
+        ]
+      },
+      "grick": {
+        "name": "Grick de Gaernoo",
+        "aliases": [
+          "grick",
+          "gricks"
+        ],
+        "sections": [],
+        "fluff": [
+          "Grick|MM"
+        ],
+        "adaptationNotes": [
+          "Référence MJ seulement : les descriptions de jets, effets, équipement, déplacements et événements de la source ne résolvent aucune mécanique. Les données et outils actuels de la partie font autorité.",
+          "Le gardien du caveau est un grick dans cette adaptation, substitué au grell papier. Ne pas lui attribuer vol, paralysie ou pouvoirs du grell. Les gricks optionnels du scénario original ne sont pas des créatures supplémentaires présentes."
+        ]
+      }
+    },
+    "bindings": {
+      "npcs": {
+        "sarah": [
+          "sarah"
+        ],
+        "sarah_at_rest": [
+          "sarah",
+          "maria",
+          "malik",
+          "janus",
+          "tianna"
+        ],
+        "vecken": [
+          "vecken"
+        ],
+        "vecken_rescued": [
+          "vecken"
+        ],
+        "faerl_city": [
+          "faerl"
+        ],
+        "faerl_village": [
+          "faerl"
+        ],
+        "avowed": [
+          "avowed"
+        ],
+        "arnulf": [
+          "arnulf"
+        ],
+        "cobbler": [
+          "cobbler"
+        ],
+        "kara": [
+          "kara"
+        ],
+        "old_fargo": [
+          "old_fargo"
+        ],
+        "young_fargo": [
+          "young_fargo"
+        ],
+        "yaeda": [
+          "yaeda",
+          "jalrax",
+          "durz",
+          "seffra",
+          "ashlan"
+        ],
+        "cemetery_keeper": [
+          "cemetery_keeper"
+        ]
+      },
+      "monsterTypes": {
+        "mage": [
+          "viallis"
+        ],
+        "thug": [
+          "mercenaries"
+        ],
+        "cultist": [
+          "cultists"
+        ],
+        "cult_fanatic": [
+          "cult_fanatics"
+        ],
+        "grick": [
+          "grick"
+        ]
+      }
+    }
+  }
+}

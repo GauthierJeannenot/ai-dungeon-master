@@ -13,7 +13,25 @@ import { logEvent } from './server-logger'
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Tables NextAuth (@auth/pg-adapter — schéma officiel Auth.js) + tables métier.
+const RUNPOD_POD_STATE_SQL = `CREATE TABLE IF NOT EXISTS runpod_pod_state (
+  control_id TEXT PRIMARY KEY,
+  state JSONB NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);`
+
+const TRAINING_SQL = `CREATE TABLE IF NOT EXISTS training_turns (
+  id TEXT PRIMARY KEY, session_id TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  metadata JSONB NOT NULL, outcome JSONB, rating TEXT, correction TEXT NOT NULL DEFAULT ''
+);
+CREATE TABLE IF NOT EXISTS training_events (
+  id TEXT PRIMARY KEY, turn_id TEXT NOT NULL, sequence INTEGER NOT NULL,
+  kind TEXT NOT NULL, payload JSONB NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS training_turns_created_idx ON training_turns (created_at, id);
+CREATE INDEX IF NOT EXISTS training_events_turn_sequence_idx ON training_events (turn_id, sequence);`
+
 export const DB_SCHEMA_SQL = `
+${TRAINING_SQL}
 CREATE TABLE IF NOT EXISTS verification_token (
   identifier TEXT NOT NULL,
   expires TIMESTAMPTZ NOT NULL,
@@ -114,6 +132,8 @@ CREATE TABLE IF NOT EXISTS guest_usage (
 -- continuent de consommer des tokens. user_id est TEXT (users.id sérialisé),
 -- sans FK, cohérent avec user_credits. L'idempotence des webhooks Stripe reste
 -- portée par la table stripe_events.
+${RUNPOD_POD_STATE_SQL}
+
 CREATE TABLE IF NOT EXISTS module_entitlements (
   user_id TEXT NOT NULL,
   module_id TEXT NOT NULL,
@@ -170,6 +190,8 @@ export function __setDbPoolForTests(testPool: Pool): void {
 // IF NOT EXISTS ne modifie pas une table existante). Tolérées en échec : sur
 // une base fraîche la colonne existe déjà via le CREATE.
 const ADDITIVE_MIGRATIONS_SQL = [
+  RUNPOD_POD_STATE_SQL,
+  TRAINING_SQL,
   'ALTER TABLE game_sessions ADD COLUMN IF NOT EXISTS owner_id TEXT',
   'ALTER TABLE game_sessions ADD COLUMN IF NOT EXISTS adventure_id TEXT',
   'ALTER TABLE game_sessions ADD COLUMN IF NOT EXISTS character_id TEXT',

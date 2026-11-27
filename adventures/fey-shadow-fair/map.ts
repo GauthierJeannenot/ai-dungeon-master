@@ -1,9 +1,10 @@
+import { FEY_SHADOW_FAIR_SOCIAL } from './social'
+import { WOOD_ENCOUNTER_SOCIAL } from './wood-social'
 import type {
   AdventureRoom,
   AdventureMapData,
   EncounterDefinition,
   AdventureNpcSpec,
-  AdventureTransition,
   MapTransition,
   MapQuest,
   GridCell,
@@ -26,7 +27,7 @@ import type {
 // produites par ChatGPT — une illustration générée s'y dépose telle quelle.
 //
 // Types de monstres : uniquement des types du bestiaire commun du moteur
-// (goblin_minion, goblin, satyr, sprite, blink_dog, will_o_wisp, violet_fungus,
+// (goblin, satyr, sprite, blink_dog, will_o_wisp, violet_fungus,
 // giant_frog, wolf, bandit, zombie, hobgoblin) avec reskin par `name`.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -87,8 +88,8 @@ export const FEY_SHADOW_FAIR_ENCOUNTERS: Record<string, EncounterDefinition> = {
     name: "Tire-goussets de l'Allée",
     playerCell: { x: 9, y: 9 },
     monsters: [
-      { monsterType: 'goblin_minion', cell: { x: 10, y: 8 }, name: 'Tire-gousset gobelin' },
-      { monsterType: 'goblin_minion', cell: { x: 11, y: 9 }, name: 'Tire-gousset gobelin' },
+      { monsterType: 'goblin', cell: { x: 10, y: 8 }, name: 'Tire-gousset gobelin' },
+      { monsterType: 'goblin', cell: { x: 11, y: 9 }, name: 'Tire-gousset gobelin' },
     ],
   },
   bonneteau_bouncers: {
@@ -118,7 +119,7 @@ export const FEY_SHADOW_FAIR_ENCOUNTERS: Record<string, EncounterDefinition> = {
     playerCell: { x: 15, y: 13 },
     monsters: [
       // zombie (22 HP, CA 8, vitesse 20) : parfait pour un flan géant offensé.
-      { monsterType: 'zombie', cell: { x: 13, y: 13 }, name: 'Le Grand Flan', hpOverride: 16 },
+      { monsterType: 'zombie', cell: { x: 13, y: 13 }, name: 'Le Grand Flan' },
     ],
   },
   mirror_reflections: {
@@ -132,6 +133,7 @@ export const FEY_SHADOW_FAIR_ENCOUNTERS: Record<string, EncounterDefinition> = {
     ],
   },
   mocking_mushrooms: {
+    socialProfile: WOOD_ENCOUNTER_SOCIAL.mocking_mushrooms,
     id: 'mocking_mushrooms',
     roomId: '10',
     name: 'Champignons moqueurs vexés',
@@ -142,17 +144,19 @@ export const FEY_SHADOW_FAIR_ENCOUNTERS: Record<string, EncounterDefinition> = {
     ],
   },
   toll_brigands: {
+    socialProfile: WOOD_ENCOUNTER_SOCIAL.toll_brigands,
     id: 'toll_brigands',
     roomId: '12',
     name: 'Le péage passe en force',
     playerCell: { x: 4, y: 12 },
     monsters: [
       { monsterType: 'goblin', cell: { x: 1, y: 12 }, name: 'Péagiste zélé' },
-      { monsterType: 'goblin_minion', cell: { x: 5, y: 10 }, name: 'Brigand à mirliton' },
-      { monsterType: 'goblin_minion', cell: { x: 6, y: 12 }, name: 'Brigand à mirliton' },
+      { monsterType: 'goblin', cell: { x: 5, y: 10 }, name: 'Brigand à mirliton' },
+      { monsterType: 'goblin', cell: { x: 6, y: 12 }, name: 'Brigand à mirliton' },
     ],
   },
   frog_gavotte: {
+    socialProfile: WOOD_ENCOUNTER_SOCIAL.frog_gavotte,
     id: 'frog_gavotte',
     roomId: '13',
     name: 'La gavotte tourne mal',
@@ -163,6 +167,7 @@ export const FEY_SHADOW_FAIR_ENCOUNTERS: Record<string, EncounterDefinition> = {
     ],
   },
   blink_pack: {
+    socialProfile: WOOD_ENCOUNTER_SOCIAL.blink_pack,
     id: 'blink_pack',
     roomId: '14',
     name: 'La meute des Chiens-Clins',
@@ -173,6 +178,7 @@ export const FEY_SHADOW_FAIR_ENCOUNTERS: Record<string, EncounterDefinition> = {
     ],
   },
   shadow_cotillon: {
+    socialProfile: WOOD_ENCOUNTER_SOCIAL.shadow_cotillon,
     id: 'shadow_cotillon',
     roomId: '15',
     name: 'Le cotillon des ombres offensées',
@@ -184,13 +190,14 @@ export const FEY_SHADOW_FAIR_ENCOUNTERS: Record<string, EncounterDefinition> = {
     ],
   },
   princes_jest: {
+    socialProfile: WOOD_ENCOUNTER_SOCIAL.princes_jest,
     id: 'princes_jest',
     roomId: '16',
     name: 'La Grande Farce du Prince',
     playerCell: { x: 7, y: 3 },
     monsters: [
       // will_o_wisp (22 HP, CA 19) retaillé pour un héros niveau 3 seul.
-      { monsterType: 'will_o_wisp', cell: { x: 8, y: 2 }, name: 'Feu follet majordome', hpOverride: 18 },
+      { monsterType: 'will_o_wisp', cell: { x: 8, y: 2 }, name: 'Feu follet majordome' },
       { monsterType: 'sprite', cell: { x: 6, y: 2 }, name: 'Lutin duelliste' },
       { monsterType: 'sprite', cell: { x: 11, y: 2 }, name: 'Lutin duelliste' },
     ],
@@ -201,6 +208,7 @@ export const FEY_SHADOW_FAIR_ENCOUNTERS: Record<string, EncounterDefinition> = {
 export const FEY_SHADOW_FAIR_NPCS: AdventureNpcSpec[] = [
   {
     id: 'nicodeme',
+    statBlock: 'goblin',
     name: 'Nicodème Minuit',
     kind: 'ticketer',
     roomId: '1',
@@ -211,6 +219,12 @@ export const FEY_SHADOW_FAIR_NPCS: AdventureNpcSpec[] = [
   },
   {
     id: 'madame_bougie',
+    statBlock: 'mage',
+    reactive: {
+      objectives: ['Accueillir les visiteurs et les guider vers une salle choisie selon leur demande.', 'Ouvrir les portes ordinaires nécessaires au passage sans déclencher de violence.'],
+      capabilities: ['move', 'open_door', 'close_door'], speed: 30,
+      triggers: ['after_player_action'],
+    },
     name: 'Madame Bougie',
     kind: 'merchant',
     roomId: '2',
@@ -221,6 +235,7 @@ export const FEY_SHADOW_FAIR_NPCS: AdventureNpcSpec[] = [
   },
   {
     id: 'barnabe',
+    statBlock: 'awakened_shrub',
     name: 'Barnabé',
     kind: 'shrub',
     roomId: '3',
@@ -234,6 +249,7 @@ export const FEY_SHADOW_FAIR_NPCS: AdventureNpcSpec[] = [
   },
   {
     id: 'pipotin',
+    statBlock: 'goblin',
     name: 'Pipotin',
     kind: 'barker',
     roomId: '4',
@@ -244,6 +260,7 @@ export const FEY_SHADOW_FAIR_NPCS: AdventureNpcSpec[] = [
   },
   {
     id: 'ernestine',
+    statBlock: 'ape',
     name: 'Ernestine',
     kind: 'musician',
     roomId: '6',
@@ -254,6 +271,7 @@ export const FEY_SHADOW_FAIR_NPCS: AdventureNpcSpec[] = [
   },
   {
     id: 'theophile',
+    statBlock: 'goblin',
     name: 'Théophile',
     kind: 'tea_goblin',
     roomId: '7',
@@ -264,6 +282,7 @@ export const FEY_SHADOW_FAIR_NPCS: AdventureNpcSpec[] = [
   },
   {
     id: 'mirabelle',
+    statBlock: 'commoner',
     name: 'Mirabelle',
     kind: 'bard',
     roomId: '8',
@@ -274,6 +293,7 @@ export const FEY_SHADOW_FAIR_NPCS: AdventureNpcSpec[] = [
   },
   {
     id: 'miroslav',
+    statBlock: 'commoner',
     name: 'Miroslav',
     kind: 'mime',
     roomId: '9',
@@ -284,6 +304,10 @@ export const FEY_SHADOW_FAIR_NPCS: AdventureNpcSpec[] = [
   },
   {
     id: 'tetes_jacassantes',
+    statBlock: 'gargoyle',
+    group: { name: 'Les Trois Têtes Jacassantes', members: [
+      { id: 'head_1', name: 'Première tête' }, { id: 'head_2', name: 'Deuxième tête' }, { id: 'head_3', name: 'Troisième tête' },
+    ] },
     name: 'Les Têtes Jacassantes',
     kind: 'oracle',
     roomId: '11',
@@ -294,6 +318,7 @@ export const FEY_SHADOW_FAIR_NPCS: AdventureNpcSpec[] = [
   },
   {
     id: 'capitaine_mirliton',
+    statBlock: 'goblin',
     name: 'Le Capitaine Mirliton',
     kind: 'brigand',
     roomId: '12',
@@ -304,6 +329,7 @@ export const FEY_SHADOW_FAIR_NPCS: AdventureNpcSpec[] = [
   },
   {
     id: 'baronne_grenouille',
+    statBlock: 'giant_frog',
     name: 'La Baronne Grenouille',
     kind: 'frog_noble',
     roomId: '13',
@@ -314,6 +340,7 @@ export const FEY_SHADOW_FAIR_NPCS: AdventureNpcSpec[] = [
   },
   {
     id: 'ombre_soliste',
+    statBlock: 'shadow',
     name: "L'Ombre Soliste",
     kind: 'shadow',
     roomId: '15',
@@ -324,6 +351,7 @@ export const FEY_SHADOW_FAIR_NPCS: AdventureNpcSpec[] = [
   },
   {
     id: 'maitre_filou',
+    statBlock: 'sprite',
     name: 'Maître Filou',
     kind: 'trickster',
     roomId: '16',
@@ -334,6 +362,7 @@ export const FEY_SHADOW_FAIR_NPCS: AdventureNpcSpec[] = [
   },
   {
     id: 'prince_farces',
+    statBlock: 'archmage',
     name: 'Le Prince des Farces',
     kind: 'archfey',
     roomId: '16',
@@ -342,71 +371,6 @@ export const FEY_SHADOW_FAIR_NPCS: AdventureNpcSpec[] = [
     visibleFromStart: false,
     description: "Archifée du Bois-Ricanant, invisible tant qu'il n'a pas ri. Collectionne les ombres bien repassées mais respecte quiconque le fait rire ou joue franc jeu.",
   },
-]
-
-export const FEY_SHADOW_FAIR_NAMED_LOCATION_CELLS: Array<{ id: string; pattern: RegExp; cell: GridCell }> = [
-  { id: 'madame_bougie', pattern: /\b(madame bougie|bougie|chandeliere|chandelière|tenanciere|tenancière)\b/, cell: { x: 7, y: 8 } },
-  { id: 'billetterie', pattern: /\b(billetterie|billets?|nicodeme|nicodème)\b/, cell: { x: 7, y: 14 } },
-  { id: 'firefly_gate', pattern: /\b(portail|vers luisants|arche luisante)\b/, cell: { x: 16, y: 2 } },
-]
-
-export const FEY_SHADOW_FAIR_ROOM_NAVIGATION_ALIASES: Array<{ roomId: string; pattern: RegExp }> = [
-  { roomId: '1', pattern: /\b(pre|pré|lanternes?|entree de la foire|entrée de la foire|prairie|billetterie)\b/ },
-  { roomId: '2', pattern: /\b(allee|allée|baraques?|stands?|echoppes?|échoppes?|boutiques?|chandelles?)\b/ },
-  { roomId: '3', pattern: /\b(carrousel|manege|manège|limaces?|escargots?|course|piste)\b/ },
-  { roomId: '4', pattern: /\b(tente|bonneteau|table de jeu|cartes)\b/ },
-  { roomId: '5', pattern: /\b(portail|vers luisants|arche)\b/ },
-  { roomId: '6', pattern: /\b(chapiteau|cirque|spectacle|numeros?|numéros?|vielle)\b/ },
-  { roomId: '7', pattern: /\b(theiere|théière|bulles?|the|thé|tisane)\b/ },
-  { roomId: '8', pattern: /\b(verger|ripailles?|banquet|gateaux?|gâteaux?|concours|festin)\b/ },
-  { roomId: '9', pattern: /\b(palais|miroirs?|glaces?|reflets?)\b/ },
-  { roomId: '10', pattern: /\b(clairiere|clairière|champignons?)\b/ },
-  { roomId: '11', pattern: /\b(carrefour|tetes?|têtes?|panneaux?|affiches?|croisee|croisée)\b/ },
-  { roomId: '12', pattern: /\b(peage|péage|pont|brigands?|mirliton)\b/ },
-  { roomId: '13', pattern: /\b(mare|etang|étang|grenouilles?|gavotte|nenuphars?|nénuphars?)\b/ },
-  { roomId: '14', pattern: /\b(sentier|chiens?[- ]clins?)\b/ },
-  { roomId: '15', pattern: /\b(bal des ombres|ronde des ombres|estrade|scene|scène|soliste)\b/ },
-  { roomId: '16', pattern: /\b(cour|prince|trone|trône)\b/ },
-]
-
-export const FEY_SHADOW_FAIR_DOOR_TRANSITIONS: AdventureTransition[] = [
-  // ── Foire ──
-  { fromRoomId: '1', toRoomId: '2' },
-  { fromRoomId: '1', toRoomId: '3', pattern: /\b(carrousel|manege|manège|limaces?|escargots?)\b/ },
-  { fromRoomId: '2', toRoomId: '1', pattern: /\b(pre|pré|lanternes?|billetterie)\b/ },
-  { fromRoomId: '2', toRoomId: '3', pattern: /\b(carrousel|manege|manège|limaces?|escargots?)\b/ },
-  { fromRoomId: '2', toRoomId: '6', pattern: /\b(chapiteau|cirque|spectacle)\b/ },
-  { fromRoomId: '2', toRoomId: '8', pattern: /\b(verger|ripailles?|banquet)\b/ },
-  { fromRoomId: '3', toRoomId: '2' },
-  { fromRoomId: '3', toRoomId: '7', pattern: /\b(theiere|théière|bulles?)\b/ },
-  { fromRoomId: '6', toRoomId: '4' },
-  { fromRoomId: '6', toRoomId: '8', pattern: /\b(verger|ripailles?)\b/ },
-  { fromRoomId: '4', toRoomId: '9' },
-  { fromRoomId: '8', toRoomId: '9', pattern: /\b(palais|miroirs?)\b/ },
-  { fromRoomId: '8', toRoomId: '6', pattern: /\b(chapiteau|cirque)\b/ },
-  { fromRoomId: '8', toRoomId: '7', pattern: /\b(theiere|théière|bulles?)\b/ },
-  { fromRoomId: '7', toRoomId: '5' },
-  { fromRoomId: '9', toRoomId: '5' },
-  // ── Bois ──
-  { fromRoomId: '10', toRoomId: '11' },
-  { fromRoomId: '11', toRoomId: '12', pattern: /\b(peage|péage|pont|brigands?)\b/ },
-  { fromRoomId: '11', toRoomId: '13', pattern: /\b(mare|grenouilles?|gavotte)\b/ },
-  { fromRoomId: '12', toRoomId: '14' },
-  { fromRoomId: '13', toRoomId: '15' },
-  { fromRoomId: '14', toRoomId: '16' },
-  { fromRoomId: '15', toRoomId: '16' },
-]
-
-export const FEY_SHADOW_FAIR_FORWARD_TRANSITIONS: AdventureTransition[] = [
-  { fromRoomId: '1', toRoomId: '2' },
-  { fromRoomId: '2', toRoomId: '6' },
-  { fromRoomId: '6', toRoomId: '4' },
-  { fromRoomId: '4', toRoomId: '9' },
-  { fromRoomId: '9', toRoomId: '5' },
-  { fromRoomId: '10', toRoomId: '11' },
-  { fromRoomId: '11', toRoomId: '12' },
-  { fromRoomId: '12', toRoomId: '14' },
-  { fromRoomId: '14', toRoomId: '16' },
 ]
 
 // ── Quêtes de map (jugées par le MOTEUR — docs/multi-map-adventures.md) ──────
@@ -501,7 +465,6 @@ export const FEY_SHADOW_FAIR_MAP_TRANSITIONS: MapTransition[] = [
     arrivalRoomId: '10',
     // Barnabé l'arbuste éveillé saute dans le sac du héros et traverse avec lui.
     companions: ['barnabe'],
-    pattern: /\b(portail|vers luisants|bois[- ]ricanant|foret|forêt)\b/,
   },
 ]
 
@@ -603,11 +566,12 @@ export const FEY_SHADOW_FAIR_ROOM_HOOKS: Record<string, string> = {
 
 // Agrégat consommé par le registre lib/adventure-map.ts (getAdventureMap).
 export const FEY_SHADOW_FAIR_MAP: AdventureMapData = {
+  social: FEY_SHADOW_FAIR_SOCIAL,
   maps: [
     // cellSize 64 = rendu net à la résolution native des images (64 px/case) ;
     // les deux cartes débordent du conteneur → viewport scrollable.
-    { id: 'fair', name: 'La Foire aux Chandelles', grid: { cols: 24, rows: 16 }, cellSize: 64 },
-    { id: 'wood', name: 'Le Bois-Ricanant', grid: { cols: 16, rows: 24 }, cellSize: 64 },
+    { id: 'fair', name: 'La Foire aux Chandelles', navigationMode: 'exploration', grid: { cols: 24, rows: 16 }, cellSize: 64 },
+    { id: 'wood', name: 'Le Bois-Ricanant', grid: { cols: 16, rows: 24 }, cellSize: 64, imageRendering: 'auto' },
   ],
   mapQuests: FEY_SHADOW_FAIR_MAP_QUESTS,
   mapTransitions: FEY_SHADOW_FAIR_MAP_TRANSITIONS,
@@ -626,10 +590,5 @@ export const FEY_SHADOW_FAIR_MAP: AdventureMapData = {
   entryCells: FEY_SHADOW_FAIR_ENTRY_CELLS,
   encounters: FEY_SHADOW_FAIR_ENCOUNTERS,
   npcs: FEY_SHADOW_FAIR_NPCS,
-  namedLocationCells: FEY_SHADOW_FAIR_NAMED_LOCATION_CELLS,
-  roomNavigationAliases: FEY_SHADOW_FAIR_ROOM_NAVIGATION_ALIASES,
-  roomContextAliases: [],
-  doorTransitions: FEY_SHADOW_FAIR_DOOR_TRANSITIONS,
-  forwardTransitions: FEY_SHADOW_FAIR_FORWARD_TRANSITIONS,
   roomHooks: FEY_SHADOW_FAIR_ROOM_HOOKS,
 }

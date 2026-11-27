@@ -1,348 +1,127 @@
+import { isEnrolledNonhostileNpcCombatant,activeNpcPartyRegistration } from '../../lib/npc-party-state'
+import { isStatBackedNpc } from '../../lib/npc-stat-blocks'
+import { preflightCampaignEngagement,recordCampaignEngagement,planCampaignEncounterClosures,commitCampaignEncounterClosures } from '../campaign-outcomes'
+import { enrollComplexTrapInitiative, inspectComplexTrapTurn } from '../../lib/complex-trap-initiative'
+import { encounterCadenceTransitionIssue } from '../../lib/encounter-cadence-state'
+import { withCackleConsequences, stageCackleCombat, assertCackleEventsResolved } from '../cackle-fever'
+import { chaseTurnIssue } from '../../lib/chase-state'
+import { sewerPlagueEvent } from '../sewer-plague'
+import { dueFrigidWaterSave } from '../../lib/frigid-water-state'
+import { eligibleXgeFallInitiative } from '../../lib/xge-falling-geometry'
+import { dueXgeFallDescent } from '../../lib/xge-falling-state'
+import { afflictionRequiresInitiativeTurn } from '../afflictions'
+import { isSurvivalDayDue, assertSurvivalEventsResolved } from '../survival'
+import { assertWeaponConsumableTimeAdvance } from '../weapon-consumables'
+import { assertOilTimeAdvance } from '../oil-ground'
+import { HazardCombatPreparationSchema,validateHazardCombatPreparation,validateActiveComplexTrapGeometry,type HazardCombatPreparation,type HazardCombatWitness } from '../hazard-combat'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 import { rollDice, getAbilityModifier, d20WithModifier } from '../dice'
 import * as gs from '../game-state'
 import * as rules from '../rules'
 import { MonsterState } from '../../lib/types'
-import { EncounterMonsterSpec, encounterIds, getEncounter, getMapSpec, resolveRoomMapId } from '../../lib/adventure-map'
+import { EncounterMonsterSpec, encounterIds, getEncounter, getMapSpec, resolveRoomMapId,inferRoomIdOnMap } from '../../lib/adventure-map'
 import { ACTIVE_ADVENTURE_ID } from '../adventure'
+import { getMonsterRecord, listMonsterTypes, MONSTER_SOURCE_DATE } from '../../lib/srd/monsters'
+import { monsterAutomation } from '../monster-automation'
+import { strictHero, hero } from '../hero-rules'
+import { encounterAwareness, pendingEncounterActors, pendingDoorAmbush } from '../../lib/encounter-awareness'
+import { registerAmbushResolutions, resolveEncounterAmbush } from '../encounter-ambush'
+import { attackProfile } from '../monster-rules'
+import { canSee } from '../monster-perception'
+import { navigationGrid } from '../../lib/navigation'
+import { completedRoundEvents } from '../../lib/combat-round-events'
+import { isActiveMonster, isKnockedOut } from '../../lib/nonlethal-state'
+import { assertKnockoutTimeAdvance } from '../nonlethal'
+import { hasNpcZeroHpEpisode } from '../../lib/npc-life-state'
+import { assertNpcLifeTimeAdvance, dueNpcDeathSaveEvents, assertNpcCombatRoster, assertNpcRoundEventRoster } from '../npc-life'
+import { CombatSurpriseInputSchema, EncounterSurpriseInputSchema, type CombatSurpriseInput } from '../../lib/surprise-state'
+import { validateCombatSurprise, initializeCombatSurprise, validateEncounterSurprise, encounterCombatSurprise } from '../surprise'
 
-// Monster stat blocks — Monster Manual 2025 (XMM)
-// Source: CR list verified from MM 2025 appendix
-const MONSTER_TEMPLATES: Record<string, Omit<MonsterState, 'id' | 'name' | 'position' | 'isAlive'>> = {
-
-  // ── GOBELINS ─────────────────────────────────────────────────────────────────
-
-  // Gobelin Minion — CR 1/8 · XP 25 (nouveau MM 2025 : version affaiblie)
-  goblin_minion: {
-    type: 'goblin_minion',
-    hp: { current: 3, max: 3 },
-    ac: 13,
-    stats: { str: 8, dex: 14, con: 10, int: 10, wis: 8, cha: 8 },
-    conditions: [],
-    xpValue: 25,
-    attackBonus: 3,
-    damageDice: '1d4+1',
-    speed: 30,
-  },
-
-  // Gobelin Warrior — CR 1/4 · XP 50 (référence pour les gobelins standard)
-  goblin: {
-    type: 'goblin',
-    hp: { current: 7, max: 7 },
-    ac: 15,  // armure de cuir + bouclier
-    stats: { str: 8, dex: 14, con: 10, int: 10, wis: 8, cha: 8 },
-    conditions: [],
-    xpValue: 50,
-    attackBonus: 4,
-    damageDice: '1d6+2',  // cimeterre
-    speed: 30,
-    // Capacité spéciale : Fuite Agile (Disengage/Hide comme Bonus Action) — géré par le DM AI
-  },
-
-  // Gobelin Boss — CR 1 · XP 200 (base de Chef Grukk, HP réduit via hpOverride)
-  goblin_boss: {
-    type: 'goblin_boss',
-    hp: { current: 21, max: 21 },
-    ac: 17,  // armure de mailles + bouclier
-    stats: { str: 10, dex: 14, con: 10, int: 10, wis: 8, cha: 10 },
-    conditions: [],
-    xpValue: 200,
-    attackBonus: 4,
-    damageDice: '1d6+2',  // cimeterre (multiattaque ×2 gérée par le DM AI)
-    speed: 30,
-  },
-
-  // ── HOBGOBELINS ───────────────────────────────────────────────────────────────
-
-  // Hobgoblin Warrior — CR 1/2 · XP 100
-  hobgoblin: {
-    type: 'hobgoblin',
-    hp: { current: 11, max: 11 },
-    ac: 18,  // cotte de mailles + bouclier
-    stats: { str: 13, dex: 12, con: 12, int: 10, wis: 10, cha: 9 },
-    conditions: [],
-    xpValue: 100,
-    attackBonus: 3,
-    damageDice: '1d8+1',  // épée longue à 1 main
-    speed: 30,
-    // Capacité : Avantage martial +2d6 si allié à 5 pieds (géré par DM AI)
-  },
-
-  // Hobgoblin Captain — CR 3 · XP 700 (pour combats futurs, pas niv.1)
-  hobgoblin_captain: {
-    type: 'hobgoblin_captain',
-    hp: { current: 52, max: 52 },
-    ac: 17,  // demi-armure
-    stats: { str: 15, dex: 14, con: 14, int: 12, wis: 10, cha: 13 },
-    conditions: [],
-    xpValue: 700,
-    attackBonus: 4,
-    damageDice: '2d6+2',  // espadon (multiattaque ×2)
-    speed: 30,
-  },
-
-  // ── MORTS-VIVANTS ─────────────────────────────────────────────────────────────
-
-  // Squelette — CR 1/4 · XP 50
-  skeleton: {
-    type: 'skeleton',
-    hp: { current: 13, max: 13 },
-    ac: 13,  // restes d'armure
-    stats: { str: 10, dex: 14, con: 15, int: 6, wis: 8, cha: 5 },
-    conditions: [],
-    xpValue: 50,
-    attackBonus: 4,
-    damageDice: '1d6+2',  // épée courte
-    speed: 30,
-    // Vulnérabilité dégâts contondants × 2 — à appliquer manuellement dans resolve_attack
-  },
-
-  // Zombie — CR 1/4 · XP 50 (utilisé pour Champignon Violet dans le module)
-  zombie: {
-    type: 'zombie',
-    hp: { current: 22, max: 22 },
-    ac: 8,
-    stats: { str: 13, dex: 6, con: 16, int: 3, wis: 6, cha: 5 },
-    conditions: [],
-    xpValue: 50,
-    attackBonus: 3,
-    damageDice: '1d6+1',  // coup
-    speed: 20,
-    // Résistance des morts-vivants : JS CON DD (5 + dégâts) pour rester à 1 PV — géré par DM AI
-  },
-
-  // ── CHAMPIGNONS ───────────────────────────────────────────────────────────────
-
-  // Violet Fungus — CR 1/4 · XP 50 (Champignon Violet, stats pures MM 2025)
-  violet_fungus: {
-    type: 'violet_fungus',
-    hp: { current: 18, max: 18 },
-    ac: 5,
-    stats: { str: 3, dex: 1, con: 10, int: 1, wis: 3, cha: 1 },
-    conditions: [],
-    xpValue: 50,
-    attackBonus: 2,
-    damageDice: '1d8',  // touche pourrie (nécrotique) — JS CON DD 10 ou pas de récup HP
-    speed: 5,
-  },
-
-  // ── BÊTES ─────────────────────────────────────────────────────────────────────
-
-  // Loup — CR 1/4 · XP 50
-  wolf: {
-    type: 'wolf',
-    hp: { current: 11, max: 11 },
-    ac: 13,  // armure naturelle
-    stats: { str: 12, dex: 15, con: 12, int: 3, wis: 12, cha: 6 },
-    conditions: [],
-    xpValue: 50,
-    attackBonus: 4,
-    damageDice: '2d4+2',  // morsure — JS FOR DD 11 ou prone
-    speed: 40,
-  },
-
-  // ── HUMANOÏDES ────────────────────────────────────────────────────────────────
-
-  // Bandit — CR 1/8 · XP 25
-  bandit: {
-    type: 'bandit',
-    hp: { current: 11, max: 11 },
-    ac: 12,  // armure de cuir
-    stats: { str: 11, dex: 12, con: 12, int: 10, wis: 10, cha: 10 },
-    conditions: [],
-    xpValue: 25,
-    attackBonus: 3,
-    damageDice: '1d6+1',  // cimeterre
-    speed: 30,
-  },
-
-  // ── FÉE / NATURE ──────────────────────────────────────────────────────────────
-
-  // Dryade — CR 1 · XP 200 (non hostile dans l'aventure)
-  dryad: {
-    type: 'dryad',
-    hp: { current: 22, max: 22 },
-    ac: 11,  // armure naturelle
-    stats: { str: 10, dex: 12, con: 11, int: 14, wis: 15, cha: 20 },
-    conditions: [],
-    xpValue: 200,
-    attackBonus: 6,  // avec Poigne du druide (Shillelagh)
-    damageDice: '1d8+3',  // gourdin + Shillelagh
-    speed: 30,
-    hostile: false,  // non hostile dans l'aventure : ne joue pas de tour offensif automatique
-    // Charme féerique : JS SAG DD 14 ou charmé 24h — géré par DM AI via apply_condition
-    // Résistance magie : Avantage sur JS contre sorts
-  },
-
-  // Mac le Tréant (Awakened Tree) — CR 2 · XP 450 (non hostile)
-  // Treant complet = CR 9 · trop puissant pour niv.1 — Mac est un "jeune" pommier éveillé
-  awakened_tree: {
-    type: 'awakened_tree',
-    hp: { current: 59, max: 59 },
-    ac: 13,  // armure naturelle
-    stats: { str: 19, dex: 6, con: 15, int: 10, wis: 10, cha: 7 },
-    conditions: [],
-    xpValue: 450,
-    attackBonus: 6,
-    damageDice: '3d6+4',  // coup (contondants)
-    speed: 20,
-    hostile: false,  // non hostile : ne joue pas de tour offensif automatique
-    // Vulnérabilité : feu × 2
-    // Fausse apparence : ressemble à un pommier ordinaire
-  },
-
-  // ── FÉERIE (Feywild) — stats SRD 5.1 (dnd5eapi.co) ───────────────────────────
-
-  // Sprite — CR 1/4 · XP 50
-  sprite: {
-    type: 'sprite',
-    hp: { current: 2, max: 2 },
-    ac: 15,  // armure de cuir
-    stats: { str: 3, dex: 18, con: 10, int: 14, wis: 13, cha: 11 },
-    conditions: [],
-    xpValue: 50,
-    attackBonus: 6,
-    damageDice: '1d2',  // arc court féerique (1 dégât) — flèche empoisonnée : JS CON DD 10 ou empoisonné, géré par DM AI
-    speed: 40,  // vol 40 ft
-  },
-
-  // Satyre — CR 1/2 · XP 100
-  satyr: {
-    type: 'satyr',
-    hp: { current: 31, max: 31 },
-    ac: 14,  // armure de cuir
-    stats: { str: 12, dex: 16, con: 11, int: 12, wis: 10, cha: 14 },
-    conditions: [],
-    xpValue: 100,
-    attackBonus: 5,
-    damageDice: '1d6+3',  // épée courte (coup de tête : +3, 2d4+1)
-    speed: 40,
-    // Résistance magie : Avantage sur JS contre sorts — géré par DM AI
-  },
-
-  // Chien esquiveur (Blink Dog) — CR 1/4 · XP 50
-  blink_dog: {
-    type: 'blink_dog',
-    hp: { current: 22, max: 22 },
-    ac: 13,
-    stats: { str: 12, dex: 17, con: 12, int: 10, wis: 13, cha: 11 },
-    conditions: [],
-    xpValue: 50,
-    attackBonus: 3,
-    damageDice: '1d6+1',  // morsure — Téléportation 40 ft (recharge 4-6) gérée par DM AI
-    speed: 40,
-  },
-
-  // Feu follet (Will-o'-Wisp) — CR 2 · XP 450
-  will_o_wisp: {
-    type: 'will_o_wisp',
-    hp: { current: 22, max: 22 },
-    ac: 19,
-    stats: { str: 1, dex: 28, con: 10, int: 13, wis: 14, cha: 11 },
-    conditions: [],
-    xpValue: 450,
-    attackBonus: 4,
-    damageDice: '2d8',  // décharge (foudre) — Invisibilité et immunités gérées par DM AI
-    speed: 50,  // vol 50 ft (stationnaire)
-  },
-
-  // Arbuste éveillé (Awakened Shrub) — CR 0 · XP 10 (créature comique/allié)
-  awakened_shrub: {
-    type: 'awakened_shrub',
-    hp: { current: 10, max: 10 },
-    ac: 9,
-    stats: { str: 3, dex: 8, con: 11, int: 10, wis: 10, cha: 6 },
-    conditions: [],
-    xpValue: 10,
-    attackBonus: 1,
-    damageDice: '1d4-1',  // griffure de branches
-    speed: 20,
-    hostile: false,  // par défaut inoffensif : ne joue pas de tour offensif automatique
-    // Vulnérabilité : feu × 2 · Fausse apparence : ressemble à un buisson ordinaire
-  },
-
-  // Grenouille géante — CR 1/4 · XP 50
-  giant_frog: {
-    type: 'giant_frog',
-    hp: { current: 18, max: 18 },
-    ac: 11,
-    stats: { str: 12, dex: 13, con: 11, int: 2, wis: 10, cha: 3 },
-    conditions: [],
-    xpValue: 50,
-    attackBonus: 3,
-    damageDice: '1d6+1',  // morsure (agrippé DD 11 sur touche — géré par DM AI)
-    speed: 30,  // + nage 30 ft
-  },
-}
+// Base statistics are generated from the pinned SRD API snapshot.
+const MONSTER_TEMPLATES = Object.fromEntries(listMonsterTypes().map(type => [type, getMonsterRecord(type)!.engine]))
 
 let monsterIdCounter = 0
 
-function createMonster(monsterType: string, cell: { x: number; y: number }, name?: string, hpOverride?: number): MonsterState {
+// A restored legacy combat may contain an exhaustion marker without its level.
+// Check every combatant before ending effects, logging a pass, changing turn
+// economy or rolling: a late initiative refusal must not commit half a turn.
+function assertTurnExhaustionLevels(): void {
+  const chase=chaseTurnIssue(gs.getState());if(chase)throw new rules.RuleViolation(chase.code,chase.message,chase)
+
+  assertNpcLifeTimeAdvance(6)
+  assertNpcRoundEventRoster(gs.getState().round+1)
+  assertKnockoutTimeAdvance(6,true)
+  const state = gs.getState()
+  for (const id of state.initiativeOrder) {
+    if (gs.getEntity(id)?.conditions.includes('exhaustion') && !state.dmTools?.exhaustion?.creatures[id])
+      throw new rules.RuleViolation('EXHAUSTION_LEVEL_REQUIRED', 'An explicit authoritative exhaustion level is required before advancing combat turns.', { targetId: id })
+  }
+}
+
+export function createMonster(monsterType: string, cell: { x: number; y: number }, name?: string, hpOverride?: number): MonsterState {
   const normalizedType = monsterType.toLowerCase()
   const id = `${normalizedType}_${Date.now()}_${monsterIdCounter++}`
   const template = MONSTER_TEMPLATES[normalizedType]
 
-  if (!template) {
-    return {
-      id,
-      name: name ?? monsterType,
-      type: monsterType,
-      hp: { current: hpOverride ?? 10, max: hpOverride ?? 10 },
-      ac: 12,
-      stats: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 },
-      position: cell,
-      conditions: [],
-      xpValue: 50,
-      attackBonus: 2,
-      damageDice: '1d6',
-      speed: 30,
-      isAlive: true,
-    }
-  }
+  const record = getMonsterRecord(normalizedType)
+  if (!template || !record) throw new rules.RuleViolation('MONSTER_UNKNOWN', 'Choose an exact monster type from the SRD catalog; no fabricated fallback stats.', { monsterType, available: listMonsterTypes() })
 
   const maxHp = hpOverride ?? template.hp.max
   return {
-    ...template,
+    ...structuredClone(template),
     id,
-    name: name ?? `${normalizedType.charAt(0).toUpperCase()}${normalizedType.slice(1)}`,
+    name: name ?? record.source.name,
     hp: { current: maxHp, max: maxHp },
-    position: cell,
+    position: { ...cell },
+    // Social stance is separate from the published mechanical block.
+    ...(['dryad', 'awakened_tree', 'awakened_shrub'].includes(normalizedType) ? { hostile: false } : {}),
+    srd: { index: record.source.index, ruleset: '2014', url: record.sourceUrl,
+      ...(hpOverride !== undefined ? { hpOverride } : {}) },
     isAlive: true,
+    ...(normalizedType==='mage'&&strictHero()?{monsterRuntime:{spellSlots:{level1:{current:4,max:4},level2:{current:3,max:3},level3:{current:3,max:3},level4:{current:3,max:3},level5:{current:1,max:1}}}}:{}),
   }
 }
 
-function startCombat(combatants: string[], options?: { playerActsFirst?: boolean }): {
+export function startCombat(combatants: string[], options?: { tieOrder?: string[]; surprise?: CombatSurpriseInput; hazardPreparation?: HazardCombatPreparation }): ReturnType<typeof startCombatResolved> {
+  const witness=options?.hazardPreparation?validateHazardCombatPreparation(gs.getState(),options.hazardPreparation,combatants):undefined
+  assertCackleEventsResolved()
+  return withCackleConsequences(()=>witness||combatants.some(id=>afflictionRequiresInitiativeTurn(gs.getState(),id))?gs.withPhysicalCreatureResolution(combatants,()=>startCombatResolved(combatants,options,witness)):startCombatResolved(combatants,options))
+}
+
+function startCombatResolved(combatants: string[], options?: { tieOrder?: string[]; surprise?: CombatSurpriseInput }, hazardPreparation?: HazardCombatWitness): {
   phase: 'combat'
   initiativeOrder: string[]
   initiatives: Array<{ id: string; initiative: number; roll: string }>
   currentTurn: string | null
   round: number
+  surprise?: import('../../lib/surprise-state').SurpriseState
+  npcDeathSaveEvents: ReturnType<typeof dueNpcDeathSaveEvents>
+  hazardPreparation?: HazardCombatWitness
 } {
-  rules.validateEnterCombat(combatants)
+  rules.validateEnterCombat(combatants,hazardPreparation)
+  validateActiveComplexTrapGeometry(gs.getState())
+  gs.validateInitiativeInput(combatants, options)
+  validateCombatSurprise(combatants, options?.surprise)
+  for (const id of combatants) if (gs.getEntity(id)?.conditions.includes('exhaustion') && !gs.getState().dmTools?.exhaustion?.creatures[id])
+    throw new rules.RuleViolation('EXHAUSTION_LEVEL_REQUIRED','An explicit authoritative exhaustion level is required before entering combat.',{targetId:id})
+  const fallingEntries=eligibleXgeFallInitiative(gs.getState(),combatants)
+  gs.enlistNpcCombatants(combatants)
   gs.setPhase('combat')
+  if(hazardPreparation?.kind==='complex_trap'){const trap=gs.getState().dmTools!.complexTraps![hazardPreparation.hazardId];trap.status='active';trap.activated=true}
 
-  const initiatives: Array<{ id: string; initiative: number; roll: string }> = []
-  for (const id of combatants) {
-    const entity = gs.getEntity(id)
-    if (!entity) continue
-    const dexMod = getAbilityModifier(entity.stats.dex)
-    const roll = rollDice(d20WithModifier(dexMod))
-    entity.initiative = roll.total
-    initiatives.push({ id, initiative: roll.total, roll: roll.detail })
-  }
-
-  initiatives.sort((a, b) => b.initiative - a.initiative)
-  const order = options?.playerActsFirst
-    ? ['player', ...initiatives.filter(i => i.id !== 'player').map(i => i.id)]
-    : initiatives.map(i => i.id)
+  const initiatives = gs.rollInitiatives(combatants, options)
+  const order = initiatives.map(i => i.id)
+  initializeCombatSurprise(options?.surprise)
   gs.setInitiativeOrder(order)
+  stageCackleCombat()
+  for(const entry of fallingEntries)(gs.getState().dmTools!.xgeFalling!.initiativeFalls??={})[`${entry.generation}:${entry.entityId}`]=entry
 
   gs.addLogEntry({
     round: 1,
     turn: 'system',
     action: 'COMBAT ENGAGE',
-    mechanicalDetail: initiatives.map(i => `${i.id}: ${i.roll}`).join(' | '),
+    mechanicalDetail: initiatives.map(i => `${i.id}: ${i.roll}`).join(' | ')+(hazardPreparation?` | preparation ${hazardPreparation.kind}:${hazardPreparation.hazardId}`:''),
   })
 
   return {
@@ -351,12 +130,16 @@ function startCombat(combatants: string[], options?: { playerActsFirst?: boolean
     initiatives,
     currentTurn: gs.getState().currentTurn,
     round: 1,
+    surprise: gs.getState().dmTools?.surprise,
+    npcDeathSaveEvents: dueNpcDeathSaveEvents(),
+    ...(hazardPreparation?{hazardPreparation}:{}),
   }
 }
 
-function assertEncounterCanStart(playerCell: { x: number; y: number } | undefined, monsters: EncounterMonsterSpec[]): void {
+function assertEncounterCanStart(playerCell: { x: number; y: number } | undefined, monsters: EncounterMonsterSpec[], encounterId?: string, allowActiveCombat = false): void {
   const state = gs.getState()
-  if (state.phase === 'combat') {
+  const cadence=encounterCadenceTransitionIssue(state);if(cadence)throw new rules.RuleViolation(cadence.code,cadence.message,cadence)
+  if (state.phase === 'combat' && !allowActiveCombat) {
     throw new rules.RuleViolation('COMBAT_ALREADY_ACTIVE', 'Cannot start an encounter while combat is already active.', {
       currentTurn: state.currentTurn,
       initiativeOrder: state.initiativeOrder,
@@ -370,8 +153,16 @@ function assertEncounterCanStart(playerCell: { x: number; y: number } | undefine
   if (playerCell) {
     rules.validateMapCell(playerCell, 'playerCell')
   }
+  const grid = navigationGrid(state, 'player', getMapSpec(state.currentMapId, gs.getState()).geometry)
+  for (const cell of [playerCell ?? state.player.position, ...monsters.map(m => m.cell)]) {
+    rules.validateMapCell(cell, 'encounter.cell')
+    if (!grid.free(cell, false)) throw new rules.RuleViolation('DESTINATION_BLOCKED', 'Encounter placement is on impassable terrain.', { cell })
+  }
 
   const occupied = new Map<string, string>()
+  for (const actor of pendingEncounterActors(state)) {
+    if (actor.encounterId !== encounterId) occupied.set(`${actor.position.x},${actor.position.y}`, actor.id)
+  }
   for (const entity of gs.getAllEntities()) {
     if (rules.occupiesSpace(entity)) {
       occupied.set(`${entity.position.x},${entity.position.y}`, entity.id)
@@ -392,6 +183,9 @@ function assertEncounterCanStart(playerCell: { x: number; y: number } | undefine
   }
 
   for (const monster of monsters) {
+    if (!getMonsterRecord(monster.monsterType.toLowerCase())) {
+      throw new rules.RuleViolation('MONSTER_UNKNOWN', 'Encounter includes an unknown SRD monster type.', { monsterType: monster.monsterType })
+    }
     rules.validateMapCell(monster.cell, 'monster.cell')
     const key = `${monster.cell.x},${monster.cell.y}`
     const blockerId = occupied.get(key)
@@ -406,17 +200,98 @@ function assertEncounterCanStart(playerCell: { x: number; y: number } | undefine
   }
 }
 
+export function registerEncounterInspectionTools(server: McpServer): void {
+  server.registerTool('inspect_encounter', {
+    description: 'Read-only confidential MJ inspection of one exact authored encounterId on the current map, including installed dungeon encounters. Returns the exact zero-based monsterIndex roster, source types, saved positions, player placement and awareness/ambush status for explicit start_encounter choices. Does not reveal anything to the player, visit a room, react to noise, spawn, roll, start combat or spend resources. No default encounter selection.',
+    inputSchema: {encounterId:z.string().min(1).max(180)},
+    annotations:{readOnlyHint:true,destructiveHint:false,idempotentHint:true,openWorldHint:false},
+  },async({encounterId})=>{
+    try{
+      const state=gs.getState(),preset=encounterIds(state).includes(encounterId)?getEncounter(encounterId,state):null
+      if(!preset)throw new rules.RuleViolation('UNKNOWN_ENCOUNTER','Choose one exact authored encounterId.',{encounterId})
+      const mapId=getMapSpec(state.currentMapId,state).id,encounterMapId=resolveRoomMapId(preset.roomId,state)
+      if(encounterMapId!==mapId)throw new rules.RuleViolation('ENCOUNTER_WRONG_MAP','Inspect only a preset on the current map.',{encounterId,encounterMapId,currentMapId:mapId})
+      const awareness=encounterAwareness(state)[encounterId]
+      return{content:[{type:'text' as const,text:JSON.stringify({confidential:true,encounterId,name:preset.name,mapId,roomId:preset.roomId,
+        alreadyTriggered:gs.hasEncounterTriggered(encounterId),playerCell:awareness?undefined:preset.playerCell,
+        roster:preset.monsters.map((monster,monsterIndex)=>({monsterIndex,...monster,cell:awareness?awareness.positions[monsterIndex]:monster.cell})),
+        awareness:awareness?{status:awareness.status,doorId:awareness.doorId}:undefined,
+        mechanicalSummary:'Confidential MJ roster only; no player discovery, movement, spawn, combat, die or cost.'})}]}
+    }catch(err){return rules.ruleErrorResult(err)}
+  })
+}
+
 export function registerPhaseTools(server: McpServer): void {
+  registerAmbushResolutions()
+  server.tool(
+    'grant_player_action',
+    'Exceptional DM ruling: grant the player ONE additional action when established circumstances warrant it. Never routine or automatic. Requires a concrete reason and a resolved first player action. At most once per player message and once per combat turn; no movement, bonus action or resources are refreshed. This grants permission only: choose a separate action tool for an action declared by the player, or return the decision to them.',
+    { reason: z.string().trim().min(1).max(1000).describe('Concrete established circumstance justifying this rare second action.') },
+    async ({ reason }) => {
+      try {
+        const state = gs.getState(), allowance = state.dmActionAllowance
+        if (!allowance) throw new rules.RuleViolation('DM_TURN_REQUIRED', 'No current player message context.', {})
+        if (allowance.granted) throw new rules.RuleViolation('ADDITIONAL_ACTION_ALREADY_GRANTED', 'Only one exceptional additional action per player message.', {})
+        if (state.hero?.pending) throw new rules.RuleViolation('REACTION_PENDING', 'Resolve the held reaction first.', {})
+        let combatTurnKey: string | undefined
+        if (state.phase === 'combat') {
+          rules.validateFreeCombatAction('player')
+          combatTurnKey = `${state.combatGeneration ?? 0}:${state.round}:${state.turnCounter ?? 0}`
+          if (allowance.combatTurnKey === combatTurnKey) throw new rules.RuleViolation('ADDITIONAL_ACTION_ALREADY_GRANTED', 'The DM already granted an additional action this combat turn.', {})
+          if (!gs.hasActionUsed('player') || strictHero() && (hero().actionCredits > 0 || (hero().attackAction?.remaining ?? 0) > 0))
+            throw new rules.RuleViolation('FIRST_ACTION_REQUIRED', 'Finish the available player action before granting another.', {})
+        } else {
+          rules.validateActionUse('player')
+          if ((state.playerActionRevision ?? 0) <= allowance.actionRevisionAtStart)
+            throw new rules.RuleViolation('FIRST_ACTION_REQUIRED', 'Resolve the first player action in this message before granting another.', {})
+        }
+        allowance.granted = true
+        allowance.reason = reason
+        if (combatTurnKey) {
+          allowance.combatTurnKey = combatTurnKey
+          gs.resetActionUsed('player')
+          if (strictHero()) { hero().actionCredits++; delete hero().attackAction }
+        }
+        gs.addLogEntry({ round: state.round, turn: 'system', action: 'Le MJ accorde exceptionnellement une deuxième action au joueur', mechanicalDetail: reason })
+        return { content: [{ type: 'text', text: JSON.stringify({ additionalPlayerAction: true, reason,
+          mechanicalSummary: 'Une deuxième action autorisée par le MJ ; déplacement, action bonus et ressources inchangés.' }) }] }
+      } catch (err) { return rules.ruleErrorResult(err) }
+    }
+  )
+
+  server.tool('get_monster_stat_block',
+    'Reads the complete locally pinned SRD 2014 API block and base engine projection. Select exactly one monsterType or monsterId; a revealed NPC ID on the current map is valid outside combat. An authored shared-HP NPC group returns its named homebrew block, current membership and canonical individual base separately. Complex traits are source references, not already-resolved effects. No network call or mutation.',
+    { monsterType: z.string().optional(), monsterId: z.string().optional() }, async ({ monsterType, monsterId }) => {
+      try {
+        if ((monsterType !== undefined) === (monsterId !== undefined)) throw new rules.RuleViolation('MONSTER_SELECTION_REQUIRED', 'Choose one exact monster type or existing monster ID.', {})
+        const monster = monsterId ? gs.getMonster(monsterId) : undefined
+        if (monsterId && !monster) throw new rules.RuleViolation('ENTITY_NOT_FOUND', 'Unknown monster ID.', { monsterId })
+        const record = getMonsterRecord(monsterType ?? monster!.type)
+        if (!record) throw new rules.RuleViolation('MONSTER_UNKNOWN', 'No canonical SRD block for this type.', {})
+        const statBlock = monster?.group ? {
+          name: monster.statBlock?.name ?? monster.name, ruleset: 'homebrew-2014',
+          baseMonsterType: monster.type, baseStatBlock: record.reference ?? record.source,
+          hp: monster.hp, ac: monster.ac, stats: monster.stats, movementModes: monster.movementModes,
+          attackName: monster.attackName, attackBonus: monster.attackBonus, damageDice: monster.damageDice,
+          group: monster.group, rules: monster.statBlock?.homebrew,
+        } : record.reference ?? record.source
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ ...record, statBlock, ruleset: '2014', retrievedAt: MONSTER_SOURCE_DATE,
+          currentMonster: monster, engineSupport: monsterAutomation(monsterType ?? monster!.type,strictHero()) }) }] }
+      } catch (err) { return rules.ruleErrorResult(err) }
+    })
   // Transitions to combat: rolls initiative for all combatants
   server.tool(
     'enter_combat',
-    'Enters combat phase. Rolls initiative (1d20+DEX) for all combatants and sets initiative order.',
+    'Enters combat using standard D&D 2014 initiative, retained for the entire encounter. Identical sourced monsters share one initiative roll. Optional tieOrder gives exact participant IDs in MJ tie priority; remaining ties follow the explicitly supplied combatants order. Explicit optional surprise is the MJ decision about exact participants that failed to notice a threat; establish any Stealth/Perception checks beforehand. No text inference or extra surprise roll. Selected actors cannot move, act, use bonus actions or react until their first turn ends; next_turn can end that turn without an action. Absence means nobody surprised. Never restart active combat to reroll. Authored start_encounter doorway ambushes remain separate.',
     {
       combatants: z.array(z.string()).describe('Array of entity IDs entering combat (include "player")'),
+      tieOrder: z.array(z.string()).optional().describe('Explicit MJ tie priority, unique exact IDs from combatants. Omitted IDs retain combatants order; identical groups stay together.'),
+      surprise: CombatSurpriseInputSchema.optional().describe('Explicit MJ determination before combat: exact surprisedIds from combatants and established reason. Omit when nobody is surprised.'),
+      hazardPreparation: HazardCombatPreparationSchema.optional().describe('Explicit preparation of real turns before approaching one actual active oil patch, deployed ground device or measured slippery ice zone (ground approach only), rooted razorvine at an already reachable face, or complex_trap with its actual linked door already open. The selected complex trap is activated by this explicit initiative request and can be the sole danger without a fabricated enemy. Select its exact kind and hazardId; the engine validates an existing actual victim or the real physical approach route. No movement, contact damage, foe or threat is created. Include every actual body already touching burning oil, even if hidden; their visibility is unchanged.'),
     },
-    async ({ combatants }) => {
+    async ({ combatants, surprise, tieOrder, hazardPreparation }) => {
       try {
-        const result = startCombat(combatants)
+        const result = startCombat(combatants, { surprise, tieOrder, hazardPreparation })
         return {
           content: [{
             type: 'text',
@@ -431,9 +306,10 @@ export function registerPhaseTools(server: McpServer): void {
 
   server.tool(
     'start_encounter',
-    'Atomically moves the player if needed, spawns monsters, and enters combat with the real spawned monster IDs. Prefer this over separate spawn_monster + enter_combat for room encounters.',
+    'Atomically moves the player if needed, spawns monsters, and enters combat with the real spawned monster IDs. Prefer this over separate spawn_monster + enter_combat for room encounters. Optional surprise for an authored encounterId uses the exact zero-based roster from inspect_encounter, explicit playerSurprised and reason; checked before movement/spawn/initiative. It is forbidden with custom replacement monsters or a prepared ambush. No inferred surprise, checks or extra turn. At a prepared doorway ambush, first cross the chosen door with normal movement; the engine stops at its inside threshold. Then provide ambush with explicit doorId, attackerIndex, exact melee weaponOrSpell and suspicious (MJ interpretation of player precautions). A suspicious player rolls Perception, then on success a DEX save to avoid the single reaction strike entirely. Failure or no suspicion permits a normal attack against AC. Do not roll those checks separately or add a second attack. This is an authored module ambush rule, not a universal entry opportunity attack.',
     {
-      encounterId: z.enum(encounterIds(ACTIVE_ADVENTURE_ID) as [string, ...string[]]).optional().describe('Preset encounter id from the adventure, e.g. bakery_floor_goblins.'),
+      encounterId: z.string().min(1).max(180).optional().describe('Exact preset encounter id from the current session map, including installed dungeon encounters.'),
+      partyNpcIds: z.array(z.string().min(1).max(120)).max(16).optional().describe('Explicit exact IDs of individual real registered nonhostile NPC companions to enlist in this authored preset, already revealed and physically in its actual scene. Magical invisibility does not prevent their initiative or remove its effect. No automatic following, movement, HP reset or attack. Civilian turns remain passive. This first tranche refuses groups, replacement/custom rosters and any explicit surprise/prepared ambush combination before costs.'),
       playerCell: z.object({ x: z.number().int().min(0), y: z.number().int().min(0) }).optional().describe('Optional player destination before combat starts.'),
       monsters: z.array(z.object({
         monsterType: z.string().describe('Monster type key'),
@@ -442,11 +318,17 @@ export function registerPhaseTools(server: McpServer): void {
         hpOverride: z.number().int().positive().optional(),
       })).optional().describe('Custom monster list when no preset encounterId is used.'),
       reason: z.string().optional().describe('Short narrative/mechanical reason for starting the encounter.'),
+      surprise:EncounterSurpriseInputSchema.optional().describe('Explicit MJ decision for this exact authored roster: playerSurprised boolean, surprisedMonsterIndices from inspect_encounter, reason. No ambush/custom roster combination.'),
+      ambush: z.object({ doorId: z.string(), attackerIndex: z.number().int().nonnegative(), weaponOrSpell: z.string().min(1),
+        suspicious: z.boolean() }).strict().optional(),
     },
-    async ({ encounterId, playerCell, monsters, reason }) => {
+    async ({ encounterId, playerCell, monsters, reason, ambush, surprise, partyNpcIds }) => {
+      const selectedPartyNpcIds=partyNpcIds??[]
       const stateBefore = structuredClone(gs.getState())
       try {
-        const preset = encounterId ? getEncounter(encounterId, ACTIVE_ADVENTURE_ID) : null
+        if (gs.getState().hero?.pending) throw new rules.RuleViolation('REACTION_PENDING', 'Resolve the held reaction before starting an encounter.', {})
+        assertNpcCombatRoster(['player',...selectedPartyNpcIds])
+        const preset = encounterId && encounterIds(gs.getState()).includes(encounterId) ? getEncounter(encounterId, gs.getState()) : null
         if (encounterId && !preset) {
           throw new rules.RuleViolation('UNKNOWN_ENCOUNTER', `Unknown encounter: ${encounterId}`, { encounterId })
         }
@@ -456,8 +338,8 @@ export function registerPhaseTools(server: McpServer): void {
         // Multi-map : une rencontre préréglée ne se déclenche que sur SA map
         // (ses cellules n'ont de sens que sur la grille de sa salle).
         if (preset) {
-          const presetMapId = resolveRoomMapId(preset.roomId, ACTIVE_ADVENTURE_ID)
-          const currentMapId = getMapSpec(gs.getState().currentMapId, ACTIVE_ADVENTURE_ID).id
+          const presetMapId = resolveRoomMapId(preset.roomId, gs.getState())
+          const currentMapId = getMapSpec(gs.getState().currentMapId, gs.getState()).id
           if (presetMapId && presetMapId !== currentMapId) {
             throw new rules.RuleViolation('ENCOUNTER_WRONG_MAP', `Encounter ${preset.id} belongs to another map.`, {
               encounterId: preset.id,
@@ -467,34 +349,106 @@ export function registerPhaseTools(server: McpServer): void {
           }
         }
 
-        const encounterMonsters = monsters ?? preset?.monsters ?? []
-        const resolvedPlayerCell = playerCell ?? preset?.playerCell
-        assertEncounterCanStart(resolvedPlayerCell, encounterMonsters)
+        const awareness = encounterId ? encounterAwareness(gs.getState())[encounterId] : undefined
+        if(selectedPartyNpcIds.length){
+          if(new Set(selectedPartyNpcIds).size!==selectedPartyNpcIds.length)
+            throw new rules.RuleViolation('ENCOUNTER_PARTY_SELECTION_INVALID','Select each exact NPC companion once, never a duplicate initiative.',{})
+          if(!preset||monsters)
+            throw new rules.RuleViolation('ENCOUNTER_PARTY_PRESET_REQUIRED','This companion selection requires one actual authored preset without a replacement/custom roster.',{})
+          if(surprise||ambush||awareness?.status==='ambushing')
+            throw new rules.RuleViolation('ENCOUNTER_PARTY_VARIANT_UNSUPPORTED','This first companion-preset tranche does not represent their additional surprise or authored entry-ambush decisions. Resolve that combination with a supported procedure before any cost; no NPC surprise is inferred.',{})
+          for(const id of selectedPartyNpcIds){
+            const npc=gs.getNpc(id),registration=activeNpcPartyRegistration(gs.getState(),id)
+            if(!isStatBackedNpc(npc)||!registration||npc.hostile!==false)
+              throw new rules.RuleViolation('ENCOUNTER_PARTY_NPC_REQUIRED','Choose an actual sourced nonhostile NPC with one active explicit party role, not an invented or unregistered combatant.',{npcId:id})
+            if(npc.group)
+              throw new rules.RuleViolation('ENCOUNTER_PARTY_GROUP_UNSUPPORTED','An authored shared-HP civilian group does not become one individual combat turn. It can remain a separately qualified present civilian group outside initiative.',{npcId:id})
+            if(!npc.visible||!gs.npcOnCurrentMap(npc)||inferRoomIdOnMap(npc.position,gs.getState().currentMapId,gs.getState())!==preset.roomId)
+              throw new rules.RuleViolation('ENCOUNTER_PARTY_NPC_SCENE_REQUIRED','The selected individual must already be revealed and physically on this map in the authored encounter scene; no move, reveal or remote participant is supplied. Magical invisibility does not remove an actual party member.',{npcId:id})
+            if(!isActiveMonster(npc))
+              throw new rules.RuleViolation('ENTITY_INCAPACITATED','This individual companion needs its actual living positive-HP body before this active initiative selection.',{entityId:id})
+          }
+          // Pure existing entry admissions before room visits, placements,
+          // spawned identities or initiative. The final full roster still uses
+          // startCombat once, with its same authoritative guards and rolls.
+          const existing=['player',...selectedPartyNpcIds]
+          rules.validateEnterCombat(existing)
+          validateActiveComplexTrapGeometry(gs.getState())
+          gs.validateInitiativeInput(existing)
+          for(const id of existing)if(gs.getEntity(id)?.conditions.includes('exhaustion')&&!gs.getState().dmTools?.exhaustion?.creatures[id])
+            throw new rules.RuleViolation('EXHAUSTION_LEVEL_REQUIRED','An explicit authoritative exhaustion level is required before entering combat.',{targetId:id})
+        }
+        if(surprise){
+          if(!preset||monsters)throw new rules.RuleViolation('ENCOUNTER_SURPRISE_PRESET_REQUIRED','General encounter surprise requires one authored encounterId without replacement monsters.',{})
+          if(ambush||awareness?.status==='ambushing')throw new rules.RuleViolation('ENCOUNTER_SURPRISE_AMBUSH_CONFLICT','Resolve the authored prepared ambush separately; do not combine or replace it with general surprise.',{})
+          validateEncounterSurprise(preset.monsters.length,surprise)
+          // Entry gates which would otherwise fail only after spawning must
+          // precede every identity/position mutation for this explicit choice.
+          assertSurvivalEventsResolved()
+          if(!rules.isAlive(gs.getPlayer()))throw new rules.RuleViolation('ENTITY_DEAD','The actual player must be alive before starting this combat.',{entityId:'player'})
+          if(gs.getPlayer().conditions.includes('exhaustion')&&!gs.getState().dmTools?.exhaustion?.creatures.player)
+            throw new rules.RuleViolation('EXHAUSTION_LEVEL_REQUIRED','An explicit authoritative exhaustion level is required before entering combat.',{targetId:'player'})
+        }
+        if (awareness?.status === 'ambushing' && !ambush
+          && (pendingDoorAmbush(gs.getState()) === encounterId || gs.getState().currentRoomId !== preset?.roomId))
+          throw new rules.RuleViolation('AMBUSH_RESOLUTION_REQUIRED', 'Cross the prepared door, then explicitly choose the ambush attacker, weapon and player suspicion.', {})
+        if (ambush && (!preset?.noiseAmbush || awareness?.status !== 'ambushing' || awareness.doorId !== ambush.doorId
+          || pendingDoorAmbush(gs.getState()) !== encounterId || playerCell || monsters))
+          throw new rules.RuleViolation('AMBUSH_THRESHOLD_REQUIRED', 'Resolve only a prepared ambush at its exact inside doorway threshold, without replacement placements.', {})
+        if (awareness && monsters) throw new rules.RuleViolation('ENCOUNTER_POSITIONS_AUTHORITATIVE', 'Do not replace an alerted encounter roster or its saved positions.', {})
+        const encounterMonsters = awareness && preset ? preset.monsters.map((monster, index) => ({ ...monster, cell: awareness.positions[index] }))
+          : monsters ?? preset?.monsters ?? []
+        const resolvedPlayerCell = playerCell ?? (awareness ? undefined : preset?.playerCell)
+        if (ambush && gs.getState().phase === 'combat' && gs.getState().currentTurn !== 'player')
+          throw new rules.RuleViolation('PLAYER_TURN_REQUIRED', 'Resolve the entry ambush during the entering player turn.', {})
+        assertEncounterCanStart(resolvedPlayerCell, encounterMonsters, encounterId, Boolean(ambush))
+        const cyclePlan=preset&&!monsters?preflightCampaignEngagement(gs.getState(),preset.id):undefined
+        if(resolvedPlayerCell)gs.assertGroundMovementPath('player',[resolvedPlayerCell],'teleport')
 
-        if (preset?.roomId) {
+        if (preset?.roomId && !awareness) {
           gs.visitRoom(preset.roomId)
         }
 
         let movedPlayer: { from: { x: number; y: number }; to: { x: number; y: number } } | null = null
         if (resolvedPlayerCell) {
           const from = { ...gs.getState().player.position }
-          gs.moveToken('player', resolvedPlayerCell.x, resolvedPlayerCell.y)
+          gs.moveToken('player', resolvedPlayerCell.x, resolvedPlayerCell.y,{groundContactKind:'teleport'})
           movedPlayer = { from, to: resolvedPlayerCell }
         }
 
         const spawnedMonsters: MonsterState[] = []
-        for (const spec of encounterMonsters) {
+        for (const [index, spec] of encounterMonsters.entries()) {
           const monster = createMonster(spec.monsterType, spec.cell, spec.name, spec.hpOverride)
+          if (preset && !monsters) monster.socialIdentity = `encounter:${preset.id}:${index}`
           gs.spawnMonster(monster)
           spawnedMonsters.push(monster)
         }
 
-        const combat = startCombat(['player', ...spawnedMonsters.map(monster => monster.id)], {
-          playerActsFirst: true,
-        })
+        if (ambush) {
+          const attacker = spawnedMonsters[ambush.attackerIndex]
+          if (!attacker) throw new rules.RuleViolation('MONSTER_SELECTION_REQUIRED', 'Choose an exact encounter attackerIndex.', {})
+          const profile = attackProfile(attacker, ambush.weaponOrSpell)
+          const player = gs.getPlayer()
+          if (!profile.melee || Math.max(Math.abs(attacker.position.x - player.position.x), Math.abs(attacker.position.y - player.position.y)) > profile.rangeCells
+            || !canSee(attacker, player))
+            throw new rules.RuleViolation('AMBUSH_ATTACK_UNAVAILABLE', 'The chosen melee attacker must reach and see the entering player through legal geometry.', {})
+        }
+
+        const combat = ambush && gs.getState().phase === 'combat' ? (() => {
+          // The player entered this room during an existing fight. These foes
+          // engage here, without leaving their room or renewing any spent budget.
+          for (const monster of spawnedMonsters) monster.initiative = rollDice(d20WithModifier(getAbilityModifier(monster.stats.dex))).total
+          const state = gs.getState()
+          state.initiativeOrder.push(...[...spawnedMonsters].sort((a, b) => b.initiative! - a.initiative!).map(monster => monster.id))
+          if(Object.values(state.dmTools?.complexTraps??{}).some(trap=>trap.mapId===state.currentMapId&&trap.status==='active'))enrollComplexTrapInitiative(state)
+          return { phase: 'combat' as const, initiativeOrder: state.initiativeOrder, currentTurn: state.currentTurn,
+            round: state.round, joinedExistingCombat: true }
+        })() : startCombat(['player', ...spawnedMonsters.map(monster => monster.id),...selectedPartyNpcIds], {
+          ...(surprise?{surprise:encounterCombatSurprise(spawnedMonsters.map(monster=>monster.id),surprise)}:{}) })
         if (encounterId) {
           gs.markEncounterTriggered(encounterId)
         }
+        if(preset&&!monsters)recordCampaignEngagement(gs.getState(),preset.id,spawnedMonsters,cyclePlan)
         if (reason || preset) {
           gs.addLogEntry({
             round: gs.getState().round,
@@ -505,6 +459,9 @@ export function registerPhaseTools(server: McpServer): void {
         }
 
         const state = gs.getState()
+        if (ambush) return resolveEncounterAmbush({ encounterId, encounterName: preset?.name, doorId: ambush.doorId,
+          attackerId: spawnedMonsters[ambush.attackerIndex].id, weaponOrSpell: ambush.weaponOrSpell,
+          roomId: state.currentRoomId, movedPlayer, spawnedMonsters, combat }, ambush.suspicious)
         return {
           content: [{
             type: 'text',
@@ -528,7 +485,7 @@ export function registerPhaseTools(server: McpServer): void {
   // Advances to the next turn in initiative order
   server.tool(
     'next_turn',
-    'Ends the current combatant turn and advances initiative. Requires the current actor to have used an action, unless skipAction=true for an explicit pass/hold.',
+    'Ends the current combatant turn and advances initiative. After everyone has acted, the engine starts a new round while retaining the encounter initiative order under standard D&D 2014 rules. Follow the returned currentTurn and initiativeOrder. Requires the current actor to have used an action, unless skipAction=true for an explicit pass/hold.',
     {
       actorId: z.string().optional().describe('Entity ID ending its own turn. Defaults to currentTurn and must match currentTurn.'),
       skipAction: z.boolean().optional().describe('Set true only when the current actor explicitly passes/holds instead of using an action.'),
@@ -538,6 +495,7 @@ export function registerPhaseTools(server: McpServer): void {
       let endingActorId: string
       try {
         endingActorId = rules.validateNextTurn(actorId, Boolean(skipAction))
+        assertTurnExhaustionLevels()
       } catch (err) {
         return rules.ruleErrorResult(err)
       }
@@ -552,16 +510,26 @@ export function registerPhaseTools(server: McpServer): void {
         })
       }
 
+      const eventsBefore = completedRoundEvents(gs.getState())
       const nextTurn = gs.advanceTurn()
       const state = gs.getState()
+      const plagueEvent = sewerPlagueEvent(state)
+      const frigidWaterEvent = dueFrigidWaterSave(state)
       return {
         content: [{
           type: 'text',
           text: JSON.stringify({
             endedTurn: endingActorId,
+            ...(plagueEvent ? { sewerPlagueEvent: plagueEvent } : {}),
+            ...(frigidWaterEvent ? { frigidWaterEvent } : {}),
+            ...(isSurvivalDayDue()?{survivalEventDue:true}:{}),
+            roundEvents: Object.values(completedRoundEvents(state)).filter(event => !eventsBefore[event.eventId]),
             currentTurn: nextTurn,
             round: state.round,
             initiativeOrder: state.initiativeOrder,
+            complexTrapTurn:inspectComplexTrapTurn(state),
+            npcDeathSaveEvents: dueNpcDeathSaveEvents(),
+            xgeFallEndTurnEvent:dueXgeFallDescent(gs.getState())??null,
             skippedAction: Boolean(skipAction),
             reason,
           }),
@@ -589,6 +557,7 @@ export function registerPhaseTools(server: McpServer): void {
       let endingActorId: string
       try {
         endingActorId = rules.validateNextTurn('player', true)
+        assertTurnExhaustionLevels()
       } catch (err) {
         return rules.ruleErrorResult(err)
       }
@@ -600,16 +569,26 @@ export function registerPhaseTools(server: McpServer): void {
         mechanicalDetail: reason,
       })
 
+      const eventsBefore = completedRoundEvents(gs.getState())
       const nextTurn = gs.advanceTurn()
       const nextState = gs.getState()
+      const plagueEvent = sewerPlagueEvent(nextState)
+      const frigidWaterEvent = dueFrigidWaterSave(nextState)
       return {
         content: [{
           type: 'text',
           text: JSON.stringify({
             endedTurn: endingActorId,
+            ...(plagueEvent ? { sewerPlagueEvent: plagueEvent } : {}),
+            ...(frigidWaterEvent ? { frigidWaterEvent } : {}),
+            ...(isSurvivalDayDue()?{survivalEventDue:true}:{}),
             currentTurn: nextTurn,
             round: nextState.round,
+            roundEvents: Object.values(completedRoundEvents(nextState)).filter(event => !eventsBefore[event.eventId]),
             initiativeOrder: nextState.initiativeOrder,
+            complexTrapTurn:inspectComplexTrapTurn(state),
+            npcDeathSaveEvents: dueNpcDeathSaveEvents(),
+            xgeFallEndTurnEvent:dueXgeFallDescent(gs.getState())??null,
             skippedAction: true,
             reason,
           }),
@@ -629,6 +608,8 @@ export function registerPhaseTools(server: McpServer): void {
     async ({ force, reason }) => {
       try {
         rules.validateEndCombat(force)
+        assertWeaponConsumableTimeAdvance(1)
+        assertOilTimeAdvance(1)
       } catch (err) {
         return rules.ruleErrorResult(err)
       }
@@ -636,9 +617,12 @@ export function registerPhaseTools(server: McpServer): void {
       const state = gs.getState()
 
       // Calculate XP from defeated monsters
-      const deadMonsters = Object.values(state.monsters).filter(m => !m.isAlive && !m.xpAwarded)
+      let campaignPlans:ReturnType<typeof planCampaignEncounterClosures>
+      try{campaignPlans=planCampaignEncounterClosures(state,force)}catch(err){return rules.ruleErrorResult(err)}
+      const deadMonsters = Object.values(state.monsters).filter(m => m.hostile!==false && (!m.isAlive || hasNpcZeroHpEpisode(m)) && !m.xpAwarded)
+      const returnedPartyMembers = Object.values(state.monsters).filter(m => isEnrolledNonhostileNpcCombatant(state,m.id))
       const disengagedMonsters = force
-        ? Object.values(state.monsters).filter(m => m.isAlive)
+        ? Object.values(state.monsters).filter(m => isActiveMonster(m) && !isEnrolledNonhostileNpcCombatant(state,m.id))
         : []
       const totalXP = deadMonsters.reduce((sum, m) => sum + m.xpValue, 0)
 
@@ -646,7 +630,7 @@ export function registerPhaseTools(server: McpServer): void {
         monster.xpAwarded = true
       }
 
-      for (const monster of disengagedMonsters) {
+      for (const monster of [...disengagedMonsters,...returnedPartyMembers]) {
         gs.removeMonster(monster.id)
       }
 
@@ -655,13 +639,15 @@ export function registerPhaseTools(server: McpServer): void {
       state.currentTurn = null
       state.round = 0
       state.movementUsed = {}
+      state.diagonalMovementUsed = {}
       state.actionUsed = {}
+      const campaignClosures=commitCampaignEncounterClosures(state,campaignPlans)
 
       gs.addLogEntry({
         round: state.round,
         turn: 'system',
         action: 'COMBAT TERMINÉ',
-        mechanicalDetail: `XP gagné: ${totalXP} (${deadMonsters.map(m => m.name).join(', ')})${disengagedMonsters.length > 0 ? ` | Désengagés: ${disengagedMonsters.map(m => m.name).join(', ')}` : ''}`,
+        mechanicalDetail: `XP gagné: ${totalXP} (${deadMonsters.map(m => m.name).join(', ')})${disengagedMonsters.length > 0 ? ` | Désengagés: ${disengagedMonsters.map(m => m.name).join(', ')}` : ''}${returnedPartyMembers.length > 0 ? ` | Compagnons hors initiative: ${returnedPartyMembers.map(m => m.name).join(', ')}` : ''}`,
       })
 
       return {
@@ -670,9 +656,11 @@ export function registerPhaseTools(server: McpServer): void {
           text: JSON.stringify({
             phase: 'exploration',
             xpAwarded: totalXP,
+            ...(campaignClosures.length?{campaignClosures}:{}),
             reason,
             defeatedMonsters: deadMonsters.map(m => ({ id: m.id, name: m.name, xp: m.xpValue })),
             disengagedMonsters: disengagedMonsters.map(m => ({ id: m.id, name: m.name, type: m.type })),
+            ...(returnedPartyMembers.length?{returnedPartyMembers:returnedPartyMembers.map(m=>({id:m.id,name:m.name,status:'returned_to_exploration'}))}:{}),
           }),
         }],
       }
@@ -692,15 +680,10 @@ export function registerPhaseTools(server: McpServer): void {
     async ({ monsterType, cell, name, hpOverride }) => {
       try {
         rules.validateSpawn(cell)
-      } catch (err) {
-        return rules.ruleErrorResult(err)
-      }
-
-      const createdMonster = createMonster(monsterType, cell, name, hpOverride)
-      gs.spawnMonster(createdMonster)
-      return {
-        content: [{ type: 'text', text: JSON.stringify(createdMonster) }],
-      }
+        const createdMonster = createMonster(monsterType, cell, name, hpOverride)
+        gs.spawnMonster(createdMonster)
+        return { content: [{ type: 'text', text: JSON.stringify(createdMonster) }] }
+      } catch (err) { return rules.ruleErrorResult(err) }
     }
   )
 }
