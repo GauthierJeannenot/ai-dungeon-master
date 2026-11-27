@@ -1,0 +1,10 @@
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import { z } from 'zod'
+import { RecordLightObjectSchema,SetLightObjectCoverSchema } from '../../lib/light-spell-state'
+import { recordLightObject,setLightObjectCover,dismissLightSpell } from '../light-spell'
+import { toolkitTransaction,toolkitResult } from '../toolkit'
+export function registerLightSpellTools(server:McpServer){
+ server.registerTool('record_light_object',{description:'MJ records real XYZ dimensions and already actual uncovered/full opaque coverage of one existing touch-reachable scene object outside combat, from a durable current physical fact. Does not create/resize an object, acquire inventory, perform a free player measurement or establish hostile bearer custody. Dimensions over10ft can be recorded but cannot receive Light. Same event is immutable.',inputSchema:RecordLightObjectSchema.shape},async input=>toolkitTransaction(()=>toolkitResult(recordLightObject(input))))
+ server.registerTool('set_light_object_cover',{description:'Physically uncover or fully cover the exact measured scene object with an actually existing opaque covering explicitly qualified by current fact/source. No cover/item is created. Outside combat choose real measured interval/activity; combat choose MJ-qualified object interaction or action. No printed universal duration is invented; covering blocks actual Light without resetting its expiry. Object source stays the same real object through movement.',inputSchema:SetLightObjectCoverSchema.shape},async input=>toolkitTransaction(()=>toolkitResult(setLightObjectCover(input))))
+ server.registerTool('dismiss_light_spell',{description:'Dismiss one explicitly selected own active Light using its real source action, not an interaction or dispel of arbitrary lighting. Exact event replays spend nothing; neither caster nor effect is inferred.',inputSchema:{eventId:z.string().min(1).max(180),actorId:z.string().min(1),effectId:z.string().min(1)}},async input=>toolkitTransaction(()=>toolkitResult(dismissLightSpell(input))))
+}

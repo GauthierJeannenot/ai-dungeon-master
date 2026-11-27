@@ -1,0 +1,244 @@
+.scene {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  border: 1px solid #78350f55;
+  border-radius: 12px;
+  background: #100c09;
+}
+
+.stage {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.viewport {
+  container-type: size;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: radial-gradient(ellipse at center, #302014, #100c09 75%);
+}
+
+/* Keep the whole illustration and its percentage anchors together at every size. */
+.frame {
+  position: relative;
+  container-type: inline-size;
+  width: 100%;
+  max-width: calc(100cqh * var(--scene-ratio));
+  aspect-ratio: var(--scene-ratio);
+  flex-shrink: 0;
+  isolation: isolate;
+}
+
+.background {
+  display: block;
+  width: 100%;
+  height: auto;
+  user-select: none;
+  pointer-events: none;
+}
+
+.fog {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.apparition {
+  position: absolute;
+  pointer-events: none;
+  animation: materialize 1.8s ease-out both;
+}
+
+.spirit {
+  object-fit: contain;
+  opacity: .78;
+  filter: drop-shadow(0 0 12px #b9d6ff66);
+  mask-image: linear-gradient(to bottom, #000 72%, transparent 100%);
+  animation: drift 7s ease-in-out infinite;
+}
+
+.hotspot {
+  position: absolute;
+  cursor: pointer;
+  border: 1px solid #fcd89733;
+  border-radius: 12px;
+  background: #fbbf2405;
+  transition: background .2s, box-shadow .2s, border-color .2s;
+}
+
+.hotspot:hover:not(:disabled), .hotspot:focus-visible {
+  outline: 2px solid #f8dda4;
+  outline-offset: 3px;
+  border-color: #fcd897aa;
+  background: #fbbf2414;
+  box-shadow: 0 0 30px #fbbf242b;
+}
+
+.hotspotLabel {
+  position: absolute;
+  bottom: 6%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 5px 12px;
+  border: 1px solid #d7b57866;
+  border-radius: 20px;
+  background: #1c1410e6;
+  color: #f5dfb2;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.hotspot:disabled, .actions button:disabled, .sideActions button:disabled {
+  cursor: wait;
+  opacity: .5;
+}
+
+.imageAction {
+  display: grid;
+  place-items: center;
+  padding: 6px;
+  border-color: #d7b578aa;
+  background: #1c1410ed;
+  box-shadow: 0 3px 16px #0008;
+}
+
+.imageAction:hover:not(:disabled), .imageAction:focus-visible {
+  background: #3b2b1cf2;
+}
+
+.imageAction .hotspotLabel {
+  position: static;
+  transform: none;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  white-space: normal;
+  text-align: center;
+  text-wrap: balance;
+  font-size: clamp(10px, 2cqw, 14px);
+  line-height: 1.3;
+}
+
+.point {
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+}
+
+.point:hover:not(:disabled), .point:focus-visible {
+  background: transparent;
+  box-shadow: none;
+}
+
+.pointMarker {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 2px solid #f8dda4;
+  border-radius: 50%;
+  background: #241910;
+  color: #ffe7b5;
+  font-size: 13px;
+  font-weight: 700;
+  box-shadow: 0 2px 12px #0009;
+}
+
+.point .hotspotLabel {
+  top: calc(50% + 18px);
+  bottom: auto;
+  padding: 4px 9px;
+  box-shadow: 0 2px 10px #0008;
+}
+
+.point:hover:not(:disabled) .pointMarker, .point:focus-visible .pointMarker {
+  background: #63441e;
+  box-shadow: 0 0 18px #fbbf2480;
+}
+
+.legendMarker {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-right: 6px;
+  border: 1px solid #d7b57899;
+  border-radius: 50%;
+  color: #ffe7b5;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+@container (max-width: 600px) {
+  .point .hotspotLabel { display: none; }
+}
+
+.caption {
+  flex-shrink: 0;
+  padding: 12px 16px;
+  border-top: 1px solid #78350f44;
+  color: #c5b7a5;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.caption p { margin: 0; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.actions button, .sideActions button {
+  padding: 6px 10px;
+  border: 1px solid #a383534d;
+  border-radius: 6px;
+  background: #292018;
+  color: #e6d0aa;
+  cursor: pointer;
+}
+.actions button:hover:not(:disabled), .sideActions button:hover:not(:disabled) { background: #3b2b1c; }
+.actions button:focus-visible, .sideActions button:focus-visible { outline: 2px solid #f8dda4; outline-offset: 2px; }
+
+.sideActions {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+  flex: 0 0 clamp(112px, 20%, 168px);
+  padding: 12px;
+  border-left: 1px solid #78350f44;
+}
+
+.sideActions button {
+  padding: 12px 10px;
+  line-height: 1.5;
+  text-wrap: balance;
+}
+
+@media (max-width: 640px) {
+  .sideActions { flex-basis: 112px; padding: 8px; }
+  .sideActions button { padding: 10px 6px; font-size: 12px; }
+}
+
+@keyframes materialize {
+  from { opacity: 0; filter: blur(8px); }
+  to { opacity: 1; filter: blur(0); }
+}
+@keyframes drift {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .apparition, .spirit { animation: none; }
+  .hotspot { transition: none; }
+}

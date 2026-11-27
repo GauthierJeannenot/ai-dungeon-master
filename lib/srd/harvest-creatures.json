@@ -1,0 +1,593 @@
+{
+  "ruleset": "2014",
+  "monsters": {
+    "carrion_crawler": {
+      "sourceUrl": "rules/books/mm-2014.md#L2134",
+      "sourceSha256": "c85c5e315c1c78464599bbc385890ccd18bac551877f0d123aabb2eddaf70389",
+      "source": {
+        "index": "carrion-crawler",
+        "name": "Carrion Crawler",
+        "size": "Large",
+        "type": "monstrosity",
+        "alignment": "unaligned",
+        "armor_class": [
+          {
+            "type": "natural",
+            "value": 13
+          }
+        ],
+        "hit_points": 51,
+        "hit_dice": "6d10+18",
+        "hit_points_roll": "6d10+18",
+        "speed": {
+          "walk": "30 ft.",
+          "climb": "30 ft."
+        },
+        "strength": 14,
+        "dexterity": 13,
+        "constitution": 16,
+        "intelligence": 1,
+        "wisdom": 12,
+        "charisma": 5,
+        "proficiencies": [
+          {
+            "proficiency": {
+              "index": "skill-perception",
+              "name": "Skill Perception"
+            },
+            "value": 3
+          }
+        ],
+        "damage_vulnerabilities": [],
+        "damage_resistances": [],
+        "damage_immunities": [],
+        "condition_immunities": [],
+        "senses": {
+          "darkvision": "60 ft.",
+          "passive_perception": 13
+        },
+        "languages": "",
+        "challenge_rating": 2,
+        "xp": 450,
+        "proficiency_bonus": 2,
+        "special_abilities": [
+          {
+            "name": "Keen Smell",
+            "desc": "The carrion crawler has advantage on Wisdom (Perception) checks that rely on smell."
+          },
+          {
+            "name": "Spider Climb",
+            "desc": "The carrion crawler can climb difficult surfaces, including upside down on ceilings, without needing to make an ability check."
+          }
+        ],
+        "actions": [
+          {
+            "name": "Multiattack",
+            "desc": "The carrion crawler makes two attacks: one with its tentacles and one with its bite.",
+            "actions": [
+              {
+                "action_name": "Tentacles",
+                "count": 1
+              },
+              {
+                "action_name": "Bite",
+                "count": 1
+              }
+            ]
+          },
+          {
+            "name": "Tentacles",
+            "desc": "*Melee Weapon Attack:* +8 to hit, reach 10 ft., one creature. *Hit:* 4 (1d4 + 2) poison damage, and the target must succeed on a DC 13 Constitution saving throw or be poisoned for 1 minute. Until this poison ends, the target is paralyzed. The target can repeat the saving throw at the end of each of its turns, ending the poison on itself on a success.",
+            "attack_bonus": 8,
+            "damage": [
+              {
+                "damage_dice": "1d4+2",
+                "damage_type": {
+                  "index": "poison",
+                  "name": "Poison"
+                }
+              }
+            ],
+            "dc": {
+              "dc_type": {
+                "index": "con"
+              },
+              "dc_value": 13,
+              "success_type": "none"
+            }
+          },
+          {
+            "name": "Bite",
+            "desc": "*Melee Weapon Attack:* +4 to hit, reach 5 ft., one target. *Hit:* 7 (2d4 + 2) piercing damage.",
+            "attack_bonus": 4,
+            "damage": [
+              {
+                "damage_dice": "2d4+2",
+                "damage_type": {
+                  "index": "piercing",
+                  "name": "Piercing"
+                }
+              }
+            ]
+          }
+        ],
+        "local_source": {
+          "book": "Supplied Monster Manual 2014 markdown",
+          "path": "rules/books/mm-2014.md",
+          "firstLine": 2134,
+          "lastLine": 2167,
+          "statBlock": "# Carrion Crawler\n\n___\n>## Carrion Crawler\n>*Large Monstrosity, Unaligned*\n>___\n>- **Armor Class** 13 (natural armor)\n>- **Hit Points** 51 (6d10 + 18)\n>- **Speed** 30 ft., Climb 30 ft.\n>- **Initiative** +1 (11)\n>___\n>|STR|DEX|CON|INT|WIS|CHA|\n>|:---:|:---:|:---:|:---:|:---:|:---:|\n>|14 (+2)|13 (+1)|16 (+3)|1 (-5)|12 (+1)|5 (-3)|\n>___\n>- **Skills** Perception +3\n>- **Senses** Darkvision 60 ft., Passive Perception 13\n>- **Languages** —\n>- **Challenge** 2 (XP 450; PB +2)\n>- **Proficiency Bonus** +2\n>___\n>***Keen Smell.*** The carrion crawler has advantage on Wisdom (Perception) checks that rely on smell.  \n>\n>***Spider Climb.*** The carrion crawler can climb difficult surfaces, including upside down on ceilings, without needing to make an ability check.  \n>\n>### Actions\n>***Multiattack.*** The carrion crawler makes two attacks: one with its tentacles and one with its bite.  \n>\n>***Tentacles.*** *Melee Weapon Attack:*  +8 to hit, reach 10 ft., one creature. *Hit:* 4 (1d4 + 2) poison damage, and the target must succeed on a DC 13 Constitution saving throw or be poisoned for 1 minute. Until this poison ends, the target is paralyzed. The target can repeat the saving throw at the end of each of its turns, ending the poison on itself on a success.  \n>\n>***Bite.*** *Melee Weapon Attack:*  +4 to hit, reach 5 ft., one target. *Hit:* 7 (2d4 + 2) piercing damage.\n\n___\n>## Carrion Crawler"
+        }
+      },
+      "engine": {
+        "type": "carrion_crawler",
+        "hp": {
+          "current": 51,
+          "max": 51
+        },
+        "ac": 13,
+        "stats": {
+          "str": 14,
+          "dex": 13,
+          "con": 16,
+          "int": 1,
+          "wis": 12,
+          "cha": 5
+        },
+        "conditions": [],
+        "xpValue": 450,
+        "attackBonus": 8,
+        "damageDice": "1d4+2",
+        "speed": 30,
+        "attackName": "Tentacles",
+        "attackRangeCells": 2,
+        "damageType": "poison",
+        "movementModes": {
+          "walk": 30,
+          "climb": 30
+        }
+      }
+    },
+    "purple_worm": {
+      "sourceUrl": "rules/books/mm-2014.md#L16274",
+      "sourceSha256": "bd38c777183153f8ab954283e9b13471cb11a0be4345efd4e4b216cc8a2027a9",
+      "source": {
+        "index": "purple-worm",
+        "name": "Purple Worm",
+        "size": "Gargantuan",
+        "type": "monstrosity",
+        "alignment": "unaligned",
+        "armor_class": [
+          {
+            "type": "natural",
+            "value": 18
+          }
+        ],
+        "hit_points": 247,
+        "hit_dice": "15d20+90",
+        "hit_points_roll": "15d20+90",
+        "speed": {
+          "walk": "50 ft.",
+          "burrow": "30 ft."
+        },
+        "strength": 28,
+        "dexterity": 7,
+        "constitution": 22,
+        "intelligence": 1,
+        "wisdom": 8,
+        "charisma": 4,
+        "proficiencies": [
+          {
+            "proficiency": {
+              "index": "saving-throw-con",
+              "name": "Saving Throw Con"
+            },
+            "value": 11
+          },
+          {
+            "proficiency": {
+              "index": "saving-throw-wis",
+              "name": "Saving Throw Wis"
+            },
+            "value": 4
+          }
+        ],
+        "damage_vulnerabilities": [],
+        "damage_resistances": [],
+        "damage_immunities": [],
+        "condition_immunities": [],
+        "senses": {
+          "blindsight": "30 ft.",
+          "tremorsense": "60 ft.",
+          "passive_perception": 9
+        },
+        "languages": "",
+        "challenge_rating": 15,
+        "xp": 13000,
+        "proficiency_bonus": 5,
+        "special_abilities": [
+          {
+            "name": "Tunneler",
+            "desc": "The worm can burrow through solid rock at half its burrow speed and leaves a 10-foot-diameter tunnel in its wake."
+          }
+        ],
+        "actions": [
+          {
+            "name": "Multiattack",
+            "desc": "The worm makes two attacks: one with its bite and one with its stinger.",
+            "actions": [
+              {
+                "action_name": "Bite",
+                "count": 1
+              },
+              {
+                "action_name": "Tail Stinger",
+                "count": 1
+              }
+            ]
+          },
+          {
+            "name": "Bite",
+            "desc": "*Melee Weapon Attack:* +14 to hit, reach 10 ft., one target. *Hit:* 22 (3d8 + 9) piercing damage. If the target is a Large or smaller creature, it must succeed on a DC 19 Dexterity saving throw or be swallowed by the worm. A swallowed creature is blinded and restrained, it has total cover against attacks and other effects outside the worm, and it takes 21 (6d6) acid damage at the start of each of the worm's turns. If the worm takes 30 damage or more on a single turn from a creature inside it, the worm must succeed on a DC 21 Constitution saving throw at the end of that turn or regurgitate all swallowed creatures, which fall prone in a space within 10 feet of the worm. If the worm dies, a swallowed creature is no longer restrained by it and can escape from the corpse by using 20 feet of movement, exiting prone.",
+            "attack_bonus": 14,
+            "damage": [
+              {
+                "damage_dice": "3d8+9",
+                "damage_type": {
+                  "index": "piercing",
+                  "name": "Piercing"
+                }
+              }
+            ],
+            "dc": {
+              "dc_type": {
+                "index": "dex"
+              },
+              "dc_value": 19,
+              "success_type": "none"
+            }
+          },
+          {
+            "name": "Tail Stinger",
+            "desc": "*Melee Weapon Attack:* +14 to hit, reach 10 ft., one creature. *Hit:* 19 (3d6 + 9) piercing damage, and the target must make a DC 19 Constitution saving throw, taking 42 (12d6) poison damage on a failed save, or half as much damage on a successful one.",
+            "attack_bonus": 14,
+            "damage": [
+              {
+                "damage_dice": "3d6+9",
+                "damage_type": {
+                  "index": "piercing",
+                  "name": "Piercing"
+                }
+              },
+              {
+                "damage_dice": "12d6",
+                "damage_type": {
+                  "index": "poison",
+                  "name": "Poison"
+                }
+              }
+            ],
+            "dc": {
+              "dc_type": {
+                "index": "con"
+              },
+              "dc_value": 19,
+              "success_type": "half"
+            }
+          }
+        ],
+        "local_source": {
+          "book": "Supplied Monster Manual 2014 markdown",
+          "path": "rules/books/mm-2014.md",
+          "firstLine": 16274,
+          "lastLine": 16307,
+          "statBlock": "# Purple Worm\n\n___\n>## Purple Worm\n>*Gargantuan Monstrosity, Unaligned*\n>___\n>- **Armor Class** 18 (natural armor)\n>- **Hit Points** 247 (15d20 + 90)\n>- **Speed** 50 ft., Burrow 30 ft.\n>- **Initiative** -2 (8)\n>___\n>|STR|DEX|CON|INT|WIS|CHA|\n>|:---:|:---:|:---:|:---:|:---:|:---:|\n>|28 (+9)|7 (-2)|22 (+6)|1 (-5)|8 (-1)|4 (-3)|\n>___\n>- **Saving Throws** Con +11, Wis +4\n>- **Senses** Blindsight 30 ft., Tremorsense 60 ft., Passive Perception 9\n>- **Languages** —\n>- **Challenge** 15 (XP 13 000; PB +5)\n>- **Proficiency Bonus** +5\n>___\n>***Tunneler.*** The worm can burrow through solid rock at half its burrow speed and leaves a 10-foot-diameter tunnel in its wake.  \n>\n>### Actions\n>***Multiattack.*** The worm makes two attacks: one with its bite and one with its stinger.  \n>\n>***Bite.*** *Melee Weapon Attack:*  +14 to hit, reach 10 ft., one target. *Hit:* 22 (3d8 + 9) piercing damage. If the target is a Large or smaller creature, it must succeed on a DC 19 Dexterity saving throw or be swallowed by the worm. A swallowed creature is blinded and restrained, it has total cover against attacks and other effects outside the worm, and it takes 21 (6d6) acid damage at the start of each of the worm's turns.  \n>If the worm takes 30 damage or more on a single turn from a creature inside it, the worm must succeed on a DC 21 Constitution saving throw at the end of that turn or regurgitate all swallowed creatures, which fall prone in a space within 10 feet of the worm. If the worm dies, a swallowed creature is no longer restrained by it and can escape from the corpse by using 20 feet of movement, exiting prone.  \n>\n>***Tail Stinger.*** *Melee Weapon Attack:*  +14 to hit, reach 10 ft., one creature. *Hit:* 19 (3d6 + 9) piercing damage, and the target must make a DC 19 Constitution saving throw, taking 42 (12d6) poison damage on a failed save, or half as much damage on a successful one.\n\n___\n>## Purple Worm\n>*Gargantuan Monstrosity, Unaligned*"
+        }
+      },
+      "engine": {
+        "type": "purple_worm",
+        "hp": {
+          "current": 247,
+          "max": 247
+        },
+        "ac": 18,
+        "stats": {
+          "str": 28,
+          "dex": 7,
+          "con": 22,
+          "int": 1,
+          "wis": 8,
+          "cha": 4
+        },
+        "conditions": [],
+        "xpValue": 13000,
+        "attackBonus": 14,
+        "damageDice": "3d8+9",
+        "speed": 50,
+        "attackName": "Bite",
+        "attackRangeCells": 2,
+        "damageType": "piercing",
+        "movementModes": {
+          "walk": 50,
+          "burrow": 30
+        }
+      }
+    },
+    "wyvern": {
+      "sourceUrl": "rules/books/mm-2014.md#L19508",
+      "sourceSha256": "8212c3b502fa5b11593c87014167de8bd840a36e7de92c18713c5230af77a42f",
+      "source": {
+        "index": "wyvern",
+        "name": "Wyvern",
+        "size": "Large",
+        "type": "dragon",
+        "alignment": "unaligned",
+        "armor_class": [
+          {
+            "type": "natural",
+            "value": 13
+          }
+        ],
+        "hit_points": 110,
+        "hit_dice": "13d10+39",
+        "hit_points_roll": "13d10+39",
+        "speed": {
+          "walk": "20 ft.",
+          "fly": "80 ft."
+        },
+        "strength": 19,
+        "dexterity": 10,
+        "constitution": 16,
+        "intelligence": 5,
+        "wisdom": 12,
+        "charisma": 6,
+        "proficiencies": [
+          {
+            "proficiency": {
+              "index": "skill-perception",
+              "name": "Skill Perception"
+            },
+            "value": 4
+          }
+        ],
+        "damage_vulnerabilities": [],
+        "damage_resistances": [],
+        "damage_immunities": [],
+        "condition_immunities": [],
+        "senses": {
+          "darkvision": "60 ft.",
+          "passive_perception": 14
+        },
+        "languages": "",
+        "challenge_rating": 6,
+        "xp": 2300,
+        "proficiency_bonus": 3,
+        "special_abilities": [],
+        "actions": [
+          {
+            "name": "Multiattack",
+            "desc": "The wyvern makes two attacks: one with its bite and one with its stinger. While flying, it can use its claws in place of one other attack.",
+            "actions": [
+              {
+                "action_name": "Bite",
+                "count": 1
+              },
+              {
+                "action_name": "Stinger",
+                "count": 1
+              }
+            ]
+          },
+          {
+            "name": "Bite",
+            "desc": "*Melee Weapon Attack:* +7 to hit, reach 10 ft., one creature. *Hit:* 11 (2d6 + 4) piercing damage.",
+            "attack_bonus": 7,
+            "damage": [
+              {
+                "damage_dice": "2d6+4",
+                "damage_type": {
+                  "index": "piercing",
+                  "name": "Piercing"
+                }
+              }
+            ]
+          },
+          {
+            "name": "Claws",
+            "desc": "*Melee Weapon Attack:* +7 to hit, reach 5 ft., one target. *Hit:* 13 (2d8 + 4) slashing damage.",
+            "attack_bonus": 7,
+            "damage": [
+              {
+                "damage_dice": "2d8+4",
+                "damage_type": {
+                  "index": "slashing",
+                  "name": "Slashing"
+                }
+              }
+            ]
+          },
+          {
+            "name": "Stinger",
+            "desc": "*Melee Weapon Attack:* +7 to hit, reach 10 ft., one creature. *Hit:* 11 (2d6 + 4) piercing damage. The target must make a DC 15 Constitution saving throw, taking 24 (7d6) poison damage on a failed save, or half as much damage on a successful one.",
+            "attack_bonus": 7,
+            "damage": [
+              {
+                "damage_dice": "2d6+4",
+                "damage_type": {
+                  "index": "piercing",
+                  "name": "Piercing"
+                }
+              },
+              {
+                "damage_dice": "7d6",
+                "damage_type": {
+                  "index": "poison",
+                  "name": "Poison"
+                }
+              }
+            ],
+            "dc": {
+              "dc_type": {
+                "index": "con"
+              },
+              "dc_value": 15,
+              "success_type": "half"
+            }
+          }
+        ],
+        "local_source": {
+          "book": "Supplied Monster Manual 2014 markdown",
+          "path": "rules/books/mm-2014.md",
+          "firstLine": 19508,
+          "lastLine": 19539,
+          "statBlock": "# Wyvern\n\n___\n>## Wyvern\n>*Large Dragon, Unaligned*\n>___\n>- **Armor Class** 13 (natural armor)\n>- **Hit Points** 110 (13d10 + 39)\n>- **Speed** 20 ft., Fly 80 ft.\n>- **Initiative** +0 (10)\n>___\n>|STR|DEX|CON|INT|WIS|CHA|\n>|:---:|:---:|:---:|:---:|:---:|:---:|\n>|19 (+4)|10 (+0)|16 (+3)|5 (-3)|12 (+1)|6 (-2)|\n>___\n>- **Skills** Perception +4\n>- **Senses** Darkvision 60 ft., Passive Perception 14\n>- **Languages** —\n>- **Challenge** 6 (XP 2 300; PB +3)\n>- **Proficiency Bonus** +3\n>___\n>### Actions\n>***Multiattack.*** The wyvern makes two attacks: one with its bite and one with its stinger. While flying, it can use its claws in place of one other attack.  \n>\n>***Bite.*** *Melee Weapon Attack:*  +7 to hit, reach 10 ft., one creature. *Hit:* 11 (2d6 + 4) piercing damage.  \n>\n>***Claws.*** *Melee Weapon Attack:*  +7 to hit, reach 5 ft., one target. *Hit:* 13 (2d8 + 4) slashing damage.  \n>\n>***Stinger.*** *Melee Weapon Attack:*  +7 to hit, reach 10 ft., one creature. *Hit:* 11 (2d6 + 4) piercing damage. The target must make a DC 15 Constitution saving throw, taking 24 (7d6) poison damage on a failed save, or half as much damage on a successful one.\n\n___\n>## Wyvern"
+        }
+      },
+      "engine": {
+        "type": "wyvern",
+        "hp": {
+          "current": 110,
+          "max": 110
+        },
+        "ac": 13,
+        "stats": {
+          "str": 19,
+          "dex": 10,
+          "con": 16,
+          "int": 5,
+          "wis": 12,
+          "cha": 6
+        },
+        "conditions": [],
+        "xpValue": 2300,
+        "attackBonus": 7,
+        "damageDice": "2d6+4",
+        "speed": 20,
+        "attackName": "Bite",
+        "attackRangeCells": 2,
+        "damageType": "piercing",
+        "movementModes": {
+          "walk": 20,
+          "fly": 80
+        }
+      }
+    },
+    "giant_poisonous_snake": {
+      "sourceUrl": "rules/books/mm-2014.md#L21495",
+      "sourceSha256": "14261520375ecc58209f4a66c3b5c37f7e4081b87493a1d110593116b00eb894",
+      "source": {
+        "index": "giant-poisonous-snake",
+        "name": "Giant Poisonous Snake",
+        "size": "Medium",
+        "type": "beast",
+        "alignment": "unaligned",
+        "armor_class": [
+          {
+            "type": "dex",
+            "value": 14
+          }
+        ],
+        "hit_points": 11,
+        "hit_dice": "2d8+2",
+        "hit_points_roll": "2d8+2",
+        "speed": {
+          "walk": "30 ft.",
+          "swim": "30 ft."
+        },
+        "strength": 10,
+        "dexterity": 18,
+        "constitution": 13,
+        "intelligence": 2,
+        "wisdom": 10,
+        "charisma": 3,
+        "proficiencies": [
+          {
+            "proficiency": {
+              "index": "skill-perception",
+              "name": "Skill Perception"
+            },
+            "value": 2
+          }
+        ],
+        "damage_vulnerabilities": [],
+        "damage_resistances": [],
+        "damage_immunities": [],
+        "condition_immunities": [],
+        "senses": {
+          "blindsight": "10 ft.",
+          "passive_perception": 12
+        },
+        "languages": "",
+        "challenge_rating": 0.25,
+        "xp": 50,
+        "proficiency_bonus": 2,
+        "special_abilities": [],
+        "actions": [
+          {
+            "name": "Bite",
+            "desc": "*Melee Weapon Attack:* +6 to hit, reach 10 ft., one target. *Hit:* 6 (1d4 + 4) piercing damage, and the target must make a DC 11 Constitution saving throw, taking 10 (3d6) poison damage on a failed save, or half as much damage on a successful one.",
+            "attack_bonus": 6,
+            "damage": [
+              {
+                "damage_dice": "1d4+4",
+                "damage_type": {
+                  "index": "piercing",
+                  "name": "Piercing"
+                }
+              },
+              {
+                "damage_dice": "3d6",
+                "damage_type": {
+                  "index": "poison",
+                  "name": "Poison"
+                }
+              }
+            ],
+            "dc": {
+              "dc_type": {
+                "index": "con"
+              },
+              "dc_value": 11,
+              "success_type": "half"
+            }
+          }
+        ],
+        "local_source": {
+          "book": "Supplied Monster Manual 2014 markdown",
+          "path": "rules/books/mm-2014.md",
+          "firstLine": 21495,
+          "lastLine": 21517,
+          "statBlock": ">## Giant Poisonous Snake\n>*Medium Beast, Unaligned*\n>___\n>- **Armor Class** 14\n>- **Hit Points** 11 (2d8 + 2)\n>- **Speed** 30 ft., Swim 30 ft.\n>- **Initiative** +4 (14)\n>___\n>|STR|DEX|CON|INT|WIS|CHA|\n>|:---:|:---:|:---:|:---:|:---:|:---:|\n>|10 (+0)|18 (+4)|13 (+1)|2 (-4)|10 (+0)|3 (-4)|\n>___\n>- **Skills** Perception +2\n>- **Senses** Blindsight 10 ft., Passive Perception 12\n>- **Languages** —\n>- **Challenge** 1/4 (XP 50; PB +2)\n>- **Proficiency Bonus** +2\n>___\n>### Actions\n>***Bite.*** *Melee Weapon Attack:*  +6 to hit, reach 10 ft., one target. *Hit:* 6 (1d4 + 4) piercing damage, and the target must make a DC 11 Constitution saving throw, taking 10 (3d6) poison damage on a failed save, or half as much damage on a successful one.\n\n___\n>## Giant Rat"
+        }
+      },
+      "engine": {
+        "type": "giant_poisonous_snake",
+        "hp": {
+          "current": 11,
+          "max": 11
+        },
+        "ac": 14,
+        "stats": {
+          "str": 10,
+          "dex": 18,
+          "con": 13,
+          "int": 2,
+          "wis": 10,
+          "cha": 3
+        },
+        "conditions": [],
+        "xpValue": 50,
+        "attackBonus": 6,
+        "damageDice": "1d4+4",
+        "speed": 30,
+        "attackName": "Bite",
+        "attackRangeCells": 2,
+        "damageType": "piercing",
+        "movementModes": {
+          "walk": 30,
+          "swim": 30
+        }
+      }
+    }
+  }
+}

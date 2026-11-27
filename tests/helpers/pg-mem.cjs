@@ -31,6 +31,7 @@ function installPgMem() {
   process.env.APP_LOG_BUFFER_ENABLED ??= 'false'
   process.env.APP_LOG_LEVEL ??= 'error'
   process.env.APP_LOG_PERSIST_ENABLED ??= 'false'
+  process.env.LLM_TRAINING_FILE_ENABLED ??= 'false'
   process.env.DATABASE_URL = IN_MEMORY_DATABASE_URL
 
   const restoreTsRequire = installTsRequireWithAliases()

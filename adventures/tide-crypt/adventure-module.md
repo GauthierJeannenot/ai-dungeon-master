@@ -220,7 +220,7 @@ trigger_room_event({ roomId: "7", eventType: "enter",
 La voûte s'ouvre sur un puits naturel : tout en haut, très loin, un rond de ciel nocturne. Au centre, un autel de pierre polie porte une lanterne de verre épais où brûle une flamme bleu-vert, paisible, qui n'éclaire que ce qu'elle veut. Devant l'autel se tient un capitaine en grand uniforme gonflé d'eau, sabre au clair — le Gardien Noyé. Il ne charge pas. Il attend de savoir qui vous êtes.
 
 ### Contenu
-**Le Gardien Noyé** (capitaine mort-vivant, 33 PV, loyal jusqu'à l'absurde) + **1 Noyé de la chapelle** :
+**Le Gardien Noyé** (profil SRD de Wight, capitaine mort-vivant à 45 PV, loyal jusqu'à l'absurde) + **1 Noyé de la chapelle** :
 - Approcher de la Lanterne sans médiation → `start_encounter("guardian_chapel")`
 - Il combat avec retenue cérémonielle : il désarme, repousse, ne poursuit pas un fuyard
 
@@ -279,7 +279,7 @@ Si le joueur a pillé la crypte ou détruit le Gardien sans égards : la Flamme 
 | Marin squelette (×1 + ×3) | skeleton | 13 | Salles 5, 6 |
 | Sonneur squelette (×2) | skeleton | 13 | Salle 7 |
 | Noyé de la chapelle | zombie | 22 | Salle 8 |
-| Le Gardien Noyé | hobgoblin_captain (PV réduits) | 33 | Salle 8 |
+| Le Gardien Noyé | wight (SRD 2014) | 45 | Salle 8 |
 
 ---
 

@@ -1,5 +1,8 @@
 'use client'
 
+import ObjectiveJournal from '@/components/ObjectiveJournal'
+import TurnReview from '@/components/TurnReview'
+
 import { useState, useCallback, useEffect, useMemo, useRef, Suspense } from 'react'
 import dynamic from 'next/dynamic'
 import { useSearchParams, useRouter } from 'next/navigation'
@@ -7,9 +10,15 @@ import Chat from '@/components/Chat'
 import CombatTracker from '@/components/CombatTracker'
 import Link from 'next/link'
 import { GameState, ChatMessage, DMResponse, DMRequest, ConversationTurn, DMClientMeta, type DMQuota, type DMTurnUsage } from '@/lib/types'
-import { getAdventure, DEFAULT_ADVENTURE_ID, type AdventureDefinition } from '@/lib/adventures'
+import { getAdventure, getAdventureScene, getTacticalView, DEFAULT_ADVENTURE_ID, type AdventureDefinition } from '@/lib/adventures'
 import { DEFAULT_CHARACTER_ID, isKnownCharacterId } from '@/lib/character-registry'
 import { buildInitialGameState } from '@/lib/initial-game-state'
+import { getMapSpec, getAdventureMap } from '@/lib/adventure-map'
+import { useGamePresence } from '@/lib/use-game-presence'
+import DmStartupModal from '@/components/DmStartupModal'
+import AdventureScene from '@/components/AdventureScene'
+
+import { migrateMapLayout } from '@/lib/map-layout-migration'
 
 // Battlemap uses browser APIs — load client-only
 const Battlemap = dynamic(() => import('@/components/Battlemap'), { ssr: false })
@@ -63,7 +72,6 @@ interface ClientBudgetSummary {
   llmCalls: number
   inputTokens: number
   outputTokens: number
-  cacheCreationInputTokens: number
   cacheReadInputTokens: number
   estimatedCostUsd: number
   lastTurnCostUsd: number
@@ -98,7 +106,6 @@ function emptyBudgetSummary(): ClientBudgetSummary {
     llmCalls: 0,
     inputTokens: 0,
     outputTokens: 0,
-    cacheCreationInputTokens: 0,
     cacheReadInputTokens: 0,
     estimatedCostUsd: 0,
     lastTurnCostUsd: 0,
@@ -115,7 +122,6 @@ function addTurnUsage(summary: ClientBudgetSummary, usage: DMTurnUsage | undefin
     llmCalls: summary.llmCalls + usage.llm.calls,
     inputTokens: summary.inputTokens + usage.llm.inputTokens,
     outputTokens: summary.outputTokens + usage.llm.outputTokens,
-    cacheCreationInputTokens: summary.cacheCreationInputTokens + usage.llm.cacheCreationInputTokens,
     cacheReadInputTokens: summary.cacheReadInputTokens + usage.llm.cacheReadInputTokens,
     estimatedCostUsd: Number((summary.estimatedCostUsd + usage.llm.estimatedCostUsd).toFixed(8)),
     lastTurnCostUsd: usage.llm.estimatedCostUsd,
@@ -370,25 +376,29 @@ function GameView({ adventure, characterId, resumeSessionId }: { adventure: Adve
   const [gameState, setGameState] = useState<GameState>(initialGameState)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const sendPendingRef = useRef(false)
   const [inputValue, setInputValue] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [hasLoadedSession, setHasLoadedSession] = useState(false)
+  const presence = useGamePresence(hasLoadedSession ? sessionId : null, adventure.id, characterId)
   // Résumé compressé des échanges anciens — stocké ici, renvoyé à chaque requête
   const [summaryContext, setSummaryContext] = useState<string | undefined>(undefined)
   // Map courante du module : image et grille suivent gameState.currentMapId
   // (modules multi-maps). Repli : première map (états legacy, modules 1-map).
   const currentMapSpec = useMemo(
-    () => adventure.map.maps.find(spec => spec.id === gameState.currentMapId) ?? adventure.map.maps[0],
-    [adventure, gameState.currentMapId]
+    () => getMapSpec(gameState.currentMapId, gameState),
+    [gameState]
   )
-  const currentBattlemapImage = adventure.battlemapImages?.[currentMapSpec.id] ?? adventure.battlemapImage
+  const combatView = getTacticalView(adventure, gameState)
+  const currentBattlemapImage = combatView?.image ?? adventure.battlemapImages?.[currentMapSpec.id] ?? adventure.battlemapImage
+  const currentScene = getAdventureScene(adventure, gameState)
   const [budgetSummary, setBudgetSummary] = useState<ClientBudgetSummary>(emptyBudgetSummary)
   const [quota, setQuota] = useState<DMQuota | null>(null)
   // Battlemap repliable sous `lg` (sans effet au-dessus) : repliée par défaut
   // hors combat pour laisser la place au journal, dépliée automatiquement à
   // l'entrée en combat. Le joueur garde la main pour replier/déplier ensuite.
-  const [mapExpanded, setMapExpanded] = useState(() => gameState.phase === 'combat')
+  const [mapExpanded, setMapExpanded] = useState(() => gameState.phase === 'combat' || Boolean(currentScene))
   const previousPhaseRef = useRef(gameState.phase)
   useEffect(() => {
     if (gameState.phase === 'combat' && previousPhaseRef.current !== 'combat') {
@@ -397,7 +407,7 @@ function GameView({ adventure, characterId, resumeSessionId }: { adventure: Adve
     previousPhaseRef.current = gameState.phase
   }, [gameState.phase])
   const currentRoomName = useMemo(
-    () => adventure.map.rooms.find(room => room.id === gameState.currentRoomId)?.name ?? null,
+    () => getAdventureMap(gameState).rooms.find(room => room.id === gameState.currentRoomId)?.name ?? null,
     [adventure, gameState.currentRoomId]
   )
   const aliveMonsterCount = useMemo(
@@ -432,8 +442,8 @@ function GameView({ adventure, characterId, resumeSessionId }: { adventure: Adve
 
   // Restore the per-tab session after hydration. sessionStorage keeps refreshes
   // coherent while still isolating separate browser tabs from one another.
-  // Cas particulier « reprise » (?session=<id>) : si le sessionStorage local est
-  // vide (nouvel appareil), on hydrate depuis le serveur.
+  // Une session connue est rechargée depuis le serveur, y compris après un
+  // rafraîchissement : le cache de l'onglet peut précéder un checkpoint moteur.
   useEffect(() => {
     let cancelled = false
 
@@ -442,25 +452,27 @@ function GameView({ adventure, characterId, resumeSessionId }: { adventure: Adve
       const localMessages = readSessionJson<ChatMessage[]>(keys.messages)
       const localBudget = readSessionJson<ClientBudgetSummary>(keys.budget)
 
-      // Reprise demandée ET aucun état local pour ce module → hydratation serveur.
-      if (resumeSessionId && !(localState && localMessages?.length)) {
+      let cachedSessionId: string | null = null
+      try { cachedSessionId = sessionStorage.getItem(keys.sessionId) } catch { /* storage unavailable */ }
+      const restoreSessionId = resumeSessionId ?? cachedSessionId
+      if (restoreSessionId) {
         try {
-          const res = await fetch(`/api/sessions/${encodeURIComponent(resumeSessionId)}`)
+          const res = await fetch(`/api/sessions/${encodeURIComponent(restoreSessionId)}`)
           if (res.ok) {
             const data = await res.json()
             if (cancelled) return
-            try { sessionStorage.setItem(keys.sessionId, resumeSessionId) } catch { /* storage unavailable */ }
+            try { sessionStorage.setItem(keys.sessionId, restoreSessionId) } catch { /* storage unavailable */ }
             const rebuilt = historyToChatMessages(data.history)
-            setSessionId(resumeSessionId)
+            setSessionId(restoreSessionId)
             setGameState(data.gameState ?? initialGameState)
             setMessages(rebuilt.length ? rebuilt : [createWelcomeMessage(adventure.welcomeMessage)])
             setSummaryContext(data.summaryContext ?? undefined)
-            setBudgetSummary(emptyBudgetSummary())
+            setBudgetSummary(restoreSessionId === cachedSessionId && localBudget ? localBudget : emptyBudgetSummary())
             setHasLoadedSession(true)
             return
           }
           // 403/404 → on retombe sur une nouvelle partie (code ci-dessous).
-        } catch { /* réseau indisponible : nouvelle partie */ }
+        } catch { /* réseau indisponible : reprise depuis le cache de l'onglet */ }
       }
 
       // Reprise sur le même navigateur : forcer le sessionId demandé.
@@ -472,7 +484,7 @@ function GameView({ adventure, characterId, resumeSessionId }: { adventure: Adve
       if (cancelled) return
 
       setSessionId(restoredSessionId)
-      if (localState) setGameState(localState)
+      if (localState) setGameState(migrateMapLayout(localState))
       setMessages(localMessages?.length ? localMessages : [createWelcomeMessage(adventure.welcomeMessage)])
       if (localBudget) setBudgetSummary(localBudget)
       appendClientDebugLog(restoredSessionId, 'client.session.loaded', {
@@ -525,7 +537,8 @@ function GameView({ adventure, characterId, resumeSessionId }: { adventure: Adve
   }, [hasLoadedSession, sessionId])
 
   const sendMessage = useCallback(async (text: string, clientMeta: DMClientMeta = { inputMode: 'text' }) => {
-    if (isLoading || !hasLoadedSession) return
+    if (sendPendingRef.current || isLoading || !hasLoadedSession) return
+    sendPendingRef.current = true
     setError(null)
     setIsLoading(true)
     setInputValue('')
@@ -544,6 +557,7 @@ function GameView({ adventure, characterId, resumeSessionId }: { adventure: Adve
     setMessages(prev => [...prev, playerMsg])
 
     try {
+      await presence.ensureReady()
       // Construit l'historique : messages player/dm uniquement (pas mechanical),
       // sans le message courant qui vient d'être ajouté à la liste.
       // On l'exclut en prenant tous les messages AVANT l'ajout du playerMsg.
@@ -585,6 +599,9 @@ function GameView({ adventure, characterId, resumeSessionId }: { adventure: Adve
 
       if (!res.ok) {
         const data = await res.json()
+        // La mécanique peut être sauvegardée avant un échec de narration.
+        // Afficher cet état empêche aussi de renvoyer l'ancienne position au tour suivant.
+        if (data.newGameState) setGameState(data.newGameState)
         // 402 = quota épuisé : le serveur renvoie l'état exact du compteur.
         if (res.status === 402 && data.quota) setQuota(data.quota)
         throw new Error(data.error ?? `HTTP ${res.status}`)
@@ -705,9 +722,10 @@ function GameView({ adventure, characterId, resumeSessionId }: { adventure: Adve
         timestamp: Date.now(),
       }])
     } finally {
+      sendPendingRef.current = false
       setIsLoading(false)
     }
-  }, [gameState, hasLoadedSession, isLoading, messages, sessionId, summaryContext])
+  }, [gameState, hasLoadedSession, isLoading, messages, sessionId, summaryContext, presence.ready])
 
   const resetGame = useCallback(() => {
     if (isLoading) return
@@ -761,6 +779,9 @@ function GameView({ adventure, characterId, resumeSessionId }: { adventure: Adve
 
   return (
     <div className="flex flex-col h-dvh bg-stone-950 text-stone-100 overflow-hidden">
+      {hasLoadedSession && sessionId && (
+        <DmStartupModal key={sessionId} state={presence.state} message={presence.message} progress={presence.progress} onRetry={presence.retry} />
+      )}
       {/* Top bar */}
       <header className="flex-shrink-0 min-h-10 bg-stone-900 border-b border-amber-900/40 flex flex-wrap items-center px-3 sm:px-4 py-1 gap-2 sm:gap-4">
         <Link
@@ -837,6 +858,11 @@ function GameView({ adventure, characterId, resumeSessionId }: { adventure: Adve
       )}
 
       {/* Main layout */}
+      {!presence.ready && (
+        <div role="status" className="flex-shrink-0 border-b border-amber-900/40 bg-stone-900 px-4 py-2 text-sm text-amber-200">
+          {presence.message}
+        </div>
+      )}
       <div className="flex flex-col lg:flex-row flex-1 overflow-hidden">
         {/* Left: Battlemap (65% sur lg ; repliable sous lg pour laisser la
             place au journal — voir mapExpanded) */}
@@ -864,14 +890,29 @@ function GameView({ adventure, characterId, resumeSessionId }: { adventure: Adve
 
           {/* Battlemap et grille de la MAP COURANTE du module actif — toujours
               visible sur lg ; repliable en dessous (voir bandeau ci-dessus) */}
-          <div className={`relative h-full ${mapExpanded ? 'block' : 'hidden'} lg:block`}>
-            <Battlemap
+            <div className={`relative h-full ${mapExpanded ? 'flex' : 'hidden'} lg:flex flex-col`}>
+              <div className="relative flex-1 min-h-0">
+            {currentScene ? (
+              <AdventureScene scene={currentScene} mapId={currentMapSpec.id} gameState={gameState}
+                disabled={isLoading || !hasLoadedSession || !presence.ready || quotaExhausted}
+                onAction={message => { void sendMessage(message) }} />
+            ) : <Battlemap
               gameState={gameState}
               cellSize={currentMapSpec.cellSize}
               image={currentBattlemapImage}
+              viewport={combatView?.bounds}
               cols={currentMapSpec.grid.cols}
               rows={currentMapSpec.grid.rows}
-            />
+              onDoorAction={message => { void sendMessage(message) }}
+              movementDisabled={isLoading || !hasLoadedSession || !presence.ready || quotaExhausted}
+              onMove={destination => {
+                void sendMessage(`Je me déplace uniquement jusqu’à la case (${destination.x}, ${destination.y}). Je garde mon action et je ne termine pas mon tour.`)
+              }}
+              onMoveToRoom={room => {
+                void sendMessage(`Je souhaite me déplacer vers la zone ${JSON.stringify(room.name)} (roomId=${JSON.stringify(room.id)}), sur la carte courante. Si une porte fermée ou une décision bloque le trajet, je m’arrête devant sans ouvrir ni forcer de porte.`)
+              }}
+            />}
+              </div>
             <button
               type="button"
               onClick={() => setMapExpanded(false)}
@@ -888,6 +929,7 @@ function GameView({ adventure, characterId, resumeSessionId }: { adventure: Adve
 
         {/* Right: Chat + CombatTracker (35%) */}
         <div className="flex-[55] lg:flex-[35] min-w-0 lg:min-w-[320px] w-full lg:max-w-[480px] flex flex-col gap-2 p-2 overflow-hidden">
+          <ObjectiveJournal gameState={gameState} />
           {debugHudEnabled && (
             <div className="flex-shrink-0 border border-stone-800 bg-stone-900/70 px-3 py-2 text-[11px] text-stone-400">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -909,7 +951,7 @@ function GameView({ adventure, characterId, resumeSessionId }: { adventure: Adve
                 </div>
               </div>
               <div className="mt-1 grid grid-cols-2 gap-x-2 gap-y-0.5 font-mono text-[10px] text-stone-500 sm:grid-cols-[auto_1fr_auto]">
-                <span className="min-w-0">cache {budgetSummary.cacheReadInputTokens}/{budgetSummary.cacheCreationInputTokens}</span>
+                <span className="min-w-0">cache {budgetSummary.cacheReadInputTokens}</span>
                 <span className="min-w-0 text-right sm:text-center">narrateur {narratorLabel(budgetSummary.lastNarrator)}</span>
                 <span className="min-w-0 text-right sm:col-auto">route {budgetSummary.lastLlmRoute}</span>
               </div>
@@ -927,13 +969,20 @@ function GameView({ adventure, characterId, resumeSessionId }: { adventure: Adve
           )}
           {gameState.phase === 'combat' && (
             <div className="flex-shrink-0">
-              <CombatTracker gameState={gameState} />
+              <CombatTracker
+                gameState={gameState}
+                onAttack={sendMessage}
+                disabled={isLoading || !hasLoadedSession || !presence.ready || quotaExhausted}
+              />
             </div>
           )}
-          <div className="flex-1 min-h-0">
+          <div className="flex flex-col flex-1 min-h-0">
+            {sessionId && <TurnReview sessionId={sessionId} busy={isLoading} />}
+            <div className="flex-1 min-h-0">
             <Chat
               messages={messages}
               isLoading={isLoading || !hasLoadedSession}
+              inputDisabled={!hasLoadedSession}
               gameState={gameState}
               onSendMessage={sendMessage}
               inputValue={inputValue}
@@ -942,6 +991,7 @@ function GameView({ adventure, characterId, resumeSessionId }: { adventure: Adve
               placeholders={adventure.chatPlaceholders}
               roomStatusHints={adventure.roomStatusHints}
             />
+            </div>
           </div>
         </div>
       </div>

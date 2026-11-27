@@ -1,0 +1,115 @@
+const test = require('node:test')
+const assert = require('node:assert/strict')
+const { installPgMem } = require('./helpers/pg-mem.cjs')
+const pg = installPgMem()
+const { saveSession, loadSession, deleteSession } = require('../lib/session-store.ts')
+const { engine, ok } = require('./helpers/mcp-toolkit.cjs')
+const { prepareRechargeCalendar, createRechargeItem } = require('./helpers/recharge-calendar-fixture.cjs')
+const { approachManorStairs, prepareRechargePlaneMap } = require('./helpers/recharge-plane-fixture.cjs')
+test.after(() => pg.restore())
+
+test('same-plane qualification after real stairs applies only future source boundaries and retains SQL receipts', async t => {
+  const call = await engine(t, { dice: '2,19' })
+  await approachManorStairs(call)
+  const ground = await createRechargeItem(call, 'wand_of_magic_missiles', 'source-floor-wand', { initialCharges: 1, pickup: false })
+  const carried = await createRechargeItem(call, 'wand_of_magic_missiles', 'same-plane-carried-wand', { initialCharges: 1 })
+  const f = await prepareRechargeCalendar(call, { firstAfterSeconds: 60 })
+  const beforeTravel = await call('get_game_state')
+  assert.equal(ok(await call('travel_to_map', { transitionId: 'descend_manor' })).travelSeconds, 0)
+  assert.equal((await call('get_game_state')).worldTimeSeconds, beforeTravel.worldTimeSeconds)
+  ok(await call('advance_time', { seconds: 60 }))
+  let state = await call('get_game_state')
+  assert.equal(state.dmTools.magicItems[ground].charges, 4)
+  assert.equal(state.dmTools.magicItems[carried].charges, 1, 'being physically connected does not qualify the same plane')
+  const binding = await prepareRechargePlaneMap(call)
+  const before = await call('get_game_state')
+  const bound = ok(await call('bind_xge_recharge_plane_map', binding.input))
+  assert.equal(bound.plane.maps[0].firstAt, before.worldTimeSeconds + 86400)
+  state = await call('get_game_state')
+  assert.equal(state.worldTimeSeconds, before.worldTimeSeconds)
+  assert.equal(state.dmTools.magicItems[carried].charges, 1, 'binding at an old occurrence grants no retroactive recharge')
+  assert.deepEqual(state.dmTools.rechargeCalendar.adoption, before.dmTools.rechargeCalendar.adoption)
+  assert.equal(ok(await call('roll_dice', { notation: '1d20' })).total, 19)
+  assert.equal((await call('bind_xge_recharge_plane_map', { ...binding.input, eventId: 'fresh-nonce' })).code, 'XGE_RECHARGE_PLANE_MAP_IMMUTABLE')
+  assert.deepEqual(await call('get_game_state'), state)
+
+  const sid = `same-plane-sql-${process.pid}`
+  await saveSession(sid, { gameState: state, history: [], adventureId: state.adventureId, characterId: state.characterId })
+  t.after(() => deleteSession(sid))
+  const resumed = await engine(t, { dice: '3,4,19' })
+  ok(await resumed('replace_game_state', { gameState: (await loadSession(sid)).gameState }))
+  assert.deepEqual((await resumed('get_game_state')).dmTools.rechargeCalendar, state.dmTools.rechargeCalendar)
+  assert.equal(ok(await resumed('bind_xge_recharge_plane_map', binding.input)).replayed, true)
+  assert.equal(ok(await resumed('adopt_xge_recharge_calendar', f.input)).replayed, true)
+  const drift = structuredClone(state)
+  drift.dmTools.rechargeCalendar.planeMaps.cellar.firstAt--
+  assert.equal((await resumed('replace_game_state', { gameState: drift })).code, 'XGE_RECHARGE_CALENDAR_STATE_MISMATCH')
+  assert.deepEqual(await resumed('get_game_state'), state)
+  ok(await resumed('advance_time', { seconds: 86400 }))
+  state = await resumed('get_game_state')
+  assert.equal(state.dmTools.magicItems[ground].charges, 7)
+  assert.equal(state.dmTools.magicItems[carried].charges, 6)
+  ok(await resumed('travel_to_map', { transitionId: 'ascend_manor' }))
+  assert.equal((await resumed('get_game_state')).worldTimeSeconds, state.worldTimeSeconds)
+  assert.equal(ok(await resumed('bind_xge_recharge_plane_map', binding.input)).replayed, true)
+  assert.equal(ok(await resumed('roll_dice', { notation: '1d20' })).total, 19)
+})
+
+test('plane scope requires an existing adopted origin, actual current map and exact durable local fact before any effect', async t => {
+  const call = await engine(t, { dice: '19' })
+  await approachManorStairs(call)
+  const missing = { eventId: 'no-rule', originMapId: 'temple', mapId: 'cellar', planeId: 'actual-plane',
+    planeName: 'Plan choisi', factId: 'missing-fact', actualSameDawnlessPlaneConfirmed: true }
+  assert.equal((await call('bind_xge_recharge_plane_map', missing)).code, 'XGE_RECHARGE_CALENDAR_REQUIRED')
+  await prepareRechargeCalendar(call)
+  const origin = await call('get_game_state')
+  assert.equal((await call('bind_xge_recharge_plane_map', missing)).code, 'XGE_RECHARGE_PLANE_MAP_REQUIRED')
+  assert.deepEqual(await call('get_game_state'), origin)
+  ok(await call('travel_to_map', { transitionId: 'descend_manor' }))
+  const f = await prepareRechargePlaneMap(call)
+  const before = await call('get_game_state')
+  for (const [input, code] of [
+    [{ ...f.input, originMapId: 'waterdeep' }, 'XGE_RECHARGE_PLANE_MAP_REQUIRED'],
+    [{ ...f.input, mapId: 'not-an-authored-map' }, 'XGE_RECHARGE_PLANE_MAP_REQUIRED'],
+    [{ ...f.input, factId: 'missing-fact' }, 'XGE_RECHARGE_PLANE_FACT_REQUIRED'],
+    [{ ...f.input, eventId: before.dmTools.rechargeCalendar.adoption.input.eventId }, 'XGE_RECHARGE_PLANE_EVENT_CONFLICT'],
+  ]) {
+    assert.equal((await call('bind_xge_recharge_plane_map', input)).code, code)
+    assert.deepEqual(await call('get_game_state'), before)
+  }
+  ok(await call('bind_xge_recharge_plane_map', f.input))
+  const saved = await call('get_game_state')
+  const altered = structuredClone(saved)
+  altered.dmTools.rechargeCalendar.planeMaps.cellar.input.planeId = 'other-plane'
+  assert.equal((await call('replace_game_state', { gameState: altered })).code, 'XGE_RECHARGE_CALENDAR_STATE_MISMATCH')
+  assert.deepEqual(await call('get_game_state'), saved)
+  ok(await call('record_scene_fact', { cell: saved.player.position, replaceFactId: f.fact.id,
+    description: 'La qualification initiale reste archivée, le MJ ajoute une précision narrative présente.' }))
+  const replacement = await call('get_game_state')
+  assert.equal(ok(await call('bind_xge_recharge_plane_map', f.input)).replayed, true)
+  assert.deepEqual(await call('get_game_state'), replacement)
+  ok(await call('replace_game_state', { gameState: replacement }))
+  assert.equal(ok(await call('roll_dice', { notation: '1d20' })).total, 19)
+})
+
+test('three actual maps share one immutable qualified plane identity without inferring connected maps', async t => {
+  const call = await engine(t, { dice: '19' })
+  await approachManorStairs(call, { beforeTower: async () => {
+    assert.equal((await call('get_game_state')).currentMapId, 'greenfast')
+    await prepareRechargeCalendar(call, { firstAfterSeconds: 7200 })
+  } })
+  const temple = await prepareRechargePlaneMap(call, 'greenfast')
+  ok(await call('bind_xge_recharge_plane_map', temple.input))
+  ok(await call('travel_to_map', { transitionId: 'descend_manor' }))
+  const cellar = await prepareRechargePlaneMap(call, 'greenfast')
+  cellar.input.eventId = 'second-real-map-binding'
+  const before = await call('get_game_state')
+  assert.equal((await call('bind_xge_recharge_plane_map', { ...cellar.input, planeId: 'different-plane' })).code, 'XGE_RECHARGE_PLANE_IDENTITY_IMMUTABLE')
+  assert.deepEqual(await call('get_game_state'), before)
+  const bound = ok(await call('bind_xge_recharge_plane_map', cellar.input))
+  assert.deepEqual(bound.plane.maps.map(map => map.mapId), ['temple', 'cellar'])
+  assert.equal(bound.plane.originMapId, 'greenfast')
+  assert.equal(bound.plane.maps[0].firstAt, bound.plane.maps[1].firstAt)
+  assert.equal((await call('get_game_state')).worldTimeSeconds, before.worldTimeSeconds)
+  assert.equal(ok(await call('roll_dice', { notation: '1d20' })).total, 19)
+})

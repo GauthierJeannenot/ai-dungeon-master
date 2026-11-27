@@ -2,6 +2,9 @@ import { dbQuery } from './db'
 import { acquireSessionLock } from './session-lock'
 import { ConversationTurn, GameState, TurnTrace } from './types'
 import { logEvent, summarizeGameState } from './server-logger'
+import { migrateMapLayout } from './map-layout-migration'
+import { migrateCurrencyState } from './currency-state'
+import { migrateSocialState } from './social-interaction-state'
 
 // Store des sessions de jeu — Postgres unique (table game_sessions). L'état,
 // l'historique et les traces sont stockés en JSONB, partagés entre instances.
@@ -104,7 +107,7 @@ export async function loadSession(sessionId: string | undefined): Promise<Stored
     ownerId: row.owner_id ?? undefined,
     adventureId: row.adventure_id ?? undefined,
     characterId: row.character_id ?? undefined,
-    gameState: row.game_state,
+    gameState: migrateSocialState(migrateCurrencyState(migrateMapLayout(row.game_state))),
     history: Array.isArray(row.history) ? row.history : [],
     summaryContext: row.summary_context ?? undefined,
     turnTraces: Array.isArray(row.turn_traces) ? row.turn_traces.slice(-50) : [],
@@ -155,7 +158,7 @@ export async function saveSession(
       data.ownerId ?? null,
       data.adventureId ?? null,
       data.characterId ?? null,
-      JSON.stringify(data.gameState),
+      JSON.stringify(migrateSocialState(data.gameState)),
       JSON.stringify(data.history ?? []),
       data.summaryContext ?? null,
       data.turnTraces ? JSON.stringify(data.turnTraces.slice(-50)) : null,

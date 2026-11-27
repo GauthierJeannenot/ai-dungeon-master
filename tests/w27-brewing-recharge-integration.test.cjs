@@ -1,0 +1,55 @@
+const test = require('node:test')
+const assert = require('node:assert/strict')
+
+Object.assign(process.env, { MONETIZATION_ENABLED: 'false', LLM_MODE: 'mock', ALLOW_PAID_LLM: 'false' })
+const { installPgMem } = require('./helpers/pg-mem.cjs')
+const pg = installPgMem()
+const { saveSession, loadSession, deleteSession } = require('../lib/session-store.ts')
+const { engine, ok } = require('./helpers/mcp-toolkit.cjs')
+const { prepareHerbalismCourse, prepareBrewAtCurrentSite } = require('./helpers/xge-brewing-fixture.cjs')
+const { prepareRechargeCalendar, expendPearl } = require('./helpers/recharge-calendar-fixture.cjs')
+const { copperValue } = require('../mcp-server/dist/lib/srd/currency.js')
+
+test.after(() => pg.restore())
+
+test('a measured brewing day crosses one chosen recharge hour and SQL replay preserves the dose, fee and recharge', async t => {
+  const options = { adventureId: 'fey-shadow-fair', characterId: 'wizard', dice: '19' }
+  const call = await engine(t, options)
+  const course = await prepareHerbalismCourse(call, 'w27-brewing-course')
+  await course.completeInstruction()
+  ok(await call('complete_xge_training', course.completion))
+  await course.nextDay()
+  assert.ok((await call('get_game_state')).player.toolProficiencies.includes('herbalism_kit'))
+
+  const pearlId = await expendPearl(call, 'w27-pearl')
+  const recharge = await prepareRechargeCalendar(call, { firstAfterSeconds: 3_600 })
+  const input = await prepareBrewAtCurrentSite(call, course.input.practiceToolItemId, {
+    eventId: 'w27-cross-brew', potionItemId: 'w27-cross-potion',
+  })
+  const before = await call('get_game_state')
+  assert.equal(recharge.result.firstAt, before.worldTimeSeconds + 3_600)
+  assert.equal(before.dmTools.magicItems[pearlId].charges, 0)
+  const brewed = ok(await call('brew_xge_healing_potion', input))
+  const after = await call('get_game_state')
+  assert.equal(brewed.seconds, 28_800)
+  assert.equal(after.worldTimeSeconds, before.worldTimeSeconds + 28_800)
+  assert.equal(copperValue(before.dmTools.wallet) - copperValue(after.dmTools.wallet), 2_500)
+  assert.equal(after.dmTools.magicItems[pearlId].charges, 1)
+  assert.equal(after.dmTools.rechargeCalendar.evaluatedThrough, after.worldTimeSeconds)
+  assert.deepEqual(after.player.spellSlots, before.player.spellSlots)
+  assert.equal(after.droppedItems[input.potionItemId].item.quantity, 1)
+  assert.equal(after.dmTools.magicItems[input.potionItemId].templateId, 'potion_of_healing')
+
+  const sessionId = `w27-brewing-recharge-${process.pid}`
+  t.after(() => deleteSession(sessionId))
+  await saveSession(sessionId, { gameState: after, history: [], adventureId: after.adventureId, characterId: after.characterId })
+  const resumed = await engine(t, options)
+  ok(await resumed('replace_game_state', { gameState: (await loadSession(sessionId)).gameState }))
+  const restored = await resumed('get_game_state')
+  assert.deepEqual(restored.dmTools.rechargeCalendar, after.dmTools.rechargeCalendar)
+  assert.deepEqual(restored.dmTools.xgeBrewing, after.dmTools.xgeBrewing)
+  assert.equal(restored.dmTools.magicItems[pearlId].charges, 1)
+  assert.equal(ok(await resumed('brew_xge_healing_potion', input)).replayed, true)
+  assert.deepEqual(await resumed('get_game_state'), restored)
+  assert.equal(ok(await resumed('roll_dice', { notation: '1d20' })).total, 19)
+})

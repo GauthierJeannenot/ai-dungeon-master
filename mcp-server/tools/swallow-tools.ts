@@ -1,0 +1,16 @@
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import { z } from 'zod'
+import { swallowStateOf,dueSwallowEvents } from '../../lib/swallow-state'
+import { PURPLE_WORM_SWALLOW_SOURCE } from '../../lib/srd/purple-worm-swallow'
+import { recordSwallowSize,resolveSwallowEvent,escapeWormCorpse,registerSwallowResolutions } from '../swallow'
+import { toolkitResult,toolkitTransaction } from '../toolkit'
+import * as gs from '../game-state'
+const Id=z.string().min(1).max(180).refine(value=>!['constructor','prototype','__proto__'].includes(value))
+const Cell=z.object({x:z.number().int().nonnegative(),y:z.number().int().nonnegative()}).strict()
+export function registerSwallowTools(server:McpServer){
+ registerSwallowResolutions()
+ server.registerTool('inspect_swallowing',{description:'Confidential read-only exact actual Purple Worm containment episodes and due source events. No interior map, movement, swallowed body, exposure, turn, roll, damage or escape is invented. Event IDs are derived from the actual preserved turn; choose the exact due event explicitly.',inputSchema:{},annotations:{readOnlyHint:true,idempotentHint:true}},async()=>toolkitResult({source:PURPLE_WORM_SWALLOW_SOURCE,state:swallowStateOf(gs.getState())??null,dueEvents:dueSwallowEvents(gs.getState(),'end')}))
+ server.registerTool('record_swallow_body_size',{description:'Explicit MJ observation of one actual body size using an existing current-map physical fact, before its original source bite. This does not resize, transform, move or swallow any body. Source creature and measured carrying sizes cannot be overridden, and another nonce cannot resize the same body.',inputSchema:{entityId:Id,size:z.enum(['Tiny','Small','Medium','Large','Huge','Gargantuan']),factId:Id,source:z.string().trim().min(1).max(1000)}},async input=>toolkitTransaction(()=>toolkitResult(recordSwallowSize(input))))
+ server.registerTool('resolve_swallow_event',{description:'Explicitly resolve exactly one actual due Purple Worm source event. Start-turn acid rolls the true6d6 once for its actual swallowed bodies, using their own defenses. End-turn regurgitation requires endTurn:true and one explicit distinct valid outside cell within10ft for EVERY contained body before the original CON21 or Inspiration. Success keeps them inside; failure ejects all prone atomically. No destination or extra MCP call is fabricated. Completing this source save commits the actual actor to ending its turn; then explicitly advance the turn.',inputSchema:{eventId:z.string().min(1).max(500),endTurn:z.boolean().optional(),exits:z.array(z.object({targetId:Id,cell:Cell}).strict()).min(1).max(128).optional()}},async input=>toolkitTransaction(()=>resolveSwallowEvent(input)))
+ server.registerTool('escape_worm_corpse',{description:'The explicitly selected actual living swallowed body spends20feet of its real remaining own movement to exit its actual dead Purple Worm into the explicitly selected free adjacent outside cell and becomes prone. Source death alone removes its own restrained provider, never grants a free exit or ends independent restraints. Exact retries replay the single exit; no action, speed, Dash, destination, resurrection or new interior is granted.',inputSchema:{episodeId:Id,toCell:Cell}},async input=>toolkitTransaction(()=>escapeWormCorpse(input)))
+}

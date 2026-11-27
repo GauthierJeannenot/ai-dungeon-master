@@ -85,24 +85,26 @@ test('spawn magicien : sorts, emplacements et stats de classe', async () => {
   })
 })
 
-test('cast_spell : sort inconnu refusé, tour de magie sans emplacement, worldFact round-trip', async () => {
+test('cast_spell : sort inconnu refusé, ancien Light sans objet physique refusé sans coût, état round-trip', async () => {
   await withCharacter({ CHARACTER_ID: 'wizard' }, async (client) => {
     // Sort d'une autre classe → refus.
     const unknown = await callTool(client, 'cast_spell', { spellId: 'cure-wounds' })
     assert.equal(unknown.isError, true)
     assert.equal(unknown.data.code, 'SPELL_NOT_KNOWN')
 
-    // Tour de magie (niveau 0) : aucun emplacement consommé, worldFact (carte).
+    // The historical level-one profile has no actual object/component producer.
+    // Light is never a generic self-target utility or a free luminous worldFact.
     const light = await callTool(client, 'cast_spell', { spellId: 'light' })
-    assert.equal(light.data.effect, 'utility')
+    assert.equal(light.isError, true)
+    assert.equal(light.data.code, 'SRD_PROFILE_REQUIRED')
     const s = await getState(client)
     assert.equal(s.player.spellSlots.level1.current, 3)
-    assert.equal(s.worldFacts.length, 1)
+    assert.equal(s.worldFacts.length, 0)
 
     // Le worldFact survit au round-trip replace_game_state (porté par l'état).
     await callTool(client, 'replace_game_state', { gameState: s })
     const after = await getState(client)
-    assert.equal(after.worldFacts.length, 1)
+    assert.equal(after.worldFacts.length, 0)
   })
 })
 
@@ -110,7 +112,8 @@ test('cast_spell utilitaire (clerc, création d\'eau) : emplacements épuisables
   await withCharacter({ CHARACTER_ID: 'cleric' }, async (client) => {
     // Sort utilitaire de niveau 1 : consomme un emplacement à chaque lancer.
     for (let i = 0; i < 3; i++) {
-      const r = await callTool(client, 'cast_spell', { spellId: 'create-water' })
+      const r = await callTool(client, 'cast_spell', { spellId: 'create-water',
+        waterEffect: { description: "De l'eau propre a mouillé le sol.", cell: { x: 4, y: 13 } } })
       assert.equal(r.isError, false, `create-water #${i + 1}`)
       assert.equal(r.data.effect, 'utility')
     }
@@ -119,7 +122,8 @@ test('cast_spell utilitaire (clerc, création d\'eau) : emplacements épuisables
     assert.ok(s.worldFacts.length >= 1, 'un fait de monde a été produit')
 
     // Plus d'emplacement → refus.
-    const exhausted = await callTool(client, 'cast_spell', { spellId: 'create-water' })
+    const exhausted = await callTool(client, 'cast_spell', { spellId: 'create-water',
+      waterEffect: { description: "De l'eau propre a mouillé le sol.", cell: { x: 4, y: 13 } } })
     assert.equal(exhausted.isError, true)
     assert.equal(exhausted.data.code, 'SPELL_SLOTS_EXHAUSTED')
 
@@ -174,7 +178,7 @@ test('roll_ability_check : maîtrise dérivée du personnage via skill (anti-tri
     // Barde : maîtrise en persuasion (CHA 16 → +3 ; maîtrise +2 ; total +5).
     // Les flags déclarés sont IGNORÉS quand skill est fourni : proficient=false
     // et expertise=true ne changent rien (le barde n'a pas d'expertise).
-    const r = await callTool(client, 'roll_ability_check', { ability: 'str', skill: 'persuasion', proficient: false, expertise: true, dc: 10 })
+    const r = await callTool(client, 'roll_ability_check', { ability: 'str', skill: 'persuasion', targetId: 'mac', proficient: false, expertise: true, dc: 10 })
     assert.equal(r.data.expertise, false)
     assert.equal(r.data.proficient, true)
     assert.equal(r.data.roll.modifier, 5)

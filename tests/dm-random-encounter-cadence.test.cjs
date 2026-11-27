@@ -1,0 +1,11 @@
+const test=require('node:test'),assert=require('node:assert/strict')
+Object.assign(process.env,{MONETIZATION_ENABLED:'false',LLM_MODE:'mock',ALLOW_PAID_LLM:'false',DM_RATE_LIMIT_PER_MINUTE:'0',APP_LOG_PERSIST_ENABLED:'false',APP_LOG_LEVEL:'error'})
+const{installPgMem}=require('./helpers/pg-mem.cjs'),pg=installPgMem()
+const{ok}=require('./helpers/mcp-toolkit.cjs'),{setupCadence,check,persistCadence}=require('./helpers/encounter-cadence-fixture.cjs'),{play,lastResult}=require('./helpers/dm-scripted-turn.cjs')
+test.after(()=>pg.restore())
+test('the POST agent explicitly adopts and advances to the actual future cadence boundary, then selects its source check without any manufactured call or player action',async t=>{
+ const f=await setupCadence(t,{adopt:false,dice:'18,19'}),before=await f.call('get_game_state'),input=check(f,'actual-api-cadence-check')
+ const{result,seen,selected}=await play(t,f.call,[{name:'configure_random_encounter_cadence',input:f.input},{name:'advance_time',input:{seconds:3600}},{name:'inspect_random_encounter_cadence',input:{}},{name:'check_random_encounter',input},p=>{assert.equal(lastResult(p).occurs,true);assert.deepEqual(lastResult(p).roll.rolls,[18]);return 'Le contrôle de cette échéance réelle est conservé. La proposition de rencontre attend un choix de table distinct du MJ.'}],'Adopte cette cadence et résous exactement son premier contrôle à l’heure choisie.')
+ assert.deepEqual(seen,selected);assert.equal(result.newGameState.worldTimeSeconds,before.worldTimeSeconds+3600);assert.deepEqual(result.newGameState.monsters,before.monsters);assert.deepEqual(result.newGameState.player.inventory,before.player.inventory);assert.deepEqual(result.newGameState.actionUsed,before.actionUsed)
+ const fresh=await persistCadence(t,f.call);assert.equal(ok(await fresh('check_random_encounter',input)).replayed,true);assert.equal(ok(await fresh('roll_dice',{notation:'1d20'})).total,19)
+})

@@ -1,0 +1,91 @@
+const assert=require('node:assert/strict'),test=require('node:test')
+Object.assign(process.env,{MONETIZATION_ENABLED:'false',LLM_MODE:'mock',ALLOW_PAID_LLM:'false',APP_LOG_PERSIST_ENABLED:'false'})
+const{installPgMem}=require('./helpers/pg-mem.cjs'),pg=installPgMem()
+const{saveSession,loadSession,deleteSession}=require('../lib/session-store.ts')
+const{engine,ok,adjacent,grid}=require('./helpers/mcp-toolkit.cjs')
+const{preparePhysicalPit}=require('./helpers/physical-pit-fixture.cjs')
+const{getMapSpec,inferRoomIdOnMap}=require('../mcp-server/dist/lib/adventure-map.js')
+test.after(()=>pg.restore())
+const get=call=>call('get_game_state')
+async function refused(call,name,input,code){const before=await get(call),answer=await call(name,input);assert.equal(answer.code,code,JSON.stringify(answer));assert.deepEqual(await get(call),before);return answer}
+async function sql(t,call,dice='19'){
+ const state=await get(call),id='physical-pit-'+process.pid+'-'+Math.random();t.after(()=>deleteSession(id))
+ await saveSession(id,{gameState:state,history:[],adventureId:state.adventureId,characterId:state.characterId})
+ const fresh=await engine(t,{characterId:state.characterId,dice});ok(await fresh('replace_game_state',{gameState:(await loadSession(id)).gameState}));assert.deepEqual(await get(fresh),state);return fresh
+}
+async function patient(call,id){
+ const state=await get(call),cell=adjacent(state)[0],npc=ok(await call('spawn_monster',{monsterType:'bandit',cell,name:'Témoin réel'}))
+ assert.equal(npc.hp.max,11);ok(await call('configure_npc_death_saves',{entityId:npc.id,eventId:id+'-life',reason:'Exception de sauvegardes de mort choisie explicitement avant la vraie blessure.'}))
+ ok(await call('create_magic_item',{itemId:id+'-potion',templateId:'potion_of_healing',name:'Fiole de soins réelle',description:'Fiole posée au sol pour son acquisition puis sa véritable administration au témoin.',cell:state.player.position}));ok(await call('pick_up_item',{itemId:id+'-potion'}))
+ return{npc,cell,potionId:id+'-potion'}
+}
+test('actual bear hit to zero retains immobilization through real potion/SQL until the actual STR15 release',async t=>{
+ let call=await engine(t,{dice:'20,6,6,2,2,19'});const{npc,cell,potionId}=await patient(call,'bear-ko')
+ ok(await call('create_trap',{trapId:'bear-ko',name:'Mâchoires du témoin',template:'bear',cell}))
+ ok(await call('interact_trap',{trapId:'bear-ko',action:'trigger',targetId:npc.id}));let state=await get(call)
+ assert.equal(state.monsters[npc.id].hp.current,0);assert.equal(state.monsters[npc.id].isAlive,true);assert.deepEqual(state.dmTools.traps['bear-ko'].victims,[npc.id])
+ assert(state.hero.effects.some(e=>e.kind==='bear-trap'&&e.targetIds.includes(npc.id)))
+ const potion=ok(await call('use_magic_item',{itemId:potionId,targetId:npc.id}));assert.equal(potion.healing,6)
+ assert.equal(ok(await call('roll_dice',{notation:'1d20'})).total,19);call=await sql(t,call,'20,19');state=await get(call)
+ const nav=grid(state,npc.id),goal=nav.neighbors(cell).find(c=>nav.step(cell,c));assert(goal)
+ await refused(call,'move_token',{tokenId:npc.id,toCell:goal},'ACTOR_IMMOBILE')
+ assert.equal(ok(await call('interact_trap',{trapId:'bear-ko',action:'free',actorId:'player',targetId:npc.id})).success,true)
+ assert.equal(ok(await call('move_token',{tokenId:npc.id,toCell:goal})).goalReached,true);assert.equal(ok(await call('roll_dice',{notation:'1d20'})).total,19)
+})
+test('actual needle failure poisons and paralyzes before its KO damage; real healing/SQL never cancels the original ten minutes',async t=>{
+ let call=await engine(t,{dice:'1,3,3,3,3,2,2,19'});const{npc,cell,potionId}=await patient(call,'needle-ko')
+ ok(await call('create_scene_object',{objectId:'needle-lock',name:'Serrure du témoin',description:'Contenant réellement fermé et verrouillé.',cell,kind:'container',material:'wood',size:'small',resilience:'resilient',locked:true,lockDc:15}))
+ ok(await call('create_trap',{trapId:'needle-ko',name:'Aiguille du témoin',template:'poison_needle',cell,objectId:'needle-lock'}))
+ ok(await call('interact_trap',{trapId:'needle-ko',action:'trigger',targetId:npc.id}));let state=await get(call)
+ assert.equal(state.monsters[npc.id].hp.current,0);for(const c of ['poisoned','paralyzed'])assert(state.monsters[npc.id].conditions.includes(c))
+ const expires=state.monsterEffects.find(e=>e.id==='trap:needle-ko:'+npc.id).expiresAt
+ ok(await call('use_magic_item',{itemId:potionId,targetId:npc.id}));assert.equal(ok(await call('roll_dice',{notation:'1d20'})).total,19);call=await sql(t,call)
+ state=await get(call);for(const c of ['poisoned','paralyzed'])assert(state.monsters[npc.id].conditions.includes(c))
+ const nav=grid(state,npc.id),goal=nav.neighbors(cell).find(c=>nav.step(cell,c));await refused(call,'move_token',{tokenId:npc.id,toCell:goal},'ACTOR_IMMOBILE')
+ ok(await call('advance_time',{seconds:expires-state.worldTimeSeconds-1}));assert((await get(call)).monsters[npc.id].conditions.includes('paralyzed'))
+ ok(await call('advance_time',{seconds:1}));state=await get(call);for(const c of ['poisoned','paralyzed'])assert(!state.monsters[npc.id].conditions.includes(c));assert.equal(ok(await call('roll_dice',{notation:'1d20'})).total,19)
+})
+test('an old armed pit refuses before its first die until its actual physical geometry is explicitly qualified',async t=>{
+ const call=await engine(t,{dice:'19'}),f=await preparePhysicalPit(call,{prefix:'qualified-pit',qualify:false})
+ await refused(call,'interact_trap',f.trigger,'PIT_GEOMETRY_REQUIRED');ok(await call('qualify_pit_geometry',f.qualification))
+ const after=await get(call);assert.equal(ok(await call('qualify_pit_geometry',f.qualification)).replayed,true);assert.deepEqual(await get(call),after)
+ assert.equal(ok(await call('roll_dice',{notation:'1d20'})).total,19)
+})
+test('failed pit save lands on the real lower floor, blocks XY ascent and survives SQL before a paid standard climb',async t=>{
+ let call=await engine(t,{dice:'1,1,19'});const f=await preparePhysicalPit(call)
+ const setup=await get(call),nav=grid(setup),spec=getMapSpec(setup.currentMapId,setup),far=Array.from({length:spec.grid.rows},(_,y)=>Array.from({length:spec.grid.cols},(_,x)=>({x,y}))).flat().find(c=>nav.free(c)&&Math.max(Math.abs(c.x-f.cell.x),Math.abs(c.y-f.cell.y))>=3&&inferRoomIdOnMap(c,setup.currentMapId,setup)===setup.currentRoomId)
+ assert(far,'Actual room needs a real distant combatant outside ascent opportunity range');const enemy=ok(await call('spawn_monster',{monsterType:'bandit',cell:far,name:'Témoin distant de la remontée'}))
+ const before=await get(call),fallen=ok(await call('interact_trap',f.trigger));assert.equal(fallen.save.success,false);assert.equal(fallen.depthFeet,10)
+ let state=await get(call);assert.equal(state.player.hp.current,before.player.hp.current-1);assert.equal(state.dmTools.jumping.supports.player.elevationFeet,-10)
+ await refused(call,'move_token',{tokenId:'player',toCell:f.safe},'VERTICAL_MOVEMENT_REQUIRED');call=await sql(t,call,'20,1,19')
+ state=await get(call);const removed=structuredClone(state);delete removed.dmTools.traps[f.trapId].pitGeometry
+ assert.equal((await call('replace_game_state',{gameState:removed})).code,'PIT_STATE_MISMATCH');assert.deepEqual(await get(call),state)
+ ok(await call('enter_combat',{combatants:['player',enemy.id]}));assert.equal((await get(call)).currentTurn,'player')
+ ok(await call('combat_action',{action:'stand_up'}));ok(await call('combat_action',{action:'dash'}))
+ const current=await get(call),held=current.dmTools.loadout?.mainHandId??current.player.inventory.find(item=>item.type==='weapon')?.id
+ if(held)ok(await call('equip_item',{itemId:held,slot:'main_hand',operation:'unequip'}))
+ const climbed=ok(await call('move_by_climbing_or_swimming',f.climb));assert.equal(climbed.costFeet,30);assert.equal(climbed.goalReached,true)
+ state=await get(call);assert.deepEqual(state.player.position,f.safe);assert.equal(state.dmTools.jumping.supports.player.elevationFeet,0);assert.equal(state.movementUsed.player,9);assert.equal(state.hero.actionCredits,0)
+ await refused(call,'move_token',{tokenId:'player',toCell:f.cell},'VERTICAL_MOVEMENT_REQUIRED')
+ assert.equal(ok(await call('roll_dice',{notation:'1d20'})).total,19);await sql(t,call)
+})
+test('successful pit save uses only the explicitly chosen safe step, no falling die or voluntary movement credit',async t=>{
+ const call=await engine(t,{dice:'20,19'}),f=await preparePhysicalPit(call,{prefix:'safe-pit'}),before=await get(call)
+ await refused(call,'interact_trap',{trapId:f.trapId,action:'trigger',targetId:'player'},'PIT_SUCCESS_DESTINATION_REQUIRED')
+ const answer=ok(await call('interact_trap',f.trigger)),after=await get(call)
+ assert.equal(answer.save.success,true);assert.equal(answer.damageRoll,undefined);assert.equal(after.player.hp.current,before.player.hp.current)
+ assert.deepEqual(after.player.position,f.safe);assert.deepEqual(after.movementUsed,before.movementUsed)
+ assert.deepEqual(after.actionUsed,before.actionUsed);assert.equal(after.dmTools.traps[f.trapId].pitGeometry.open,true)
+ assert.equal(ok(await call('roll_dice',{notation:'1d20'})).total,19);await sql(t,call)
+})
+
+test('an actual petrified victim falls to the lower support but a one-point resisted impact adds no prone condition',async t=>{
+ const call=await engine(t,{dice:'1,19'}),f=await preparePhysicalPit(call,{prefix:'resisted-pit'})
+ ok(await call('apply_condition',{entityId:'player',condition:'petrified'}));const before=await get(call)
+ const result=ok(await call('interact_trap',f.trigger)),after=await get(call)
+ assert.equal(result.save.success,false);assert.equal(result.save.roll.notation,'automatic-failure')
+ assert.equal(result.damageRoll.total,1);assert.equal(result.damageResolution.damageDealt,0)
+ assert.equal(after.player.hp.current,before.player.hp.current);assert.equal(after.player.conditions.includes('prone'),false)
+ assert.equal(after.dmTools.jumping.supports.player.elevationFeet,-10)
+ assert.equal(ok(await call('roll_dice',{notation:'1d20'})).total,19);await sql(t,call)
+})

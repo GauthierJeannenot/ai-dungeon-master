@@ -11,8 +11,8 @@ import CharacterSheet from '@/components/CharacterSheet'
 // paramètre reste valide côté page de jeu). Le survol d'une classe affiche un
 // aperçu détaillé (popover) de sa fiche ; au tactile (pas de hover), le clic
 // fait office de toggle. Voir docs/playable-characters.md.
-export default function CharacterPicker({ playPath }: { playPath: string }) {
-  const characters = listCharacters()
+export default function CharacterPicker({ playPath, level }: { playPath: string; level?: number }) {
+  const characters = listCharacters(level)
   const [selected, setSelected] = useState<string>(DEFAULT_CHARACTER_ID)
   // Aperçu affiché : la fiche du personnage survolé/sélectionné (indépendant
   // de la sélection courante). null = aucun aperçu → pas de popover.
@@ -95,7 +95,7 @@ export default function CharacterPicker({ playPath }: { playPath: string }) {
                   <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
                 </svg>
               </button>
-              <CharacterSheet data={characterSheetFromTemplate(previewChar)} variant="compact" />
+              <CharacterSheet data={characterSheetFromTemplate(previewChar, level)} variant="compact" />
             </div>
           </div>
         )}

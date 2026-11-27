@@ -1,0 +1,42 @@
+const test=require('node:test'),assert=require('node:assert/strict')
+Object.assign(process.env,{MONETIZATION_ENABLED:'false',LLM_MODE:'mock',ALLOW_PAID_LLM:'false'})
+const{installPgMem}=require('./helpers/pg-mem.cjs'),pg=installPgMem()
+const{saveSession,loadSession,deleteSession}=require('../lib/session-store.ts')
+const{engine,ok}=require('./helpers/mcp-toolkit.cjs')
+const{setupWardChase,freeDice,refused}=require('./helpers/chase-death-ward-fixture.cjs')
+const legacy=require('./fixtures/chase-ward-r7-public.json')
+test.after(()=>pg.restore())
+async function sql(t,state,label){const id=`ward-chase-${label}-${process.pid}-${Math.random()}`;t.after(()=>deleteSession(id));await saveSession(id,{gameState:state,history:[],adventureId:state.adventureId,characterId:state.characterId});return(await loadSession(id)).gameState}
+
+test('actual Cleric Death Ward admits the first excess Dash, refuses the second before its action/dice, and resolves the first original CON',async t=>{
+ const f=await setupWardChase(t,{dice:freeDice([1,2,11,19])}),before=await f.call('get_game_state')
+ assert.equal(before.hero.actionCredits,1)
+ await refused(f.call,'chase_dash',f.second)
+ const done=ok(await f.call('resolve_chase_turn',{eventId:'ward-admitted-original-con',chaseId:f.chaseId}))
+ assert.equal(done.checks.length,1);assert.equal(done.checks[0].ability,'con');assert.equal(done.checks[0].success,false);assert.equal(done.checks[0].roll.rolls[0],1);assert.match(done.checks[0].roll.detail,/DIS/)
+ const after=await f.call('get_game_state');assert.equal(after.dmTools.exhaustion.creatures.player.level,5);assert.equal(after.dmTools.chases.fatigue.player.levels,1);assert.ok(after.hero.effects.some(e=>e.kind==='death-ward'))
+ assert.equal(ok(await f.call('roll_dice',{notation:'1d20'})).total,19)
+})
+
+test('actual publicly captured R7 two-CON debt and reserved PHB Inspiration survive SQL; repeated refusal precedes dice, then a distinct real MJ source reduction permits the original debt',async t=>{
+ assert.equal(legacy.provenance.compiledFiles,1651);assert.equal(legacy.provenance.mechanicalStateInvented,false)
+ const captured=structuredClone(legacy.gameState),call=await engine(t,{characterId:'cleric',dice:'7,1,3,4,11,19'})
+ ok(await call('replace_game_state',{gameState:await sql(t,captured,'actual-r7-original')}));assert.deepEqual(await call('get_game_state'),captured)
+ ok(await call('grant_inspiration',{eventId:'actual-postcapture-mj-inspiration',reason:'Explicit real PHB2014 Inspiration award after restoration, before any check is rolled.'}))
+ ok(await call('spend_inspiration',{spendId:'actual-postcapture-reserved-check',rollKind:'check'}))
+ const before=await call('get_game_state'),next=await engine(t,{characterId:'cleric',dice:'7,1,3,4,11,19'})
+ ok(await next('replace_game_state',{gameState:await sql(t,before,'actual-token-and-original-debt')}));assert.deepEqual(await next('get_game_state'),before)
+ await refused(next,'resolve_chase_turn',legacy.resolveInput);await refused(next,'resolve_chase_turn',legacy.resolveInput)
+ assert.equal(ok(await next('roll_dice',{notation:'1d20'})).total,7)
+ ok(await next('remove_exhaustion',{eventId:'actual-distinct-mj-other-source-reduction',targetId:'player',levels:1,removalSource:'other',reason:'Explicit exceptional MJ ruling removes one actual OTHER exhaustion source; no rest, healing, original Dash, Ward decision or free recovery is inferred.'}))
+ const done=ok(await next('resolve_chase_turn',legacy.resolveInput));assert.equal(done.checks.length,2);assert.ok(done.checks.every(c=>c.success===false));assert.equal(done.checks[0].roll.rolls[0],1);assert.equal(done.checks[1].roll.rolls[0],3);assert.equal(done.tableRoll.total,11)
+ const after=await next('get_game_state');assert.equal(after.dmTools.exhaustion.creatures.player.level,5);assert.equal(after.dmTools.chases.fatigue.player.levels,2);assert.ok(after.hero.effects.some(e=>e.kind==='death-ward'));assert.equal(after.dmTools.dmInspiration.spends['actual-postcapture-reserved-check'].status,'consumed')
+ assert.equal(ok(await next('resolve_chase_turn',legacy.resolveInput)).replayed,true);assert.deepEqual(await next('get_game_state'),after);assert.equal(ok(await next('roll_dice',{notation:'1d20'})).total,19)
+})
+
+test('a distinct real MJ exhaustion increase that would make two owed CON checks lethal under actual Ward refuses before source cost or dice',async t=>{
+ const f=await setupWardChase(t,{level:3,dice:freeDice([1,2,3,4,11,19])});ok(await f.call('chase_dash',f.second))
+ await refused(f.call,'add_exhaustion',{eventId:'cannot-strand-actual-source-debt',targetId:'player',levels:1,reason:'Explicit exceptional requested other-source exhaustion increase; it must not make the already acquired Ward interaction unrepresentable.'})
+ const done=ok(await f.call('resolve_chase_turn',{eventId:'ward-safe-original-two-con',chaseId:f.chaseId}));assert.equal(done.checks.length,2);assert.ok(done.checks.every(c=>c.success===false));assert.equal(done.checks[0].roll.rolls[0],1);assert.equal(done.checks[1].roll.rolls[0],3);assert.equal(done.tableRoll.total,11)
+ const after=await f.call('get_game_state');assert.equal(after.dmTools.exhaustion.creatures.player.level,5);assert.equal(after.dmTools.chases.fatigue.player.levels,2);assert.ok(after.hero.effects.some(e=>e.kind==='death-ward'));assert.equal(ok(await f.call('roll_dice',{notation:'1d20'})).total,19)
+})

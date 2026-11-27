@@ -1,0 +1,384 @@
+{
+  "chapter": "Sarah of Yellowcrest Manor",
+  "chapterUrl": "https://2014.5e.tools/adventure.html#cm,9",
+  "revision": "v1.221.2",
+  "rights": "Illustrations et tokens des publications D&D de Wizards of the Coast. Disponibilité sur 5e.tools ne vaut pas licence libre ; crédits conservés selon les données source.",
+  "sources": [
+    {
+      "file": "adventure/adventure-cm.json",
+      "sha256": "eee270953f4588f0af8c8be0b63937e3738f0a02770b6cb47320e03b1078885c",
+      "url": "https://raw.githubusercontent.com/5etools-mirror-3/5etools-2014-src/v1.221.2/data/adventure/adventure-cm.json"
+    },
+    {
+      "file": "bestiary/bestiary-mm.json",
+      "sha256": "2cf9cf4101ee6b7094049916ec8caa0377946ab48cf129da45d5c9b84dc368ac",
+      "url": "https://raw.githubusercontent.com/5etools-mirror-3/5etools-2014-src/v1.221.2/data/bestiary/bestiary-mm.json"
+    },
+    {
+      "file": "bestiary/fluff-bestiary-mm.json",
+      "sha256": "884d593b71a2fd2021a10a1a175e5e61c32b52d675c96f7f79e16e9dbde1645f",
+      "url": "https://raw.githubusercontent.com/5etools-mirror-3/5etools-2014-src/v1.221.2/data/bestiary/fluff-bestiary-mm.json"
+    },
+    {
+      "file": "bestiary/bestiary-cm.json",
+      "sha256": "a89273e0ead6e1d7ebe7418ffda848e2b94af77f31735659c1fb92da18e09721",
+      "url": "https://raw.githubusercontent.com/5etools-mirror-3/5etools-2014-src/v1.221.2/data/bestiary/bestiary-cm.json"
+    },
+    {
+      "file": "bestiary/fluff-bestiary-cm.json",
+      "sha256": "0b4b6c489ca0e509f5367528e2f78c2ab937ea314648aaf2dc544c2df92caeea",
+      "url": "https://raw.githubusercontent.com/5etools-mirror-3/5etools-2014-src/v1.221.2/data/bestiary/fluff-bestiary-cm.json"
+    }
+  ],
+  "assets": [
+    {
+      "title": "Sarah of Yellowcrest Manor",
+      "category": "illustration",
+      "credit": "Irina Nordsol",
+      "url": "https://5e.tools/img/adventure/CM/067-09-001.book.webp",
+      "localPath": "/adventures/sarah-of-yellowcrest-manor/5etools/chapter/067-09-001.book.webp",
+      "width": 850,
+      "height": 906,
+      "bytes": 58320,
+      "sha256": "2f1c277c8984c7f4cfa00a59401797b8e353c51a68e4da1776302785ebbb62c9"
+    },
+    {
+      "title": "Sarah's Ghost",
+      "category": "illustration",
+      "credit": "Katerina Ladon",
+      "url": "https://5e.tools/img/adventure/CM/068-09-002.sarahs-ghost.webp",
+      "localPath": "/adventures/sarah-of-yellowcrest-manor/5etools/chapter/068-09-002.sarahs-ghost.webp",
+      "width": 850,
+      "height": 1320,
+      "bytes": 184242,
+      "sha256": "a132e24b282f6d617af5c3c5bd831adc2bee9c0682264e6050e6177cb7b05cee"
+    },
+    {
+      "title": "Faerl",
+      "category": "illustration",
+      "credit": "Nikki Dawes",
+      "url": "https://5e.tools/img/adventure/CM/069-09-003.faerl.webp",
+      "localPath": "/adventures/sarah-of-yellowcrest-manor/5etools/chapter/069-09-003.faerl.webp",
+      "width": 850,
+      "height": 982,
+      "bytes": 143280,
+      "sha256": "b55dae5858686e9d81352cfef99a8493474e502ed4953bb26995539c27f3913b"
+    },
+    {
+      "title": "Sir Vecken",
+      "category": "illustration",
+      "credit": "Nikki Dawes",
+      "url": "https://5e.tools/img/adventure/CM/070-09-004.Sir-vecken.webp",
+      "localPath": "/adventures/sarah-of-yellowcrest-manor/5etools/chapter/070-09-004.Sir-vecken.webp",
+      "width": 850,
+      "height": 813,
+      "bytes": 111396,
+      "sha256": "1a19b6f148e729ea12906dad1806791420a332e0931943acf8cbf3a1ca2199fc"
+    },
+    {
+      "title": "Map 9.1: Greenfast",
+      "category": "map",
+      "credit": "Sean MacDonald",
+      "url": "https://5e.tools/img/adventure/CM/071-map-9.01-greenfast.webp",
+      "localPath": "/adventures/sarah-of-yellowcrest-manor/5etools/chapter/071-map-9.01-greenfast.webp",
+      "width": 3000,
+      "height": 2134,
+      "bytes": 809426,
+      "sha256": "97707e243d7fb4a4025ad66208b25c3e1993446bbeccee7b35ba05a2c2e11b50"
+    },
+    {
+      "title": "Map 9.1: Greenfast — miniature",
+      "category": "thumbnail",
+      "credit": "Sean MacDonald",
+      "url": "https://5e.tools/img/adventure/CM/thumbnail/071-map-9.01-greenfast.webp",
+      "localPath": "/adventures/sarah-of-yellowcrest-manor/5etools/thumbnails/071-map-9.01-greenfast.webp",
+      "width": 320,
+      "height": 320,
+      "bytes": 20010,
+      "sha256": "7572cf9c308c638a4d8bd6aaca9fe42dd9293c1a4393f10749e119e4af149b5b"
+    },
+    {
+      "title": "Player Version",
+      "category": "mapPlayer",
+      "credit": "Sean MacDonald",
+      "url": "https://5e.tools/img/adventure/CM/072-map-9.01-greenfast-player.webp",
+      "localPath": "/adventures/sarah-of-yellowcrest-manor/5etools/chapter/072-map-9.01-greenfast-player.webp",
+      "width": 3000,
+      "height": 2134,
+      "bytes": 801146,
+      "sha256": "68a2525594dfc1482e3bbd80cdf6b6ca81720536279634803c477df7f1eb9527"
+    },
+    {
+      "title": "Map 9.2: Temple of the Burnt Tongue Cult",
+      "category": "map",
+      "credit": "Sean MacDonald",
+      "url": "https://5e.tools/img/adventure/CM/073-map-9.02-temple-of-the-burnt-tongue-cult.webp",
+      "localPath": "/adventures/sarah-of-yellowcrest-manor/5etools/chapter/073-map-9.02-temple-of-the-burnt-tongue-cult.webp",
+      "width": 2199,
+      "height": 3000,
+      "bytes": 593154,
+      "sha256": "0673f0f0973bb6ac648960b335294d6760e9b8b6255fe60bf0616353bb62786f"
+    },
+    {
+      "title": "Map 9.2: Temple of the Burnt Tongue Cult — miniature",
+      "category": "thumbnail",
+      "credit": "Sean MacDonald",
+      "url": "https://5e.tools/img/adventure/CM/thumbnail/073-map-9.02-temple-of-the-burnt-tongue-cult.webp",
+      "localPath": "/adventures/sarah-of-yellowcrest-manor/5etools/thumbnails/073-map-9.02-temple-of-the-burnt-tongue-cult.webp",
+      "width": 320,
+      "height": 320,
+      "bytes": 12330,
+      "sha256": "282662afb335ea2d9fd378525abf4f9b74ba1486d58e6b94ce31677c942393d2"
+    },
+    {
+      "title": "Player Version",
+      "category": "mapPlayer",
+      "credit": "Sean MacDonald",
+      "url": "https://5e.tools/img/adventure/CM/074-map-9.02-temple-of-the-burnt-tongue-cult-player.webp",
+      "localPath": "/adventures/sarah-of-yellowcrest-manor/5etools/chapter/074-map-9.02-temple-of-the-burnt-tongue-cult-player.webp",
+      "width": 2199,
+      "height": 3000,
+      "bytes": 580518,
+      "sha256": "496cadb6b4abbd9a1b7976c06e9c38df998a35f16d9c0cb8c4f91540ff802129"
+    },
+    {
+      "title": "Viallis Yellowcrest",
+      "category": "illustration",
+      "credit": "Nikki Dawes",
+      "url": "https://5e.tools/img/adventure/CM/075-09-005.Viallis-yellowcrest.webp",
+      "localPath": "/adventures/sarah-of-yellowcrest-manor/5etools/chapter/075-09-005.Viallis-yellowcrest.webp",
+      "width": 850,
+      "height": 980,
+      "bytes": 92086,
+      "sha256": "12fc9288732bc554ce895d4f5eeaf57ddd9608593e032a4e8bc7a9f277ca88b1"
+    },
+    {
+      "title": "Commoner",
+      "category": "token",
+      "credit": "Non indiqué dans les données source",
+      "profile": "Commoner|MM",
+      "url": "https://5e.tools/img/bestiary/tokens/MM/Commoner.webp",
+      "localPath": "/adventures/sarah-of-yellowcrest-manor/5etools/tokens/commoner.webp",
+      "width": 280,
+      "height": 280,
+      "bytes": 75492,
+      "sha256": "8c124f23e87f5a84e261444e2497cb8ea503470f47d87d4f0e719c2122a4ac06"
+    },
+    {
+      "title": "Cult Fanatic",
+      "category": "token",
+      "credit": "Non indiqué dans les données source",
+      "profile": "Cult Fanatic|MM",
+      "url": "https://5e.tools/img/bestiary/tokens/MM/Cult%20Fanatic.webp",
+      "localPath": "/adventures/sarah-of-yellowcrest-manor/5etools/tokens/cult-fanatic.webp",
+      "width": 280,
+      "height": 280,
+      "bytes": 87274,
+      "sha256": "905893cd90f7c8d29077062a205e15677770fb1072205d417ae05eb7cb594fed"
+    },
+    {
+      "title": "Cult Fanatic",
+      "category": "bestiary",
+      "credit": "Non indiqué dans les données source",
+      "profile": "Cult Fanatic|MM",
+      "url": "https://5e.tools/img/bestiary/MM/Cult%20Fanatic.webp",
+      "localPath": "/adventures/sarah-of-yellowcrest-manor/5etools/bestiary/Cult Fanatic.webp",
+      "width": 800,
+      "height": 1000,
+      "bytes": 74476,
+      "sha256": "b31e3372b373d7c59e966794be789593b351976857711dee579cfc384794e58c"
+    },
+    {
+      "title": "Cultist",
+      "category": "token",
+      "credit": "Non indiqué dans les données source",
+      "profile": "Cultist|MM",
+      "url": "https://5e.tools/img/bestiary/tokens/MM/Cultist.webp",
+      "localPath": "/adventures/sarah-of-yellowcrest-manor/5etools/tokens/cultist.webp",
+      "width": 280,
+      "height": 280,
+      "bytes": 90406,
+      "sha256": "84de434dfaa6b7537f4ad14b82ae40762696444aca6c5912c4ba30c69f1663f1"
+    },
+    {
+      "title": "Cultist",
+      "category": "bestiary",
+      "credit": "Non indiqué dans les données source",
+      "profile": "Cultist|MM",
+      "url": "https://5e.tools/img/bestiary/MM/Cultist.webp",
+      "localPath": "/adventures/sarah-of-yellowcrest-manor/5etools/bestiary/Cultist.webp",
+      "width": 618,
+      "height": 1000,
+      "bytes": 85414,
+      "sha256": "88a64651c11e74c20574b3300a42945479d8edc89de4739dc944664f0c4b3737"
+    },
+    {
+      "title": "Ghost",
+      "category": "token",
+      "credit": "Non indiqué dans les données source",
+      "profile": "Ghost|MM",
+      "url": "https://5e.tools/img/bestiary/tokens/MM/Ghost.webp",
+      "localPath": "/adventures/sarah-of-yellowcrest-manor/5etools/tokens/ghost.webp",
+      "width": 280,
+      "height": 280,
+      "bytes": 83150,
+      "sha256": "f82bec3ec6c5b858174eb94997a049159c1492b7222710f5f6fe18c44bd5704f"
+    },
+    {
+      "title": "Ghost",
+      "category": "bestiary",
+      "credit": "Non indiqué dans les données source",
+      "profile": "Ghost|MM",
+      "url": "https://5e.tools/img/bestiary/MM/Ghost.webp",
+      "localPath": "/adventures/sarah-of-yellowcrest-manor/5etools/bestiary/Ghost.webp",
+      "width": 586,
+      "height": 1000,
+      "bytes": 64564,
+      "sha256": "18fbc9053b72c6c94bdd94a9d08bfeb4b95f2a5a916a06151b875a0d7b835e3d"
+    },
+    {
+      "title": "Grell",
+      "category": "token",
+      "credit": "Non indiqué dans les données source",
+      "profile": "Grell|MM",
+      "url": "https://5e.tools/img/bestiary/tokens/MM/Grell.webp",
+      "localPath": "/adventures/sarah-of-yellowcrest-manor/5etools/tokens/grell.webp",
+      "width": 280,
+      "height": 280,
+      "bytes": 85928,
+      "sha256": "0eb8a25f066a1dc73731a258fc80e7eebe683831f68affddb62b105e60b39121"
+    },
+    {
+      "title": "Grell",
+      "category": "bestiary",
+      "credit": "Daniel Landerman",
+      "profile": "Grell|MM",
+      "url": "https://5e.tools/img/bestiary/MM/Grell.webp",
+      "localPath": "/adventures/sarah-of-yellowcrest-manor/5etools/bestiary/Grell.webp",
+      "width": 559,
+      "height": 1000,
+      "bytes": 99638,
+      "sha256": "dc635325b52f98213106961b1a78bb2c1accec8f45629953c7142ba1dc6a26ac"
+    },
+    {
+      "title": "Grick",
+      "category": "token",
+      "credit": "Non indiqué dans les données source",
+      "profile": "Grick|MM",
+      "url": "https://5e.tools/img/bestiary/tokens/MM/Grick.webp",
+      "localPath": "/adventures/sarah-of-yellowcrest-manor/5etools/tokens/grick.webp",
+      "width": 280,
+      "height": 280,
+      "bytes": 98264,
+      "sha256": "0a43a63f8f805036e78624044945c6e6fb8c968af2f50f0a1790428dfd060c4f"
+    },
+    {
+      "title": "Grick",
+      "category": "bestiary",
+      "credit": "Non indiqué dans les données source",
+      "profile": "Grick|MM",
+      "url": "https://5e.tools/img/bestiary/MM/Grick.webp",
+      "localPath": "/adventures/sarah-of-yellowcrest-manor/5etools/bestiary/Grick.webp",
+      "width": 680,
+      "height": 1000,
+      "bytes": 97754,
+      "sha256": "0f418a8bd4f2b9e27ab6d900e5478a44b9cfe936488d6720ab541aff48493e3d"
+    },
+    {
+      "title": "Knight",
+      "category": "token",
+      "credit": "Non indiqué dans les données source",
+      "profile": "Knight|MM",
+      "url": "https://5e.tools/img/bestiary/tokens/MM/Knight.webp",
+      "localPath": "/adventures/sarah-of-yellowcrest-manor/5etools/tokens/knight.webp",
+      "width": 280,
+      "height": 280,
+      "bytes": 104004,
+      "sha256": "a0832da747ad4129490637ce087e15d526e047b15d8d8b89a2536ebc14ea04e2"
+    },
+    {
+      "title": "Mage",
+      "category": "token",
+      "credit": "Non indiqué dans les données source",
+      "profile": "Mage|MM",
+      "url": "https://5e.tools/img/bestiary/tokens/MM/Mage.webp",
+      "localPath": "/adventures/sarah-of-yellowcrest-manor/5etools/tokens/mage.webp",
+      "width": 280,
+      "height": 280,
+      "bytes": 98526,
+      "sha256": "515d0f9f4904770d22bdef9d4be32d7640873f2ac7a06dc5781a814cd6ef56da"
+    },
+    {
+      "title": "Noble",
+      "category": "token",
+      "credit": "Non indiqué dans les données source",
+      "profile": "Noble|MM",
+      "url": "https://5e.tools/img/bestiary/tokens/MM/Noble.webp",
+      "localPath": "/adventures/sarah-of-yellowcrest-manor/5etools/tokens/noble.webp",
+      "width": 280,
+      "height": 280,
+      "bytes": 88550,
+      "sha256": "8a3e06dd96e01e68c3602bfff302a8e5779a405cb6f0357efbbbc18267e3f875"
+    },
+    {
+      "title": "Noble",
+      "category": "bestiary",
+      "credit": "Daniel Landerman",
+      "profile": "Noble|MM",
+      "url": "https://5e.tools/img/bestiary/MM/Noble.webp",
+      "localPath": "/adventures/sarah-of-yellowcrest-manor/5etools/bestiary/Noble.webp",
+      "width": 605,
+      "height": 756,
+      "bytes": 132688,
+      "sha256": "dbef3a3ea8bd305b97152389b2b7e876dfd8c3e90c44bea8cacd760cd9b7ae51"
+    },
+    {
+      "title": "Thug",
+      "category": "token",
+      "credit": "Non indiqué dans les données source",
+      "profile": "Thug|MM",
+      "url": "https://5e.tools/img/bestiary/tokens/MM/Thug.webp",
+      "localPath": "/adventures/sarah-of-yellowcrest-manor/5etools/tokens/thug.webp",
+      "width": 280,
+      "height": 280,
+      "bytes": 89996,
+      "sha256": "83b6e5fbc69ba092389f85657f8fe8bf4c67d1abebcd9ffdbe53b5194a4adf99"
+    },
+    {
+      "title": "Thug",
+      "category": "bestiary",
+      "credit": "Non indiqué dans les données source",
+      "profile": "Thug|MM",
+      "url": "https://5e.tools/img/bestiary/MM/Thug.webp",
+      "localPath": "/adventures/sarah-of-yellowcrest-manor/5etools/bestiary/Thug.webp",
+      "width": 608,
+      "height": 1000,
+      "bytes": 69708,
+      "sha256": "99e066e16b05e732c209c9286e1f0dee6773b1a893069437614d9f5a70961013"
+    },
+    {
+      "title": "Faerl",
+      "category": "token",
+      "credit": "Non indiqué dans les données source",
+      "profile": "Faerl|CM",
+      "url": "https://5e.tools/img/bestiary/tokens/CM/Faerl.webp",
+      "localPath": "/adventures/sarah-of-yellowcrest-manor/5etools/tokens/faerl.webp",
+      "width": 280,
+      "height": 280,
+      "bytes": 88986,
+      "sha256": "5503957da073c2c542fa6318ac7c339608c78fd5e06a6b28191e98c11dcea012"
+    },
+    {
+      "title": "Faerl",
+      "category": "bestiary",
+      "credit": "Nikki Dawes",
+      "profile": "Faerl|CM",
+      "url": "https://5e.tools/img/bestiary/CM/Faerl.webp",
+      "localPath": "/adventures/sarah-of-yellowcrest-manor/5etools/bestiary/Faerl.webp",
+      "width": 865,
+      "height": 1000,
+      "bytes": 152442,
+      "sha256": "c4c180eeef23a106885a3230d5e77ee6cbcd56e00a01049d9539751a95bf58a0"
+    }
+  ]
+}

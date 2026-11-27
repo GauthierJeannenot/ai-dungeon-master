@@ -1,7 +1,9 @@
 import type { Condition, EntityStats, Item, PlayerState } from './types'
-import type { CharacterTemplate } from './character-registry'
+import { buildPlayerState, type CharacterTemplate } from './character-registry'
 import { getSkill } from './srd/skills'
 import { getSpell } from './srd/spells'
+import { CLASS_FEATURE_LABELS,SUBCLASS_LABELS } from './srd/class-features'
+import { heroArmorClass, type HeroState } from './hero-state'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Modèle de vue d'une fiche de personnage, PARTAGÉ landing + jeu. Normalise les
@@ -25,13 +27,19 @@ const ABILITY_ORDER: Array<keyof EntityStats> = ['str', 'dex', 'con', 'int', 'wi
 
 // Libellés FR des capacités de classe (ClassFeatureId). Défaut = l'id brut.
 const FEATURE_LABELS: Record<string, string> = {
+  ...CLASS_FEATURE_LABELS,
   second_wind: 'Second souffle',
   spellcasting: 'Incantation',
+  extra_attack: 'Attaque supplémentaire',
+  action_surge: 'Sursaut',
+  jack_of_all_trades: 'Touche-à-tout',
 }
 
 // Libellés FR des ressources rechargeables (clés de PlayerState.resources).
 const RESOURCE_LABELS: Record<string, string> = {
+  bardic_inspiration:'Inspiration bardique (d8)',channel_divinity:'Canalisation divine',
   second_wind: 'Second souffle',
+  action_surge: 'Sursaut',
 }
 
 // Libellés FR des conditions (miroir lisible de Condition).
@@ -75,6 +83,8 @@ export interface SkillView {
 }
 
 export interface CharacterSheetData {
+  hitDice?: {current:number;max:number;die:number}
+  concentration?:string
   name: string
   className: string
   level: number | null            // connu en jeu ; null pour l'aperçu landing
@@ -93,6 +103,7 @@ export interface CharacterSheetData {
     spells: string[]             // libellés FR (niveau 1)
     // current null = aperçu landing (on n'affiche que le nombre d'emplacements).
     slots: { current: number | null; max: number } | null
+    levels?: Array<{ level: number; spells: string[]; slots: { current: number | null; max: number } }>
   }
   resources: Array<{ label: string; current: number; max: number }>
   conditions: string[]            // libellés FR
@@ -124,7 +135,14 @@ function featureLabel(id: string): string {
 
 // Aperçu landing : fiche « à froid » depuis le catalogue. Pas d'état live — on
 // montre les PV de base (niveau 1) et le nombre d'emplacements de sort.
-export function characterSheetFromTemplate(tpl: CharacterTemplate): CharacterSheetData {
+export function characterSheetFromTemplate(tpl: CharacterTemplate, level?: number): CharacterSheetData {
+  if (level !== undefined) {
+    const view = characterSheetFromPlayerState(buildPlayerState({ characterId: tpl.id, level, position: { x: 0, y: 0 } }))
+    view.hp.current = null
+    if (view.spellcasting?.slots) view.spellcasting.slots.current = null
+    for (const group of view.spellcasting?.levels ?? []) group.slots.current = null
+    return view
+  }
   const expertise = tpl.expertise ?? []
   return {
     name: tpl.name,
@@ -158,7 +176,7 @@ export function characterSheetFromTemplate(tpl: CharacterTemplate): CharacterShe
 
 // Fiche en jeu : état live autoritaire (PV courants, emplacements restants,
 // ressources, conditions, niveau réel).
-export function characterSheetFromPlayerState(player: PlayerState): CharacterSheetData {
+export function characterSheetFromPlayerState(player: PlayerState,hero?:HeroState,worldTimeSeconds=0): CharacterSheetData {
   const expertise = player.expertise ?? []
 
   // knownSpells mélange tours de magie (niveau 0) et sorts de niveau 1 : on
@@ -180,21 +198,26 @@ export function characterSheetFromPlayerState(player: PlayerState): CharacterShe
         slots: player.spellSlots
           ? { current: player.spellSlots.level1.current, max: player.spellSlots.level1.max }
           : null,
+        levels: Object.entries(player.spellSlots ?? {}).map(([key, pool]) => ({
+          level: Number(key.slice(5)), slots: { current: pool.current, max: pool.max },
+          spells: (player.knownSpells ?? []).filter(id => getSpell(id)?.level === Number(key.slice(5))).map(spellLabel),
+        })),
       }
     : undefined
 
   const resources = Object.entries(player.resources ?? {}).map(([key, res]) => ({
-    label: RESOURCE_LABELS[key] ?? key,
+    label: key === 'bardic_inspiration' && player.level < 5 ? 'Inspiration bardique (d6)' : RESOURCE_LABELS[key] ?? key,
     current: res.current,
     max: res.max,
   }))
 
   return {
+    ...(hero?{hitDice:hero.hitDice,concentration:(()=>{const id=hero.effects.find(e=>e.id===hero.concentrationId)?.kind.replace('concentration:','');return id?spellLabel(id):undefined})()}:{}),
     name: player.name,
-    className: player.class,
+    className: player.subclassId?`${player.class} · ${SUBCLASS_LABELS[player.subclassId]}`:player.class,
     level: player.level,
     abilities: buildAbilities(player.stats),
-    ac: player.ac,
+    ac: heroArmorClass(player,hero,worldTimeSeconds),
     speed: player.speed,
     proficiencyBonus: player.proficiencyBonus,
     hp: { current: player.hp.current, max: player.hp.max },
@@ -205,7 +228,8 @@ export function characterSheetFromPlayerState(player: PlayerState): CharacterShe
     skills: (player.skillProficiencies ?? [])
       .map(id => skillView(id, expertise))
       .filter((s): s is SkillView => s !== null),
-    features: (player.features ?? []).map(featureLabel),
+    features: (player.features ?? []).map(id => id === 'bardic_inspiration' && player.level < 5 ? 'Inspiration bardique (d6)'
+      : id === 'channel_divinity' && player.level < 6 ? 'Canalisation divine (1)' : featureLabel(id)),
     spellcasting,
     resources,
     conditions: player.conditions.map(c => CONDITION_LABELS[c] ?? c),

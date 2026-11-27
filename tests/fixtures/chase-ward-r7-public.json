@@ -1,0 +1,4822 @@
+{
+  "provenance": {
+    "capture": "Actual unmodified get_game_state from R7 public MCP + faithfully synchronized app context; all spells, exhaustion sources, initiative and Dash/grant actions were real.",
+    "sourcePath": "output/mcp-w24-chase-ward-probe-20261105/r2-before-original-con-chain.json",
+    "originalCapturedBytesSha256": "78fc506be25eabae32936b0cc95a100eed06be6c8898a093534be26428a833c4",
+    "probeEvidenceIndexSha256": "5e58b7d3c8c64dde024c7d765d4b94d6d3b0ac6ca8b22eac3d8a424f1de8d6b3",
+    "captureScriptSha256": "c398c55e789a10c79dbbe3524a725aa102d218f1d6850d438cb2b94b105f19aa",
+    "compiledFiles": 1651,
+    "compiledSealSha256": "0cf1249ed47af369f0d9c33acc012d23880b55321c25756b8e25f8f9f033395e",
+    "mechanicalStateInvented": false,
+    "heldBardicWardCaptured": false
+  },
+  "resolveInput": {
+    "eventId": "actual-two-excess-con-original",
+    "chaseId": "actual-ward-chase"
+  },
+  "gameState": {
+    "socialProfileSeed": "c073fc23-df89-4243-96b0-dd9aacbd8ad5",
+    "socialPersonalities": {
+      "sarah": {
+        "ideals": [
+          "Une promesse mérite d’être tenue."
+        ],
+        "bonds": [
+          "Le souvenir d’un moment paisible."
+        ],
+        "traits": [
+          "Observe longtemps avant de réagir."
+        ],
+        "likedTopics": [
+          "Souvenirs de gestes bienveillants"
+        ],
+        "tabooTopics": [
+          "Familiarité imposée"
+        ]
+      },
+      "avowed": {
+        "ideals": [
+          "Les gestes comptent autant que les paroles."
+        ],
+        "bonds": [
+          "Le souvenir d’un moment paisible."
+        ],
+        "traits": [
+          "Observe longtemps avant de réagir."
+        ],
+        "likedTopics": [
+          "Calligraphie"
+        ],
+        "tabooTopics": [
+          "Mépris des petites attentions"
+        ]
+      },
+      "arnulf": {
+        "ideals": [
+          "Les petits témoignages de respect ont de la valeur."
+        ],
+        "bonds": [
+          "Les marques de respect reçues dans les moments difficiles."
+        ],
+        "traits": [
+          "Prend un instant pour mesurer sa réponse."
+        ],
+        "likedTopics": [
+          "Maisons bien entretenues"
+        ],
+        "tabooTopics": [
+          "Mépris des petites attentions"
+        ]
+      },
+      "vecken": {
+        "ideals": [
+          "Une promesse mérite d’être tenue."
+        ],
+        "bonds": [
+          "Le souvenir d’un moment paisible."
+        ],
+        "traits": [
+          "Remarque les gestes de respect."
+        ],
+        "likedTopics": [
+          "Courage discret"
+        ],
+        "tabooTopics": [
+          "Impatience devant une hésitation"
+        ]
+      },
+      "cobbler": {
+        "ideals": [
+          "Les gestes comptent autant que les paroles."
+        ],
+        "bonds": [
+          "Une habitude familière et rassurante."
+        ],
+        "traits": [
+          "Exprime son accord par un signe de tête."
+        ],
+        "likedTopics": [
+          "Savoir-faire artisanal"
+        ],
+        "tabooTopics": [
+          "Mépris des petites attentions"
+        ]
+      },
+      "faerl": {
+        "traits": [
+          "Marque un silence pesant avant de réagir."
+        ],
+        "likedTopics": [
+          "Comptes impeccablement tenus"
+        ],
+        "tabooTopics": [
+          "Désordre dans les préparatifs"
+        ]
+      },
+      "kara": {
+        "ideals": [
+          "Les petits témoignages de respect ont de la valeur."
+        ],
+        "bonds": [
+          "Les marques de respect reçues dans les moments difficiles."
+        ],
+        "traits": [
+          "Prend un instant pour mesurer sa réponse."
+        ],
+        "likedTopics": [
+          "Soins apportés aux plantes"
+        ],
+        "tabooTopics": [
+          "Impatience devant une hésitation"
+        ]
+      },
+      "old_fargo": {
+        "ideals": [
+          "Les petits témoignages de respect ont de la valeur."
+        ],
+        "bonds": [
+          "Les marques de respect reçues dans les moments difficiles."
+        ],
+        "traits": [
+          "Prend un instant pour mesurer sa réponse."
+        ],
+        "likedTopics": [
+          "Histoires de voyageurs sans indiscrétion"
+        ],
+        "tabooTopics": [
+          "Promesses faites à la légère"
+        ]
+      },
+      "yaeda": {
+        "ideals": [
+          "Les petits témoignages de respect ont de la valeur."
+        ],
+        "bonds": [
+          "Les marques de respect reçues dans les moments difficiles."
+        ],
+        "traits": [
+          "Observe longtemps avant de réagir."
+        ],
+        "likedTopics": [
+          "Projets simples après le retour"
+        ],
+        "tabooTopics": [
+          "Familiarité imposée"
+        ]
+      },
+      "young_fargo": {
+        "ideals": [
+          "Les gestes comptent autant que les paroles."
+        ],
+        "bonds": [
+          "Une habitude familière et rassurante."
+        ],
+        "traits": [
+          "Prend un instant pour mesurer sa réponse."
+        ],
+        "likedTopics": [
+          "Apprentissage patient"
+        ],
+        "tabooTopics": [
+          "Mépris des petites attentions"
+        ]
+      },
+      "cemetery_keeper": {
+        "ideals": [
+          "La patience aide à comprendre."
+        ],
+        "bonds": [
+          "Le souvenir d’une aide discrète."
+        ],
+        "traits": [
+          "Remarque les gestes de respect."
+        ],
+        "likedTopics": [
+          "Histoire des monuments"
+        ],
+        "tabooTopics": [
+          "Promesses faites à la légère"
+        ]
+      },
+      "encounter:faerl_bodyguards:0": {
+        "ideals": [
+          "Les petits témoignages de respect ont de la valeur."
+        ],
+        "bonds": [
+          "Une habitude familière et rassurante."
+        ],
+        "traits": [
+          "Observe longtemps avant de réagir."
+        ],
+        "likedTopics": [
+          "Équipement solide"
+        ],
+        "tabooTopics": [
+          "Ordres contradictoires"
+        ]
+      },
+      "encounter:faerl_bodyguards:1": {
+        "traits": [
+          "Garde une immobilité étudiée."
+        ],
+        "likedTopics": [
+          "Symboles rituels soigneusement tracés"
+        ],
+        "tabooTopics": [
+          "Interruption des formules"
+        ]
+      },
+      "encounter:barn_watch:0": {
+        "traits": [
+          "Observe les mains de son interlocuteur."
+        ],
+        "likedTopics": [
+          "Discipline des officiants"
+        ],
+        "tabooTopics": [
+          "Imprécision dans le cérémonial"
+        ]
+      },
+      "encounter:barn_watch:1": {
+        "traits": [
+          "Garde une immobilité étudiée."
+        ],
+        "likedTopics": [
+          "Discipline des officiants"
+        ],
+        "tabooTopics": [
+          "Désinvolture envers les symboles"
+        ]
+      },
+      "encounter:temple_guard:0": {
+        "traits": [
+          "Garde une immobilité étudiée."
+        ],
+        "likedTopics": [
+          "Discipline des officiants"
+        ],
+        "tabooTopics": [
+          "Désinvolture envers les symboles"
+        ]
+      },
+      "encounter:temple_guard:1": {
+        "traits": [
+          "Marque un silence pesant avant de réagir."
+        ],
+        "likedTopics": [
+          "Symboles rituels soigneusement tracés"
+        ],
+        "tabooTopics": [
+          "Imprécision dans le cérémonial"
+        ]
+      },
+      "encounter:stair_watch:0": {
+        "traits": [
+          "Répète un geste rituel discret avant de répondre."
+        ],
+        "likedTopics": [
+          "Symboles rituels soigneusement tracés"
+        ],
+        "tabooTopics": [
+          "Désordre dans les préparatifs"
+        ]
+      },
+      "encounter:vault_grick:0": {
+        "traits": [
+          "Se replie près de la pierre avant d’avancer."
+        ],
+        "likedTopics": [
+          "Nourriture déposée à distance"
+        ],
+        "tabooTopics": [
+          "Issues bloquées autour de lui"
+        ]
+      },
+      "encounter:acolyte_training:0": {
+        "traits": [
+          "Marque un silence pesant avant de réagir."
+        ],
+        "likedTopics": [
+          "Récitation exacte des formules"
+        ],
+        "tabooTopics": [
+          "Désordre dans les préparatifs"
+        ]
+      },
+      "encounter:acolyte_training:1": {
+        "traits": [
+          "Marque un silence pesant avant de réagir."
+        ],
+        "likedTopics": [
+          "Symboles rituels soigneusement tracés"
+        ],
+        "tabooTopics": [
+          "Interruption des formules"
+        ]
+      },
+      "encounter:viallis_ritual:0": {
+        "traits": [
+          "Observe les mains de son interlocuteur."
+        ],
+        "likedTopics": [
+          "Traités occultes anciens"
+        ],
+        "tabooTopics": [
+          "Imprécision dans le cérémonial"
+        ]
+      },
+      "encounter:viallis_ritual:1": {
+        "traits": [
+          "Garde une immobilité étudiée."
+        ],
+        "likedTopics": [
+          "Récitation exacte des formules"
+        ],
+        "tabooTopics": [
+          "Désinvolture envers les symboles"
+        ]
+      }
+    },
+    "dmTools": {
+      "version": 1,
+      "objects": {},
+      "traps": {},
+      "npcs": {},
+      "itemUses": {},
+      "wallet": {
+        "cp": 0,
+        "sp": 0,
+        "ep": 0,
+        "gp": 250,
+        "pp": 0
+      },
+      "exhaustion": {
+        "creatures": {
+          "player": {
+            "level": 4,
+            "unexhaustedHpMax": 52
+          }
+        },
+        "receipts": {
+          "actual-mj-exhaustion-four": {
+            "eventId": "actual-mj-exhaustion-four",
+            "command": "{\"targetId\":\"player\",\"operation\":\"add\",\"levels\":4,\"reason\":\"Explicit exceptional MJ baseline: four real cumulative other-source exhaustion levels for this bounded Death Ward interaction probe.\"}",
+            "targetId": "player",
+            "operation": "add",
+            "reason": "Explicit exceptional MJ baseline: four real cumulative other-source exhaustion levels for this bounded Death Ward interaction probe.",
+            "levels": 4,
+            "beforeLevel": 0,
+            "afterLevel": 4,
+            "hpBefore": {
+              "current": 52,
+              "max": 52
+            },
+            "hpAfter": {
+              "current": 26,
+              "max": 26
+            },
+            "died": false,
+            "at": 240
+          }
+        }
+      },
+      "chases": {
+        "activeId": "actual-ward-chase",
+        "episodes": {
+          "actual-ward-chase": {
+            "id": "actual-ward-chase",
+            "input": {
+              "eventId": "actual-ward-chase-begin",
+              "chaseId": "actual-ward-chase",
+              "quarryId": "player",
+              "pursuerIds": [
+                "bandit_1793848065847_0"
+              ],
+              "table": "urban",
+              "guardIds": [
+                "commoner_1793848065856_1"
+              ],
+              "reason": "Explicit optional official urban chase on these actual supported current-map bodies."
+            },
+            "command": "{\"chaseId\":\"actual-ward-chase\",\"eventId\":\"actual-ward-chase-begin\",\"guardIds\":[\"commoner_1793848065856_1\"],\"pursuerIds\":[\"bandit_1793848065847_0\"],\"quarryId\":\"player\",\"reason\":\"Explicit optional official urban chase on these actual supported current-map bodies.\",\"table\":\"urban\"}",
+            "at": 240,
+            "mapId": "candlekeep",
+            "combatGeneration": 1,
+            "firstEscapeRound": 1,
+            "status": "active",
+            "participants": {
+              "player": {
+                "id": "player",
+                "role": "quarry",
+                "status": "active",
+                "dashIds": [
+                  "78b45919-1f6a-4f6f-8a8b-cef08be1b786",
+                  "7cc2b632-af59-447a-ad46-be450f794141",
+                  "f4e65d0d-2d03-497f-b258-89e33fd38bfe",
+                  "6e269461-77a3-4cda-b1b6-a7e0f05a898c",
+                  "00ddc03e-b785-48ad-bbf3-9692f6050296",
+                  "5bcc74c8-fc18-461d-a9f0-dc081d8b0b7f",
+                  "b786e10e-f7c4-443e-ba1c-4cdbb88e081b"
+                ],
+                "initialConstitution": 14
+              },
+              "bandit_1793848065847_0": {
+                "id": "bandit_1793848065847_0",
+                "role": "pursuer",
+                "status": "active",
+                "dashIds": [],
+                "initialConstitution": 12
+              }
+            },
+            "turns": {
+              "actual-player-free-end-1": {
+                "id": "actual-player-free-end-1",
+                "key": "1:0:1:player",
+                "actorId": "player",
+                "round": 1,
+                "turnCounter": 0,
+                "dashIds": [
+                  "78b45919-1f6a-4f6f-8a8b-cef08be1b786"
+                ],
+                "constitutionAtEnd": 14,
+                "checksDue": 0,
+                "checks": [],
+                "status": "complete",
+                "d20": 11,
+                "tableRoll": {
+                  "notation": "1d20",
+                  "rolls": [
+                    11
+                  ],
+                  "modifier": 0,
+                  "total": 11,
+                  "detail": "1d20: [11] = 11"
+                },
+                "nextParticipantId": "bandit_1793848065847_0",
+                "consequence": {
+                  "noComplication": true,
+                  "noOtherActiveParticipant": false
+                },
+                "effectExpired": true,
+                "result": {
+                  "chaseId": "actual-ward-chase",
+                  "turnEventId": "actual-player-free-end-1",
+                  "actorId": "player",
+                  "status": "complete",
+                  "checks": [],
+                  "tableRoll": {
+                    "notation": "1d20",
+                    "rolls": [
+                      11
+                    ],
+                    "modifier": 0,
+                    "total": 11,
+                    "detail": "1d20: [11] = 11"
+                  },
+                  "nextParticipantId": "bandit_1793848065847_0",
+                  "qualificationRequired": false,
+                  "source": {
+                    "book": "dmg-2014",
+                    "beginning": [
+                      8173,
+                      8177
+                    ],
+                    "dashing": [
+                      8185,
+                      8189
+                    ],
+                    "opportunity": [
+                      8191,
+                      8197
+                    ],
+                    "escape": [
+                      8199,
+                      8220
+                    ],
+                    "complications": [
+                      8222,
+                      8241
+                    ],
+                    "customTables": [
+                      8258,
+                      8260
+                    ],
+                    "splitAndRoleReversal": [
+                      8262,
+                      8276
+                    ]
+                  },
+                  "consequence": {
+                    "noComplication": true,
+                    "noOtherActiveParticipant": false
+                  }
+                }
+              },
+              "actual-pursuer-end-1": {
+                "id": "actual-pursuer-end-1",
+                "key": "1:1:1:bandit_1793848065847_0",
+                "actorId": "bandit_1793848065847_0",
+                "round": 1,
+                "turnCounter": 1,
+                "dashIds": [],
+                "constitutionAtEnd": 12,
+                "checksDue": 0,
+                "checks": [],
+                "status": "complete",
+                "d20": 11,
+                "tableRoll": {
+                  "notation": "1d20",
+                  "rolls": [
+                    11
+                  ],
+                  "modifier": 0,
+                  "total": 11,
+                  "detail": "1d20: [11] = 11"
+                },
+                "nextParticipantId": "player",
+                "consequence": {
+                  "noComplication": true,
+                  "noOtherActiveParticipant": false
+                },
+                "effectExpired": true,
+                "result": {
+                  "chaseId": "actual-ward-chase",
+                  "turnEventId": "actual-pursuer-end-1",
+                  "actorId": "bandit_1793848065847_0",
+                  "status": "complete",
+                  "checks": [],
+                  "tableRoll": {
+                    "notation": "1d20",
+                    "rolls": [
+                      11
+                    ],
+                    "modifier": 0,
+                    "total": 11,
+                    "detail": "1d20: [11] = 11"
+                  },
+                  "nextParticipantId": "player",
+                  "qualificationRequired": false,
+                  "source": {
+                    "book": "dmg-2014",
+                    "beginning": [
+                      8173,
+                      8177
+                    ],
+                    "dashing": [
+                      8185,
+                      8189
+                    ],
+                    "opportunity": [
+                      8191,
+                      8197
+                    ],
+                    "escape": [
+                      8199,
+                      8220
+                    ],
+                    "complications": [
+                      8222,
+                      8241
+                    ],
+                    "customTables": [
+                      8258,
+                      8260
+                    ],
+                    "splitAndRoleReversal": [
+                      8262,
+                      8276
+                    ]
+                  },
+                  "consequence": {
+                    "noComplication": true,
+                    "noOtherActiveParticipant": false
+                  }
+                }
+              },
+              "actual-player-free-end-2": {
+                "id": "actual-player-free-end-2",
+                "key": "1:3:2:player",
+                "actorId": "player",
+                "round": 2,
+                "turnCounter": 3,
+                "dashIds": [
+                  "7cc2b632-af59-447a-ad46-be450f794141"
+                ],
+                "constitutionAtEnd": 14,
+                "checksDue": 0,
+                "checks": [],
+                "status": "complete",
+                "d20": 11,
+                "tableRoll": {
+                  "notation": "1d20",
+                  "rolls": [
+                    11
+                  ],
+                  "modifier": 0,
+                  "total": 11,
+                  "detail": "1d20: [11] = 11"
+                },
+                "nextParticipantId": "bandit_1793848065847_0",
+                "consequence": {
+                  "noComplication": true,
+                  "noOtherActiveParticipant": false
+                },
+                "effectExpired": true,
+                "result": {
+                  "chaseId": "actual-ward-chase",
+                  "turnEventId": "actual-player-free-end-2",
+                  "actorId": "player",
+                  "status": "complete",
+                  "checks": [],
+                  "tableRoll": {
+                    "notation": "1d20",
+                    "rolls": [
+                      11
+                    ],
+                    "modifier": 0,
+                    "total": 11,
+                    "detail": "1d20: [11] = 11"
+                  },
+                  "nextParticipantId": "bandit_1793848065847_0",
+                  "qualificationRequired": false,
+                  "source": {
+                    "book": "dmg-2014",
+                    "beginning": [
+                      8173,
+                      8177
+                    ],
+                    "dashing": [
+                      8185,
+                      8189
+                    ],
+                    "opportunity": [
+                      8191,
+                      8197
+                    ],
+                    "escape": [
+                      8199,
+                      8220
+                    ],
+                    "complications": [
+                      8222,
+                      8241
+                    ],
+                    "customTables": [
+                      8258,
+                      8260
+                    ],
+                    "splitAndRoleReversal": [
+                      8262,
+                      8276
+                    ]
+                  },
+                  "consequence": {
+                    "noComplication": true,
+                    "noOtherActiveParticipant": false
+                  }
+                }
+              },
+              "actual-pursuer-end-2": {
+                "id": "actual-pursuer-end-2",
+                "key": "1:4:2:bandit_1793848065847_0",
+                "actorId": "bandit_1793848065847_0",
+                "round": 2,
+                "turnCounter": 4,
+                "dashIds": [],
+                "constitutionAtEnd": 12,
+                "checksDue": 0,
+                "checks": [],
+                "status": "complete",
+                "d20": 11,
+                "tableRoll": {
+                  "notation": "1d20",
+                  "rolls": [
+                    11
+                  ],
+                  "modifier": 0,
+                  "total": 11,
+                  "detail": "1d20: [11] = 11"
+                },
+                "nextParticipantId": "player",
+                "consequence": {
+                  "noComplication": true,
+                  "noOtherActiveParticipant": false
+                },
+                "effectExpired": true,
+                "result": {
+                  "chaseId": "actual-ward-chase",
+                  "turnEventId": "actual-pursuer-end-2",
+                  "actorId": "bandit_1793848065847_0",
+                  "status": "complete",
+                  "checks": [],
+                  "tableRoll": {
+                    "notation": "1d20",
+                    "rolls": [
+                      11
+                    ],
+                    "modifier": 0,
+                    "total": 11,
+                    "detail": "1d20: [11] = 11"
+                  },
+                  "nextParticipantId": "player",
+                  "qualificationRequired": false,
+                  "source": {
+                    "book": "dmg-2014",
+                    "beginning": [
+                      8173,
+                      8177
+                    ],
+                    "dashing": [
+                      8185,
+                      8189
+                    ],
+                    "opportunity": [
+                      8191,
+                      8197
+                    ],
+                    "escape": [
+                      8199,
+                      8220
+                    ],
+                    "complications": [
+                      8222,
+                      8241
+                    ],
+                    "customTables": [
+                      8258,
+                      8260
+                    ],
+                    "splitAndRoleReversal": [
+                      8262,
+                      8276
+                    ]
+                  },
+                  "consequence": {
+                    "noComplication": true,
+                    "noOtherActiveParticipant": false
+                  }
+                }
+              },
+              "actual-player-free-end-3": {
+                "id": "actual-player-free-end-3",
+                "key": "1:6:3:player",
+                "actorId": "player",
+                "round": 3,
+                "turnCounter": 6,
+                "dashIds": [
+                  "f4e65d0d-2d03-497f-b258-89e33fd38bfe"
+                ],
+                "constitutionAtEnd": 14,
+                "checksDue": 0,
+                "checks": [],
+                "status": "complete",
+                "d20": 11,
+                "tableRoll": {
+                  "notation": "1d20",
+                  "rolls": [
+                    11
+                  ],
+                  "modifier": 0,
+                  "total": 11,
+                  "detail": "1d20: [11] = 11"
+                },
+                "nextParticipantId": "bandit_1793848065847_0",
+                "consequence": {
+                  "noComplication": true,
+                  "noOtherActiveParticipant": false
+                },
+                "effectExpired": true,
+                "result": {
+                  "chaseId": "actual-ward-chase",
+                  "turnEventId": "actual-player-free-end-3",
+                  "actorId": "player",
+                  "status": "complete",
+                  "checks": [],
+                  "tableRoll": {
+                    "notation": "1d20",
+                    "rolls": [
+                      11
+                    ],
+                    "modifier": 0,
+                    "total": 11,
+                    "detail": "1d20: [11] = 11"
+                  },
+                  "nextParticipantId": "bandit_1793848065847_0",
+                  "qualificationRequired": false,
+                  "source": {
+                    "book": "dmg-2014",
+                    "beginning": [
+                      8173,
+                      8177
+                    ],
+                    "dashing": [
+                      8185,
+                      8189
+                    ],
+                    "opportunity": [
+                      8191,
+                      8197
+                    ],
+                    "escape": [
+                      8199,
+                      8220
+                    ],
+                    "complications": [
+                      8222,
+                      8241
+                    ],
+                    "customTables": [
+                      8258,
+                      8260
+                    ],
+                    "splitAndRoleReversal": [
+                      8262,
+                      8276
+                    ]
+                  },
+                  "consequence": {
+                    "noComplication": true,
+                    "noOtherActiveParticipant": false
+                  }
+                }
+              },
+              "actual-pursuer-end-3": {
+                "id": "actual-pursuer-end-3",
+                "key": "1:7:3:bandit_1793848065847_0",
+                "actorId": "bandit_1793848065847_0",
+                "round": 3,
+                "turnCounter": 7,
+                "dashIds": [],
+                "constitutionAtEnd": 12,
+                "checksDue": 0,
+                "checks": [],
+                "status": "complete",
+                "d20": 11,
+                "tableRoll": {
+                  "notation": "1d20",
+                  "rolls": [
+                    11
+                  ],
+                  "modifier": 0,
+                  "total": 11,
+                  "detail": "1d20: [11] = 11"
+                },
+                "nextParticipantId": "player",
+                "consequence": {
+                  "noComplication": true,
+                  "noOtherActiveParticipant": false
+                },
+                "effectExpired": true,
+                "result": {
+                  "chaseId": "actual-ward-chase",
+                  "turnEventId": "actual-pursuer-end-3",
+                  "actorId": "bandit_1793848065847_0",
+                  "status": "complete",
+                  "checks": [],
+                  "tableRoll": {
+                    "notation": "1d20",
+                    "rolls": [
+                      11
+                    ],
+                    "modifier": 0,
+                    "total": 11,
+                    "detail": "1d20: [11] = 11"
+                  },
+                  "nextParticipantId": "player",
+                  "qualificationRequired": false,
+                  "source": {
+                    "book": "dmg-2014",
+                    "beginning": [
+                      8173,
+                      8177
+                    ],
+                    "dashing": [
+                      8185,
+                      8189
+                    ],
+                    "opportunity": [
+                      8191,
+                      8197
+                    ],
+                    "escape": [
+                      8199,
+                      8220
+                    ],
+                    "complications": [
+                      8222,
+                      8241
+                    ],
+                    "customTables": [
+                      8258,
+                      8260
+                    ],
+                    "splitAndRoleReversal": [
+                      8262,
+                      8276
+                    ]
+                  },
+                  "consequence": {
+                    "noComplication": true,
+                    "noOtherActiveParticipant": false
+                  }
+                }
+              },
+              "actual-player-free-end-4": {
+                "id": "actual-player-free-end-4",
+                "key": "1:9:4:player",
+                "actorId": "player",
+                "round": 4,
+                "turnCounter": 9,
+                "dashIds": [
+                  "6e269461-77a3-4cda-b1b6-a7e0f05a898c"
+                ],
+                "constitutionAtEnd": 14,
+                "checksDue": 0,
+                "checks": [],
+                "status": "complete",
+                "d20": 11,
+                "tableRoll": {
+                  "notation": "1d20",
+                  "rolls": [
+                    11
+                  ],
+                  "modifier": 0,
+                  "total": 11,
+                  "detail": "1d20: [11] = 11"
+                },
+                "nextParticipantId": "bandit_1793848065847_0",
+                "consequence": {
+                  "noComplication": true,
+                  "noOtherActiveParticipant": false
+                },
+                "effectExpired": true,
+                "result": {
+                  "chaseId": "actual-ward-chase",
+                  "turnEventId": "actual-player-free-end-4",
+                  "actorId": "player",
+                  "status": "complete",
+                  "checks": [],
+                  "tableRoll": {
+                    "notation": "1d20",
+                    "rolls": [
+                      11
+                    ],
+                    "modifier": 0,
+                    "total": 11,
+                    "detail": "1d20: [11] = 11"
+                  },
+                  "nextParticipantId": "bandit_1793848065847_0",
+                  "qualificationRequired": false,
+                  "source": {
+                    "book": "dmg-2014",
+                    "beginning": [
+                      8173,
+                      8177
+                    ],
+                    "dashing": [
+                      8185,
+                      8189
+                    ],
+                    "opportunity": [
+                      8191,
+                      8197
+                    ],
+                    "escape": [
+                      8199,
+                      8220
+                    ],
+                    "complications": [
+                      8222,
+                      8241
+                    ],
+                    "customTables": [
+                      8258,
+                      8260
+                    ],
+                    "splitAndRoleReversal": [
+                      8262,
+                      8276
+                    ]
+                  },
+                  "consequence": {
+                    "noComplication": true,
+                    "noOtherActiveParticipant": false
+                  }
+                }
+              },
+              "actual-pursuer-end-4": {
+                "id": "actual-pursuer-end-4",
+                "key": "1:10:4:bandit_1793848065847_0",
+                "actorId": "bandit_1793848065847_0",
+                "round": 4,
+                "turnCounter": 10,
+                "dashIds": [],
+                "constitutionAtEnd": 12,
+                "checksDue": 0,
+                "checks": [],
+                "status": "complete",
+                "d20": 11,
+                "tableRoll": {
+                  "notation": "1d20",
+                  "rolls": [
+                    11
+                  ],
+                  "modifier": 0,
+                  "total": 11,
+                  "detail": "1d20: [11] = 11"
+                },
+                "nextParticipantId": "player",
+                "consequence": {
+                  "noComplication": true,
+                  "noOtherActiveParticipant": false
+                },
+                "effectExpired": true,
+                "result": {
+                  "chaseId": "actual-ward-chase",
+                  "turnEventId": "actual-pursuer-end-4",
+                  "actorId": "bandit_1793848065847_0",
+                  "status": "complete",
+                  "checks": [],
+                  "tableRoll": {
+                    "notation": "1d20",
+                    "rolls": [
+                      11
+                    ],
+                    "modifier": 0,
+                    "total": 11,
+                    "detail": "1d20: [11] = 11"
+                  },
+                  "nextParticipantId": "player",
+                  "qualificationRequired": false,
+                  "source": {
+                    "book": "dmg-2014",
+                    "beginning": [
+                      8173,
+                      8177
+                    ],
+                    "dashing": [
+                      8185,
+                      8189
+                    ],
+                    "opportunity": [
+                      8191,
+                      8197
+                    ],
+                    "escape": [
+                      8199,
+                      8220
+                    ],
+                    "complications": [
+                      8222,
+                      8241
+                    ],
+                    "customTables": [
+                      8258,
+                      8260
+                    ],
+                    "splitAndRoleReversal": [
+                      8262,
+                      8276
+                    ]
+                  },
+                  "consequence": {
+                    "noComplication": true,
+                    "noOtherActiveParticipant": false
+                  }
+                }
+              },
+              "actual-player-free-end-5": {
+                "id": "actual-player-free-end-5",
+                "key": "1:12:5:player",
+                "actorId": "player",
+                "round": 5,
+                "turnCounter": 12,
+                "dashIds": [
+                  "00ddc03e-b785-48ad-bbf3-9692f6050296"
+                ],
+                "constitutionAtEnd": 14,
+                "checksDue": 0,
+                "checks": [],
+                "status": "complete",
+                "d20": 11,
+                "tableRoll": {
+                  "notation": "1d20",
+                  "rolls": [
+                    11
+                  ],
+                  "modifier": 0,
+                  "total": 11,
+                  "detail": "1d20: [11] = 11"
+                },
+                "nextParticipantId": "bandit_1793848065847_0",
+                "consequence": {
+                  "noComplication": true,
+                  "noOtherActiveParticipant": false
+                },
+                "effectExpired": true,
+                "result": {
+                  "chaseId": "actual-ward-chase",
+                  "turnEventId": "actual-player-free-end-5",
+                  "actorId": "player",
+                  "status": "complete",
+                  "checks": [],
+                  "tableRoll": {
+                    "notation": "1d20",
+                    "rolls": [
+                      11
+                    ],
+                    "modifier": 0,
+                    "total": 11,
+                    "detail": "1d20: [11] = 11"
+                  },
+                  "nextParticipantId": "bandit_1793848065847_0",
+                  "qualificationRequired": false,
+                  "source": {
+                    "book": "dmg-2014",
+                    "beginning": [
+                      8173,
+                      8177
+                    ],
+                    "dashing": [
+                      8185,
+                      8189
+                    ],
+                    "opportunity": [
+                      8191,
+                      8197
+                    ],
+                    "escape": [
+                      8199,
+                      8220
+                    ],
+                    "complications": [
+                      8222,
+                      8241
+                    ],
+                    "customTables": [
+                      8258,
+                      8260
+                    ],
+                    "splitAndRoleReversal": [
+                      8262,
+                      8276
+                    ]
+                  },
+                  "consequence": {
+                    "noComplication": true,
+                    "noOtherActiveParticipant": false
+                  }
+                }
+              },
+              "actual-pursuer-end-5": {
+                "id": "actual-pursuer-end-5",
+                "key": "1:13:5:bandit_1793848065847_0",
+                "actorId": "bandit_1793848065847_0",
+                "round": 5,
+                "turnCounter": 13,
+                "dashIds": [],
+                "constitutionAtEnd": 12,
+                "checksDue": 0,
+                "checks": [],
+                "status": "complete",
+                "d20": 11,
+                "tableRoll": {
+                  "notation": "1d20",
+                  "rolls": [
+                    11
+                  ],
+                  "modifier": 0,
+                  "total": 11,
+                  "detail": "1d20: [11] = 11"
+                },
+                "nextParticipantId": "player",
+                "consequence": {
+                  "noComplication": true,
+                  "noOtherActiveParticipant": false
+                },
+                "result": {
+                  "chaseId": "actual-ward-chase",
+                  "turnEventId": "actual-pursuer-end-5",
+                  "actorId": "bandit_1793848065847_0",
+                  "status": "complete",
+                  "checks": [],
+                  "tableRoll": {
+                    "notation": "1d20",
+                    "rolls": [
+                      11
+                    ],
+                    "modifier": 0,
+                    "total": 11,
+                    "detail": "1d20: [11] = 11"
+                  },
+                  "nextParticipantId": "player",
+                  "qualificationRequired": false,
+                  "source": {
+                    "book": "dmg-2014",
+                    "beginning": [
+                      8173,
+                      8177
+                    ],
+                    "dashing": [
+                      8185,
+                      8189
+                    ],
+                    "opportunity": [
+                      8191,
+                      8197
+                    ],
+                    "escape": [
+                      8199,
+                      8220
+                    ],
+                    "complications": [
+                      8222,
+                      8241
+                    ],
+                    "customTables": [
+                      8258,
+                      8260
+                    ],
+                    "splitAndRoleReversal": [
+                      8262,
+                      8276
+                    ]
+                  },
+                  "consequence": {
+                    "noComplication": true,
+                    "noOtherActiveParticipant": false
+                  }
+                }
+              }
+            },
+            "escapes": {
+              "1": {
+                "chaseId": "actual-ward-chase",
+                "round": 1,
+                "automaticFailure": true,
+                "dieRolled": false,
+                "escaped": false,
+                "passives": [
+                  {
+                    "id": "bandit_1793848065847_0",
+                    "score": 10
+                  }
+                ],
+                "leaderId": "bandit_1793848065847_0",
+                "input": {
+                  "eventId": "actual-visible-escape-1",
+                  "chaseId": "actual-ward-chase",
+                  "leaderId": "bandit_1793848065847_0",
+                  "sightFactId": "wf-1793848065865-m4rp3",
+                  "continuousSight": true,
+                  "hide": "normal",
+                  "area": "normal",
+                  "senseByPursuer": {
+                    "bandit_1793848065847_0": "sight"
+                  }
+                },
+                "command": "{\"area\":\"normal\",\"chaseId\":\"actual-ward-chase\",\"continuousSight\":true,\"eventId\":\"actual-visible-escape-1\",\"hide\":\"normal\",\"leaderId\":\"bandit_1793848065847_0\",\"senseByPursuer\":{\"bandit_1793848065847_0\":\"sight\"},\"sightFactId\":\"wf-1793848065865-m4rp3\"}"
+              },
+              "2": {
+                "chaseId": "actual-ward-chase",
+                "round": 2,
+                "automaticFailure": true,
+                "dieRolled": false,
+                "escaped": false,
+                "passives": [
+                  {
+                    "id": "bandit_1793848065847_0",
+                    "score": 10
+                  }
+                ],
+                "leaderId": "bandit_1793848065847_0",
+                "input": {
+                  "eventId": "actual-visible-escape-2",
+                  "chaseId": "actual-ward-chase",
+                  "leaderId": "bandit_1793848065847_0",
+                  "sightFactId": "wf-1793848065865-m4rp3",
+                  "continuousSight": true,
+                  "hide": "normal",
+                  "area": "normal",
+                  "senseByPursuer": {
+                    "bandit_1793848065847_0": "sight"
+                  }
+                },
+                "command": "{\"area\":\"normal\",\"chaseId\":\"actual-ward-chase\",\"continuousSight\":true,\"eventId\":\"actual-visible-escape-2\",\"hide\":\"normal\",\"leaderId\":\"bandit_1793848065847_0\",\"senseByPursuer\":{\"bandit_1793848065847_0\":\"sight\"},\"sightFactId\":\"wf-1793848065865-m4rp3\"}"
+              },
+              "3": {
+                "chaseId": "actual-ward-chase",
+                "round": 3,
+                "automaticFailure": true,
+                "dieRolled": false,
+                "escaped": false,
+                "passives": [
+                  {
+                    "id": "bandit_1793848065847_0",
+                    "score": 10
+                  }
+                ],
+                "leaderId": "bandit_1793848065847_0",
+                "input": {
+                  "eventId": "actual-visible-escape-3",
+                  "chaseId": "actual-ward-chase",
+                  "leaderId": "bandit_1793848065847_0",
+                  "sightFactId": "wf-1793848065865-m4rp3",
+                  "continuousSight": true,
+                  "hide": "normal",
+                  "area": "normal",
+                  "senseByPursuer": {
+                    "bandit_1793848065847_0": "sight"
+                  }
+                },
+                "command": "{\"area\":\"normal\",\"chaseId\":\"actual-ward-chase\",\"continuousSight\":true,\"eventId\":\"actual-visible-escape-3\",\"hide\":\"normal\",\"leaderId\":\"bandit_1793848065847_0\",\"senseByPursuer\":{\"bandit_1793848065847_0\":\"sight\"},\"sightFactId\":\"wf-1793848065865-m4rp3\"}"
+              },
+              "4": {
+                "chaseId": "actual-ward-chase",
+                "round": 4,
+                "automaticFailure": true,
+                "dieRolled": false,
+                "escaped": false,
+                "passives": [
+                  {
+                    "id": "bandit_1793848065847_0",
+                    "score": 10
+                  }
+                ],
+                "leaderId": "bandit_1793848065847_0",
+                "input": {
+                  "eventId": "actual-visible-escape-4",
+                  "chaseId": "actual-ward-chase",
+                  "leaderId": "bandit_1793848065847_0",
+                  "sightFactId": "wf-1793848065865-m4rp3",
+                  "continuousSight": true,
+                  "hide": "normal",
+                  "area": "normal",
+                  "senseByPursuer": {
+                    "bandit_1793848065847_0": "sight"
+                  }
+                },
+                "command": "{\"area\":\"normal\",\"chaseId\":\"actual-ward-chase\",\"continuousSight\":true,\"eventId\":\"actual-visible-escape-4\",\"hide\":\"normal\",\"leaderId\":\"bandit_1793848065847_0\",\"senseByPursuer\":{\"bandit_1793848065847_0\":\"sight\"},\"sightFactId\":\"wf-1793848065865-m4rp3\"}"
+              },
+              "5": {
+                "chaseId": "actual-ward-chase",
+                "round": 5,
+                "automaticFailure": true,
+                "dieRolled": false,
+                "escaped": false,
+                "passives": [
+                  {
+                    "id": "bandit_1793848065847_0",
+                    "score": 10
+                  }
+                ],
+                "leaderId": "bandit_1793848065847_0",
+                "input": {
+                  "eventId": "actual-visible-escape-5",
+                  "chaseId": "actual-ward-chase",
+                  "leaderId": "bandit_1793848065847_0",
+                  "sightFactId": "wf-1793848065865-m4rp3",
+                  "continuousSight": true,
+                  "hide": "normal",
+                  "area": "normal",
+                  "senseByPursuer": {
+                    "bandit_1793848065847_0": "sight"
+                  }
+                },
+                "command": "{\"area\":\"normal\",\"chaseId\":\"actual-ward-chase\",\"continuousSight\":true,\"eventId\":\"actual-visible-escape-5\",\"hide\":\"normal\",\"leaderId\":\"bandit_1793848065847_0\",\"senseByPursuer\":{\"bandit_1793848065847_0\":\"sight\"},\"sightFactId\":\"wf-1793848065865-m4rp3\"}"
+              }
+            },
+            "newInitiatives": [],
+            "initialDistances": {
+              "bandit_1793848065847_0": 5
+            }
+          }
+        },
+        "receipts": {
+          "actual-guard-role-spear": {
+            "command": "{\"input\":{\"actualSpearHeld\":true,\"entityId\":\"commoner_1793848065856_1\",\"eventId\":\"actual-guard-role-spear\",\"roleFactId\":\"wf-1793848065868-k5x1c\",\"spearFactId\":\"wf-1793848065869-qysk6\",\"spearInstanceId\":\"actual-ward-probe-held-spear\"},\"operation\":\"qualify-chase-guard\"}",
+            "result": {
+              "qualified": true,
+              "entityId": "commoner_1793848065856_1",
+              "spearInstanceId": "actual-ward-probe-held-spear",
+              "source": "DMG2014 Urban Chase9 only: attack+3,1d6+1 piercing; no MM Guard profile or general Spear action",
+              "inventoryGranted": false,
+              "lootGranted": false,
+              "statBlockChanged": false,
+              "custody": "Existing carried NPC spear observed explicitly; location derives only from its actual holder body; no inventory/ground duplicate or transfer permission."
+            },
+            "at": 240
+          },
+          "actual-ward-chase-begin": {
+            "command": "{\"input\":{\"chaseId\":\"actual-ward-chase\",\"eventId\":\"actual-ward-chase-begin\",\"guardIds\":[\"commoner_1793848065856_1\"],\"pursuerIds\":[\"bandit_1793848065847_0\"],\"quarryId\":\"player\",\"reason\":\"Explicit optional official urban chase on these actual supported current-map bodies.\",\"table\":\"urban\"},\"operation\":\"begin-chase\"}",
+            "result": {
+              "chaseId": "actual-ward-chase",
+              "adopted": true,
+              "table": "urban",
+              "initialDistances": {
+                "bandit_1793848065847_0": 5
+              },
+              "newInitiatives": [],
+              "initiativeOrder": [
+                "player",
+                "bandit_1793848065847_0",
+                "commoner_1793848065856_1"
+              ],
+              "currentTurn": "player",
+              "source": {
+                "book": "dmg-2014",
+                "beginning": [
+                  8173,
+                  8177
+                ],
+                "dashing": [
+                  8185,
+                  8189
+                ],
+                "opportunity": [
+                  8191,
+                  8197
+                ],
+                "escape": [
+                  8199,
+                  8220
+                ],
+                "complications": [
+                  8222,
+                  8241
+                ],
+                "customTables": [
+                  8258,
+                  8260
+                ],
+                "splitAndRoleReversal": [
+                  8262,
+                  8276
+                ]
+              },
+              "limitation": "Single supported ground-map chase, one quarry. Real guard bodies prepared before combat. Player-only actual rest recovery; NPC fatigue remains until a real NPC rest procedure exists."
+            },
+            "at": 240
+          },
+          "78b45919-1f6a-4f6f-8a8b-cef08be1b786": {
+            "command": "{\"input\":{\"actorId\":\"player\",\"chaseId\":\"actual-ward-chase\",\"effectId\":\"hero-1793848065891-h1fqksd9l8h\",\"round\":1,\"turnCounter\":0,\"turnKey\":\"1:0:1:player\"},\"operation\":\"actual-chase-dash\"}",
+            "result": {
+              "operation": "chase-dash",
+              "chaseId": "actual-ward-chase",
+              "actorId": "player",
+              "effectId": "hero-1793848065891-h1fqksd9l8h",
+              "turnKey": "1:0:1:player",
+              "turnCounter": 0,
+              "round": 1,
+              "index": 1,
+              "freeThreshold": 5
+            },
+            "at": 240
+          },
+          "actual-free-dash-1": {
+            "command": "{\"input\":{\"actorId\":\"player\",\"chaseId\":\"actual-ward-chase\",\"eventId\":\"actual-free-dash-1\"},\"operation\":\"chase-dash-choice\"}",
+            "result": {
+              "success": true,
+              "chaseId": "actual-ward-chase",
+              "actorId": "player",
+              "effectId": "hero-1793848065891-h1fqksd9l8h",
+              "actionSpent": true,
+              "totalDashes": 1
+            },
+            "at": 240
+          },
+          "actual-player-free-end-1": {
+            "command": "{\"input\":{\"chaseId\":\"actual-ward-chase\",\"eventId\":\"actual-player-free-end-1\"},\"operation\":\"resolve-chase-turn\"}",
+            "result": {
+              "chaseId": "actual-ward-chase",
+              "turnEventId": "actual-player-free-end-1",
+              "adoptedEndTurn": true
+            },
+            "at": 240
+          },
+          "actual-pursuer-end-1": {
+            "command": "{\"input\":{\"chaseId\":\"actual-ward-chase\",\"eventId\":\"actual-pursuer-end-1\"},\"operation\":\"resolve-chase-turn\"}",
+            "result": {
+              "chaseId": "actual-ward-chase",
+              "turnEventId": "actual-pursuer-end-1",
+              "adoptedEndTurn": true
+            },
+            "at": 240
+          },
+          "actual-visible-escape-1": {
+            "command": "{\"input\":{\"area\":\"normal\",\"chaseId\":\"actual-ward-chase\",\"continuousSight\":true,\"eventId\":\"actual-visible-escape-1\",\"hide\":\"normal\",\"leaderId\":\"bandit_1793848065847_0\",\"senseByPursuer\":{\"bandit_1793848065847_0\":\"sight\"},\"sightFactId\":\"wf-1793848065865-m4rp3\"},\"operation\":\"resolve-chase-escape\"}",
+            "result": {
+              "chaseId": "actual-ward-chase",
+              "round": 1,
+              "automaticFailure": true,
+              "dieRolled": false,
+              "escaped": false,
+              "passives": [
+                {
+                  "id": "bandit_1793848065847_0",
+                  "score": 10
+                }
+              ],
+              "leaderId": "bandit_1793848065847_0",
+              "input": {
+                "eventId": "actual-visible-escape-1",
+                "chaseId": "actual-ward-chase",
+                "leaderId": "bandit_1793848065847_0",
+                "sightFactId": "wf-1793848065865-m4rp3",
+                "continuousSight": true,
+                "hide": "normal",
+                "area": "normal",
+                "senseByPursuer": {
+                  "bandit_1793848065847_0": "sight"
+                }
+              },
+              "command": "{\"area\":\"normal\",\"chaseId\":\"actual-ward-chase\",\"continuousSight\":true,\"eventId\":\"actual-visible-escape-1\",\"hide\":\"normal\",\"leaderId\":\"bandit_1793848065847_0\",\"senseByPursuer\":{\"bandit_1793848065847_0\":\"sight\"},\"sightFactId\":\"wf-1793848065865-m4rp3\"}"
+            },
+            "at": 240
+          },
+          "7cc2b632-af59-447a-ad46-be450f794141": {
+            "command": "{\"input\":{\"actorId\":\"player\",\"chaseId\":\"actual-ward-chase\",\"effectId\":\"hero-1793848065940-lypfuih8g8\",\"round\":2,\"turnCounter\":3,\"turnKey\":\"1:3:2:player\"},\"operation\":\"actual-chase-dash\"}",
+            "result": {
+              "operation": "chase-dash",
+              "chaseId": "actual-ward-chase",
+              "actorId": "player",
+              "effectId": "hero-1793848065940-lypfuih8g8",
+              "turnKey": "1:3:2:player",
+              "turnCounter": 3,
+              "round": 2,
+              "index": 2,
+              "freeThreshold": 5
+            },
+            "at": 246
+          },
+          "actual-free-dash-2": {
+            "command": "{\"input\":{\"actorId\":\"player\",\"chaseId\":\"actual-ward-chase\",\"eventId\":\"actual-free-dash-2\"},\"operation\":\"chase-dash-choice\"}",
+            "result": {
+              "success": true,
+              "chaseId": "actual-ward-chase",
+              "actorId": "player",
+              "effectId": "hero-1793848065940-lypfuih8g8",
+              "actionSpent": true,
+              "totalDashes": 2
+            },
+            "at": 246
+          },
+          "actual-player-free-end-2": {
+            "command": "{\"input\":{\"chaseId\":\"actual-ward-chase\",\"eventId\":\"actual-player-free-end-2\"},\"operation\":\"resolve-chase-turn\"}",
+            "result": {
+              "chaseId": "actual-ward-chase",
+              "turnEventId": "actual-player-free-end-2",
+              "adoptedEndTurn": true
+            },
+            "at": 246
+          },
+          "actual-pursuer-end-2": {
+            "command": "{\"input\":{\"chaseId\":\"actual-ward-chase\",\"eventId\":\"actual-pursuer-end-2\"},\"operation\":\"resolve-chase-turn\"}",
+            "result": {
+              "chaseId": "actual-ward-chase",
+              "turnEventId": "actual-pursuer-end-2",
+              "adoptedEndTurn": true
+            },
+            "at": 246
+          },
+          "actual-visible-escape-2": {
+            "command": "{\"input\":{\"area\":\"normal\",\"chaseId\":\"actual-ward-chase\",\"continuousSight\":true,\"eventId\":\"actual-visible-escape-2\",\"hide\":\"normal\",\"leaderId\":\"bandit_1793848065847_0\",\"senseByPursuer\":{\"bandit_1793848065847_0\":\"sight\"},\"sightFactId\":\"wf-1793848065865-m4rp3\"},\"operation\":\"resolve-chase-escape\"}",
+            "result": {
+              "chaseId": "actual-ward-chase",
+              "round": 2,
+              "automaticFailure": true,
+              "dieRolled": false,
+              "escaped": false,
+              "passives": [
+                {
+                  "id": "bandit_1793848065847_0",
+                  "score": 10
+                }
+              ],
+              "leaderId": "bandit_1793848065847_0",
+              "input": {
+                "eventId": "actual-visible-escape-2",
+                "chaseId": "actual-ward-chase",
+                "leaderId": "bandit_1793848065847_0",
+                "sightFactId": "wf-1793848065865-m4rp3",
+                "continuousSight": true,
+                "hide": "normal",
+                "area": "normal",
+                "senseByPursuer": {
+                  "bandit_1793848065847_0": "sight"
+                }
+              },
+              "command": "{\"area\":\"normal\",\"chaseId\":\"actual-ward-chase\",\"continuousSight\":true,\"eventId\":\"actual-visible-escape-2\",\"hide\":\"normal\",\"leaderId\":\"bandit_1793848065847_0\",\"senseByPursuer\":{\"bandit_1793848065847_0\":\"sight\"},\"sightFactId\":\"wf-1793848065865-m4rp3\"}"
+            },
+            "at": 246
+          },
+          "f4e65d0d-2d03-497f-b258-89e33fd38bfe": {
+            "command": "{\"input\":{\"actorId\":\"player\",\"chaseId\":\"actual-ward-chase\",\"effectId\":\"hero-1793848065984-7c8swxhohi7\",\"round\":3,\"turnCounter\":6,\"turnKey\":\"1:6:3:player\"},\"operation\":\"actual-chase-dash\"}",
+            "result": {
+              "operation": "chase-dash",
+              "chaseId": "actual-ward-chase",
+              "actorId": "player",
+              "effectId": "hero-1793848065984-7c8swxhohi7",
+              "turnKey": "1:6:3:player",
+              "turnCounter": 6,
+              "round": 3,
+              "index": 3,
+              "freeThreshold": 5
+            },
+            "at": 252
+          },
+          "actual-free-dash-3": {
+            "command": "{\"input\":{\"actorId\":\"player\",\"chaseId\":\"actual-ward-chase\",\"eventId\":\"actual-free-dash-3\"},\"operation\":\"chase-dash-choice\"}",
+            "result": {
+              "success": true,
+              "chaseId": "actual-ward-chase",
+              "actorId": "player",
+              "effectId": "hero-1793848065984-7c8swxhohi7",
+              "actionSpent": true,
+              "totalDashes": 3
+            },
+            "at": 252
+          },
+          "actual-player-free-end-3": {
+            "command": "{\"input\":{\"chaseId\":\"actual-ward-chase\",\"eventId\":\"actual-player-free-end-3\"},\"operation\":\"resolve-chase-turn\"}",
+            "result": {
+              "chaseId": "actual-ward-chase",
+              "turnEventId": "actual-player-free-end-3",
+              "adoptedEndTurn": true
+            },
+            "at": 252
+          },
+          "actual-pursuer-end-3": {
+            "command": "{\"input\":{\"chaseId\":\"actual-ward-chase\",\"eventId\":\"actual-pursuer-end-3\"},\"operation\":\"resolve-chase-turn\"}",
+            "result": {
+              "chaseId": "actual-ward-chase",
+              "turnEventId": "actual-pursuer-end-3",
+              "adoptedEndTurn": true
+            },
+            "at": 252
+          },
+          "actual-visible-escape-3": {
+            "command": "{\"input\":{\"area\":\"normal\",\"chaseId\":\"actual-ward-chase\",\"continuousSight\":true,\"eventId\":\"actual-visible-escape-3\",\"hide\":\"normal\",\"leaderId\":\"bandit_1793848065847_0\",\"senseByPursuer\":{\"bandit_1793848065847_0\":\"sight\"},\"sightFactId\":\"wf-1793848065865-m4rp3\"},\"operation\":\"resolve-chase-escape\"}",
+            "result": {
+              "chaseId": "actual-ward-chase",
+              "round": 3,
+              "automaticFailure": true,
+              "dieRolled": false,
+              "escaped": false,
+              "passives": [
+                {
+                  "id": "bandit_1793848065847_0",
+                  "score": 10
+                }
+              ],
+              "leaderId": "bandit_1793848065847_0",
+              "input": {
+                "eventId": "actual-visible-escape-3",
+                "chaseId": "actual-ward-chase",
+                "leaderId": "bandit_1793848065847_0",
+                "sightFactId": "wf-1793848065865-m4rp3",
+                "continuousSight": true,
+                "hide": "normal",
+                "area": "normal",
+                "senseByPursuer": {
+                  "bandit_1793848065847_0": "sight"
+                }
+              },
+              "command": "{\"area\":\"normal\",\"chaseId\":\"actual-ward-chase\",\"continuousSight\":true,\"eventId\":\"actual-visible-escape-3\",\"hide\":\"normal\",\"leaderId\":\"bandit_1793848065847_0\",\"senseByPursuer\":{\"bandit_1793848065847_0\":\"sight\"},\"sightFactId\":\"wf-1793848065865-m4rp3\"}"
+            },
+            "at": 252
+          },
+          "6e269461-77a3-4cda-b1b6-a7e0f05a898c": {
+            "command": "{\"input\":{\"actorId\":\"player\",\"chaseId\":\"actual-ward-chase\",\"effectId\":\"hero-1793848066035-y3c32l0sw4m\",\"round\":4,\"turnCounter\":9,\"turnKey\":\"1:9:4:player\"},\"operation\":\"actual-chase-dash\"}",
+            "result": {
+              "operation": "chase-dash",
+              "chaseId": "actual-ward-chase",
+              "actorId": "player",
+              "effectId": "hero-1793848066035-y3c32l0sw4m",
+              "turnKey": "1:9:4:player",
+              "turnCounter": 9,
+              "round": 4,
+              "index": 4,
+              "freeThreshold": 5
+            },
+            "at": 258
+          },
+          "actual-free-dash-4": {
+            "command": "{\"input\":{\"actorId\":\"player\",\"chaseId\":\"actual-ward-chase\",\"eventId\":\"actual-free-dash-4\"},\"operation\":\"chase-dash-choice\"}",
+            "result": {
+              "success": true,
+              "chaseId": "actual-ward-chase",
+              "actorId": "player",
+              "effectId": "hero-1793848066035-y3c32l0sw4m",
+              "actionSpent": true,
+              "totalDashes": 4
+            },
+            "at": 258
+          },
+          "actual-player-free-end-4": {
+            "command": "{\"input\":{\"chaseId\":\"actual-ward-chase\",\"eventId\":\"actual-player-free-end-4\"},\"operation\":\"resolve-chase-turn\"}",
+            "result": {
+              "chaseId": "actual-ward-chase",
+              "turnEventId": "actual-player-free-end-4",
+              "adoptedEndTurn": true
+            },
+            "at": 258
+          },
+          "actual-pursuer-end-4": {
+            "command": "{\"input\":{\"chaseId\":\"actual-ward-chase\",\"eventId\":\"actual-pursuer-end-4\"},\"operation\":\"resolve-chase-turn\"}",
+            "result": {
+              "chaseId": "actual-ward-chase",
+              "turnEventId": "actual-pursuer-end-4",
+              "adoptedEndTurn": true
+            },
+            "at": 258
+          },
+          "actual-visible-escape-4": {
+            "command": "{\"input\":{\"area\":\"normal\",\"chaseId\":\"actual-ward-chase\",\"continuousSight\":true,\"eventId\":\"actual-visible-escape-4\",\"hide\":\"normal\",\"leaderId\":\"bandit_1793848065847_0\",\"senseByPursuer\":{\"bandit_1793848065847_0\":\"sight\"},\"sightFactId\":\"wf-1793848065865-m4rp3\"},\"operation\":\"resolve-chase-escape\"}",
+            "result": {
+              "chaseId": "actual-ward-chase",
+              "round": 4,
+              "automaticFailure": true,
+              "dieRolled": false,
+              "escaped": false,
+              "passives": [
+                {
+                  "id": "bandit_1793848065847_0",
+                  "score": 10
+                }
+              ],
+              "leaderId": "bandit_1793848065847_0",
+              "input": {
+                "eventId": "actual-visible-escape-4",
+                "chaseId": "actual-ward-chase",
+                "leaderId": "bandit_1793848065847_0",
+                "sightFactId": "wf-1793848065865-m4rp3",
+                "continuousSight": true,
+                "hide": "normal",
+                "area": "normal",
+                "senseByPursuer": {
+                  "bandit_1793848065847_0": "sight"
+                }
+              },
+              "command": "{\"area\":\"normal\",\"chaseId\":\"actual-ward-chase\",\"continuousSight\":true,\"eventId\":\"actual-visible-escape-4\",\"hide\":\"normal\",\"leaderId\":\"bandit_1793848065847_0\",\"senseByPursuer\":{\"bandit_1793848065847_0\":\"sight\"},\"sightFactId\":\"wf-1793848065865-m4rp3\"}"
+            },
+            "at": 258
+          },
+          "00ddc03e-b785-48ad-bbf3-9692f6050296": {
+            "command": "{\"input\":{\"actorId\":\"player\",\"chaseId\":\"actual-ward-chase\",\"effectId\":\"hero-1793848066085-oowgp66t3jm\",\"round\":5,\"turnCounter\":12,\"turnKey\":\"1:12:5:player\"},\"operation\":\"actual-chase-dash\"}",
+            "result": {
+              "operation": "chase-dash",
+              "chaseId": "actual-ward-chase",
+              "actorId": "player",
+              "effectId": "hero-1793848066085-oowgp66t3jm",
+              "turnKey": "1:12:5:player",
+              "turnCounter": 12,
+              "round": 5,
+              "index": 5,
+              "freeThreshold": 5
+            },
+            "at": 264
+          },
+          "actual-free-dash-5": {
+            "command": "{\"input\":{\"actorId\":\"player\",\"chaseId\":\"actual-ward-chase\",\"eventId\":\"actual-free-dash-5\"},\"operation\":\"chase-dash-choice\"}",
+            "result": {
+              "success": true,
+              "chaseId": "actual-ward-chase",
+              "actorId": "player",
+              "effectId": "hero-1793848066085-oowgp66t3jm",
+              "actionSpent": true,
+              "totalDashes": 5
+            },
+            "at": 264
+          },
+          "actual-player-free-end-5": {
+            "command": "{\"input\":{\"chaseId\":\"actual-ward-chase\",\"eventId\":\"actual-player-free-end-5\"},\"operation\":\"resolve-chase-turn\"}",
+            "result": {
+              "chaseId": "actual-ward-chase",
+              "turnEventId": "actual-player-free-end-5",
+              "adoptedEndTurn": true
+            },
+            "at": 264
+          },
+          "actual-pursuer-end-5": {
+            "command": "{\"input\":{\"chaseId\":\"actual-ward-chase\",\"eventId\":\"actual-pursuer-end-5\"},\"operation\":\"resolve-chase-turn\"}",
+            "result": {
+              "chaseId": "actual-ward-chase",
+              "turnEventId": "actual-pursuer-end-5",
+              "adoptedEndTurn": true
+            },
+            "at": 264
+          },
+          "actual-visible-escape-5": {
+            "command": "{\"input\":{\"area\":\"normal\",\"chaseId\":\"actual-ward-chase\",\"continuousSight\":true,\"eventId\":\"actual-visible-escape-5\",\"hide\":\"normal\",\"leaderId\":\"bandit_1793848065847_0\",\"senseByPursuer\":{\"bandit_1793848065847_0\":\"sight\"},\"sightFactId\":\"wf-1793848065865-m4rp3\"},\"operation\":\"resolve-chase-escape\"}",
+            "result": {
+              "chaseId": "actual-ward-chase",
+              "round": 5,
+              "automaticFailure": true,
+              "dieRolled": false,
+              "escaped": false,
+              "passives": [
+                {
+                  "id": "bandit_1793848065847_0",
+                  "score": 10
+                }
+              ],
+              "leaderId": "bandit_1793848065847_0",
+              "input": {
+                "eventId": "actual-visible-escape-5",
+                "chaseId": "actual-ward-chase",
+                "leaderId": "bandit_1793848065847_0",
+                "sightFactId": "wf-1793848065865-m4rp3",
+                "continuousSight": true,
+                "hide": "normal",
+                "area": "normal",
+                "senseByPursuer": {
+                  "bandit_1793848065847_0": "sight"
+                }
+              },
+              "command": "{\"area\":\"normal\",\"chaseId\":\"actual-ward-chase\",\"continuousSight\":true,\"eventId\":\"actual-visible-escape-5\",\"hide\":\"normal\",\"leaderId\":\"bandit_1793848065847_0\",\"senseByPursuer\":{\"bandit_1793848065847_0\":\"sight\"},\"sightFactId\":\"wf-1793848065865-m4rp3\"}"
+            },
+            "at": 264
+          },
+          "5bcc74c8-fc18-461d-a9f0-dc081d8b0b7f": {
+            "command": "{\"input\":{\"actorId\":\"player\",\"chaseId\":\"actual-ward-chase\",\"effectId\":\"hero-1793848066215-5ii7vszca8j\",\"round\":6,\"turnCounter\":15,\"turnKey\":\"1:15:6:player\"},\"operation\":\"actual-chase-dash\"}",
+            "result": {
+              "operation": "chase-dash",
+              "chaseId": "actual-ward-chase",
+              "actorId": "player",
+              "effectId": "hero-1793848066215-5ii7vszca8j",
+              "turnKey": "1:15:6:player",
+              "turnCounter": 15,
+              "round": 6,
+              "index": 6,
+              "freeThreshold": 5
+            },
+            "at": 270
+          },
+          "actual-excess-dash-six": {
+            "command": "{\"input\":{\"actorId\":\"player\",\"chaseId\":\"actual-ward-chase\",\"eventId\":\"actual-excess-dash-six\"},\"operation\":\"chase-dash-choice\"}",
+            "result": {
+              "success": true,
+              "chaseId": "actual-ward-chase",
+              "actorId": "player",
+              "effectId": "hero-1793848066215-5ii7vszca8j",
+              "actionSpent": true,
+              "totalDashes": 6
+            },
+            "at": 270
+          },
+          "b786e10e-f7c4-443e-ba1c-4cdbb88e081b": {
+            "command": "{\"input\":{\"actorId\":\"player\",\"chaseId\":\"actual-ward-chase\",\"effectId\":\"hero-1793848066231-pvl5zj6ps9\",\"round\":6,\"turnCounter\":15,\"turnKey\":\"1:15:6:player\"},\"operation\":\"actual-chase-dash\"}",
+            "result": {
+              "operation": "chase-dash",
+              "chaseId": "actual-ward-chase",
+              "actorId": "player",
+              "effectId": "hero-1793848066231-pvl5zj6ps9",
+              "turnKey": "1:15:6:player",
+              "turnCounter": 15,
+              "round": 6,
+              "index": 7,
+              "freeThreshold": 5
+            },
+            "at": 270
+          },
+          "actual-excess-dash-seven": {
+            "command": "{\"input\":{\"actorId\":\"player\",\"chaseId\":\"actual-ward-chase\",\"eventId\":\"actual-excess-dash-seven\"},\"operation\":\"chase-dash-choice\"}",
+            "result": {
+              "success": true,
+              "chaseId": "actual-ward-chase",
+              "actorId": "player",
+              "effectId": "hero-1793848066231-pvl5zj6ps9",
+              "actionSpent": true,
+              "totalDashes": 7
+            },
+            "at": 270
+          }
+        },
+        "fatigue": {},
+        "guardRoles": {
+          "commoner_1793848065856_1": {
+            "input": {
+              "eventId": "actual-guard-role-spear",
+              "entityId": "commoner_1793848065856_1",
+              "roleFactId": "wf-1793848065868-k5x1c",
+              "spearFactId": "wf-1793848065869-qysk6",
+              "spearInstanceId": "actual-ward-probe-held-spear",
+              "actualSpearHeld": true
+            },
+            "command": "{\"actualSpearHeld\":true,\"entityId\":\"commoner_1793848065856_1\",\"eventId\":\"actual-guard-role-spear\",\"roleFactId\":\"wf-1793848065868-k5x1c\",\"spearFactId\":\"wf-1793848065869-qysk6\",\"spearInstanceId\":\"actual-ward-probe-held-spear\"}",
+            "roleFact": {
+              "text": "This existing commoner has the explicitly established actual guard role for the source urban table event.",
+              "source": "record_scene_fact",
+              "mapId": "candlekeep",
+              "roomId": "1",
+              "expires": "never",
+              "narrativeEffect": {
+                "description": "This existing commoner has the explicitly established actual guard role for the source urban table event.",
+                "cell": {
+                  "x": 4,
+                  "y": 8
+                }
+              },
+              "basis": "ai_interpretation",
+              "id": "wf-1793848065868-k5x1c"
+            },
+            "spearFact": {
+              "text": "The same actual guard holds this exact physical spear before initiative; no item is awarded to the player.",
+              "source": "record_scene_fact",
+              "mapId": "candlekeep",
+              "roomId": "1",
+              "expires": "never",
+              "narrativeEffect": {
+                "description": "The same actual guard holds this exact physical spear before initiative; no item is awarded to the player.",
+                "cell": {
+                  "x": 4,
+                  "y": 8
+                }
+              },
+              "basis": "ai_interpretation",
+              "id": "wf-1793848065869-qysk6"
+            },
+            "at": 240
+          }
+        },
+        "restRulings": {}
+      }
+    },
+    "worldTimeSeconds": 270,
+    "turnCounter": 15,
+    "monsterEffects": [],
+    "monsterPowerImmunities": [],
+    "playerActionRevision": 7,
+    "combatGeneration": 1,
+    "npcActivationLedger": [],
+    "handledRequestIds": [],
+    "dmActionAllowance": {
+      "requestId": "actual-ward-probe-message",
+      "actionRevisionAtStart": 7,
+      "granted": true,
+      "reason": "Explicit exceptional MJ grant for this actual sixth player turn only: one additional Dash action; no movement, resource, fatigue or check reset.",
+      "combatTurnKey": "1:6:15"
+    },
+    "phase": "combat",
+    "characterId": "cleric",
+    "player": {
+      "ruleset": "srd2014",
+      "subclassId": "life",
+      "domainSpells": [
+        "bless",
+        "cure-wounds",
+        "lesser-restoration",
+        "spiritual-weapon",
+        "beacon-of-hope",
+        "revivify",
+        "death-ward",
+        "guardian-of-faith"
+      ],
+      "languages": [
+        "common",
+        "celestial"
+      ],
+      "id": "player",
+      "name": "Séréna",
+      "class": "Clerc",
+      "level": 7,
+      "hp": {
+        "current": 26,
+        "max": 26
+      },
+      "deathSaves": {
+        "successes": 0,
+        "failures": 0
+      },
+      "ac": 18,
+      "stats": {
+        "str": 14,
+        "dex": 10,
+        "con": 14,
+        "int": 10,
+        "wis": 18,
+        "cha": 12
+      },
+      "proficiencyBonus": 3,
+      "position": {
+        "x": 4,
+        "y": 8
+      },
+      "conditions": [
+        "exhaustion"
+      ],
+      "inventory": [
+        {
+          "id": "shield",
+          "name": "Bouclier",
+          "type": "armor",
+          "acBonus": 2,
+          "description": "Bouclier standard (inclus dans la CA)"
+        },
+        {
+          "id": "holy_symbol",
+          "name": "Symbole sacré",
+          "type": "misc",
+          "description": "Focaliseur divin pour incanter"
+        },
+        {
+          "id": "potion1",
+          "name": "Potion de soin",
+          "type": "potion",
+          "description": "Restaure 2d4+2 HP"
+        },
+        {
+          "id": "chain_mail",
+          "name": "Cotte de mailles",
+          "type": "armor",
+          "acBonus": 6,
+          "description": "CA 16, plus bouclier ; maîtrise des armures lourdes du domaine."
+        },
+        {
+          "id": "revivify_diamonds",
+          "name": "Diamants de revivification",
+          "type": "misc",
+          "description": "Valeur 300 po ; consommés par Revivification."
+        },
+        {
+          "id": "divination_offering_1",
+          "name": "Offrande de divination",
+          "type": "misc",
+          "description": "Encens et offrande valant 25 po, consommés par Divination."
+        },
+        {
+          "id": "divination_offering_2",
+          "name": "Offrande de divination",
+          "type": "misc",
+          "description": "Encens et offrande valant 25 po, consommés par Divination."
+        },
+        {
+          "id": "divination_offering_3",
+          "name": "Offrande de divination",
+          "type": "misc",
+          "description": "Encens et offrande valant 25 po, consommés par Divination."
+        },
+        {
+          "id": "healing_yellowcrest_1",
+          "name": "Potion de soins",
+          "type": "potion"
+        },
+        {
+          "id": "healing_yellowcrest_2",
+          "name": "Potion de soins",
+          "type": "potion"
+        },
+        {
+          "id": "healing_yellowcrest_3",
+          "name": "Potion de soins",
+          "type": "potion"
+        },
+        {
+          "id": "healing_yellowcrest_4",
+          "name": "Potion de soins",
+          "type": "potion"
+        }
+      ],
+      "speed": 30,
+      "initiative": 20,
+      "characterId": "cleric",
+      "savingThrowProficiencies": [
+        "wis",
+        "cha"
+      ],
+      "skillProficiencies": [
+        "medicine",
+        "insight",
+        "religion",
+        "persuasion"
+      ],
+      "features": [
+        "spellcasting",
+        "disciple_of_life",
+        "channel_divinity",
+        "destroy_undead",
+        "blessed_healer"
+      ],
+      "spellSlots": {
+        "level1": {
+          "current": 4,
+          "max": 4
+        },
+        "level2": {
+          "current": 3,
+          "max": 3
+        },
+        "level3": {
+          "current": 3,
+          "max": 3
+        },
+        "level4": {
+          "current": 0,
+          "max": 1
+        }
+      },
+      "knownSpells": [
+        "sacred-flame",
+        "thaumaturgy",
+        "light",
+        "mending",
+        "death-ward",
+        "bless",
+        "cure-wounds",
+        "lesser-restoration",
+        "spiritual-weapon",
+        "beacon-of-hope",
+        "revivify",
+        "guardian-of-faith"
+      ],
+      "spellcastingAbility": "wis",
+      "resources": {
+        "channel_divinity": {
+          "current": 2,
+          "max": 2
+        }
+      }
+    },
+    "monsters": {
+      "bandit_1793848065847_0": {
+        "id": "bandit_1793848065847_0",
+        "name": "Bandit",
+        "type": "bandit",
+        "hp": {
+          "current": 11,
+          "max": 11
+        },
+        "ac": 12,
+        "stats": {
+          "str": 11,
+          "dex": 12,
+          "con": 12,
+          "int": 10,
+          "wis": 10,
+          "cha": 10
+        },
+        "position": {
+          "x": 4,
+          "y": 7
+        },
+        "conditions": [],
+        "xpValue": 25,
+        "attackBonus": 3,
+        "damageDice": "1d6+1",
+        "speed": 30,
+        "attackName": "Scimitar",
+        "attackRangeCells": 1,
+        "damageType": "slashing",
+        "movementModes": {
+          "walk": 30
+        },
+        "srd": {
+          "index": "bandit",
+          "ruleset": "2014",
+          "url": "https://www.dnd5eapi.co/api/2014/monsters/bandit"
+        },
+        "monsterRuntime": {
+          "startedTurn": "1:13:bandit_1793848065847_0"
+        },
+        "initiative": 11,
+        "isAlive": true
+      },
+      "commoner_1793848065856_1": {
+        "id": "commoner_1793848065856_1",
+        "name": "Commoner",
+        "type": "commoner",
+        "hp": {
+          "current": 4,
+          "max": 4
+        },
+        "ac": 10,
+        "stats": {
+          "str": 10,
+          "dex": 10,
+          "con": 10,
+          "int": 10,
+          "wis": 10,
+          "cha": 10
+        },
+        "position": {
+          "x": 3,
+          "y": 8
+        },
+        "conditions": [],
+        "xpValue": 10,
+        "attackBonus": 2,
+        "damageDice": "1d4",
+        "speed": 30,
+        "attackName": "Club",
+        "attackRangeCells": 1,
+        "damageType": "bludgeoning",
+        "movementModes": {
+          "walk": 30
+        },
+        "srd": {
+          "index": "commoner",
+          "ruleset": "2014",
+          "url": "https://www.dnd5eapi.co/api/2014/monsters/commoner"
+        },
+        "monsterRuntime": {
+          "startedTurn": "1:14:commoner_1793848065856_1"
+        },
+        "initiative": 1,
+        "isAlive": true
+      }
+    },
+    "npcs": {
+      "sarah": {
+        "statBlock": {
+          "type": "ghost",
+          "name": "Ghost",
+          "ruleset": "2014",
+          "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/ghost",
+          "sourceSha256": "32c6f528707440c9da15aa5c9ae0ae19fcb703231b5762608dd0b3e646fda234",
+          "published": {
+            "index": "ghost",
+            "name": "Ghost",
+            "size": "Medium",
+            "type": "undead",
+            "alignment": "any alignment",
+            "armor_class": [
+              {
+                "type": "dex",
+                "value": 11
+              }
+            ],
+            "hit_points": 45,
+            "hit_dice": "10d8",
+            "hit_points_roll": "10d8",
+            "speed": {
+              "walk": "0 ft.",
+              "fly": "40 ft.",
+              "hover": true
+            },
+            "strength": 7,
+            "dexterity": 13,
+            "constitution": 10,
+            "intelligence": 10,
+            "wisdom": 12,
+            "charisma": 17,
+            "proficiencies": [],
+            "damage_vulnerabilities": [],
+            "damage_resistances": [
+              "acid",
+              "fire",
+              "lightning",
+              "thunder",
+              "bludgeoning, piercing, and slashing from nonmagical weapons"
+            ],
+            "damage_immunities": [
+              "cold",
+              "necrotic",
+              "poison"
+            ],
+            "condition_immunities": [
+              {
+                "index": "charmed",
+                "name": "Charmed",
+                "url": "/api/2014/conditions/charmed"
+              },
+              {
+                "index": "exhaustion",
+                "name": "Exhaustion",
+                "url": "/api/2014/conditions/exhaustion"
+              },
+              {
+                "index": "frightened",
+                "name": "Frightened",
+                "url": "/api/2014/conditions/frightened"
+              },
+              {
+                "index": "grappled",
+                "name": "Grappled",
+                "url": "/api/2014/conditions/grappled"
+              },
+              {
+                "index": "paralyzed",
+                "name": "Paralyzed",
+                "url": "/api/2014/conditions/paralyzed"
+              },
+              {
+                "index": "petrified",
+                "name": "Petrified",
+                "url": "/api/2014/conditions/petrified"
+              },
+              {
+                "index": "poisoned",
+                "name": "Poisoned",
+                "url": "/api/2014/conditions/poisoned"
+              },
+              {
+                "index": "prone",
+                "name": "Prone",
+                "url": "/api/2014/conditions/prone"
+              },
+              {
+                "index": "restrained",
+                "name": "Restrained",
+                "url": "/api/2014/conditions/restrained"
+              }
+            ],
+            "senses": {
+              "darkvision": "60 ft.",
+              "passive_perception": 11
+            },
+            "languages": "any languages it knew in life",
+            "challenge_rating": 4,
+            "proficiency_bonus": 2,
+            "xp": 1100,
+            "special_abilities": [
+              {
+                "name": "Ethereal Sight",
+                "desc": "The ghost can see 60 ft. into the Ethereal Plane when it is on the Material Plane, and vice versa.",
+                "damage": []
+              },
+              {
+                "name": "Incorporeal Movement",
+                "desc": "The ghost can move through other creatures and objects as if they were difficult terrain. It takes 5 (1d10) force damage if it ends its turn inside an object.",
+                "damage": []
+              }
+            ],
+            "actions": [
+              {
+                "name": "Withering Touch",
+                "desc": "Melee Weapon Attack: +5 to hit, reach 5 ft., one target. Hit: 17 (4d6 + 3) necrotic damage.",
+                "attack_bonus": 5,
+                "damage": [
+                  {
+                    "damage_type": {
+                      "index": "necrotic",
+                      "name": "Necrotic",
+                      "url": "/api/2014/damage-types/necrotic"
+                    },
+                    "damage_dice": "4d6+3"
+                  }
+                ],
+                "actions": []
+              },
+              {
+                "damage": [],
+                "name": "Etherealness",
+                "desc": "The ghost enters the Ethereal Plane from the Material Plane, or vice versa. It is visible on the Material Plane while it is in the Border Ethereal, and vice versa, yet it can't affect or be affected by anything on the other plane.",
+                "actions": []
+              },
+              {
+                "damage": [],
+                "name": "Horrifying Visage",
+                "desc": "Each non-undead creature within 60 ft. of the ghost that can see it must succeed on a DC 13 Wisdom saving throw or be frightened for 1 minute. If the save fails by 5 or more, the target also ages 1d4 × 10 years. A frightened target can repeat the saving throw at the end of each of its turns, ending the frightened condition on itself on a success. If a target's saving throw is successful or the effect ends for it, the target is immune to this ghost's Horrifying Visage for the next 24 hours. The aging effect can be reversed with a greater restoration spell, but only within 24 hours of it occurring.",
+                "dc": {
+                  "dc_type": {
+                    "index": "wis",
+                    "name": "WIS",
+                    "url": "/api/2014/ability-scores/wis"
+                  },
+                  "dc_value": 13,
+                  "success_type": "none"
+                },
+                "actions": []
+              },
+              {
+                "damage": [],
+                "name": "Possession",
+                "desc": "One humanoid that the ghost can see within 5 ft. of it must succeed on a DC 13 Charisma saving throw or be possessed by the ghost; the ghost then disappears, and the target is incapacitated and loses control of its body. The ghost now controls the body but doesn't deprive the target of awareness. The ghost can't be targeted by any attack, spell, or other effect, except ones that turn undead, and it retains its alignment, Intelligence, Wisdom, Charisma, and immunity to being charmed and frightened. It otherwise uses the possessed target's statistics, but doesn't gain access to the target's knowledge, class features, or proficiencies.\nThe possession lasts until the body drops to 0 hit points, the ghost ends it as a bonus action, or the ghost is turned or forced out by an effect like the dispel evil and good spell. When the possession ends, the ghost reappears in an unoccupied space within 5 ft. of the body. The target is immune to this ghost's Possession for 24 hours after succeeding on the saving throw or after the possession ends.",
+                "usage": {
+                  "type": "recharge on roll",
+                  "dice": "1d6",
+                  "min_value": 6
+                },
+                "dc": {
+                  "dc_type": {
+                    "index": "cha",
+                    "name": "CHA",
+                    "url": "/api/2014/ability-scores/cha"
+                  },
+                  "dc_value": 13,
+                  "success_type": "none"
+                },
+                "actions": []
+              }
+            ],
+            "image": "/api/images/monsters/ghost.png",
+            "url": "/api/2014/monsters/ghost",
+            "updated_at": "2026-04-01T20:35:38.254Z",
+            "forms": [],
+            "legendary_actions": [],
+            "reactions": []
+          }
+        },
+        "id": "sarah",
+        "name": "Sarah",
+        "type": "ghost",
+        "hp": {
+          "current": 45,
+          "max": 45
+        },
+        "ac": 11,
+        "stats": {
+          "str": 7,
+          "dex": 13,
+          "con": 10,
+          "int": 10,
+          "wis": 12,
+          "cha": 17
+        },
+        "position": {
+          "x": 6,
+          "y": 7
+        },
+        "conditions": [],
+        "xpValue": 1100,
+        "attackBonus": 5,
+        "damageDice": "4d6+3",
+        "speed": 0,
+        "attackName": "Withering Touch",
+        "attackRangeCells": 1,
+        "damageType": "necrotic",
+        "movementModes": {
+          "walk": 0,
+          "fly": 40,
+          "hover": true
+        },
+        "srd": {
+          "index": "ghost",
+          "ruleset": "2014",
+          "url": "https://www.dnd5eapi.co/api/2014/monsters/ghost"
+        },
+        "isAlive": true,
+        "hostile": false,
+        "kind": "ghost",
+        "roomId": "1",
+        "mapId": "candlekeep",
+        "disposition": "neutral",
+        "visible": false,
+        "description": "Fantôme muet lié au journal ; elle apparaît au fond de la salle après sa lecture, montre les passages et ne combat jamais."
+      },
+      "avowed": {
+        "statBlock": {
+          "type": "commoner",
+          "name": "Commoner",
+          "ruleset": "2014",
+          "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/commoner",
+          "sourceSha256": "534451fc4f991c7957ab93a702adc3a2249e2b34a98825e64ad07d73e9be7074",
+          "published": {
+            "index": "commoner",
+            "name": "Commoner",
+            "desc": "Commoners include peasants, serfs, slaves, servants, pilgrims, merchants, artisans, and hermits.",
+            "size": "Medium",
+            "type": "humanoid",
+            "subtype": "any race",
+            "alignment": "any alignment",
+            "armor_class": [
+              {
+                "type": "dex",
+                "value": 10
+              }
+            ],
+            "hit_points": 4,
+            "hit_dice": "1d8",
+            "hit_points_roll": "1d8",
+            "speed": {
+              "walk": "30 ft."
+            },
+            "strength": 10,
+            "dexterity": 10,
+            "constitution": 10,
+            "intelligence": 10,
+            "wisdom": 10,
+            "charisma": 10,
+            "proficiencies": [],
+            "damage_vulnerabilities": [],
+            "damage_resistances": [],
+            "damage_immunities": [],
+            "condition_immunities": [],
+            "senses": {
+              "passive_perception": 10
+            },
+            "languages": "any one language (usually Common)",
+            "challenge_rating": 0,
+            "proficiency_bonus": 2,
+            "xp": 10,
+            "actions": [
+              {
+                "name": "Club",
+                "desc": "Melee Weapon Attack: +2 to hit, reach 5 ft., one target. Hit: 2 (1d4) bludgeoning damage.",
+                "attack_bonus": 2,
+                "damage": [
+                  {
+                    "damage_type": {
+                      "index": "bludgeoning",
+                      "name": "Bludgeoning",
+                      "url": "/api/2014/damage-types/bludgeoning"
+                    },
+                    "damage_dice": "1d4"
+                  }
+                ],
+                "actions": []
+              }
+            ],
+            "image": "/api/images/monsters/commoner.png",
+            "url": "/api/2014/monsters/commoner",
+            "updated_at": "2026-04-01T20:35:38.253Z",
+            "forms": [],
+            "legendary_actions": [],
+            "reactions": [],
+            "special_abilities": []
+          }
+        },
+        "id": "avowed",
+        "name": "L’archiviste des Avoués",
+        "type": "commoner",
+        "hp": {
+          "current": 4,
+          "max": 4
+        },
+        "ac": 10,
+        "stats": {
+          "str": 10,
+          "dex": 10,
+          "con": 10,
+          "int": 10,
+          "wis": 10,
+          "cha": 10
+        },
+        "position": {
+          "x": 16,
+          "y": 2
+        },
+        "conditions": [],
+        "xpValue": 10,
+        "attackBonus": 2,
+        "damageDice": "1d4",
+        "speed": 30,
+        "attackName": "Club",
+        "attackRangeCells": 1,
+        "damageType": "bludgeoning",
+        "movementModes": {
+          "walk": 30
+        },
+        "srd": {
+          "index": "commoner",
+          "ruleset": "2014",
+          "url": "https://www.dnd5eapi.co/api/2014/monsters/commoner"
+        },
+        "isAlive": true,
+        "hostile": false,
+        "kind": "scholar",
+        "roomId": "2",
+        "mapId": "candlekeep",
+        "disposition": "neutral",
+        "visible": false,
+        "description": "Aide à identifier le sceau et le tome ; aucun indice indispensable ne dépend d’un jet."
+      },
+      "arnulf": {
+        "statBlock": {
+          "type": "commoner",
+          "name": "Commoner",
+          "ruleset": "2014",
+          "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/commoner",
+          "sourceSha256": "534451fc4f991c7957ab93a702adc3a2249e2b34a98825e64ad07d73e9be7074",
+          "published": {
+            "index": "commoner",
+            "name": "Commoner",
+            "desc": "Commoners include peasants, serfs, slaves, servants, pilgrims, merchants, artisans, and hermits.",
+            "size": "Medium",
+            "type": "humanoid",
+            "subtype": "any race",
+            "alignment": "any alignment",
+            "armor_class": [
+              {
+                "type": "dex",
+                "value": 10
+              }
+            ],
+            "hit_points": 4,
+            "hit_dice": "1d8",
+            "hit_points_roll": "1d8",
+            "speed": {
+              "walk": "30 ft."
+            },
+            "strength": 10,
+            "dexterity": 10,
+            "constitution": 10,
+            "intelligence": 10,
+            "wisdom": 10,
+            "charisma": 10,
+            "proficiencies": [],
+            "damage_vulnerabilities": [],
+            "damage_resistances": [],
+            "damage_immunities": [],
+            "condition_immunities": [],
+            "senses": {
+              "passive_perception": 10
+            },
+            "languages": "any one language (usually Common)",
+            "challenge_rating": 0,
+            "proficiency_bonus": 2,
+            "xp": 10,
+            "actions": [
+              {
+                "name": "Club",
+                "desc": "Melee Weapon Attack: +2 to hit, reach 5 ft., one target. Hit: 2 (1d4) bludgeoning damage.",
+                "attack_bonus": 2,
+                "damage": [
+                  {
+                    "damage_type": {
+                      "index": "bludgeoning",
+                      "name": "Bludgeoning",
+                      "url": "/api/2014/damage-types/bludgeoning"
+                    },
+                    "damage_dice": "1d4"
+                  }
+                ],
+                "actions": []
+              }
+            ],
+            "image": "/api/images/monsters/commoner.png",
+            "url": "/api/2014/monsters/commoner",
+            "updated_at": "2026-04-01T20:35:38.253Z",
+            "forms": [],
+            "legendary_actions": [],
+            "reactions": [],
+            "special_abilities": []
+          }
+        },
+        "id": "arnulf",
+        "name": "Arnulf",
+        "type": "commoner",
+        "hp": {
+          "current": 4,
+          "max": 4
+        },
+        "ac": 10,
+        "stats": {
+          "str": 10,
+          "dex": 10,
+          "con": 10,
+          "int": 10,
+          "wis": 10,
+          "cha": 10
+        },
+        "position": {
+          "x": 10,
+          "y": 4
+        },
+        "conditions": [],
+        "xpValue": 10,
+        "attackBonus": 2,
+        "damageDice": "1d4",
+        "speed": 30,
+        "attackName": "Club",
+        "attackRangeCells": 1,
+        "damageType": "bludgeoning",
+        "movementModes": {
+          "walk": 30
+        },
+        "srd": {
+          "index": "commoner",
+          "ruleset": "2014",
+          "url": "https://www.dnd5eapi.co/api/2014/monsters/commoner"
+        },
+        "isAlive": true,
+        "hostile": false,
+        "kind": "butler",
+        "roomId": "5",
+        "mapId": "waterdeep",
+        "disposition": "neutral",
+        "visible": false,
+        "description": "Majordome des Falgarst ; accueillant si la famille actuelle est respectée."
+      },
+      "vecken": {
+        "statBlock": {
+          "type": "knight",
+          "name": "Knight",
+          "ruleset": "2014",
+          "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/knight",
+          "sourceSha256": "d3aa70e443c5cefc21fccabfc09cd855b4ebc552ac72f5ca28dd0d9e617464a9",
+          "published": {
+            "index": "knight",
+            "name": "Knight",
+            "desc": "Knights are warriors who pledge service to rulers, religious orders, and noble causes. A knight’s alignment determines the extent to which a pledge is honored. Whether undertaking a quest or patrolling a realm, a knight often travels with an entourage that includes squires and hirelings who are commoners.",
+            "size": "Medium",
+            "type": "humanoid",
+            "subtype": "any race",
+            "alignment": "any alignment",
+            "armor_class": [
+              {
+                "type": "armor",
+                "value": 18,
+                "armor": [
+                  {
+                    "index": "plate-armor",
+                    "name": "Plate Armor",
+                    "url": "/api/2014/equipment/plate-armor"
+                  }
+                ]
+              }
+            ],
+            "hit_points": 52,
+            "hit_dice": "8d8",
+            "hit_points_roll": "8d8+16",
+            "speed": {
+              "walk": "30 ft."
+            },
+            "strength": 16,
+            "dexterity": 11,
+            "constitution": 14,
+            "intelligence": 11,
+            "wisdom": 11,
+            "charisma": 15,
+            "proficiencies": [
+              {
+                "value": 4,
+                "proficiency": {
+                  "index": "saving-throw-con",
+                  "name": "Saving Throw: CON",
+                  "url": "/api/2014/proficiencies/saving-throw-con"
+                }
+              },
+              {
+                "value": 2,
+                "proficiency": {
+                  "index": "saving-throw-wis",
+                  "name": "Saving Throw: WIS",
+                  "url": "/api/2014/proficiencies/saving-throw-wis"
+                }
+              }
+            ],
+            "damage_vulnerabilities": [],
+            "damage_resistances": [],
+            "damage_immunities": [],
+            "condition_immunities": [],
+            "senses": {
+              "passive_perception": 10
+            },
+            "languages": "any one language (usually Common)",
+            "challenge_rating": 3,
+            "proficiency_bonus": 2,
+            "xp": 700,
+            "special_abilities": [
+              {
+                "name": "Brave",
+                "desc": "The knight has advantage on saving throws against being frightened.",
+                "damage": []
+              }
+            ],
+            "actions": [
+              {
+                "damage": [],
+                "name": "Multiattack",
+                "multiattack_type": "actions",
+                "desc": "The knight makes two melee attacks.",
+                "actions": [
+                  {
+                    "action_name": "Greatsword",
+                    "count": "2",
+                    "type": "melee"
+                  }
+                ]
+              },
+              {
+                "name": "Greatsword",
+                "desc": "Melee Weapon Attack: +5 to hit, reach 5 ft., one target. Hit: 10 (2d6 + 3) slashing damage.",
+                "attack_bonus": 5,
+                "damage": [
+                  {
+                    "damage_type": {
+                      "index": "slashing",
+                      "name": "Slashing",
+                      "url": "/api/2014/damage-types/slashing"
+                    },
+                    "damage_dice": "2d6+3"
+                  }
+                ],
+                "actions": []
+              },
+              {
+                "name": "Heavy Crossbow",
+                "desc": "Ranged Weapon Attack: +2 to hit, range 100/400 ft., one target. Hit: 5 (1d10) piercing damage.",
+                "attack_bonus": 2,
+                "damage": [
+                  {
+                    "damage_type": {
+                      "index": "piercing",
+                      "name": "Piercing",
+                      "url": "/api/2014/damage-types/piercing"
+                    },
+                    "damage_dice": "1d10"
+                  }
+                ],
+                "actions": []
+              },
+              {
+                "damage": [],
+                "name": "Leadership",
+                "desc": "For 1 minute, the knight can utter a special command or warning whenever a nonhostile creature that it can see within 30 ft. of it makes an attack roll or a saving throw. The creature can add a d4 to its roll provided it can hear and understand the knight. A creature can benefit from only one Leadership die at a time. This effect ends if the knight is incapacitated.",
+                "usage": {
+                  "type": "recharge after rest",
+                  "rest_types": [
+                    "short",
+                    "long"
+                  ]
+                },
+                "actions": []
+              }
+            ],
+            "reactions": [
+              {
+                "name": "Parry",
+                "desc": "The knight adds 2 to its AC against one melee attack that would hit it. To do so, the knight must see the attacker and be wielding a melee weapon."
+              }
+            ],
+            "image": "/api/images/monsters/knight.png",
+            "url": "/api/2014/monsters/knight",
+            "updated_at": "2026-04-01T20:35:38.254Z",
+            "forms": [],
+            "legendary_actions": []
+          }
+        },
+        "id": "vecken",
+        "name": "Sir Vecken de la Corne brisée",
+        "type": "knight",
+        "hp": {
+          "current": 52,
+          "max": 52
+        },
+        "ac": 18,
+        "stats": {
+          "str": 16,
+          "dex": 11,
+          "con": 14,
+          "int": 11,
+          "wis": 11,
+          "cha": 15
+        },
+        "position": {
+          "x": 20,
+          "y": 4
+        },
+        "conditions": [],
+        "xpValue": 700,
+        "attackBonus": 5,
+        "damageDice": "2d6+3",
+        "speed": 30,
+        "attackName": "Greatsword",
+        "attackRangeCells": 1,
+        "damageType": "slashing",
+        "movementModes": {
+          "walk": 30
+        },
+        "srd": {
+          "index": "knight",
+          "ruleset": "2014",
+          "url": "https://www.dnd5eapi.co/api/2014/monsters/knight"
+        },
+        "isAlive": true,
+        "hostile": false,
+        "kind": "knight",
+        "roomId": "6",
+        "mapId": "waterdeep",
+        "disposition": "neutral",
+        "visible": false,
+        "description": "Ancien amant de Sarah ; veille sur son père Yacken."
+      },
+      "cobbler": {
+        "statBlock": {
+          "type": "commoner",
+          "name": "Commoner",
+          "ruleset": "2014",
+          "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/commoner",
+          "sourceSha256": "534451fc4f991c7957ab93a702adc3a2249e2b34a98825e64ad07d73e9be7074",
+          "published": {
+            "index": "commoner",
+            "name": "Commoner",
+            "desc": "Commoners include peasants, serfs, slaves, servants, pilgrims, merchants, artisans, and hermits.",
+            "size": "Medium",
+            "type": "humanoid",
+            "subtype": "any race",
+            "alignment": "any alignment",
+            "armor_class": [
+              {
+                "type": "dex",
+                "value": 10
+              }
+            ],
+            "hit_points": 4,
+            "hit_dice": "1d8",
+            "hit_points_roll": "1d8",
+            "speed": {
+              "walk": "30 ft."
+            },
+            "strength": 10,
+            "dexterity": 10,
+            "constitution": 10,
+            "intelligence": 10,
+            "wisdom": 10,
+            "charisma": 10,
+            "proficiencies": [],
+            "damage_vulnerabilities": [],
+            "damage_resistances": [],
+            "damage_immunities": [],
+            "condition_immunities": [],
+            "senses": {
+              "passive_perception": 10
+            },
+            "languages": "any one language (usually Common)",
+            "challenge_rating": 0,
+            "proficiency_bonus": 2,
+            "xp": 10,
+            "actions": [
+              {
+                "name": "Club",
+                "desc": "Melee Weapon Attack: +2 to hit, reach 5 ft., one target. Hit: 2 (1d4) bludgeoning damage.",
+                "attack_bonus": 2,
+                "damage": [
+                  {
+                    "damage_type": {
+                      "index": "bludgeoning",
+                      "name": "Bludgeoning",
+                      "url": "/api/2014/damage-types/bludgeoning"
+                    },
+                    "damage_dice": "1d4"
+                  }
+                ],
+                "actions": []
+              }
+            ],
+            "image": "/api/images/monsters/commoner.png",
+            "url": "/api/2014/monsters/commoner",
+            "updated_at": "2026-04-01T20:35:38.253Z",
+            "forms": [],
+            "legendary_actions": [],
+            "reactions": [],
+            "special_abilities": []
+          }
+        },
+        "id": "cobbler",
+        "name": "Le cordonnier des Yellowcrest",
+        "type": "commoner",
+        "hp": {
+          "current": 4,
+          "max": 4
+        },
+        "ac": 10,
+        "stats": {
+          "str": 10,
+          "dex": 10,
+          "con": 10,
+          "int": 10,
+          "wis": 10,
+          "cha": 10
+        },
+        "position": {
+          "x": 10,
+          "y": 16
+        },
+        "conditions": [],
+        "xpValue": 10,
+        "attackBonus": 2,
+        "damageDice": "1d4",
+        "speed": 30,
+        "attackName": "Club",
+        "attackRangeCells": 1,
+        "damageType": "bludgeoning",
+        "movementModes": {
+          "walk": 30
+        },
+        "srd": {
+          "index": "commoner",
+          "ruleset": "2014",
+          "url": "https://www.dnd5eapi.co/api/2014/monsters/commoner"
+        },
+        "isAlive": true,
+        "hostile": false,
+        "kind": "artisan",
+        "roomId": "7",
+        "mapId": "waterdeep",
+        "disposition": "neutral",
+        "visible": false,
+        "description": "Connaît l’adresse de Faerl à Greenfast ; donne la piste même si la négociation échoue."
+      },
+      "faerl_city": {
+        "statBlock": {
+          "type": "noble",
+          "name": "Noble",
+          "ruleset": "2014",
+          "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/noble",
+          "sourceSha256": "74c227943b01184d93c1167a63a5881afe6c1148042370477bff5a466b3a30cc",
+          "published": {
+            "index": "noble",
+            "name": "Noble",
+            "desc": "**Nobles** wield great authority and influence as members of the upper class, possessing wealth and connections that can make them as powerful as monarchs and generals. A noble often travels in the company of guards, as well as servants who are commoners.\n\nThe noble’s statistics can also be used to represent **courtiers** who aren’t of noble birth.",
+            "size": "Medium",
+            "type": "humanoid",
+            "subtype": "any race",
+            "alignment": "any alignment",
+            "armor_class": [
+              {
+                "type": "armor",
+                "value": 15,
+                "armor": [
+                  {
+                    "index": "breastplate",
+                    "name": "Breastplate",
+                    "url": "/api/2014/equipment/breastplate"
+                  }
+                ]
+              }
+            ],
+            "hit_points": 9,
+            "hit_dice": "2d8",
+            "hit_points_roll": "2d8",
+            "speed": {
+              "walk": "30 ft."
+            },
+            "strength": 11,
+            "dexterity": 12,
+            "constitution": 11,
+            "intelligence": 12,
+            "wisdom": 14,
+            "charisma": 16,
+            "proficiencies": [
+              {
+                "value": 5,
+                "proficiency": {
+                  "index": "skill-deception",
+                  "name": "Skill: Deception",
+                  "url": "/api/2014/proficiencies/skill-deception"
+                }
+              },
+              {
+                "value": 4,
+                "proficiency": {
+                  "index": "skill-insight",
+                  "name": "Skill: Insight",
+                  "url": "/api/2014/proficiencies/skill-insight"
+                }
+              },
+              {
+                "value": 5,
+                "proficiency": {
+                  "index": "skill-persuasion",
+                  "name": "Skill: Persuasion",
+                  "url": "/api/2014/proficiencies/skill-persuasion"
+                }
+              }
+            ],
+            "damage_vulnerabilities": [],
+            "damage_resistances": [],
+            "damage_immunities": [],
+            "condition_immunities": [],
+            "senses": {
+              "passive_perception": 12
+            },
+            "languages": "any two languages",
+            "challenge_rating": 0.125,
+            "proficiency_bonus": 2,
+            "xp": 25,
+            "actions": [
+              {
+                "name": "Rapier",
+                "desc": "Melee Weapon Attack: +3 to hit, reach 5 ft., one target. Hit: 5 (1d8 + 1) piercing damage.",
+                "attack_bonus": 3,
+                "damage": [
+                  {
+                    "damage_type": {
+                      "index": "piercing",
+                      "name": "Piercing",
+                      "url": "/api/2014/damage-types/piercing"
+                    },
+                    "damage_dice": "1d8+1"
+                  }
+                ],
+                "actions": []
+              }
+            ],
+            "reactions": [
+              {
+                "name": "Parry",
+                "desc": "The noble adds 2 to its AC against one melee attack that would hit it. To do so, the noble must see the attacker and be wielding a melee weapon."
+              }
+            ],
+            "image": "/api/images/monsters/noble.png",
+            "url": "/api/2014/monsters/noble",
+            "updated_at": "2026-06-02T19:33:15.988Z",
+            "forms": [],
+            "legendary_actions": [],
+            "special_abilities": []
+          }
+        },
+        "socialIdentity": "faerl",
+        "id": "faerl_city",
+        "name": "Faerl",
+        "type": "noble",
+        "hp": {
+          "current": 9,
+          "max": 9
+        },
+        "ac": 15,
+        "stats": {
+          "str": 11,
+          "dex": 12,
+          "con": 11,
+          "int": 12,
+          "wis": 14,
+          "cha": 16
+        },
+        "position": {
+          "x": 23,
+          "y": 15
+        },
+        "conditions": [],
+        "xpValue": 25,
+        "attackBonus": 3,
+        "damageDice": "1d8+1",
+        "speed": 30,
+        "attackName": "Rapier",
+        "attackRangeCells": 1,
+        "damageType": "piercing",
+        "movementModes": {
+          "walk": 30
+        },
+        "srd": {
+          "index": "noble",
+          "ruleset": "2014",
+          "url": "https://www.dnd5eapi.co/api/2014/monsters/noble"
+        },
+        "isAlive": true,
+        "hostile": false,
+        "kind": "overseer",
+        "roomId": "8",
+        "mapId": "waterdeep",
+        "disposition": "neutral",
+        "visible": false,
+        "description": "Intendant elfe loyal au culte ; fuit dans le coche, aucune corruption ne lui fait trahir Viallis."
+      },
+      "kara": {
+        "statBlock": {
+          "type": "commoner",
+          "name": "Commoner",
+          "ruleset": "2014",
+          "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/commoner",
+          "sourceSha256": "534451fc4f991c7957ab93a702adc3a2249e2b34a98825e64ad07d73e9be7074",
+          "published": {
+            "index": "commoner",
+            "name": "Commoner",
+            "desc": "Commoners include peasants, serfs, slaves, servants, pilgrims, merchants, artisans, and hermits.",
+            "size": "Medium",
+            "type": "humanoid",
+            "subtype": "any race",
+            "alignment": "any alignment",
+            "armor_class": [
+              {
+                "type": "dex",
+                "value": 10
+              }
+            ],
+            "hit_points": 4,
+            "hit_dice": "1d8",
+            "hit_points_roll": "1d8",
+            "speed": {
+              "walk": "30 ft."
+            },
+            "strength": 10,
+            "dexterity": 10,
+            "constitution": 10,
+            "intelligence": 10,
+            "wisdom": 10,
+            "charisma": 10,
+            "proficiencies": [],
+            "damage_vulnerabilities": [],
+            "damage_resistances": [],
+            "damage_immunities": [],
+            "condition_immunities": [],
+            "senses": {
+              "passive_perception": 10
+            },
+            "languages": "any one language (usually Common)",
+            "challenge_rating": 0,
+            "proficiency_bonus": 2,
+            "xp": 10,
+            "actions": [
+              {
+                "name": "Club",
+                "desc": "Melee Weapon Attack: +2 to hit, reach 5 ft., one target. Hit: 2 (1d4) bludgeoning damage.",
+                "attack_bonus": 2,
+                "damage": [
+                  {
+                    "damage_type": {
+                      "index": "bludgeoning",
+                      "name": "Bludgeoning",
+                      "url": "/api/2014/damage-types/bludgeoning"
+                    },
+                    "damage_dice": "1d4"
+                  }
+                ],
+                "actions": []
+              }
+            ],
+            "image": "/api/images/monsters/commoner.png",
+            "url": "/api/2014/monsters/commoner",
+            "updated_at": "2026-04-01T20:35:38.253Z",
+            "forms": [],
+            "legendary_actions": [],
+            "reactions": [],
+            "special_abilities": []
+          }
+        },
+        "id": "kara",
+        "name": "Kara Firenni",
+        "type": "commoner",
+        "hp": {
+          "current": 4,
+          "max": 4
+        },
+        "ac": 10,
+        "stats": {
+          "str": 10,
+          "dex": 10,
+          "con": 10,
+          "int": 10,
+          "wis": 10,
+          "cha": 10
+        },
+        "position": {
+          "x": 8,
+          "y": 3
+        },
+        "conditions": [],
+        "xpValue": 10,
+        "attackBonus": 2,
+        "damageDice": "1d4",
+        "speed": 30,
+        "attackName": "Club",
+        "attackRangeCells": 1,
+        "damageType": "bludgeoning",
+        "movementModes": {
+          "walk": 30
+        },
+        "srd": {
+          "index": "commoner",
+          "ruleset": "2014",
+          "url": "https://www.dnd5eapi.co/api/2014/monsters/commoner"
+        },
+        "isAlive": true,
+        "hostile": false,
+        "kind": "mayor",
+        "roomId": "11",
+        "mapId": "greenfast",
+        "disposition": "neutral",
+        "visible": false,
+        "description": "Mairesse inquiète pour sa sœur Yaeda, partie à la propriété de Viallis."
+      },
+      "old_fargo": {
+        "statBlock": {
+          "type": "commoner",
+          "name": "Commoner",
+          "ruleset": "2014",
+          "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/commoner",
+          "sourceSha256": "534451fc4f991c7957ab93a702adc3a2249e2b34a98825e64ad07d73e9be7074",
+          "published": {
+            "index": "commoner",
+            "name": "Commoner",
+            "desc": "Commoners include peasants, serfs, slaves, servants, pilgrims, merchants, artisans, and hermits.",
+            "size": "Medium",
+            "type": "humanoid",
+            "subtype": "any race",
+            "alignment": "any alignment",
+            "armor_class": [
+              {
+                "type": "dex",
+                "value": 10
+              }
+            ],
+            "hit_points": 4,
+            "hit_dice": "1d8",
+            "hit_points_roll": "1d8",
+            "speed": {
+              "walk": "30 ft."
+            },
+            "strength": 10,
+            "dexterity": 10,
+            "constitution": 10,
+            "intelligence": 10,
+            "wisdom": 10,
+            "charisma": 10,
+            "proficiencies": [],
+            "damage_vulnerabilities": [],
+            "damage_resistances": [],
+            "damage_immunities": [],
+            "condition_immunities": [],
+            "senses": {
+              "passive_perception": 10
+            },
+            "languages": "any one language (usually Common)",
+            "challenge_rating": 0,
+            "proficiency_bonus": 2,
+            "xp": 10,
+            "actions": [
+              {
+                "name": "Club",
+                "desc": "Melee Weapon Attack: +2 to hit, reach 5 ft., one target. Hit: 2 (1d4) bludgeoning damage.",
+                "attack_bonus": 2,
+                "damage": [
+                  {
+                    "damage_type": {
+                      "index": "bludgeoning",
+                      "name": "Bludgeoning",
+                      "url": "/api/2014/damage-types/bludgeoning"
+                    },
+                    "damage_dice": "1d4"
+                  }
+                ],
+                "actions": []
+              }
+            ],
+            "image": "/api/images/monsters/commoner.png",
+            "url": "/api/2014/monsters/commoner",
+            "updated_at": "2026-04-01T20:35:38.253Z",
+            "forms": [],
+            "legendary_actions": [],
+            "reactions": [],
+            "special_abilities": []
+          }
+        },
+        "id": "old_fargo",
+        "name": "Le vieux Fargo",
+        "type": "commoner",
+        "hp": {
+          "current": 4,
+          "max": 4
+        },
+        "ac": 10,
+        "stats": {
+          "str": 10,
+          "dex": 10,
+          "con": 10,
+          "int": 10,
+          "wis": 10,
+          "cha": 10
+        },
+        "position": {
+          "x": 16,
+          "y": 4
+        },
+        "conditions": [],
+        "xpValue": 10,
+        "attackBonus": 2,
+        "damageDice": "1d4",
+        "speed": 30,
+        "attackName": "Club",
+        "attackRangeCells": 1,
+        "damageType": "bludgeoning",
+        "movementModes": {
+          "walk": 30
+        },
+        "srd": {
+          "index": "commoner",
+          "ruleset": "2014",
+          "url": "https://www.dnd5eapi.co/api/2014/monsters/commoner"
+        },
+        "isAlive": true,
+        "hostile": false,
+        "kind": "innkeeper",
+        "roomId": "12",
+        "mapId": "greenfast",
+        "disposition": "neutral",
+        "visible": false,
+        "description": "Vieil aubergiste du Chaudron ventru, derrière son comptoir avec son chapeau élimé."
+      },
+      "faerl_village": {
+        "statBlock": {
+          "type": "noble",
+          "name": "Noble",
+          "ruleset": "2014",
+          "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/noble",
+          "sourceSha256": "74c227943b01184d93c1167a63a5881afe6c1148042370477bff5a466b3a30cc",
+          "published": {
+            "index": "noble",
+            "name": "Noble",
+            "desc": "**Nobles** wield great authority and influence as members of the upper class, possessing wealth and connections that can make them as powerful as monarchs and generals. A noble often travels in the company of guards, as well as servants who are commoners.\n\nThe noble’s statistics can also be used to represent **courtiers** who aren’t of noble birth.",
+            "size": "Medium",
+            "type": "humanoid",
+            "subtype": "any race",
+            "alignment": "any alignment",
+            "armor_class": [
+              {
+                "type": "armor",
+                "value": 15,
+                "armor": [
+                  {
+                    "index": "breastplate",
+                    "name": "Breastplate",
+                    "url": "/api/2014/equipment/breastplate"
+                  }
+                ]
+              }
+            ],
+            "hit_points": 9,
+            "hit_dice": "2d8",
+            "hit_points_roll": "2d8",
+            "speed": {
+              "walk": "30 ft."
+            },
+            "strength": 11,
+            "dexterity": 12,
+            "constitution": 11,
+            "intelligence": 12,
+            "wisdom": 14,
+            "charisma": 16,
+            "proficiencies": [
+              {
+                "value": 5,
+                "proficiency": {
+                  "index": "skill-deception",
+                  "name": "Skill: Deception",
+                  "url": "/api/2014/proficiencies/skill-deception"
+                }
+              },
+              {
+                "value": 4,
+                "proficiency": {
+                  "index": "skill-insight",
+                  "name": "Skill: Insight",
+                  "url": "/api/2014/proficiencies/skill-insight"
+                }
+              },
+              {
+                "value": 5,
+                "proficiency": {
+                  "index": "skill-persuasion",
+                  "name": "Skill: Persuasion",
+                  "url": "/api/2014/proficiencies/skill-persuasion"
+                }
+              }
+            ],
+            "damage_vulnerabilities": [],
+            "damage_resistances": [],
+            "damage_immunities": [],
+            "condition_immunities": [],
+            "senses": {
+              "passive_perception": 12
+            },
+            "languages": "any two languages",
+            "challenge_rating": 0.125,
+            "proficiency_bonus": 2,
+            "xp": 25,
+            "actions": [
+              {
+                "name": "Rapier",
+                "desc": "Melee Weapon Attack: +3 to hit, reach 5 ft., one target. Hit: 5 (1d8 + 1) piercing damage.",
+                "attack_bonus": 3,
+                "damage": [
+                  {
+                    "damage_type": {
+                      "index": "piercing",
+                      "name": "Piercing",
+                      "url": "/api/2014/damage-types/piercing"
+                    },
+                    "damage_dice": "1d8+1"
+                  }
+                ],
+                "actions": []
+              }
+            ],
+            "reactions": [
+              {
+                "name": "Parry",
+                "desc": "The noble adds 2 to its AC against one melee attack that would hit it. To do so, the noble must see the attacker and be wielding a melee weapon."
+              }
+            ],
+            "image": "/api/images/monsters/noble.png",
+            "url": "/api/2014/monsters/noble",
+            "updated_at": "2026-06-02T19:33:15.988Z",
+            "forms": [],
+            "legendary_actions": [],
+            "special_abilities": []
+          }
+        },
+        "socialIdentity": "faerl",
+        "id": "faerl_village",
+        "name": "Faerl — au village",
+        "type": "noble",
+        "hp": {
+          "current": 9,
+          "max": 9
+        },
+        "ac": 15,
+        "stats": {
+          "str": 11,
+          "dex": 12,
+          "con": 11,
+          "int": 12,
+          "wis": 14,
+          "cha": 16
+        },
+        "position": {
+          "x": 9,
+          "y": 17
+        },
+        "conditions": [],
+        "xpValue": 25,
+        "attackBonus": 3,
+        "damageDice": "1d8+1",
+        "speed": 30,
+        "attackName": "Rapier",
+        "attackRangeCells": 1,
+        "damageType": "piercing",
+        "movementModes": {
+          "walk": 30
+        },
+        "srd": {
+          "index": "noble",
+          "ruleset": "2014",
+          "url": "https://www.dnd5eapi.co/api/2014/monsters/noble"
+        },
+        "isAlive": true,
+        "hostile": false,
+        "kind": "overseer",
+        "roomId": "14",
+        "mapId": "greenfast",
+        "disposition": "neutral",
+        "visible": false,
+        "description": "Utiliser seulement si Faerl n’a pas été capturé à Waterdeep ; ne jamais dupliquer sa présence."
+      },
+      "yaeda": {
+        "statBlock": {
+          "type": "commoner",
+          "name": "Groupe des captifs de la cellule sud",
+          "ruleset": "2014",
+          "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/commoner",
+          "sourceSha256": "534451fc4f991c7957ab93a702adc3a2249e2b34a98825e64ad07d73e9be7074",
+          "published": {
+            "index": "commoner",
+            "name": "Commoner",
+            "desc": "Commoners include peasants, serfs, slaves, servants, pilgrims, merchants, artisans, and hermits.",
+            "size": "Medium",
+            "type": "humanoid",
+            "subtype": "any race",
+            "alignment": "any alignment",
+            "armor_class": [
+              {
+                "type": "dex",
+                "value": 10
+              }
+            ],
+            "hit_points": 4,
+            "hit_dice": "1d8",
+            "hit_points_roll": "1d8",
+            "speed": {
+              "walk": "30 ft."
+            },
+            "strength": 10,
+            "dexterity": 10,
+            "constitution": 10,
+            "intelligence": 10,
+            "wisdom": 10,
+            "charisma": 10,
+            "proficiencies": [],
+            "damage_vulnerabilities": [],
+            "damage_resistances": [],
+            "damage_immunities": [],
+            "condition_immunities": [],
+            "senses": {
+              "passive_perception": 10
+            },
+            "languages": "any one language (usually Common)",
+            "challenge_rating": 0,
+            "proficiency_bonus": 2,
+            "xp": 10,
+            "actions": [
+              {
+                "name": "Club",
+                "desc": "Melee Weapon Attack: +2 to hit, reach 5 ft., one target. Hit: 2 (1d4) bludgeoning damage.",
+                "attack_bonus": 2,
+                "damage": [
+                  {
+                    "damage_type": {
+                      "index": "bludgeoning",
+                      "name": "Bludgeoning",
+                      "url": "/api/2014/damage-types/bludgeoning"
+                    },
+                    "damage_dice": "1d4"
+                  }
+                ],
+                "actions": []
+              }
+            ],
+            "image": "/api/images/monsters/commoner.png",
+            "url": "/api/2014/monsters/commoner",
+            "updated_at": "2026-04-01T20:35:38.253Z",
+            "forms": [],
+            "legendary_actions": [],
+            "reactions": [],
+            "special_abilities": []
+          },
+          "homebrew": "Shared HP group: one member removed per full individual HP lost; attacks scale with remaining members. No healing or temporary HP. Losses do not choose named victims or assert their death."
+        },
+        "group": {
+          "rule": "shared-hp-attrition-v1",
+          "name": "Groupe des captifs de la cellule sud",
+          "members": [
+            {
+              "id": "yaeda",
+              "name": "Yaeda Firenni"
+            },
+            {
+              "id": "jalrax",
+              "name": "Jalrax"
+            },
+            {
+              "id": "durz",
+              "name": "Durz"
+            },
+            {
+              "id": "seffra",
+              "name": "Seffra"
+            },
+            {
+              "id": "ashlan",
+              "name": "Ashlan"
+            }
+          ],
+          "initialCount": 5,
+          "remainingCount": 5,
+          "memberMaxHp": 4,
+          "incapacitatedCount": 0,
+          "cannotRegainHp": true,
+          "cannotGainTemporaryHp": true
+        },
+        "id": "yaeda",
+        "name": "Yaeda Firenni et les captifs",
+        "type": "commoner",
+        "hp": {
+          "current": 20,
+          "max": 20
+        },
+        "ac": 10,
+        "stats": {
+          "str": 10,
+          "dex": 10,
+          "con": 10,
+          "int": 10,
+          "wis": 10,
+          "cha": 10
+        },
+        "position": {
+          "x": 21,
+          "y": 13
+        },
+        "conditions": [],
+        "xpValue": 10,
+        "attackBonus": 2,
+        "damageDice": "5d4",
+        "speed": 30,
+        "attackName": "Club",
+        "attackRangeCells": 1,
+        "damageType": "bludgeoning",
+        "movementModes": {
+          "walk": 30
+        },
+        "srd": {
+          "index": "commoner",
+          "ruleset": "2014",
+          "url": "https://www.dnd5eapi.co/api/2014/monsters/commoner"
+        },
+        "isAlive": true,
+        "hostile": false,
+        "kind": "prisoners",
+        "roomId": "30",
+        "mapId": "cellar",
+        "disposition": "neutral",
+        "visible": false,
+        "description": "Yaeda, Jalrax, Durz, Seffra et Ashlan attendent derrière la grille de la cellule sud, sous la menace du culte."
+      },
+      "vecken_rescued": {
+        "statBlock": {
+          "type": "knight",
+          "name": "Knight",
+          "ruleset": "2014",
+          "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/knight",
+          "sourceSha256": "d3aa70e443c5cefc21fccabfc09cd855b4ebc552ac72f5ca28dd0d9e617464a9",
+          "published": {
+            "index": "knight",
+            "name": "Knight",
+            "desc": "Knights are warriors who pledge service to rulers, religious orders, and noble causes. A knight’s alignment determines the extent to which a pledge is honored. Whether undertaking a quest or patrolling a realm, a knight often travels with an entourage that includes squires and hirelings who are commoners.",
+            "size": "Medium",
+            "type": "humanoid",
+            "subtype": "any race",
+            "alignment": "any alignment",
+            "armor_class": [
+              {
+                "type": "armor",
+                "value": 18,
+                "armor": [
+                  {
+                    "index": "plate-armor",
+                    "name": "Plate Armor",
+                    "url": "/api/2014/equipment/plate-armor"
+                  }
+                ]
+              }
+            ],
+            "hit_points": 52,
+            "hit_dice": "8d8",
+            "hit_points_roll": "8d8+16",
+            "speed": {
+              "walk": "30 ft."
+            },
+            "strength": 16,
+            "dexterity": 11,
+            "constitution": 14,
+            "intelligence": 11,
+            "wisdom": 11,
+            "charisma": 15,
+            "proficiencies": [
+              {
+                "value": 4,
+                "proficiency": {
+                  "index": "saving-throw-con",
+                  "name": "Saving Throw: CON",
+                  "url": "/api/2014/proficiencies/saving-throw-con"
+                }
+              },
+              {
+                "value": 2,
+                "proficiency": {
+                  "index": "saving-throw-wis",
+                  "name": "Saving Throw: WIS",
+                  "url": "/api/2014/proficiencies/saving-throw-wis"
+                }
+              }
+            ],
+            "damage_vulnerabilities": [],
+            "damage_resistances": [],
+            "damage_immunities": [],
+            "condition_immunities": [],
+            "senses": {
+              "passive_perception": 10
+            },
+            "languages": "any one language (usually Common)",
+            "challenge_rating": 3,
+            "proficiency_bonus": 2,
+            "xp": 700,
+            "special_abilities": [
+              {
+                "name": "Brave",
+                "desc": "The knight has advantage on saving throws against being frightened.",
+                "damage": []
+              }
+            ],
+            "actions": [
+              {
+                "damage": [],
+                "name": "Multiattack",
+                "multiattack_type": "actions",
+                "desc": "The knight makes two melee attacks.",
+                "actions": [
+                  {
+                    "action_name": "Greatsword",
+                    "count": "2",
+                    "type": "melee"
+                  }
+                ]
+              },
+              {
+                "name": "Greatsword",
+                "desc": "Melee Weapon Attack: +5 to hit, reach 5 ft., one target. Hit: 10 (2d6 + 3) slashing damage.",
+                "attack_bonus": 5,
+                "damage": [
+                  {
+                    "damage_type": {
+                      "index": "slashing",
+                      "name": "Slashing",
+                      "url": "/api/2014/damage-types/slashing"
+                    },
+                    "damage_dice": "2d6+3"
+                  }
+                ],
+                "actions": []
+              },
+              {
+                "name": "Heavy Crossbow",
+                "desc": "Ranged Weapon Attack: +2 to hit, range 100/400 ft., one target. Hit: 5 (1d10) piercing damage.",
+                "attack_bonus": 2,
+                "damage": [
+                  {
+                    "damage_type": {
+                      "index": "piercing",
+                      "name": "Piercing",
+                      "url": "/api/2014/damage-types/piercing"
+                    },
+                    "damage_dice": "1d10"
+                  }
+                ],
+                "actions": []
+              },
+              {
+                "damage": [],
+                "name": "Leadership",
+                "desc": "For 1 minute, the knight can utter a special command or warning whenever a nonhostile creature that it can see within 30 ft. of it makes an attack roll or a saving throw. The creature can add a d4 to its roll provided it can hear and understand the knight. A creature can benefit from only one Leadership die at a time. This effect ends if the knight is incapacitated.",
+                "usage": {
+                  "type": "recharge after rest",
+                  "rest_types": [
+                    "short",
+                    "long"
+                  ]
+                },
+                "actions": []
+              }
+            ],
+            "reactions": [
+              {
+                "name": "Parry",
+                "desc": "The knight adds 2 to its AC against one melee attack that would hit it. To do so, the knight must see the attacker and be wielding a melee weapon."
+              }
+            ],
+            "image": "/api/images/monsters/knight.png",
+            "url": "/api/2014/monsters/knight",
+            "updated_at": "2026-04-01T20:35:38.254Z",
+            "forms": [],
+            "legendary_actions": []
+          }
+        },
+        "socialIdentity": "vecken",
+        "id": "vecken_rescued",
+        "name": "Vecken — blessé",
+        "type": "knight",
+        "hp": {
+          "current": 25,
+          "max": 52
+        },
+        "ac": 18,
+        "stats": {
+          "str": 16,
+          "dex": 11,
+          "con": 14,
+          "int": 11,
+          "wis": 11,
+          "cha": 15
+        },
+        "position": {
+          "x": 18,
+          "y": 13
+        },
+        "conditions": [],
+        "xpValue": 700,
+        "attackBonus": 5,
+        "damageDice": "2d6+3",
+        "speed": 30,
+        "attackName": "Greatsword",
+        "attackRangeCells": 1,
+        "damageType": "slashing",
+        "movementModes": {
+          "walk": 30
+        },
+        "srd": {
+          "index": "knight",
+          "ruleset": "2014",
+          "url": "https://www.dnd5eapi.co/api/2014/monsters/knight"
+        },
+        "isAlive": true,
+        "hostile": false,
+        "kind": "knight",
+        "roomId": "30",
+        "mapId": "cellar",
+        "disposition": "neutral",
+        "visible": false,
+        "description": "Vecken capturé seulement si la visite de Waterdeep l’a envoyé sur la route ; sinon représente son arrivée tardive en soutien."
+      },
+      "young_fargo": {
+        "statBlock": {
+          "type": "cultist",
+          "name": "Cultist",
+          "ruleset": "2014",
+          "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/cultist",
+          "sourceSha256": "afae4e230c718d77ce7c3207ac561884e688fa86942d9d406b0d3b9b70b97368",
+          "published": {
+            "index": "cultist",
+            "name": "Cultist",
+            "desc": "Cultists swear allegiance to dark powers such as elemental princes, demon lords, or archdevils. Most conceal their loyalties to avoid being ostracized, imprisoned, or executed for their beliefs. Unlike evil acolytes, cultists often show signs of insanity in their beliefs and practices.",
+            "size": "Medium",
+            "type": "humanoid",
+            "subtype": "any race",
+            "alignment": "any non-good alignment",
+            "armor_class": [
+              {
+                "type": "armor",
+                "value": 12,
+                "armor": [
+                  {
+                    "index": "leather-armor",
+                    "name": "Leather Armor",
+                    "url": "/api/2014/equipment/leather-armor"
+                  }
+                ]
+              }
+            ],
+            "hit_points": 9,
+            "hit_dice": "2d8",
+            "hit_points_roll": "2d8",
+            "speed": {
+              "walk": "30 ft."
+            },
+            "strength": 11,
+            "dexterity": 12,
+            "constitution": 10,
+            "intelligence": 10,
+            "wisdom": 11,
+            "charisma": 10,
+            "proficiencies": [
+              {
+                "value": 2,
+                "proficiency": {
+                  "index": "skill-deception",
+                  "name": "Skill: Deception",
+                  "url": "/api/2014/proficiencies/skill-deception"
+                }
+              },
+              {
+                "value": 2,
+                "proficiency": {
+                  "index": "skill-religion",
+                  "name": "Skill: Religion",
+                  "url": "/api/2014/proficiencies/skill-religion"
+                }
+              }
+            ],
+            "damage_vulnerabilities": [],
+            "damage_resistances": [],
+            "damage_immunities": [],
+            "condition_immunities": [],
+            "senses": {
+              "passive_perception": 10
+            },
+            "languages": "any one language (usually Common)",
+            "challenge_rating": 0.125,
+            "proficiency_bonus": 2,
+            "xp": 25,
+            "special_abilities": [
+              {
+                "name": "Dark Devotion",
+                "desc": "The cultist has advantage on saving throws against being charmed or frightened.",
+                "damage": []
+              }
+            ],
+            "actions": [
+              {
+                "name": "Scimitar",
+                "desc": "Melee Weapon Attack: +3 to hit, reach 5 ft., one creature. Hit: 4 (1d6 + 1) slashing damage.",
+                "attack_bonus": 3,
+                "damage": [
+                  {
+                    "damage_type": {
+                      "index": "slashing",
+                      "name": "Slashing",
+                      "url": "/api/2014/damage-types/slashing"
+                    },
+                    "damage_dice": "1d6+1"
+                  }
+                ],
+                "actions": []
+              }
+            ],
+            "image": "/api/images/monsters/cultist.png",
+            "url": "/api/2014/monsters/cultist",
+            "updated_at": "2026-04-01T20:35:38.253Z",
+            "forms": [],
+            "legendary_actions": [],
+            "reactions": []
+          }
+        },
+        "id": "young_fargo",
+        "name": "Le jeune Fargo",
+        "type": "cultist",
+        "hp": {
+          "current": 9,
+          "max": 9
+        },
+        "ac": 12,
+        "stats": {
+          "str": 11,
+          "dex": 12,
+          "con": 10,
+          "int": 10,
+          "wis": 11,
+          "cha": 10
+        },
+        "position": {
+          "x": 25,
+          "y": 13
+        },
+        "conditions": [],
+        "xpValue": 25,
+        "attackBonus": 3,
+        "damageDice": "1d6+1",
+        "speed": 30,
+        "attackName": "Scimitar",
+        "attackRangeCells": 1,
+        "damageType": "slashing",
+        "movementModes": {
+          "walk": 30
+        },
+        "srd": {
+          "index": "cultist",
+          "ruleset": "2014",
+          "url": "https://www.dnd5eapi.co/api/2014/monsters/cultist"
+        },
+        "isAlive": true,
+        "hostile": false,
+        "kind": "novice",
+        "roomId": "31",
+        "mapId": "cellar",
+        "disposition": "neutral",
+        "visible": false,
+        "description": "Recrue manipulée : peut être convaincue ou épargnée sans être tuée."
+      },
+      "cemetery_keeper": {
+        "statBlock": {
+          "type": "commoner",
+          "name": "Commoner",
+          "ruleset": "2014",
+          "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/commoner",
+          "sourceSha256": "534451fc4f991c7957ab93a702adc3a2249e2b34a98825e64ad07d73e9be7074",
+          "published": {
+            "index": "commoner",
+            "name": "Commoner",
+            "desc": "Commoners include peasants, serfs, slaves, servants, pilgrims, merchants, artisans, and hermits.",
+            "size": "Medium",
+            "type": "humanoid",
+            "subtype": "any race",
+            "alignment": "any alignment",
+            "armor_class": [
+              {
+                "type": "dex",
+                "value": 10
+              }
+            ],
+            "hit_points": 4,
+            "hit_dice": "1d8",
+            "hit_points_roll": "1d8",
+            "speed": {
+              "walk": "30 ft."
+            },
+            "strength": 10,
+            "dexterity": 10,
+            "constitution": 10,
+            "intelligence": 10,
+            "wisdom": 10,
+            "charisma": 10,
+            "proficiencies": [],
+            "damage_vulnerabilities": [],
+            "damage_resistances": [],
+            "damage_immunities": [],
+            "condition_immunities": [],
+            "senses": {
+              "passive_perception": 10
+            },
+            "languages": "any one language (usually Common)",
+            "challenge_rating": 0,
+            "proficiency_bonus": 2,
+            "xp": 10,
+            "actions": [
+              {
+                "name": "Club",
+                "desc": "Melee Weapon Attack: +2 to hit, reach 5 ft., one target. Hit: 2 (1d4) bludgeoning damage.",
+                "attack_bonus": 2,
+                "damage": [
+                  {
+                    "damage_type": {
+                      "index": "bludgeoning",
+                      "name": "Bludgeoning",
+                      "url": "/api/2014/damage-types/bludgeoning"
+                    },
+                    "damage_dice": "1d4"
+                  }
+                ],
+                "actions": []
+              }
+            ],
+            "image": "/api/images/monsters/commoner.png",
+            "url": "/api/2014/monsters/commoner",
+            "updated_at": "2026-04-01T20:35:38.253Z",
+            "forms": [],
+            "legendary_actions": [],
+            "reactions": [],
+            "special_abilities": []
+          }
+        },
+        "id": "cemetery_keeper",
+        "name": "La gardienne des sépultures",
+        "type": "commoner",
+        "hp": {
+          "current": 4,
+          "max": 4
+        },
+        "ac": 10,
+        "stats": {
+          "str": 10,
+          "dex": 10,
+          "con": 10,
+          "int": 10,
+          "wis": 10,
+          "cha": 10
+        },
+        "position": {
+          "x": 7,
+          "y": 10
+        },
+        "conditions": [],
+        "xpValue": 10,
+        "attackBonus": 2,
+        "damageDice": "1d4",
+        "speed": 30,
+        "attackName": "Club",
+        "attackRangeCells": 1,
+        "damageType": "bludgeoning",
+        "movementModes": {
+          "walk": 30
+        },
+        "srd": {
+          "index": "commoner",
+          "ruleset": "2014",
+          "url": "https://www.dnd5eapi.co/api/2014/monsters/commoner"
+        },
+        "isAlive": true,
+        "hostile": false,
+        "kind": "caretaker",
+        "roomId": "33",
+        "mapId": "rest",
+        "disposition": "neutral",
+        "visible": false,
+        "description": "Indique le mausolée consacré et reçoit les preuves pour la justice."
+      },
+      "sarah_at_rest": {
+        "statBlock": {
+          "type": "ghost",
+          "name": "Groupe des esprits libérés",
+          "ruleset": "2014",
+          "sourceUrl": "https://www.dnd5eapi.co/api/2014/monsters/ghost",
+          "sourceSha256": "32c6f528707440c9da15aa5c9ae0ae19fcb703231b5762608dd0b3e646fda234",
+          "published": {
+            "index": "ghost",
+            "name": "Ghost",
+            "size": "Medium",
+            "type": "undead",
+            "alignment": "any alignment",
+            "armor_class": [
+              {
+                "type": "dex",
+                "value": 11
+              }
+            ],
+            "hit_points": 45,
+            "hit_dice": "10d8",
+            "hit_points_roll": "10d8",
+            "speed": {
+              "walk": "0 ft.",
+              "fly": "40 ft.",
+              "hover": true
+            },
+            "strength": 7,
+            "dexterity": 13,
+            "constitution": 10,
+            "intelligence": 10,
+            "wisdom": 12,
+            "charisma": 17,
+            "proficiencies": [],
+            "damage_vulnerabilities": [],
+            "damage_resistances": [
+              "acid",
+              "fire",
+              "lightning",
+              "thunder",
+              "bludgeoning, piercing, and slashing from nonmagical weapons"
+            ],
+            "damage_immunities": [
+              "cold",
+              "necrotic",
+              "poison"
+            ],
+            "condition_immunities": [
+              {
+                "index": "charmed",
+                "name": "Charmed",
+                "url": "/api/2014/conditions/charmed"
+              },
+              {
+                "index": "exhaustion",
+                "name": "Exhaustion",
+                "url": "/api/2014/conditions/exhaustion"
+              },
+              {
+                "index": "frightened",
+                "name": "Frightened",
+                "url": "/api/2014/conditions/frightened"
+              },
+              {
+                "index": "grappled",
+                "name": "Grappled",
+                "url": "/api/2014/conditions/grappled"
+              },
+              {
+                "index": "paralyzed",
+                "name": "Paralyzed",
+                "url": "/api/2014/conditions/paralyzed"
+              },
+              {
+                "index": "petrified",
+                "name": "Petrified",
+                "url": "/api/2014/conditions/petrified"
+              },
+              {
+                "index": "poisoned",
+                "name": "Poisoned",
+                "url": "/api/2014/conditions/poisoned"
+              },
+              {
+                "index": "prone",
+                "name": "Prone",
+                "url": "/api/2014/conditions/prone"
+              },
+              {
+                "index": "restrained",
+                "name": "Restrained",
+                "url": "/api/2014/conditions/restrained"
+              }
+            ],
+            "senses": {
+              "darkvision": "60 ft.",
+              "passive_perception": 11
+            },
+            "languages": "any languages it knew in life",
+            "challenge_rating": 4,
+            "proficiency_bonus": 2,
+            "xp": 1100,
+            "special_abilities": [
+              {
+                "name": "Ethereal Sight",
+                "desc": "The ghost can see 60 ft. into the Ethereal Plane when it is on the Material Plane, and vice versa.",
+                "damage": []
+              },
+              {
+                "name": "Incorporeal Movement",
+                "desc": "The ghost can move through other creatures and objects as if they were difficult terrain. It takes 5 (1d10) force damage if it ends its turn inside an object.",
+                "damage": []
+              }
+            ],
+            "actions": [
+              {
+                "name": "Withering Touch",
+                "desc": "Melee Weapon Attack: +5 to hit, reach 5 ft., one target. Hit: 17 (4d6 + 3) necrotic damage.",
+                "attack_bonus": 5,
+                "damage": [
+                  {
+                    "damage_type": {
+                      "index": "necrotic",
+                      "name": "Necrotic",
+                      "url": "/api/2014/damage-types/necrotic"
+                    },
+                    "damage_dice": "4d6+3"
+                  }
+                ],
+                "actions": []
+              },
+              {
+                "damage": [],
+                "name": "Etherealness",
+                "desc": "The ghost enters the Ethereal Plane from the Material Plane, or vice versa. It is visible on the Material Plane while it is in the Border Ethereal, and vice versa, yet it can't affect or be affected by anything on the other plane.",
+                "actions": []
+              },
+              {
+                "damage": [],
+                "name": "Horrifying Visage",
+                "desc": "Each non-undead creature within 60 ft. of the ghost that can see it must succeed on a DC 13 Wisdom saving throw or be frightened for 1 minute. If the save fails by 5 or more, the target also ages 1d4 × 10 years. A frightened target can repeat the saving throw at the end of each of its turns, ending the frightened condition on itself on a success. If a target's saving throw is successful or the effect ends for it, the target is immune to this ghost's Horrifying Visage for the next 24 hours. The aging effect can be reversed with a greater restoration spell, but only within 24 hours of it occurring.",
+                "dc": {
+                  "dc_type": {
+                    "index": "wis",
+                    "name": "WIS",
+                    "url": "/api/2014/ability-scores/wis"
+                  },
+                  "dc_value": 13,
+                  "success_type": "none"
+                },
+                "actions": []
+              },
+              {
+                "damage": [],
+                "name": "Possession",
+                "desc": "One humanoid that the ghost can see within 5 ft. of it must succeed on a DC 13 Charisma saving throw or be possessed by the ghost; the ghost then disappears, and the target is incapacitated and loses control of its body. The ghost now controls the body but doesn't deprive the target of awareness. The ghost can't be targeted by any attack, spell, or other effect, except ones that turn undead, and it retains its alignment, Intelligence, Wisdom, Charisma, and immunity to being charmed and frightened. It otherwise uses the possessed target's statistics, but doesn't gain access to the target's knowledge, class features, or proficiencies.\nThe possession lasts until the body drops to 0 hit points, the ghost ends it as a bonus action, or the ghost is turned or forced out by an effect like the dispel evil and good spell. When the possession ends, the ghost reappears in an unoccupied space within 5 ft. of the body. The target is immune to this ghost's Possession for 24 hours after succeeding on the saving throw or after the possession ends.",
+                "usage": {
+                  "type": "recharge on roll",
+                  "dice": "1d6",
+                  "min_value": 6
+                },
+                "dc": {
+                  "dc_type": {
+                    "index": "cha",
+                    "name": "CHA",
+                    "url": "/api/2014/ability-scores/cha"
+                  },
+                  "dc_value": 13,
+                  "success_type": "none"
+                },
+                "actions": []
+              }
+            ],
+            "image": "/api/images/monsters/ghost.png",
+            "url": "/api/2014/monsters/ghost",
+            "updated_at": "2026-04-01T20:35:38.254Z",
+            "forms": [],
+            "legendary_actions": [],
+            "reactions": []
+          },
+          "homebrew": "Shared HP group: one member removed per full individual HP lost; attacks scale with remaining members. No healing or temporary HP. Losses do not choose named victims or assert their death."
+        },
+        "group": {
+          "rule": "shared-hp-attrition-v1",
+          "name": "Groupe des esprits libérés",
+          "members": [
+            {
+              "id": "sarah",
+              "name": "Sarah"
+            },
+            {
+              "id": "maria",
+              "name": "Maria Yellowcrest"
+            },
+            {
+              "id": "malik",
+              "name": "Malik Yellowcrest"
+            },
+            {
+              "id": "janus",
+              "name": "Janus Yellowcrest"
+            },
+            {
+              "id": "tianna",
+              "name": "Tianna Yellowcrest"
+            }
+          ],
+          "initialCount": 5,
+          "remainingCount": 5,
+          "memberMaxHp": 45,
+          "incapacitatedCount": 0,
+          "cannotRegainHp": true,
+          "cannotGainTemporaryHp": true
+        },
+        "socialIdentity": "sarah",
+        "id": "sarah_at_rest",
+        "name": "Sarah et les quatre esprits Yellowcrest",
+        "type": "ghost",
+        "hp": {
+          "current": 225,
+          "max": 225
+        },
+        "ac": 11,
+        "stats": {
+          "str": 7,
+          "dex": 13,
+          "con": 10,
+          "int": 10,
+          "wis": 12,
+          "cha": 17
+        },
+        "position": {
+          "x": 16,
+          "y": 3
+        },
+        "conditions": [],
+        "xpValue": 1100,
+        "attackBonus": 5,
+        "damageDice": "20d6+15",
+        "speed": 0,
+        "attackName": "Withering Touch",
+        "attackRangeCells": 1,
+        "damageType": "necrotic",
+        "movementModes": {
+          "walk": 0,
+          "fly": 40,
+          "hover": true
+        },
+        "srd": {
+          "index": "ghost",
+          "ruleset": "2014",
+          "url": "https://www.dnd5eapi.co/api/2014/monsters/ghost"
+        },
+        "isAlive": true,
+        "hostile": false,
+        "kind": "ghost",
+        "roomId": "35",
+        "mapId": "rest",
+        "disposition": "neutral",
+        "visible": false,
+        "description": "Apparaissent uniquement après l’inhumation effective de l’urne et l’adieu voulu par le joueur."
+      }
+    },
+    "droppedItems": {
+      "sarah_diary_copy": {
+        "item": {
+          "id": "sarah_diary_copy",
+          "name": "Copie du journal de Sarah",
+          "type": "misc",
+          "description": "Copie autorisée des dernières pages et des croquis. Le journal original et Sarah restent à Candlekeep."
+        },
+        "mapId": "candlekeep",
+        "roomId": "1",
+        "position": {
+          "x": 5,
+          "y": 8
+        }
+      },
+      "retribution_tome": {
+        "item": {
+          "spellIds": [
+            "counterspell",
+            "fireball",
+            "detect-magic",
+            "mage-armor",
+            "shield",
+            "misty-step",
+            "greater-invisibility"
+          ],
+          "id": "retribution_tome",
+          "name": "La Rétribution des Anciens",
+          "type": "misc",
+          "description": "Tome du rituel de Gaernoo ; preuve à remettre aux Avoués, sans sorts supplémentaires automatisés."
+        },
+        "mapId": "temple",
+        "roomId": "19",
+        "position": {
+          "x": 3,
+          "y": 9
+        }
+      },
+      "yellowcrest_urn": {
+        "item": {
+          "id": "yellowcrest_urn",
+          "name": "Urne des cendres Yellowcrest",
+          "type": "misc",
+          "description": "Urne d’or gravée contenant les cendres de Maria, Malik, Janus et Tianna. À inhumer en terre consacrée."
+        },
+        "mapId": "temple",
+        "roomId": "26",
+        "position": {
+          "x": 35,
+          "y": 21
+        }
+      },
+      "mace": {
+        "item": {
+          "id": "mace",
+          "name": "Masse d'armes",
+          "type": "weapon",
+          "damage": "1d6+2",
+          "description": "Arme de mêlée (FOR)"
+        },
+        "mapId": "candlekeep",
+        "roomId": "1",
+        "position": {
+          "x": 4,
+          "y": 8
+        }
+      }
+    },
+    "hero": {
+      "version": 1,
+      "hitDice": {
+        "die": 8,
+        "current": 7,
+        "max": 7
+      },
+      "reactionsUsed": {
+        "player": false,
+        "bandit_1793848065847_0": false,
+        "commoner_1793848065856_1": false
+      },
+      "effects": [
+        {
+          "id": "hero-1793848065825-zybo9xdb34p",
+          "kind": "death-ward",
+          "sourceId": "player",
+          "targetIds": [
+            "player"
+          ],
+          "expiresAt": 29040,
+          "concentration": false,
+          "data": {
+            "spellId": "death-ward",
+            "slotLevel": 4
+          }
+        },
+        {
+          "id": "hero-1793848066231-pvl5zj6ps9",
+          "kind": "dash",
+          "sourceId": "player",
+          "targetIds": [
+            "player"
+          ],
+          "expiresAt": 282,
+          "concentration": false,
+          "data": {
+            "untilStartOf": "player"
+          }
+        }
+      ],
+      "concentrationIds": {},
+      "actionCredits": 0,
+      "bonusSpellCast": false,
+      "actionSpellCast": false,
+      "preparedAtRest": false,
+      "inspiration": [],
+      "corpseTimes": {},
+      "turnStarted": {
+        "player": 6,
+        "bandit_1793848065847_0": 5,
+        "commoner_1793848065856_1": 5
+      },
+      "movementTrail": []
+    },
+    "initiativeOrder": [
+      "player",
+      "bandit_1793848065847_0",
+      "commoner_1793848065856_1"
+    ],
+    "currentTurn": "player",
+    "round": 6,
+    "diagonalMovementUsed": {},
+    "movementUsed": {},
+    "actionUsed": {
+      "player": true
+    },
+    "bonusActionUsed": {},
+    "worldFacts": [
+      {
+        "id": "wf-1793848065815-18z80",
+        "text": "Masse d'armes déposé en (4,8), salle 1. L'objet n'est plus dans l'inventaire et ne suit pas ce repère.",
+        "source": "drop_item",
+        "mapId": "candlekeep",
+        "roomId": "1",
+        "expires": "never",
+        "subjectItemId": "mace"
+      },
+      {
+        "id": "wf-1793848065865-m4rp3",
+        "text": "Actual measured supported current-room urban chase source for this explicit bounded test, not an inferred route or actor.",
+        "source": "record_scene_fact",
+        "mapId": "candlekeep",
+        "roomId": "1",
+        "expires": "never",
+        "narrativeEffect": {
+          "description": "Actual measured supported current-room urban chase source for this explicit bounded test, not an inferred route or actor.",
+          "cell": {
+            "x": 4,
+            "y": 8
+          }
+        },
+        "basis": "ai_interpretation"
+      },
+      {
+        "id": "wf-1793848065868-k5x1c",
+        "text": "This existing commoner has the explicitly established actual guard role for the source urban table event.",
+        "source": "record_scene_fact",
+        "mapId": "candlekeep",
+        "roomId": "1",
+        "expires": "never",
+        "narrativeEffect": {
+          "description": "This existing commoner has the explicitly established actual guard role for the source urban table event.",
+          "cell": {
+            "x": 4,
+            "y": 8
+          }
+        },
+        "basis": "ai_interpretation"
+      },
+      {
+        "id": "wf-1793848065869-qysk6",
+        "text": "The same actual guard holds this exact physical spear before initiative; no item is awarded to the player.",
+        "source": "record_scene_fact",
+        "mapId": "candlekeep",
+        "roomId": "1",
+        "expires": "never",
+        "narrativeEffect": {
+          "description": "The same actual guard holds this exact physical spear before initiative; no item is awarded to the player.",
+          "cell": {
+            "x": 4,
+            "y": 8
+          }
+        },
+        "basis": "ai_interpretation"
+      }
+    ],
+    "combatLog": [
+      {
+        "id": "log-1793848065815-carl6",
+        "round": 0,
+        "turn": "player",
+        "action": "Séréna — drop_item: mace",
+        "mechanicalDetail": "Masse d'armes déposé en (4,8), salle 1. L'objet n'est plus dans l'inventaire et ne suit pas ce repère.",
+        "timestamp": 1793848065815
+      },
+      {
+        "id": "log-1793848065825-cn9z2",
+        "round": 0,
+        "turn": "player",
+        "action": "Séréna lance Protection contre la mort",
+        "mechanicalDetail": "Protection contre la mort résolu selon le SRD 2014 ; 1 cible(s), emplacement 4.",
+        "timestamp": 1793848065825
+      },
+      {
+        "id": "log-1793848065881-pxsrv",
+        "round": 1,
+        "turn": "system",
+        "action": "COMBAT ENGAGE",
+        "mechanicalDetail": "player: DIS: 1d20: [20] = 20 / 1d20: [20] = 20 -> kept 20 | bandit_1793848065847_0: 1d20+1: [10]+1 = 11 | commoner_1793848065856_1: 1d20: [1] = 1",
+        "timestamp": 1793848065881
+      },
+      {
+        "id": "log-1793848065905-x1c5b",
+        "round": 1,
+        "turn": "player",
+        "action": "Séréna passe son tour",
+        "mechanicalDetail": "Explicit actual end of this completed chase turn; no action or movement invented.",
+        "timestamp": 1793848065905
+      },
+      {
+        "id": "log-1793848065918-ybhd0",
+        "round": 1,
+        "turn": "bandit_1793848065847_0",
+        "action": "Bandit passe son tour",
+        "mechanicalDetail": "Explicit actual end of this completed chase turn; no action or movement invented.",
+        "timestamp": 1793848065918
+      },
+      {
+        "id": "log-1793848065935-ms687",
+        "round": 1,
+        "turn": "commoner_1793848065856_1",
+        "action": "Commoner passe son tour",
+        "mechanicalDetail": "Explicit actual end of this completed chase turn; no action or movement invented.",
+        "timestamp": 1793848065935
+      },
+      {
+        "id": "log-1793848065936-040cj",
+        "round": 2,
+        "turn": "system",
+        "action": "Ordre d’initiative — round 2",
+        "mechanicalDetail": "Ordre initial conservé : player → bandit_1793848065847_0 → commoner_1793848065856_1 ; aucun nouveau jet.",
+        "timestamp": 1793848065936
+      },
+      {
+        "id": "log-1793848065952-vvgdy",
+        "round": 2,
+        "turn": "player",
+        "action": "Séréna passe son tour",
+        "mechanicalDetail": "Explicit actual end of this completed chase turn; no action or movement invented.",
+        "timestamp": 1793848065952
+      },
+      {
+        "id": "log-1793848065966-1gaqj",
+        "round": 2,
+        "turn": "bandit_1793848065847_0",
+        "action": "Bandit passe son tour",
+        "mechanicalDetail": "Explicit actual end of this completed chase turn; no action or movement invented.",
+        "timestamp": 1793848065966
+      },
+      {
+        "id": "log-1793848065979-lomdy",
+        "round": 2,
+        "turn": "commoner_1793848065856_1",
+        "action": "Commoner passe son tour",
+        "mechanicalDetail": "Explicit actual end of this completed chase turn; no action or movement invented.",
+        "timestamp": 1793848065979
+      },
+      {
+        "id": "log-1793848065980-vid50",
+        "round": 3,
+        "turn": "system",
+        "action": "Ordre d’initiative — round 3",
+        "mechanicalDetail": "Ordre initial conservé : player → bandit_1793848065847_0 → commoner_1793848065856_1 ; aucun nouveau jet.",
+        "timestamp": 1793848065980
+      },
+      {
+        "id": "log-1793848065998-tuyv4",
+        "round": 3,
+        "turn": "player",
+        "action": "Séréna passe son tour",
+        "mechanicalDetail": "Explicit actual end of this completed chase turn; no action or movement invented.",
+        "timestamp": 1793848065998
+      },
+      {
+        "id": "log-1793848066013-bsino",
+        "round": 3,
+        "turn": "bandit_1793848065847_0",
+        "action": "Bandit passe son tour",
+        "mechanicalDetail": "Explicit actual end of this completed chase turn; no action or movement invented.",
+        "timestamp": 1793848066013
+      },
+      {
+        "id": "log-1793848066029-at88a",
+        "round": 3,
+        "turn": "commoner_1793848065856_1",
+        "action": "Commoner passe son tour",
+        "mechanicalDetail": "Explicit actual end of this completed chase turn; no action or movement invented.",
+        "timestamp": 1793848066029
+      },
+      {
+        "id": "log-1793848066029-ju6ug",
+        "round": 4,
+        "turn": "system",
+        "action": "Ordre d’initiative — round 4",
+        "mechanicalDetail": "Ordre initial conservé : player → bandit_1793848065847_0 → commoner_1793848065856_1 ; aucun nouveau jet.",
+        "timestamp": 1793848066030
+      },
+      {
+        "id": "log-1793848066048-myv9f",
+        "round": 4,
+        "turn": "player",
+        "action": "Séréna passe son tour",
+        "mechanicalDetail": "Explicit actual end of this completed chase turn; no action or movement invented.",
+        "timestamp": 1793848066048
+      },
+      {
+        "id": "log-1793848066064-vvm5n",
+        "round": 4,
+        "turn": "bandit_1793848065847_0",
+        "action": "Bandit passe son tour",
+        "mechanicalDetail": "Explicit actual end of this completed chase turn; no action or movement invented.",
+        "timestamp": 1793848066064
+      },
+      {
+        "id": "log-1793848066080-dfod0",
+        "round": 4,
+        "turn": "commoner_1793848065856_1",
+        "action": "Commoner passe son tour",
+        "mechanicalDetail": "Explicit actual end of this completed chase turn; no action or movement invented.",
+        "timestamp": 1793848066080
+      },
+      {
+        "id": "log-1793848066080-56eaz",
+        "round": 5,
+        "turn": "system",
+        "action": "Ordre d’initiative — round 5",
+        "mechanicalDetail": "Ordre initial conservé : player → bandit_1793848065847_0 → commoner_1793848065856_1 ; aucun nouveau jet.",
+        "timestamp": 1793848066080
+      },
+      {
+        "id": "log-1793848066099-uxyxs",
+        "round": 5,
+        "turn": "player",
+        "action": "Séréna passe son tour",
+        "mechanicalDetail": "Explicit actual end of this completed chase turn; no action or movement invented.",
+        "timestamp": 1793848066099
+      },
+      {
+        "id": "log-1793848066113-u7asv",
+        "round": 5,
+        "turn": "bandit_1793848065847_0",
+        "action": "Bandit passe son tour",
+        "mechanicalDetail": "Explicit actual end of this completed chase turn; no action or movement invented.",
+        "timestamp": 1793848066113
+      },
+      {
+        "id": "log-1793848066126-13k0m",
+        "round": 5,
+        "turn": "commoner_1793848065856_1",
+        "action": "Commoner passe son tour",
+        "mechanicalDetail": "Explicit actual end of this completed chase turn; no action or movement invented.",
+        "timestamp": 1793848066126
+      },
+      {
+        "id": "log-1793848066127-qcp5m",
+        "round": 6,
+        "turn": "system",
+        "action": "Ordre d’initiative — round 6",
+        "mechanicalDetail": "Ordre initial conservé : player → bandit_1793848065847_0 → commoner_1793848065856_1 ; aucun nouveau jet.",
+        "timestamp": 1793848066127
+      },
+      {
+        "round": 6,
+        "turn": "system",
+        "action": "Le MJ accorde exceptionnellement une deuxième action au joueur",
+        "mechanicalDetail": "Explicit exceptional MJ grant for this actual sixth player turn only: one additional Dash action; no movement, resource, fatigue or check reset.",
+        "id": "log-1793848066222-u2vwc",
+        "timestamp": 1793848066222
+      }
+    ],
+    "roomsVisited": [
+      "1"
+    ],
+    "currentRoomId": "1",
+    "currentMapId": "candlekeep",
+    "mapOutcomes": {},
+    "encountersTriggered": [],
+    "sceneMemory": {
+      "layoutMigrations": [
+        "split-manor-floors-v1"
+      ]
+    },
+    "adventureId": "sarah-of-yellowcrest-manor"
+  }
+}

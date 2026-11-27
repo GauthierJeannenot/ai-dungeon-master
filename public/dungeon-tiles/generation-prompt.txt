@@ -1,0 +1,11 @@
+Use case: stylized-concept.
+Asset type: ONE production sprite atlas for a modular top-down dungeon, exactly 1536x1024 pixels, six square tiles arranged in exactly 3 columns by 2 rows. Each tile is exactly 512x512 pixels. All cells touch, absolutely NO gutter, NO margin, NO separating frames, NO text, labels, numbers or watermark.
+Primary request: rough hand-doodled graphite pencil dungeon tiles on clean white paper, like a dungeon master's sketchbook. Black/gray pencil only, scratchy doubled lines, lively crosshatching outside stone walls, pale uneven flagstones in walkable passages, tiny cracks. Strict orthographic overhead plan, NO perspective, NO isometric, no shadows suggesting height. Sparse and readable.
+CRITICAL GEOMETRY: every passage mouth is centered exactly at the midpoint of its tile edge, width exactly one quarter of the tile (128px). Pale walkable floor occupies coordinates 192..320 across every open edge. The two walls at mouth sides must meet the edge at x=192 and x=320 (or y=192 and y=320 on vertical edges). No threshold or wall crosses an open mouth. Floor and wall scale identical in all six tiles. Closed edges are white with sparse graphite hatching, never an opening. Match all mouth positions so tiles connect under 90 degree rotation.
+Top row left: dead end, one opening NORTH only, corridor leads south to a small rounded-square termination around tile center; south east west closed.
+Top row center: straight narrow corridor, NORTH and SOUTH openings only; east west closed.
+Top row right: L shaped narrow corridor, NORTH and EAST openings only; south west closed.
+Bottom row left: T junction, NORTH EAST WEST openings only; south closed.
+Bottom row center: plus crossing, NORTH EAST SOUTH WEST openings.
+Bottom row right: spacious square chamber centered within the tile, interior bounds approximately x=80..432 y=80..432, four short narrow entrance passages open at NORTH EAST SOUTH WEST edge centers; room otherwise empty with faint stone floor and sparse rubble against inner corners.
+Constraints: six equally sized tightly aligned square cells, white paper base remains white, absolutely no decorative border around atlas or tiles, no doors closing mouths, no furniture or objects blocking walkable space, no characters, no color. Focus on reliable centered edge connections and authentic scribbly pencil marks.

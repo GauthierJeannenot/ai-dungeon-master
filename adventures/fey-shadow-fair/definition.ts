@@ -73,7 +73,37 @@ export const FEY_SHADOW_FAIR_CONTENT: AdventureContent = {
   battlemapImage: '/battlemaps/fey-shadow-fair-fair.png',
   battlemapImages: {
     fair: '/battlemaps/fey-shadow-fair-fair.png',
-    wood: '/battlemaps/fey-shadow-fair-wood.png',
+    wood: '/battlemaps/fey-shadow-fair-wood-zelda.png',
+  },
+  scenes: {
+    fair: {
+      image: '/adventures/fey-shadow-fair/fair-aerial.png',
+      alt: 'La Foire aux Chandelles vue de haut : tente du bonneteau, palais des miroirs et portail au nord ; grand chapiteau, allée des baraques et carrousel au centre ; pré aux lanternes, verger et théière à bulles au sud.',
+      width: 1536,
+      height: 1024,
+      hint: 'Choisis un repère sur la foire ou son bouton dans la légende pour demander au MJ de t’y rendre.',
+      hotspots: FEY_SHADOW_FAIR_MAP.rooms
+        .filter(room => room.mapId === 'fair')
+        .sort((a, b) => Number(a.id) - Number(b.id))
+        .map(room => ({
+          id: `fair_room_${room.id}`,
+          destinationRoomId: room.id,
+          marker: room.id,
+          label: room.id === '3' ? 'Carrousel et piste d’escargots' : room.name,
+          roomIds: FEY_SHADOW_FAIR_MAP.rooms.filter(candidate => candidate.mapId === 'fair').map(candidate => candidate.id),
+          message: room.id === '5'
+            ? 'Je me rends devant le Portail des Vers Luisants, sans le franchir ni quitter la foire.'
+            : `Je me rends au lieu « ${room.name} ».`,
+          // Anchor every pin to the engine zone, independently of illustration size.
+          bounds: {
+            x: (room.zone.minX + room.zone.maxX + 1) / (2 * FEY_SHADOW_FAIR_MAP.maps[0].grid.cols) * 100 - 3,
+            y: (room.zone.minY + room.zone.maxY + 1) / (2 * FEY_SHADOW_FAIR_MAP.maps[0].grid.rows) * 100 - 4,
+            width: 6,
+            height: 8,
+          },
+        })),
+      npcOverlays: [],
+    },
   },
   // Source de vérité unique : la grille du moteur (map.ts, première map). Pas de duplication.
   grid: FEY_SHADOW_FAIR_MAP.maps[0].grid,
@@ -95,16 +125,15 @@ export const FEY_SHADOW_FAIR_CONTENT: AdventureContent = {
       "le Pré aux Lanternes, l'Allée des Baraques, le Carrousel de Limaces et la Piste d'Escargots, la Tente du Bonneteau, le Grand Chapiteau, la Théière à Bulles, le Verger aux Ripailles, le Palais des Miroirs, le Portail des Vers Luisants — puis, au Bois-Ricanant : la clairière des champignons, le Carrefour des Têtes Jacassantes, le Péage des Brigands, la Mare aux Grenouilles, le Sentier des Chiens-Clins, le Bal des Ombres, la Cour du Prince",
     visibleNpcExample: 'Nicodème, Madame Bougie et Barnabé dès le départ sur la foire',
     nonHostileNpcs: "Nicodème Minuit, Madame Bougie, Pipotin, Barnabé l'arbuste, Ernestine, Théophile, Mirabelle, Miroslav le mime, les Têtes Jacassantes, le Capitaine Mirliton, la Baronne Grenouille, l'Ombre Soliste, Maître Filou, le Prince des Farces",
-    revealNpcKindExample: 'reveal_npc:archfey',
-    plannerExamples: [
-      '- "je complimente madame bougie sur ses chandelles" → requiresMechanic=true, tool=roll_ability_check, ability=cha, dc≈13, confidence=high.',
-      '- "j\'attrape le tire-gousset la main dans mon sac" → requiresMechanic=true, tool=start_encounter, confidence=high.',
-      '- "je franchis le portail des vers luisants" → requiresMechanic=true, tool=travel_to_map, confidence=high.',
-      '- "je monte dans une bulle de la théière et je vise le portail" → requiresMechanic=true, tool=roll_ability_check, ability=dex, dc≈10, confidence=high.',
-      '- "je paie le péage d\'une blague inédite" → requiresMechanic=true, tool=roll_ability_check, ability=cha, dc≈12, sceneMarkers=["reveal_npc:brigand"], confidence=high.',
-      '- "je danse la gavotte avec la baronne" → requiresMechanic=true, tool=roll_ability_check, ability=dex, dc≈11, sceneMarkers=["reveal_npc:frog_noble"], confidence=medium.',
-      '- "je raconte au prince comment j\'ai perdu mon ombre comme un idiot" → requiresMechanic=true, tool=roll_ability_check, ability=cha, dc≈13, sceneMarkers=["reveal_npc:archfey"], confidence=high.',
-      '- "je contemple les lampions / c\'est quoi cette foire ?" → requiresMechanic=false, confidence=high.',
+    actionExamples: [
+      '- "je complimente madame bougie sur ses chandelles" → appelle roll_ability_check, ability=cha, dc≈13.',
+      '- "j\'attrape le tire-gousset la main dans mon sac" → appelle start_encounter.',
+      '- "je franchis le portail des vers luisants" → appelle travel_to_map.',
+      '- "je monte dans une bulle de la théière et je vise le portail" → appelle roll_ability_check, ability=dex, dc≈10.',
+      '- "je paie le péage d\'une blague inédite" → appelle roll_ability_check, ability=cha, dc≈12 ; après réussite confirmée, choisis reveal_npc si la scène le justifie, avec un npcId exact du profil brigand présent.',
+      '- "je danse la gavotte avec la baronne" → appelle roll_ability_check, ability=dex, dc≈11 ; après réussite confirmée, choisis reveal_npc si la scène le justifie, avec un npcId exact du profil frog_noble présent.',
+      '- "je raconte au prince comment j\'ai perdu mon ombre comme un idiot" → appelle roll_ability_check, ability=cha, dc≈13 ; après réussite confirmée, choisis reveal_npc si la scène le justifie, avec un npcId exact du profil archfey présent.',
+      '- "je contemple les lampions / c\'est quoi cette foire ?" → dialogue ou description sans effet mécanique.',
     ],
   },
 }

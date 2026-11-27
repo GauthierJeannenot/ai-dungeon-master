@@ -1,0 +1,20 @@
+const test=require('node:test'),assert=require('node:assert/strict')
+Object.assign(process.env,{LLM_MODE:'mock',ALLOW_PAID_LLM:'false',MONETIZATION_ENABLED:'false',DM_RATE_LIMIT_PER_MINUTE:'0',APP_LOG_PERSIST_ENABLED:'false',APP_LOG_LEVEL:'error',LLM_MAX_CALLS_PER_REQUEST:'12'})
+const{installPgMem}=require('./helpers/pg-mem.cjs'),pg=installPgMem()
+const{setupCalendar}=require('./helpers/calendar-fixture.cjs'),{play,lastResult}=require('./helpers/dm-scripted-turn.cjs'),{ok}=require('./helpers/mcp-toolkit.cjs')
+test.after(()=>pg.restore())
+test('POST transmits exact explicit calendar/reference choices unchanged, SQL persists them, and no administrative call consumes the one player primary action',async t=>{
+ const f=await setupCalendar(t,{configure:false,dice:'17,19'}),commands=[{name:'configure_campaign_calendar',input:f.configuration},{name:'record_calendar_reference',input:f.reference},{name:'inspect_campaign_calendar',input:{}},{name:'roll_ability_check',input:{entityId:'player',ability:'wis',dc:10}},{name:'roll_ability_check',input:{entityId:'player',ability:'wis',dc:10}}]
+ const{result,seen,selected,before}=await play(t,f.call,[...commands,p=>{assert.equal(lastResult(p).code,'PRIMARY_ACTION_ALREADY_RESOLVED');return 'Tu consultes la date choisie, puis tu observes les environs. Les références du calendrier ne déclenchent aucun événement.'}],'Le MJ choisit ce calendrier et cette référence déjà établis ; je consulte la date puis j’observe les lieux.')
+ assert.deepEqual(seen,selected.slice(0,-1));assert.deepEqual(result.newGameState.dmTools.calendar.configuration.input,f.configuration);assert.deepEqual(result.newGameState.dmTools.calendar.references[f.reference.referenceId].input,f.reference);assert.equal(result.newGameState.worldTimeSeconds,before.worldTimeSeconds);assert.deepEqual(result.newGameState.player.inventory,before.player.inventory);assert.deepEqual(result.newGameState.npcs,before.npcs);assert.equal(ok(await f.call('roll_dice',{notation:'1d20'})).total,19)
+})
+test('POST real time progression crosses explicit Shieldmeet midnight and inspection persists its original SQL anchor without fabricating calls or effects',async t=>{
+ const f=await setupCalendar(t,{configure:false,harptos:true,dice:'19'}),commands=[{name:'configure_campaign_calendar',input:f.configuration},{name:'advance_time',input:{seconds:1}},{name:'inspect_campaign_calendar',input:{}}]
+ const{result,seen,selected,before}=await play(t,f.call,[...commands,'Une seconde réelle passe : le calendrier explicitement choisi indique désormais Shieldmeet. Aucun effet de fête ne se produit automatiquement.'],'Le MJ fixe cette date actuelle ; je laisse passer une seconde et consulte ensuite le calendrier.')
+ assert.deepEqual(seen,selected);assert.equal(result.newGameState.worldTimeSeconds,(before.worldTimeSeconds??0)+1);assert.equal(result.newGameState.dmTools.calendar.configuration.at,before.worldTimeSeconds??0);assert.equal(ok(await f.call('inspect_campaign_calendar')).date.segmentId,'shieldmeet');assert.deepEqual(result.newGameState.dmTools.wallet,before.dmTools?.wallet);assert.equal(ok(await f.call('roll_dice',{notation:'1d20'})).total,19)
+})
+test('POST refuses a fresh calendar reset nonce before time/resources and leaves a distinct chosen player check available',async t=>{
+ const f=await setupCalendar(t,{dice:'17,19'}),reset={name:'configure_campaign_calendar',input:{...f.configuration,eventId:'fresh-reset-nonce',anchor:{...f.configuration.anchor,year:8}}},check={name:'roll_ability_check',input:{entityId:'player',ability:'wis',dc:10}}
+ const{result,before}=await play(t,f.call,[reset,p=>{assert.equal(lastResult(p).code,'CALENDAR_CONFIGURATION_IMMUTABLE');return check},'Le calendrier initial est conservé et ton observation indépendante est résolue.'],'Le MJ propose cette nouvelle ancre ; j’observe indépendamment les lieux.')
+ assert.deepEqual(result.newGameState.dmTools.calendar,before.dmTools.calendar);assert.equal(result.newGameState.worldTimeSeconds,before.worldTimeSeconds);assert.equal(ok(await f.call('roll_dice',{notation:'1d20'})).total,19)
+})

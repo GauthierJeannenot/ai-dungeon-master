@@ -6,7 +6,6 @@ const path = require('node:path')
 const test = require('node:test')
 const { installPgMem } = require('./helpers/pg-mem.cjs')
 
-process.env.ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || 'sk-ant-test-placeholder'
 process.env.ALLOW_PAID_LLM = 'false'
 process.env.LLM_MODE = 'mock'
 process.env.MONETIZATION_ENABLED = 'false'

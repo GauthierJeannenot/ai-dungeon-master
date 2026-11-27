@@ -1,0 +1,58 @@
+{
+  "title": "Bestiaire & notes de maîtrise — Grammy's Country Apple Pie",
+  "notes": [
+    "**Niveau du joueur : 1.** Les gardes et pâtissiers utilisent désormais le gobelin SRD à 7 PV, sans variante minion. Deux gobelins représentent 100 XP bruts avant tout multiplicateur de rencontre : danger réel pour un héros solo. Privilégier les solutions créatives et sociales prévues par le module ; ne pas réduire leurs PV en secret.",
+    "Les DD d'interaction propres au scénario ne sont pas des caractéristiques SRD : repérer les dryades, DD 13 Perception ; approcher leur groupe sans les faire fuir, DD 14 Charisme ; obtenir l'aide de Mac par le respect, DD 12 Persuasion. Ne pas inventer un DD générique de 17–18.",
+    "Le chef est un hobgobelin SRD à 11 PV, pas un Goblin Boss ou un Hobgoblin Captain. Ces deux anciens blocs ne sont pas fournis par le catalogue SRD de cette API et ne servent plus de référence."
+  ],
+  "creatures": [
+    {
+      "type": "goblin",
+      "title": "Gobelins pâtissiers et gardes",
+      "role": "Deux pâtissiers à découvert en salle 8, occupés à essayer de faire des tartes aux pommes en se chamaillant, visibles depuis le quai par la porte ouverte selon la ligne de vue. Aucune embuscade ni combat automatique pour ces pâtissiers ; deux gardes en salle 9. Aucun gobelin dans le quai de chargement, salle 7.",
+      "notes": [
+        "Les armes et dégâts restent ceux du gobelin SRD ; les outils de boulangerie sont de la mise en scène et ne remplacent pas les statistiques."
+      ]
+    },
+    {
+      "type": "hobgoblin",
+      "title": "Chef Grukk — hobgobelin",
+      "role": "Chef de l'appartement, salle 9.",
+      "notes": [
+        "Son titre est narratif : ni multiattaque de capitaine ni redirection d'attaque de boss gobelin ne s'ajoutent à ce bloc. Peut tenter de fuir lorsqu'il est très blessé, uniquement après résolution du déplacement."
+      ]
+    },
+    {
+      "type": "violet_fungus",
+      "title": "Champignon violet",
+      "role": "Tas de déchets, salle 3.",
+      "notes": [
+        "Créature végétale SRD, jamais un zombie reskinné. La touche pourrie inflige des dégâts nécrotiques : aucun effet anti-soin ni sauvegarde de Constitution DD 10 n'est ajouté."
+      ]
+    },
+    {
+      "type": "awakened_tree",
+      "title": "Mac — arbre éveillé",
+      "role": "Gardien de l'entrée extérieure, normalement neutre.",
+      "notes": [
+        "Pommier éveillé de fiction, pas le Treant FP 9. Les langues supplémentaires du scénario restent un choix narratif du module, distinct de la référence SRD."
+      ],
+      "npcIds": [
+        "mac"
+      ]
+    },
+    {
+      "type": "dryad",
+      "title": "Dryades du verger",
+      "role": "Trois protectrices cachées dans la salle 2.",
+      "notes": [
+        "Charisme 18. Le gourdin de base et sa variante sous shillelagh sont distincts ; ne pas supposer le sort actif. La liste innée exacte figure ci-dessous, sans le sort inventé « Hérissons »."
+      ],
+      "npcIds": [
+        "dryad_1",
+        "dryad_2",
+        "dryad_3"
+      ]
+    }
+  ]
+}

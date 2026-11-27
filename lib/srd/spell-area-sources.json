@@ -1,0 +1,29 @@
+{
+  "ruleset": "2014",
+  "source": "https://media.wizards.com/2023/downloads/dnd/SRD_CC_v5.1.pdf",
+  "license": "CC-BY-4.0",
+  "records": {
+    "spells/flame-strike": {
+      "localSource": { "file": "rules/books/phb-2014.md", "section": "Flame Strike", "startLine": 10032, "endLine": 10044 },
+      "source": {
+        "index": "flame-strike",
+        "name": "Flame Strike",
+        "level": 5,
+        "school": { "index": "evocation" },
+        "casting_time": "1 action",
+        "range": "60 feet",
+        "duration": "Instantaneous",
+        "concentration": false,
+        "ritual": false,
+        "components": ["V", "S", "M"],
+        "material": "A pinch of sulfur.",
+        "classes": [{ "index": "cleric" }],
+        "area_of_effect": { "type": "cylinder", "size": 10 },
+        "heightFeet": 40,
+        "damageComponents": [{ "type": "fire", "dice": "4d6" }, { "type": "radiant", "dice": "4d6" }],
+        "savingThrow": { "ability": "dex", "halfOnSuccess": true },
+        "higherLevels": { "startingSlotLevel": 6, "additionalDie": "1d6", "chosenDamageType": ["fire", "radiant"] }
+      }
+    }
+  }
+}

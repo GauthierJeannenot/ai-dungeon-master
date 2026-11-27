@@ -1,0 +1,21 @@
+const test=require('node:test'),assert=require('node:assert/strict')
+process.env.MONETIZATION_ENABLED='false'
+const {installPgMem}=require('./helpers/pg-mem.cjs'),pg=installPgMem()
+const {saveSession,loadSession,deleteSession}=require('../lib/session-store.ts')
+const {engine,ok,spawn}=require('./helpers/mcp-toolkit.cjs')
+test.after(()=>pg.restore())
+
+test('real stdio scene-stock→pickup→DMG coating→SQL→initiative→actual wound preserves one physical dose and its source CON/damage',async t=>{
+ const call=await engine(t,{dice:'20,1,17,2,1,1,2,3,19'}),initial=await call('get_game_state'),blade=initial.player.inventory.find(item=>(item.equipmentId??item.id)==='longsword')
+ assert.ok(blade)
+ const shield=initial.player.inventory.find(item=>(item.equipmentId??item.id)==='shield');if(shield)ok(await call('equip_item',{itemId:shield.id,slot:'shield',operation:'unequip'}))
+ ok(await call('create_scene_object',{objectId:'actual-venom-stock',name:'Réserve réellement présente',description:'Cette réserve physique du scénario contient une dose réelle de venin de serpent.',cell:initial.player.position,kind:'container',material:'wood',size:'small',resilience:'fragile',contents:['poison_serpent_venom']}))
+ const dose=ok(await call('interact_object',{objectId:'actual-venom-stock',action:'open'})).releasedItems[0];ok(await call('pick_up_item',{itemId:dose.id}))
+ const input={eventId:'actual-public-coat',doseItemId:dose.id,surfaceKind:'weapon',surfaceId:blade.id,surfaceDescription:'Cette dose physique entière est réellement étalée sur la lame sélectionnée.'},prepared=ok(await call('prepare_player_poison',input));assert.equal(prepared.templateId,'serpent_venom')
+ let state=await call('get_game_state');assert.equal(state.player.inventory.some(item=>item.id===dose.id),false)
+ const sessionId=`player-poison-stdio-${process.pid}`;t.after(()=>deleteSession(sessionId));await saveSession(sessionId,{gameState:state,history:[],adventureId:state.adventureId,characterId:state.characterId});ok(await call('replace_game_state',{gameState:(await loadSession(sessionId)).gameState}))
+ const target=await spawn(call);ok(await call('enter_combat',{combatants:['player',target.id]}))
+ const hit=ok(await call('resolve_player_attack',{targetId:target.id,weaponOrSpell:blade.id}));assert.equal(hit.playerPoison.save.dc,11);assert.equal(hit.playerPoison.damageRoll.notation,'3d6');assert.equal(hit.poisonDamageDealt,6);assert.equal(hit.damageDealt,hit.weaponDamageDealt+6)
+ state=await call('get_game_state');assert.equal(state.dmTools.playerPoisons.preparations[input.eventId].status,'delivered');assert.equal(ok(await call('prepare_player_poison',input)).replayed,true);assert.deepEqual(await call('get_game_state'),state)
+ assert.equal(ok(await call('inspect_player_poisons')).catalogue.length,14);assert.equal(ok(await call('roll_dice',{notation:'1d20'})).total,19)
+})

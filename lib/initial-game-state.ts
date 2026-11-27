@@ -2,10 +2,13 @@ import type { GameState } from './types'
 import {
   getAdventureMap,
   seedAdventureNpcs,
+  seedAdventureGroundItems,
   inferAdventureRoomId,
   DEFAULT_ADVENTURE_ID,
 } from './adventure-map'
 import { buildPlayerState, DEFAULT_CHARACTER_ID } from './character-registry'
+import { initialHeroState } from './hero-state'
+import { initialCurrencyState } from './currency-state'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // État de jeu initial OPTIMISTE (client) pour un module + personnage donnés :
@@ -13,6 +16,8 @@ import { buildPlayerState, DEFAULT_CHARACTER_ID } from './character-registry'
 // renvoie l'état réel au premier message — ceci n'existe que pour un premier
 // rendu correct (position du joueur, PV, PNJ visibles). Miroir exact de
 // mcp-server/game-state.ts (même buildPlayerState partagé, aucun drift).
+// Les personnalités aléatoires sont préparées par le moteur à la première
+// synchronisation ; le client ne crée ni graine ni nouveau tirage.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function buildInitialGameState(
@@ -29,6 +34,8 @@ export function buildInitialGameState(
     extraInventory: map.initialPlayer.extraInventory,
   })
   return {
+    ...initialCurrencyState(player),
+    ...(player.ruleset === 'srd2014' ? { hero: initialHeroState(characterId, player.level) } : {}),
     adventureId,
     characterId,
     phase: 'exploration',
@@ -46,5 +53,7 @@ export function buildInitialGameState(
     currentRoomId: roomId,
     encountersTriggered: [],
     worldFacts: [],
+    droppedItems: seedAdventureGroundItems(adventureId),
+    ...(map.layoutMigrations?.length ? { sceneMemory: { layoutMigrations: map.layoutMigrations.map(m => m.id) } } : {}),
   }
 }

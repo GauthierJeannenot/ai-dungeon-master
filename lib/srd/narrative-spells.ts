@@ -1,0 +1,53 @@
+import type { SpellSpec } from './spells'
+
+// SRD 2014 exploration magic. The engine owns costs, placement and lifetime;
+// the agent supplies the creative description, never mechanical mutations.
+const utility = (id: string, label: string, level: 0 | 1 | 2, rangeCells: number,
+  target: 'self' | 'point' | 'creature', srdNote: string, materialName?: string, materialConsumed = true): SpellSpec => ({
+  id, label, level, rangeCells, target: target === 'self' ? 'self' : 'any',
+  narrativeTarget: target, materialName, materialConsumed,
+  effect: { kind: 'utility', srdNote },
+})
+
+export const NARRATIVE_SPELLS: SpellSpec[] = [
+  utility('prestidigitation', 'Prestidigitation', 0, 2, 'point',
+    'Effet sensoriel anodin, allumer/éteindre une petite flamme, nettoyer/salir un objet de 30 cm, saveur/température/couleur ou marque pendant 1 heure. Au plus trois effets non instantanés. Aucun dégât, état, objet de valeur ou avantage automatique.'),
+  utility('message', 'Message', 0, 24, 'creature',
+    'Murmure à une créature précise dans les 36 m ; elle seule entend et peut répondre en chuchotant. Pas de lecture des pensées ni de réponse forcée. Les obstacles épais, le plomb ou un silence magique bloquent le message ; aucun secret inventé.'),
+  utility('dancing-lights', 'Lumières dansantes', 0, 24, 'point',
+    'Jusqu’à quatre lumières faibles, chacune éclairant sur 3 m, pendant 1 minute avec concentration. Elles restent à 6 m les unes des autres ; déplacement ultérieur par action bonus. Aucun dégât ni aveuglement.'),
+  utility('alarm', 'Alarme', 1, 6, 'point',
+    'Alarme mentale sur une porte réelle ou un cube de 5 pieds au sol explicitement choisi, avec ses exemptions. Incantation d’une minute ou rituel, puis durée de huit heures. Les contacts et entrées représentés déclenchent le signal mental sans identifier l’intrus.', undefined, false),
+  utility('unseen-servant', 'Serviteur invisible', 1, 12, 'point',
+    'Force informe pendant 1 heure : tâches simples et non combattantes, FOR 2, CA 10, 1 PV. Ne peut attaquer ; disparaît à 0 PV ou au-delà de 18 m du lanceur. Commande par action bonus. Toute modification réelle d’inventaire, porte ou objet exige son outil dédié.'),
+  utility('floating-disk', 'Disque flottant', 1, 6, 'point',
+    'Disque horizontal de 90 cm, à 90 cm du sol, porte 250 kg pendant 1 heure et suit le lanceur à 6 m. Ne vole pas au-dessus des fosses de plus de 3 m ; disparaît si séparé de plus de 30 m. Ne transporte pas automatiquement un pion, ne change ni inventaire ni carte.'),
+  utility('illusory-script', 'Écriture illusoire', 1, 1, 'point',
+    'Après 1 minute, inscrit sur un support touché un texte lisible par les lecteurs désignés pendant 10 jours ; les autres voient une écriture inconnue ou un autre texte choisi. Vision véritable perce la tromperie. Encre de 10 po consommée ; aucun faux document ne garantit la persuasion.', 'Encre d’écriture illusoire'),
+  utility('silent-image', 'Image silencieuse', 1, 12, 'point',
+    'Image visuelle dans un cube de 4,5 m, 10 minutes avec concentration. Ni son, ni odeur, ni matière ; interaction physique révèle l’illusion, Investigation contre le DD du lanceur peut la percer. La déplacer exige une action. Ne bloque pas mécaniquement les mouvements ni la visibilité.'),
+  utility('magic-mouth', 'Bouche magique', 2, 6, 'point',
+    'Après 1 minute, enchante un objet non porté : message de 25 mots au plus durant au plus 10 minutes, déclenché par une circonstance visuelle ou audible à 9 m définie à l’incantation. Choisir usage unique ou répétitif ; dure jusqu’à dissipation. Ne détecte pas les pensées ni les secrets. Poudre de jade de 10 po consommée.', 'Poudre de jade de bouche magique'),
+  utility('locate-object', 'Localisation d’objet', 2, 0, 'self',
+    'Pendant 10 minutes avec concentration, indique la direction d’un objet familier décrit dans les 300 m, ou le plus proche d’un type choisi. Un objet précis doit avoir été vu de près ; le plomb bloque. Ne révèle ni nom du voleur, ni trajet, ni contenu secret ; absence d’objet connu ne permet pas d’en inventer un.'),
+  utility('detect-evil-and-good', 'Détection du mal et du bien', 1, 0, 'self',
+    'Pendant 10 minutes avec concentration, ressent présence et position des aberrations, célestes, élémentaires, fées, fiélons et morts-vivants à 9 m, et lieux consacrés/profanés. Ne détecte ni alignement, mensonge ni intention ; pierre de 30 cm, métal de 2,5 cm, plomb ou bois/terre de 90 cm bloquent.'),
+  utility('detect-poison-and-disease', 'Détection du poison et des maladies', 1, 0, 'self',
+    'Pendant 10 minutes avec concentration, détecte et identifie poisons, créatures venimeuses et maladies à 9 m. Pierre de 30 cm, métal de 2,5 cm, plomb ou bois/terre de 90 cm bloquent. Ne soigne ni ne purifie ; ne révèle que les éléments établis de la scène.'),
+  utility('purify-food-and-drink', 'Purification de nourriture et d’eau', 1, 2, 'point',
+    'Purifie nourriture et boissons non magiques dans une sphère de 1,5 m de rayon au point choisi : retire poisons et maladies. Ne crée pas de nourriture, ne soigne pas un consommateur et ne dissipe pas un enchantement.'),
+  utility('augury', 'Augure', 2, 0, 'self',
+    'Après 1 minute, présage favorable, défavorable, les deux ou aucun pour une action précise envisagée dans les 30 prochaines minutes. Ne prédit pas les circonstances futures nouvelles. Répétitions avant repos long : 25 % de risque cumulatif de réponse aléatoire, voir oracleReliable. Jetons divinatoires de 25 po requis, conservés.', 'Jetons divinatoires', false),
+  utility('animal-messenger', 'Messager animal', 2, 6, 'creature',
+    'Une bête de taille Très Petite visible transmet au plus 25 mots à un destinataire décrit dans un lieu déjà visité. Voyage pendant 24 heures (80 km en vol, 40 km autrement) ; +48 heures par emplacement supérieur. Ne téléporte pas le message, ne garantit pas la livraison et ne contrôle pas une autre catégorie de créature.'),
+  utility('rope-trick', 'Corde enchantée', 2, 1, 'point',
+    'Une corde touchée de 18 m au plus s’élève vers un abri extradimensionnel pour huit créatures Moyennes ou plus petites pendant 1 heure. Entrée par escalade, aucune attaque ni sort à travers l’ouverture ; tout tombe à la fin. Ne déplace pas automatiquement les pions, ne change pas de carte et ne rend pas un repos instantané.'),
+  utility('arcanists-magic-aura', 'Aura magique trompeuse', 2, 1, 'point',
+    'Objet non porté ou créature consentante touchée, pendant 24 heures : choisir une aura magique fausse ou masquer le type/alignement aux divinations. Ne change pas la vraie nature, les statistiques ou les immunités. Trente incantations quotidiennes identiques peuvent pérenniser l’aura ; pas de permanence accordée par un seul appel.'),
+  utility('see-invisibility', 'Détection de l’invisibilité', 2, 0, 'self',
+    'Pendant 1 heure, voit créatures et objets invisibles comme visibles et perçoit le plan Éthéré de façon translucide. Ne traverse ni mur ni porte et ne révèle pas les pensées ou les créatures cachées derrière un obstacle.'),
+  utility('continual-flame', 'Flamme éternelle', 2, 1, 'point',
+    'Flamme sur un objet touché, jusqu’à dissipation : lumière vive sur 6 m puis faible sur 6 m, sans chaleur ni consommation d’oxygène. Peut être cachée, pas étouffée. Ne brûle ni ne blesse et ne devient pas une torche physique dans l’inventaire. Poudre de rubis de 50 po consommée.', 'Poudre de rubis'),
+  { id: 'invisibility', label: 'Invisibilité', level: 2, rangeCells: 1, target: 'any',
+    effect: { kind: 'advanced', mechanic: 'invisibility' } },
+]

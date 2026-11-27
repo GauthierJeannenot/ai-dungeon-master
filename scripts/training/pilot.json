@@ -1,0 +1,396 @@
+{
+  "schemaVersion": 1,
+  "description": "Petit corpus synthétique écrit explicitement, à relire avant entraînement. Aucune génération LLM distante.",
+  "scenarios": [
+    {
+      "id": "rules-dash",
+      "split": "train",
+      "adventureId": "grammys-country-apple-pie",
+      "characterId": "fighter",
+      "message": "Avant d'agir, rappelle-moi ce que permet l'action Foncer. Je ne me déplace pas encore.",
+      "unchanged": [
+        "player.position",
+        "player.hp",
+        "player.inventory",
+        "actionUsed"
+      ],
+      "steps": [
+        {
+          "operation": "dm.turn",
+          "tool": {
+            "name": "consult_rules",
+            "input": {
+              "book": "srd-5.1-2014",
+              "query": "Dash"
+            }
+          }
+        },
+        {
+          "operation": "dm.turn",
+          "checks": [
+            {
+              "path": "lastTool.name",
+              "equals": "consult_rules"
+            },
+            {
+              "path": "lastToolResult.kind",
+              "equals": "search"
+            }
+          ],
+          "tool": {
+            "name": "consult_rules",
+            "input": {
+              "sectionId": {
+                "$ref": "lastToolResult.results.0.sectionId"
+              },
+              "limit": 5000
+            }
+          }
+        },
+        {
+          "operation": "dm.turn",
+          "checks": [
+            {
+              "path": "lastToolResult.kind",
+              "equals": "passage"
+            },
+            {
+              "path": "lastToolResult.source.license",
+              "equals": "CC-BY-4.0"
+            },
+            {
+              "path": "lastToolResult.text",
+              "includes": "you gain extra movement"
+            },
+            {
+              "path": "lastToolResult.text",
+              "includes": "after applying any modifiers"
+            }
+          ],
+          "text": "Foncer te donne, pour le tour en cours, du déplacement supplémentaire égal à ta vitesse après application de ses modificateurs. Par exemple, avec une vitesse de 30 pieds, tu peux parcourir jusqu'à 60 pieds au total. Tu n'as encore ni utilisé cette action ni bougé."
+        }
+      ]
+    },
+    {
+      "id": "rules-concentration",
+      "split": "validation",
+      "adventureId": "fey-shadow-fair",
+      "characterId": "wizard",
+      "message": "Puis-je maintenir deux sorts de concentration en même temps ? C'est une question de règle : je ne lance aucun sort.",
+      "unchanged": [
+        "player.position",
+        "player.hp",
+        "player.inventory",
+        "hero",
+        "actionUsed"
+      ],
+      "steps": [
+        {
+          "operation": "dm.turn",
+          "tool": {
+            "name": "consult_rules",
+            "input": {
+              "book": "srd-5.1-2014",
+              "query": "concentration"
+            }
+          }
+        },
+        {
+          "operation": "dm.turn",
+          "checks": [
+            {
+              "path": "lastToolResult.kind",
+              "equals": "search"
+            }
+          ],
+          "tool": {
+            "name": "consult_rules",
+            "input": {
+              "sectionId": {
+                "$ref": "lastToolResult.results.0.sectionId"
+              },
+              "limit": 5000
+            }
+          }
+        },
+        {
+          "operation": "dm.turn",
+          "checks": [
+            {
+              "path": "lastToolResult.kind",
+              "equals": "passage"
+            },
+            {
+              "path": "lastToolResult.text",
+              "includes": "on two"
+            },
+            {
+              "path": "lastToolResult.text",
+              "includes": "at once"
+            }
+          ],
+          "text": "Tu ne peux pas te concentrer sur deux sorts à la fois. Lancer un autre sort qui exige la concentration met fin à ta concentration sur le premier. Ici, tu n'as lancé aucun sort : nous avons seulement consulté la règle."
+        }
+      ]
+    },
+    {
+      "id": "movement-local-refresh",
+      "split": "train",
+      "adventureId": "grammys-country-apple-pie",
+      "characterId": "fighter",
+      "message": "Je me déplace en (5,13).",
+      "checks": [
+        {
+          "path": "state.player.position",
+          "equals": {
+            "x": 5,
+            "y": 13
+          }
+        }
+      ],
+      "unchanged": [
+        "player.hp",
+        "player.inventory"
+      ],
+      "steps": [
+        {
+          "operation": "dm.turn",
+          "tool": {
+            "name": "move_token",
+            "input": {
+              "tokenId": "player",
+              "toCell": {
+                "x": 5,
+                "y": 13
+              }
+            }
+          }
+        },
+        {
+          "operation": "dm.turn",
+          "checks": [
+            {
+              "path": "lastTool.name",
+              "equals": "move_token"
+            },
+            {
+              "path": "lastTool.isError",
+              "equals": false
+            },
+            {
+              "path": "lastToolResult.success",
+              "equals": true
+            },
+            {
+              "path": "lastToolResult.sceneContext",
+              "exists": true
+            },
+            {
+              "path": "gameState.player.position",
+              "equals": {
+                "x": 5,
+                "y": 13
+              }
+            }
+          ],
+          "text": "Tu avances d'une case et atteins la position (5,13)."
+        }
+      ]
+    },
+    {
+      "id": "movement-refused",
+      "split": "train",
+      "adventureId": "grammys-country-apple-pie",
+      "characterId": "fighter",
+      "message": "Je veux me déplacer en (999,999).",
+      "unchanged": [
+        "player.position",
+        "player.hp",
+        "player.inventory",
+        "movementUsed"
+      ],
+      "steps": [
+        {
+          "operation": "dm.turn",
+          "tool": {
+            "name": "move_token",
+            "input": {
+              "tokenId": "player",
+              "toCell": {
+                "x": 999,
+                "y": 999
+              }
+            }
+          }
+        },
+        {
+          "operation": "dm.turn",
+          "checks": [
+            {
+              "path": "lastTool.name",
+              "equals": "move_token"
+            },
+            {
+              "path": "lastTool.isError",
+              "equals": true
+            },
+            {
+              "path": "lastToolResult.error",
+              "exists": true
+            }
+          ],
+          "text": "La destination (999,999) se trouve hors de la carte. Ton déplacement est refusé et tu restes sur place."
+        }
+      ]
+    },
+    {
+      "id": "perception-success",
+      "split": "train",
+      "adventureId": "grammys-country-apple-pie",
+      "characterId": "fighter",
+      "diceSequence": "17",
+      "message": "Fais-moi un test de Sagesse (Perception) DD 15 pour écouter, sans avancer ni révéler automatiquement un secret.",
+      "unchanged": [
+        "player.position",
+        "player.hp",
+        "player.inventory",
+        "worldFacts"
+      ],
+      "steps": [
+        {
+          "operation": "dm.turn",
+          "tool": {
+            "name": "roll_ability_check",
+            "input": {
+              "entityId": "player",
+              "ability": "wis",
+              "skill": "perception",
+              "dc": 15,
+              "label": "Écoute",
+              "sightBased": false
+            }
+          }
+        },
+        {
+          "operation": "dm.turn",
+          "checks": [
+            {
+              "path": "lastTool.name",
+              "equals": "roll_ability_check"
+            },
+            {
+              "path": "lastToolResult.success",
+              "equals": true
+            }
+          ],
+          "text": "Ton test de Perception contre un DD de 15 est réussi. Tu restes sur place ; ce jet ne révèle pas automatiquement de secret."
+        }
+      ]
+    },
+    {
+      "id": "perception-failure",
+      "split": "train",
+      "adventureId": "grammys-country-apple-pie",
+      "characterId": "fighter",
+      "diceSequence": "1",
+      "message": "Fais-moi un test de Sagesse (Perception) DD 15 pour écouter, sans avancer ni révéler automatiquement un secret.",
+      "unchanged": [
+        "player.position",
+        "player.hp",
+        "player.inventory",
+        "worldFacts"
+      ],
+      "steps": [
+        {
+          "operation": "dm.turn",
+          "tool": {
+            "name": "roll_ability_check",
+            "input": {
+              "entityId": "player",
+              "ability": "wis",
+              "skill": "perception",
+              "dc": 15,
+              "label": "Écoute",
+              "sightBased": false
+            }
+          }
+        },
+        {
+          "operation": "dm.turn",
+          "checks": [
+            {
+              "path": "lastTool.name",
+              "equals": "roll_ability_check"
+            },
+            {
+              "path": "lastToolResult.success",
+              "equals": false
+            }
+          ],
+          "text": "Ton test de Perception contre un DD de 15 échoue. Tu restes sur place et aucune information cachée n'est établie par cette tentative."
+        }
+      ]
+    },
+    {
+      "id": "target-clarification",
+      "split": "validation",
+      "adventureId": "fey-shadow-fair",
+      "characterId": "wizard",
+      "message": "Je l'attaque.",
+      "unchanged": [
+        "player.position",
+        "player.hp",
+        "player.inventory",
+        "monsters",
+        "actionUsed"
+      ],
+      "steps": [
+        {
+          "operation": "dm.turn",
+          "text": "Qui veux-tu attaquer, et avec quelle arme ou quel sort ? Aucune attaque n'est encore effectuée."
+        }
+      ]
+    },
+    {
+      "id": "history-compression",
+      "split": "train",
+      "adventureId": "grammys-country-apple-pie",
+      "characterId": "fighter",
+      "historyTemplate": {
+        "pairs": 8,
+        "repetitions": 8,
+        "player": "Je réfléchis à ce que je pourrais faire plus tard : observer les lieux, poser des questions ou me déplacer après en avoir décidé la destination. Pour l'instant, ce sont seulement des hypothèses, je ne fais rien.",
+        "dm": "Tu examines ces possibilités sans accomplir d'action. Aucun déplacement, jet, acquisition, découverte de secret ou changement de disposition n'a encore été résolu. Ces intentions ne deviennent pas des faits accomplis."
+      },
+      "message": "Après cette discussion, ai-je effectivement bougé ou ramassé quelque chose ?",
+      "unchanged": [
+        "player.position",
+        "player.hp",
+        "player.inventory",
+        "worldFacts"
+      ],
+      "checks": [
+        {
+          "path": "body.summaryContext",
+          "includes": "hypothétiques"
+        }
+      ],
+      "steps": [
+        {
+          "operation": "history.compress",
+          "text": "Le joueur et le MJ ont discuté de possibilités d'observation, de dialogue et de déplacement. Ces intentions restent hypothétiques : aucun déplacement, jet, ramassage, secret découvert ou changement de disposition n'a été résolu."
+        },
+        {
+          "operation": "dm.turn",
+          "checks": [
+            {
+              "path": "params.messages.0.content",
+              "includes": "hypothétiques"
+            }
+          ],
+          "text": "Tu n'as ni bougé ni ramassé d'objet pendant cette discussion. Nous avons seulement envisagé des possibilités ; ta position et ton inventaire sont inchangés."
+        }
+      ]
+    }
+  ]
+}

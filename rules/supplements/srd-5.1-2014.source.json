@@ -1,0 +1,20 @@
+{
+  "id": "srd-5.1-2014-supplement",
+  "ruleset": "2014",
+  "srdVersion": "5.1",
+  "title": "System Reference Document 5.1",
+  "publisher": "Wizards of the Coast LLC",
+  "sourceUrl": "https://media.wizards.com/2023/downloads/dnd/SRD_CC_v5.1.pdf",
+  "currentOfficialMirror": "https://media.dndbeyond.com/compendium-images/srd/5.1/SRD_CC_v5.1.pdf",
+  "verifiedOn": "2026-10-31",
+  "license": "CC-BY-4.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by/4.0/legalcode",
+  "pages": 403,
+  "pdf": "rules/supplements/SRD_CC_v5.1.pdf",
+  "pdfSha256": "2504d2a0abb0a4d491a939be4f17910a2dde0312570ab8d208080225ccf0a1f0",
+  "text": "rules/supplements/srd-5.1-2014.md",
+  "textSha256": "cd39aadde7d705a87c0e6c4f3579f59ca1cb7e0841efaa91595b36929be51eb9",
+  "extraction": "pypdf extract_text per page, no mechanical interpretation",
+  "coverage": "SRD subset, not all PHB/DMG/XGE; separate from unchanged supplied-book manifest",
+  "attribution": "This work includes material taken from the System Reference Document 5.1 (SRD 5.1) by Wizards of the Coast LLC and available at https://dnd.wizards.com/resources/systems-reference-document. The SRD 5.1 is licensed under the Creative Commons Attribution 4.0 International License available at https://creativecommons.org/licenses/by/4.0/legalcode."
+}

@@ -77,6 +77,8 @@ export default function CharacterSheet({
       </header>
 
       {/* Conditions actives (jeu uniquement) */}
+      {data.hitDice&&<p className="text-xs text-stone-400">Dés de vie : <span className="font-mono text-amber-300">{data.hitDice.current}/{data.hitDice.max} d{data.hitDice.die}</span></p>}
+      {data.concentration&&<p className="text-xs text-purple-300">Concentration : {data.concentration}</p>}
       {data.conditions.length > 0 && (
         <div className="flex flex-wrap gap-1">
           {data.conditions.map(c => (
@@ -165,7 +167,15 @@ export default function CharacterSheet({
                 ))}
               </div>
             )}
-            {data.spellcasting.spells.length > 0 && (
+            {data.spellcasting.levels ? data.spellcasting.levels.map(group => (
+              <div key={group.level} className="flex flex-wrap items-center gap-1">
+                <span className="text-[10px] text-stone-500 mr-0.5">
+                  Niv.&nbsp;{group.level}
+                  <span className="ml-1 font-mono text-amber-300">({group.slots.current !== null ? `${group.slots.current}/${group.slots.max}` : group.slots.max} empl.)</span>&nbsp;:
+                </span>
+                {group.spells.map(spell => <Pill key={spell}>{spell}</Pill>)}
+              </div>
+            )) : data.spellcasting.spells.length > 0 && (
               <div className="flex flex-wrap items-center gap-1">
                 <span className="text-[10px] text-stone-500 mr-0.5">
                   Niv.&nbsp;1

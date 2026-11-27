@@ -1,11 +1,16 @@
 # AI Dungeon Master
 
-Application web de jeu de rôle D&D 5e avec un Dungeon Master IA (Claude) comme narrateur et arbitre de règles. Landing page avec choix de modules d'aventure, interface battlemap interactive avec chat latéral. Un serveur MCP TypeScript gère tous les calculs mécaniques.
+Application web de jeu de rôle D&D 5e avec un Dungeon Master IA (OpenAI) qui choisit les outils et raconte leurs résultats. Landing page avec choix de modules d'aventure, interface battlemap interactive avec chat latéral. Un serveur MCP TypeScript gère tous les calculs mécaniques.
+
+Le [registre canonique des intégrations MCP](docs/suivi-integration-mcp.md)
+donne les statuts, validations et limites du travail identifié. Suivre ce
+document pour poursuivre les lots ; ne pas refaire l'audit global ni
+reconstruire le backlog depuis les anciennes matrices et leurs JSON.
 
 ## Stack
 
 - **Frontend** : Next.js 16, TypeScript, Tailwind CSS
-- **IA** : Anthropic SDK — Haiku 4.5 (classifieur d'intention) + Sonnet (narration)
+- **IA** : OpenAI Responses — un agent MJ interprète, choisit ses outils MCP et narre leurs résultats ; modèle de résumé séparé
 - **MCP** : `@modelcontextprotocol/sdk` — game engine déterministe
 - **Auth** : NextAuth v5 (OAuth 2.0 Google) — sessions Postgres via
   `@auth/pg-adapter` (stratégie « database »)
@@ -34,7 +39,7 @@ Le joueur choisit un personnage prétiré (Guerrier, Barde, Magicien, Clerc — 
 
 ### Ajouter un module d'aventure
 
-1. `adventures/<id>/adventure-module.md` (format « ## Salle N » + « Point d'entrée ») et `map.ts` (exporter un `AdventureMapData` : rooms, entryCells, encounters — **types de monstres existants du moteur uniquement**, npcs, aliases, transitions, roomHooks, startCell, `initialPlayer` = `{ level, extraInventory? }`). Chaque module fournit aussi ses `player-rules.md` et `bestiary.md` (requis) ; seules les règles DM génériques sont partagées (`adventures/_shared/dm-rules.md`). (La fiche du héros est globale : `characters/<id>/`, pas de `player-character.md`.)
+1. `adventures/<id>/adventure-module.md` (format « ## Salle N » + « Point d'entrée ») et `map.ts` (exporter un `AdventureMapData` : rooms, entryCells, encounters — **types de monstres existants du moteur uniquement**, npcs, aliases, transitions, roomHooks, startCell, `initialPlayer` = `{ level, extraInventory? }`). Chaque module fournit son `bestiary.md` (requis) et un `player-rules.md` facultatif pour ses spécificités. Les socles MJ et joueur sont partagés dans `adventures/_shared/{dm-rules,player-rules}.md` ; le complément joueur est ajouté après le socle. (La fiche du héros est globale : `characters/<id>/`, pas de `player-character.md`.)
 2. `adventures/<id>/definition.ts` : exporter un `AdventureContent` (meta landing, `welcomeMessage`, `chatPlaceholders`, `roomStatusHints`, et surtout `promptGuidance` — le vocabulaire du module injecté dans les prompts DM ; **aucun terme d'un autre module**).
 3. Battlemap 17×15 : dupliquer `scripts/generate-battlemap-grammys-country-apple-pie.cjs` → `scripts/generate-battlemap-<id>.cjs`, sortie `public/battlemaps/<id>.png`.
 4. Enregistrer la carte dans `lib/adventure-map.ts` (`ADVENTURE_MAPS`), importer la définition dans `lib/adventures.ts` et l'ajouter à `AVAILABILITY`.
@@ -104,7 +109,7 @@ node scripts/generate-battlemap-tide-crypt.cjs
 ## Prérequis
 
 - Node.js 20+
-- Une clé API Anthropic
+- Un serveur vLLM compatible Chat Completions (pour le mode live)
 
 ## Installation
 
@@ -114,13 +119,21 @@ npm install
 
 ## Configuration
 
-### 1. Clé API
+### 1. Fournisseur LLM
 
-Éditez `.env.local` et remplacez `your_key_here` par votre clé Anthropic :
+Copiez `.env.example` vers `.env.local`. Pour jouer en live :
 
+```dotenv
+LLM_PROVIDER=openai
+LLM_MODE=live
+ALLOW_PAID_LLM=true
+OPENAI_API_KEY=votre-cle-openai
+DM_MODEL=gpt-5.4-mini
 ```
-ANTHROPIC_API_KEY=sk-ant-...
-```
+
+Le MJ et les résumés utilisent l’API Responses. Le moteur MCP reste dans le
+serveur de l’application. Le budget de contexte est compté par OpenAI avant
+génération. Voir [le guide OpenAI](docs/openai.md).
 
 ### 2. Authentification & paiements
 
@@ -144,7 +157,7 @@ l'absence du fichier, un fond sombre est affiché.
 
 ### 4. Cout LLM et tests sans appels payants
 
-Par defaut, l'application utilise le LLM en live. Pour tester les regles, les deplacements et la boucle de combat sans cout Anthropic :
+Par defaut, l'application utilise le LLM en live. Pour tester les regles, les deplacements et la boucle de combat sans coût d’inférence :
 
 ```env
 LLM_MODE=mock
@@ -155,17 +168,16 @@ Modes et réglages effectivement lus par le code :
 
 | Variable | Effet |
 |----------|-------|
-| `LLM_MODE=live` | Appels Anthropic normaux (défaut) |
+| `LLM_MODE=live` | Appels du fournisseur choisi (défaut) |
+| `LLM_PROVIDER=openai` | Seul fournisseur live ; valeur par défaut |
+| `OPENAI_BASE_URL` / `OPENAI_API_KEY` | URL `/v1` et clé API OpenAI |
 | `LLM_MODE=mock` | Reponses deterministes locales, sans appel payant |
 | `ALLOW_PAID_LLM=false` | Refuse tout appel payant (ceinture de sécurité en mode `live`) |
-| `LLM_PLANNER_ENABLED=false` | Désactive la pré-passe d'intention (classifieur Haiku) |
-| `LLM_MAX_CALLS_PER_REQUEST=10` | Coupe une requete trop bavarde (itérations de la boucle tool-use) |
+| `LLM_MAX_STALLED_ITERATIONS=6` | Borne les itérations sans nouvelle résolution MCP |
 | `LLM_MAX_TOKENS=1024` | Plafond de sortie par appel API |
-| `LLM_PROMPT_CACHE_ENABLED=true` | Active les breakpoints de prompt caching Anthropic |
 | `LLM_COMBAT_LOG_TAIL=6` | Nombre d'entrées de journal de combat envoyées au LLM |
 | `LLM_HISTORY_COMPRESS_THRESHOLD_CHARS` / `LLM_HISTORY_KEEP_RECENT` | Seuil et fenêtre de compression d'historique |
-| `DM_MODEL` / `DM_PLANNER_MODEL` / `DM_COMPRESS_MODEL` | Modèles narration / classifieur / résumé |
-| `DM_EFFORT=medium` | Effort de réflexion du DM (modèles compatibles uniquement) |
+| `DM_MODEL` / `DM_COMPRESS_MODEL` | Modèles MJ / résumé |
 
 > ⚠️ `LLM_MODE` ne connaît QUE `mock` et `live`. Les anciens modes `record`/
 > `replay` (cassettes) ont été supprimés, ainsi que `NARRATION_MODE`, le
@@ -174,23 +186,18 @@ Modes et réglages effectivement lus par le code :
 > `LLM_MAX_CALLS_PER_SESSION`, `LLM_REPLAY_FALLBACK_TO_MOCK` : elles ne sont
 > plus lues par personne.
 
-En mode live, la route DM reduit aussi le cout sans passer en mock :
+Le système conserve le contrat commun, la fiche et l’index du module. Les procédures spécialisées vivent dans `lib/dm/rule-guides.json` et se lisent via `get_rules_support({domain})`. `discover_tools` charge les schémas spécialisés demandés par le MJ ; aucun choix d’action n’est déduit du message joueur par le serveur. Le moteur valide chaque appel structuré.
 
-- actions evidentes de combat/deplacement par coordonnees/passage de tour resolues cote moteur avant Anthropic
-- tools MCP filtres selon la phase et l'intention au lieu d'envoyer tous les schemas a chaque appel
-- classifieur d'intention Haiku en pré-passe qui exécute lui-même les marqueurs de scène sûrs (reveal_npc, trigger_room_event) et injecte une directive mécanique au DM
-- memoire de scene compacte dans `gameState.sceneMemory` pour porter les consequences sans repayer tout l'historique
-- prompt caching sur les blocs systeme statiques et les schemas tools selectionnes
-- mini budget visible en jeu: cout partie/tour, appels LLM, cache lu/ecrit et route LLM
+Le contexte de scène reste local à la carte et aux salles pertinentes. L’historique est résumé et la requête complète, outils compris, est vérifiée avec le compteur OpenAI avant génération. Les tokens cachés sont comptabilisés séparément.
 
-Playtest cout/qualite (mock par défaut ; `--mode live` exige `--allow-paid` et facture Anthropic) :
+Playtest cout/qualite (mock par défaut ; `--mode live` exige `--allow-paid` et utilise l’API OpenAI) :
 
 ```bash
 npm run playtest:mock
 node scripts/playtest.cjs --mode live --allow-paid --report .data/playtest-reports/live.json
 ```
 
-Le playtest agrège appels LLM, cout estime, routes `none/short/rich/blocked`, tools, violations de seuils et formulations robotiques interdites (`[Mock]`, coordonnees visibles, phrases generiques type "decor se replace"). Les seuils sont configurables via `PLAYTEST_MAX_COST_USD`, `PLAYTEST_MIN_LLM_NARRATOR_RATIO`, `PLAYTEST_MAX_AVERAGE_LLM_CALLS` et `PLAYTEST_MAX_SIMPLE_TURN_LLM_CALLS`.
+Le playtest vérifie le pipeline actuel : appels MCP attendus/interdits, jets et changements d'état réels, persistance, narration et cycles de combat complets. Il utilise pg-mem et désactive les limites de débit uniquement dans son processus. Les 28 tours doivent passer avec un code de sortie 0. Les seuils sont configurables via `PLAYTEST_MAX_COST_USD` (0,05 $), `PLAYTEST_MIN_LLM_NARRATOR_RATIO` (1) et `PLAYTEST_MAX_AVERAGE_LLM_CALLS` (4). `--report <path>` écrit le détail des échecs ; `--session-fixture <path>` ajoute un scénario au contrat courant (voir scripts/CLAUDE.md). Le harnais n'attend plus les événements, traces et affordances de l'ancien pipeline.
 
 > ⚠️ L'estimateur de coût facture désormais chaque appel au tarif de SON modèle
 > (Haiku 1/5, Sonnet 3/15 $/MTok…) au lieu de tout facturer au tarif Haiku —
@@ -203,7 +210,7 @@ Le playtest agrège appels LLM, cout estime, routes `none/short/rich/blocked`, t
 Chaque module vit dans son dossier `adventures/<id>/` :
 
 - `adventures/<id>/adventure-module.md` — Carte des salles, monstres, trésors, triggers
-- `adventures/<id>/player-rules.md` — Règles côté joueur propres au module *(requis)*
+- `adventures/<id>/player-rules.md` — Complément joueur propre au module *(facultatif)*, ajouté au socle obligatoire `adventures/_shared/player-rules.md`
 - `adventures/<id>/bestiary.md` — Bestiaire & notes de maîtrise du module : stats reskinnées, calibrage, mise en scène *(requis)*
 
 Les règles DM génériques sont le SEUL contenu partagé entre modules :
@@ -229,10 +236,21 @@ docker compose up -d   # Postgres local sur localhost:5432
 
 npm run build:mcp   # compile le serveur MCP (une seule fois)
 npm run db:migrate  # applique le schéma (aussi fait au 1er accès)
-npm run dev         # lance Next.js + MCP server en parallèle
+npm run dev         # lance Next.js ; un moteur MCP est créé par session
 ```
 
 Ouvrez http://localhost:3000
+
+En développement (`npm run dev` ou `npm run dev:mock`), Next.js recharge
+l'interface à l'enregistrement. Les changements du moteur, des cartes et des
+personnages sont compilés automatiquement au prochain message de jeu ; la
+session reprend depuis son état sauvegardé. Le tour déjà commencé conserve son
+moteur. Les fichiers narratifs sont également relus au début du prochain tour.
+Une compilation invalide fait échouer la requête sans remplacer le moteur ni
+la sauvegarde ; corrigez le code puis renvoyez le message. Les compilations de
+développement vivent dans `.data/dev-mcp/`, séparées de `mcp-server/dist/`.
+Les changements de dépendances et de configuration de démarrage peuvent encore
+nécessiter un redémarrage.
 
 ## Tools MCP disponibles
 
@@ -297,7 +315,8 @@ GitHub repo
 3. Renseigner les variables du service web :
 
 ```
-ANTHROPIC_API_KEY   = sk-ant-...          # clé réelle
+VLLM_BASE_URL      = https://votre-serveur/v1
+VLLM_API_KEY       = secret-inference
 DATABASE_URL        = ${{Postgres.DATABASE_URL}}
 AUTH_SECRET         = <npx auth secret>
 AUTH_URL            = https://<votre-domaine-railway>
@@ -322,7 +341,7 @@ Le workflow `.github/workflows/ci.yml` se déclenche sur chaque push et PR :
 | `tsc --noEmit` | Type-check Next.js |
 | `next build` | Build de production complet |
 
-Aucune clé Anthropic réelle n'est nécessaire pour le CI — une clé placeholder est utilisée (la clé n'est pas lue au build time).
+Le CI utilise le mode mock, sans serveur d’inférence ni clé réelle.
 
 ---
 
@@ -386,7 +405,7 @@ curl -X DELETE -H "Authorization: Bearer un-token-long-aleatoire" \
 
 L'endpoint `GET /api/debug/logs` retourne les logs persistants si le fichier JSONL existe, sinon les logs recents gardes en memoire par le process Node. Pendant le debug live, la lecture est publique par defaut pour permettre une surveillance externe sans acces hebergeur; remettez `APP_DEBUG_LOG_PUBLIC_READ=false` ou retirez ce mode apres la session. `DELETE /api/debug/logs` reste protege par `APP_DEBUG_LOG_TOKEN` et efface a la fois le buffer memoire et le fichier JSONL local. Utilisez de preference le header `Authorization: Bearer ...`. Le parametre `?token=` est desactive par defaut; activez-le seulement pour depannage manuel avec `APP_DEBUG_LOG_TOKEN_QUERY_ENABLED=true`, car il peut fuiter dans des historiques navigateur/proxy.
 
-Les logs incluent notamment `requestId`, `sessionId`, appels Anthropic, usage tokens/cout estime, appels MCP, erreurs de regles, resume compact du `GameState`, persistance session et durees. Les valeurs ressemblant a des secrets/tokens sont masquees automatiquement.
+Les logs incluent notamment `requestId`, `sessionId`, appels vLLM, usage tokens/cout estime, appels MCP, erreurs de regles, resume compact du `GameState`, persistance session et durees. Les valeurs ressemblant a des secrets/tokens sont masquees automatiquement.
 
 > ℹ️ L'endpoint accepte un paramètre `?traces=true` qui filtre les événements
 > `dm.turn.trace`, mais **aucun code ne produit ce type de trace** aujourd'hui

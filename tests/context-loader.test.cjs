@@ -1,8 +1,4 @@
-// Le context-loader charge les fichiers markdown du bon module. Chaque module
-// possède SON player-rules.md, SON bestiary.md et SON adventure-module.md —
-// jamais de repli sur une autre aventure (sauf fail-safe id inconnu). Le SEUL
-// contenu partagé est adventures/_shared/dm-rules.md (règles DM génériques,
-// sans vocabulaire de module).
+// Socles partagés obligatoires, compléments joueur facultatifs par campagne.
 
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
@@ -44,9 +40,9 @@ test('the character sheet is GLOBAL : même personnage → même fiche sur deux 
   assert.notEqual(wizard.playerCharacter, grammyFighter.playerCharacter)
 })
 
-const MODULE_IDS = ['grammys-country-apple-pie', 'tide-crypt', 'fey-shadow-fair']
+const MODULE_IDS = require('../lib/adventures.ts').ADVENTURES.map(({ id }) => id)
 
-test('dm rules are the single shared file, identical for every module', () => {
+test('dm rules are shared, identical for every module', () => {
   const sharedDmRules = fs.readFileSync(
     path.join(process.cwd(), 'adventures', '_shared', 'dm-rules.md'), 'utf-8')
   for (const id of MODULE_IDS) {
@@ -56,14 +52,45 @@ test('dm rules are the single shared file, identical for every module', () => {
   assert.doesNotMatch(sharedDmRules, /Grammy|Grukk|Mac le|verger|boulangerie|dryade|Gardien Noyé|Morgane|Chien-clin|Filou|salle \d/i)
 })
 
-test('each module ships its OWN player rules, bestiary and adventure module', () => {
+test('every character gets a compact 2014 rules core and on-demand books rather than full manuals', () => {
+  const { ADVENTURES } = require('../lib/adventures.ts')
+  const { buildStaticPrompt } = require('../lib/dm/prompts.ts')
+  const catalog = require('../mcp-server/dist/mcp-server/rules-library.js').consultRules({})
+  for (const { id } of ADVENTURES) {
+    for (const character of ['fighter', 'bard', 'wizard', 'cleric']) {
+      const ctx = loader.loadContextFiles(id, character)
+      const prompt = buildStaticPrompt(id, character)
+      assert.match(prompt, /D&D 5e 2014/)
+      assert.match(prompt, /consult_rules/)
+      assert.match(ctx.dmRules, /Consulte d'abord le bestiaire local de la campagne/)
+      assert.match(ctx.dmRules, /book:"mm-2014"/)
+      assert.match(ctx.dmRules, /règle maison/)
+      assert.ok(ctx.dmRules.length + ctx.playerRules.length < 10000)
+      assert.doesNotMatch(ctx.dmRules + ctx.playerRules, /2024|Guerrier niveau 1|Désavantage sur le jet d'initiative/)
+      for (const book of catalog.books) {
+        const sourcePath = book.id === 'srd-5.1-2014'
+          ? 'rules/supplements/srd-5.1-2014.md' : `rules/books/${book.id}.md`
+        const full = fs.readFileSync(sourcePath, 'utf8')
+        assert.equal(prompt.includes(full.slice(0, 500)), false, `${id}/${character}: full book leaked into static prompt`)
+      }
+    }
+  }
+})
+
+test('each module combines the shared player core with only its own optional supplement', () => {
   for (const id of MODULE_IDS) {
     const dir = path.join(process.cwd(), 'adventures', id)
-    for (const file of ['player-rules.md', 'bestiary.md', 'adventure-module.md']) {
+    for (const file of ['bestiary.md', 'adventure-module.md']) {
       assert.ok(fs.existsSync(path.join(dir, file)), `fichier manquant : adventures/${id}/${file}`)
     }
     const ctx = loader.loadContextFiles(id)
-    assert.equal(ctx.playerRules, fs.readFileSync(path.join(dir, 'player-rules.md'), 'utf-8'))
+    const core = fs.readFileSync('adventures/_shared/player-rules.md', 'utf8')
+    const supplementPath = path.join(dir, 'player-rules.md')
+    const supplement = fs.existsSync(supplementPath) ? fs.readFileSync(supplementPath, 'utf8').trim() : ''
+    assert.equal(ctx.playerRules, supplement ? `${core.trimEnd()}\n\n${supplement}\n` : core)
+    assert.equal(ctx.playerRules.split('# Socle joueur').length, 2)
+    if (id !== 'sarah-of-yellowcrest-manor') assert.doesNotMatch(ctx.playerRules, /Yellowcrest|Candlekeep|Greenfast/)
+
     assert.equal(ctx.bestiary, fs.readFileSync(path.join(dir, 'bestiary.md'), 'utf-8'))
   }
 
@@ -87,18 +114,55 @@ test('unknown character id defaults to the fighter sheet (fail-safe)', () => {
   assert.equal(unknown.playerCharacter, fighter.playerCharacter)
 })
 
+test('full bestiary remains available as a reference while the static prompt contains no roster', () => {
+  const { ADVENTURES } = require('../lib/adventures.ts')
+  const { buildStaticPrompt } = require('../lib/dm/prompts.ts')
+  for (const { id } of ADVENTURES) {
+    const manifest = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'adventures', id, 'bestiary.json'), 'utf8'))
+    const prompt = loader.loadBestiaryPrompt(id)
+    const system = buildStaticPrompt(id)
+    assert.ok(!system.includes(prompt), `${id}: a campaign-wide roster must not enter the static prompt`)
+    assert.doesNotMatch(system, /## (?:Bestiaire du module|Récapitulatif des monstres de la session)/i)
+    assert.match(prompt, /get_monster_stat_block/)
+    assert.match(prompt, /engineSupport/)
+    for (const note of [...manifest.notes, ...(manifest.narrativeNpcs ?? [])]) assert.ok(prompt.includes(note), `${id}: lost module note`)
+    for (const creature of manifest.creatures) {
+      assert.ok(prompt.includes(creature.title))
+      assert.ok(prompt.includes(JSON.stringify(creature.type)))
+      if (creature.role) assert.ok(prompt.includes(creature.role))
+      for (const note of creature.notes ?? []) assert.ok(prompt.includes(note), `${id}: lost creature guidance`)
+    }
+    for (const creature of manifest.creatures) {
+      const local = loader.loadBestiaryPrompt(id, [creature.type])
+      assert.ok(local.includes(JSON.stringify(creature.type)))
+      if (creature.role) assert.ok(!local.includes(creature.role), `${id}: campaign-wide placement leaked`)
+      for (const note of creature.notes ?? []) assert.ok(local.includes(note))
+      for (const note of [...manifest.notes, ...(manifest.narrativeNpcs ?? [])]) assert.ok(!local.includes(note))
+      for (const other of manifest.creatures.filter(other => other.type !== creature.type)) {
+        assert.ok(!local.includes(`### Type moteur ${JSON.stringify(other.type)}`))
+      }
+    }
+    assert.equal(loader.loadBestiaryPrompt(id, []), '')
+    const full = loader.loadContextFiles(id).bestiary
+    assert.ok(prompt.length < full.length * 0.6, `${id}: leave room for tool results and narration`)
+    assert.ok(!system.includes(full), `${id}: do not also inject the complete bestiary`)
+  }
+  assert.equal(loader.loadBestiaryPrompt('does-not-exist'), loader.loadBestiaryPrompt())
+})
+
 test('unknown module defaults to the default module content (fail-safe)', () => {
   const grammy = loader.loadContextFiles('grammys-country-apple-pie')
   const unknown = loader.loadContextFiles('does-not-exist')
   assert.equal(unknown.adventureModule, grammy.adventureModule)
+  assert.equal(unknown.playerRules, grammy.playerRules)
 })
 
-test('the shared dm rules exist (single shared file), and every character ships a sheet', () => {
+test('the shared rule cores exist, and every character ships a sheet', () => {
   // player-character.md a disparu des modules : la fiche vit dans characters/.
-  // _shared/ ne contient QUE dm-rules.md — tout le reste est par module.
+  // _shared/ contient les deux socles génériques.
   const sharedDir = path.join(process.cwd(), 'adventures', '_shared')
   assert.ok(fs.existsSync(path.join(sharedDir, 'dm-rules.md')), 'fichier manquant : _shared/dm-rules.md')
-  assert.ok(!fs.existsSync(path.join(sharedDir, 'player-rules.md')), '_shared/player-rules.md ne doit plus exister (règles joueur PAR module)')
+  assert.ok(fs.existsSync(path.join(sharedDir, 'player-rules.md')))
   for (const id of ['fighter', 'bard', 'wizard', 'cleric']) {
     const sheet = path.join(process.cwd(), 'characters', id, 'character-sheet.md')
     assert.ok(fs.existsSync(sheet), `fiche de personnage manquante : ${id}`)
@@ -113,4 +177,20 @@ test('parsed module is cached per adventure and split into rooms', () => {
   assert.notEqual(grammy.index, tide.index)
   // Cache : deux appels rendent la même instance.
   assert.equal(loader.loadAdventureModuleParsed('tide-crypt'), tide)
+})
+
+test('missing shared player core fails explicitly instead of using a campaign file', () => {
+  const read = fs.readFileSync
+  fs.readFileSync = function (filename, ...args) {
+    if (path.resolve(String(filename)) === path.resolve('adventures/_shared/player-rules.md')) {
+      throw Object.assign(new Error('missing test core'), { code: 'ENOENT' })
+    }
+    return read.call(this, filename, ...args)
+  }
+  try {
+    assert.throws(() => loader.loadContextFiles('tide-crypt', 'missing-core-test'),
+      /Fichier de contexte manquant : adventures\/_shared\/player-rules\.md/)
+  } finally {
+    fs.readFileSync = read
+  }
 })

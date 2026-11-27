@@ -1,0 +1,67 @@
+{
+  "ruleset": "2014",
+  "license": "CC-BY-4.0",
+  "primarySource": "https://media.wizards.com/2023/downloads/dnd/SRD_CC_v5.1.pdf",
+  "pdfSha256": "2504d2a0abb0a4d491a939be4f17910a2dde0312570ab8d208080225ccf0a1f0",
+  "verifiedAt": "2026-10-31",
+  "records": {
+    "Cloak of Protection": {
+      "page": 214,
+      "text": "Cloak of Protection Wondrous item, uncommon (requires attunement) You gain a +1 bonus to AC and saving throws while you wear this cloak.",
+      "sha256": "6dcabdf6709cdcf8599aaaa29ae967752734668fd29a8414cf0825478628dc45"
+    },
+    "Pearl of Power": {
+      "page": 232,
+      "text": "Pearl of Power Wondrous item, uncommon (requires attunement by a spellcaster) While this pearl is on your person, you can use an action to speak its command word and regain one expended spell slot. If the expe nded slot was of 4th level or higher, the new slot is 3rd level. Once you use the pearl, it can` t be used again until the nex t dawn.",
+      "sha256": "4fb128b1055ed827cd0a188b65f27fc0eed25b9a0bc1916ff100352cc5c33070"
+    },
+    "Potion of Healing": {
+      "page": 234,
+      "text": "Potion of Healing Potion, rarity varies You regain hit points when you drink this potion. The number of hit points depends on the potion’s rarity, as shown in the Potions of Healing table. Whatever its potency, the potion’s red liquid glimmers when agitated. Potions of Healing Potion of ... Rarity HP Regained Healing Common 2d4 + 2 Greater healing Uncommon 4d4 + 4 Superior healing Rare 8d4 + 8 Supreme healing Very rare 10d4 + 20",
+      "sha256": "49780bc7446daa758b187e2fcb77dae3d49682dea2143f7e6f995626ea0a253f"
+    },
+    "Ring of Protection": {
+      "page": 237,
+      "text": "Ring of Protection Ring, rare (requires attunement) You gain a +1 bonus to AC and saving throws while wearing this ring.",
+      "sha256": "75b6f113f40535b38bb7d10f1770d2c6a5626c5148e0f67f48be30ce66b138a0"
+    },
+    "Shield, +1, +2, or +3": {
+      "page": 242,
+      "text": "Shield, +1, +2, or +3 Armor (shield), uncommon (+1), rare (+2), or very rare (+3) While holding this shield, you have a bonus to AC determined by the shield’s rarity. This bonus is in addition to the shield’s normal bonus to AC.",
+      "sha256": "ffb326cc3f269907c28a53e890ca43dc5f30d7c9fed64d0fb1502bddf27e9d30"
+    },
+    "Wand of Fireballs": {
+      "page": 248,
+      "text": "Wand of Fireballs Wand, rare (requires attunement by a spellcaster) This wand has 7 charges. While holding it, you can use an action to expend 1 or more of its charges to cast the fireball spell (save DC 15) from it. For 1 charge, you cast the 3rd-­‐‐level version of the spell. You can increase the spell slot level by one for each additional charge you expend. The wand regains 1d6 + 1 expended charges daily at dawn. If you expend the wand’s last charge, roll a System Reference Document 5.1 249 d20. On a 1, the wand crumble s into ashes and is destroyed.",
+      "sha256": "6d352097da2923dc7328e5c60275fb69319d8606515fc28f7023c530da6065ce"
+    },
+    "Wand of Magic Missiles": {
+      "page": 249,
+      "text": "Wand of Magic Missiles Wand, uncommon This wand has 7 charges. While holding it, you can use an action to expend 1 or more of its charges to cast the magic missile spell from it. For 1 charge, you cast the 1st-­‐‐level version of the spell. You can increase the spell slot level by one for each additional charge you expend. The wand regains 1d6 + 1 expended charges daily at dawn. If you expend the wand’s last charge, roll a d20. On a 1, the wand crumbles into ashes and is destroyed.",
+      "sha256": "96477f8ff9d4196f10d6ccca5bf9e963113239dacf744191e8bd54aba0bc86af"
+    },
+    "Weapon, +1, +2, or +3": {
+      "page": 250,
+      "text": "Weapon, +1, +2, or +3 Weapon (any), uncommon (+1), rare (+2), or very rare (+3) You have a bonus to attack and damage rolls made with this magic weapon. The bonus is determined by the weapon’s rarity.",
+      "sha256": "d4baa9108735727db8a2c46670d0b2d8ba21b1c7050f3b52fd0e30b633f80e0c"
+    },
+    "Chime of Opening": {
+      "page": 213,
+      "pages": [
+        213,
+        214
+      ],
+      "dmgPage": 158,
+      "text": "Chime of Opening. Wondrous item, rare. This hollow metal tube measures about 1 foot long and weighs 1 pound. You can strike it as an action, pointing it at an object within 120 feet of you that can be opened, such as a door, lid, or lock. The chime issues a clear tone, and one lock or latch on the object opens unless the sound can’t reach the object. If no locks or latches remain, the object itself opens. The chime can be used ten times. After the tenth time, it cracks and becomes useless.",
+      "sha256": "df6cf98c59ccf7bd51cc7c712eae68354d728d9131b54c071ec6dae3bd7e143e",
+      "verifiedFrom": "Official SRD5.1 PDF2504d2a0abb0a4d491a939be4f17910a2dde0312570ab8d208080225ccf0a1f0; targeted pages only"
+    },
+    "Robe of Scintillating Colors": {
+      "page": 238,
+      "dmgPage": 194,
+      "text": "Robe of Scintillating Colors. Wondrous item, very rare (requires attunement). This robe has 3 charges, and it regains 1d3 expended charges daily at dawn. While you wear it, you can use an action and expend 1 charge to cause the garment to display a shifting pattern of dazzling hues until the end of your next turn. During this time, the robe sheds bright light in a 30-foot radius and dim light for an additional 30 feet. Creatures that can see you have disadvantage on attack rolls against you. In addition, any creature in the bright light that can see you when the robe’s power is activated must succeed on a DC 15 Wisdom saving throw or become stunned until the effect ends.",
+      "sha256": "05f427d6a88b79bdbee94e322a18e0b3708e943404cf874be536073e9c280d29",
+      "verifiedFrom": "Official SRD5.1 PDF2504d2a0abb0a4d491a939be4f17910a2dde0312570ab8d208080225ccf0a1f0; targeted pages only"
+    }
+  }
+}

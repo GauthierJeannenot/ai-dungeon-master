@@ -1,0 +1,15 @@
+const test=require('node:test'),assert=require('node:assert/strict')
+process.env.MONETIZATION_ENABLED='false'
+const {installPgMem}=require('./helpers/pg-mem.cjs'),pg=installPgMem()
+const {saveSession,loadSession,deleteSession}=require('../lib/session-store.ts')
+const {engine,ok,adjacent}=require('./helpers/mcp-toolkit.cjs')
+test.after(()=>pg.restore())
+test('real stdio explicitly selected Wyvern Bite+Stinger pays one action and persists the original native venom through SQL',async t=>{
+ const call=await engine(t,{dice:[1,20,17,2,3,17,2,3,1,...Array(7).fill(1),19].join(',')}),initial=await call('get_game_state')
+ const wyvern=ok(await call('spawn_monster',{monsterType:'wyvern',cell:adjacent(initial)[0]}));assert.equal(wyvern.hp.max,110)
+ ok(await call('enter_combat',{combatants:['player',wyvern.id]}));const before=await call('get_game_state');assert.equal(before.currentTurn,wyvern.id)
+ const input={monsterId:wyvern.id,targetId:'player',actionName:'Multiattack',attackActions:['Bite','Stinger']},a=ok(await call('resolve_monster_action',input));assert.equal(a.attacks.length,2);assert.deepEqual(a.attacks.map(hit=>hit.weaponOrSpell),input.attackActions);assert.equal(a.attacks[1].playerPoison.save.dc,15);assert.equal(a.attacks[1].poisonDamageDealt,7)
+ const state=await call('get_game_state'),id=`wyvern-multiattack-${process.pid}`;t.after(()=>deleteSession(id));assert.equal(state.player.hp.current,before.player.hp.current-25);assert.equal(state.actionUsed[wyvern.id],true)
+ await saveSession(id,{gameState:state,history:[],adventureId:state.adventureId,characterId:state.characterId});const loaded=(await loadSession(id)).gameState;assert.deepEqual(loaded.dmTools.nativePoison,state.dmTools.nativePoison);ok(await call('replace_game_state',{gameState:loaded}))
+ const again=await call('resolve_monster_action',input);assert.equal(again.code,'ACTION_ALREADY_USED');assert.deepEqual(await call('get_game_state'),state);assert.equal(ok(await call('roll_dice',{notation:'1d20'})).total,19)
+})

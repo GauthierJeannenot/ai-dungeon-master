@@ -1,0 +1,15 @@
+# Sorts, arrivées et dangers au sol
+
+La téléportation et la poussée utilisent les vrais corps, appuis et dispositifs déjà présents. Les destinations et le compagnon sont choisis explicitement par l’IA MJ ; le moteur ne choisit pas une case voisine. Pour Porte dimensionnelle, la volonté du compagnon est un fait explicitement confirmé, distinct de sa disposition amicale.
+
+Les arrivées simultanées de Porte dimensionnelle sont prévalidées et engagées ensemble. Chaque contact physique produit ensuite son événement réel. Résoudre ces événements ne relance pas le sort, ne dépense pas un second emplacement et ne transporte pas un dispositif externe quitté par téléportation. Une téléportation sans changement de position ne crée pas une entrée fictive.
+
+Vague tonnante résout tous ses jets et dégâts avant de déplacer les corps. Les trajets initiaux vers l’extérieur sont conservés, puis engagés par pas groupés de 5 pieds. Un contact suspend cette suite jusqu’à son propre jet et son éventuel choix d’inspiration. L’arrêt du déplacement volontaire par des chausse-trappes n’annule pas la poussée forcée du sort. Une vraie contrainte produite entre les pas, par exemple la chaîne d’un piège refermé, peut arrêter le reste du trajet ; les dégâts et déplacements déjà engagés restent acquis. Libérer ensuite le corps ne relance pas cette ancienne poussée.
+
+Les capacités de conservation des événements sont vérifiées avant les coûts et les dés du sort, y compris les deux pas possibles. Les prévisions pures n’ajoutent aucun contact, jet, événement ou reçu à l’historique.
+
+`enter_combat.hazardPreparation.approach` peut désigner un vrai sort connu avec son emplacement, ou un parchemin réellement possédé et lisible, ainsi que ses destinations exactes. Le moteur valide cette approche possible sans lancer le sort, déplacer un pion ni consommer sa source. Cela permet de préparer les tours avant une arrivée magique dans un danger réellement existant, même si aucun chemin au sol ne le rejoint. Un éventuel test de lecture de parchemin au-dessus du niveau reste incertain et doit être résolu lors du véritable lancement. L’IA choisit encore explicitement chaque appel ultérieur.
+
+Sources ciblées : PHB 2014, *Dimension Door* (`rules/books/phb-2014.md:9309`) et *Thunderwave* (`rules/books/phb-2014.md:13124`). La segmentation du déplacement sur la grille et l’interruption par une contrainte physique sont des conventions explicites du moteur. Ce raccord n’ajoute pas le traitement général des objets non fixés poussés par Vague tonnante ni l’intégralité du contrôle de masse/tailles du compagnon de Porte dimensionnelle ; ces limites restent distinctes.
+
+Une ancienne continuation dépourvue de trajet peut conserver ses cibles et ses dés déjà tirés : avant tout dégât, le moteur peut retenir le trajet physique réellement constaté au moment de sa reprise. Si l’ancien contexte a déjà appliqué des dégâts sans retenir de trajet, il refuse précisément cette frontière historique inconnue ; il ne reconstruit pas une position passée et ne répète aucun dégât.

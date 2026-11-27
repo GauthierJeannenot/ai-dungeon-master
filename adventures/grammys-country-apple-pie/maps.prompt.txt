@@ -1,0 +1,6 @@
+Built-in image_gen.
+Exterior: aerial three-quarter village-map illustration, intact tiled roof, apple orchard north, refuse east, old apple tree southwest, path foreground, no labels/grid/characters.
+Interior: style upgrade from public/battlemaps/grammys_bakery.png, preserve framing, walls, room shapes and thresholds, strict topdown, brighten textures, no labels/tokens. Resized to 1360x1200 for 17x15 square cells.
+Revision: image 1 strict geometry reference, image 2 painted style reference. Natural stone and wood, soft realistic lighting, no pixel grass. Artwork registered to original building bounds before application viewport cropping.
+Final interior edit: retain rooms and thresholds, remove all exterior vegetation and refuse to dark charcoal void, tight interior framing, 880x720 local art.
+Latest built-in edit: replace exterior charcoal void with strongly blurred subdued orchard/earth/path textures; preserve sharp building layout and framing. Native generated 1387x1134, normalized by one pixel to 1386x1134 (11:9), no enlargement.

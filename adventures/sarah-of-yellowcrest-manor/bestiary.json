@@ -1,0 +1,113 @@
+{
+  "title": "Sarah du manoir Yellowcrest — bestiaire et adaptation solo",
+  "notes": [
+    "Source narrative : document utilisateur Candlekeep Mysteries — Sarah of Yellowcrest Manor, Derek Ruiz ; développement et édition Scott Fitzgerald Gray. Les statistiques de référence ci-dessous viennent du SRD 2014, pas du texte commercial.",
+    "Version pour un héros au niveau 7 avec le kit et les capacités implémentées du personnage choisi. Effectifs réduits, PV SRD inchangés. Les gardes du coche et de la grange sont moins nombreux ; aucun renfort automatique dans la chapelle. Les négociations, le contournement et les redditions peuvent éviter des combats.",
+    "Les grells non SRD ne sont pas simulés par un bloc inventé : un grick SRD garde le caveau dans cette adaptation. Le vol, les tentacules paralysants et l’apparition d’un second grell au round 2 sont retirés. Le piège de chute B2 est explicitement neutralisé et ne téléporte personne. La Porte dimensionnelle d’un héros peut en revanche rejoindre une case libre du plan déplié en dépensant son emplacement.",
+    "Viallis emploie le mage SRD. Avec un profil SRD 2014, cast_creature_spell résout explicitement Boule de feu, Projectile magique, Armure du mage, Foulée brumeuse, Invisibilité supérieure et Détection de la magie, avec ses emplacements réels et une éventuelle réaction de Contresort du héros. Les autres sorts, réactions du mage, robe et parchemin de fuite restent non automatisés ; aucun effet par narration seule.",
+    "Sarah, Vecken, Faerl et le jeune Fargo sont des PNJ narratifs, pas des monstres hostiles cachés. Leurs blocs sources servent à les identifier ; aucun effet spécial, attaque alliée ou PV de PNJ ne doit être présenté comme acquis sans outil. Les deux positions de Faerl et de Vecken correspondent au même individu à des étapes différentes.",
+    "Tous les pions PNJ possèdent désormais leur fiche mécanique dans state.npcs. Les captifs sont un groupe maison de cinq Commoners et le pion final un groupe de cinq Ghosts ; les pertes réduisent leur effectif, sans désigner de victime nommée. Aucun groupe supplémentaire n’est créé par la narration."
+  ],
+  "creatures": [
+    {
+      "type": "cultist",
+      "title": "Fidèles de la Langue brûlée",
+      "role": "Garde du coche, guetteurs de la grange et de B1, novice de B12.",
+      "notes": [
+        "Fanatisme humain, sans pouvoir magique ajouté. Une reddition établie peut terminer une rencontre sans tuer tous les adversaires."
+      ],
+      "npcIds": [
+        "young_fargo"
+      ]
+    },
+    {
+      "type": "cult_fanatic",
+      "title": "Officiants et ravisseurs",
+      "role": "Meneur de la grange, guetteur B3, instructeur B12 et assistant de Viallis.",
+      "notes": [
+        "Les sorts du bloc source ne sont pas des actions automatisées de la projection ; seule l’attaque prise en charge produit ses dégâts."
+      ]
+    },
+    {
+      "type": "thug",
+      "title": "Mercenaire du coche",
+      "role": "Protège Faerl à Waterdeep ; le reste de l’escorte du texte papier est retiré dans la version solo."
+    },
+    {
+      "type": "mage",
+      "title": "Lord Viallis Yellowcrest",
+      "role": "Meurtrier de sa famille et meneur du culte de Gaernoo, rencontré en B7.",
+      "notes": [
+        "Arrogant, loyal à Gaernoo, hésitant quand il perd la maîtrise. Choisir une attaque ou un sort réellement pris en charge : cast_creature_spell exige casterId, spellId, emplacement et cible ou zone explicites. Puis terminer les tours restants sans rejouer son action. La dague ne devient jamais une Boule de feu par changement de nom.",
+        "Armure du mage, téléportation et invisibilité ne modifient l’état qu’après leur outil. Le mage possède des emplacements 4/3/3/3/1 ; un sort de base peut utiliser un niveau supérieur explicitement choisi. Aucun sort non listé par engineSupport.spellcasting n’est acquis."
+      ]
+    },
+    {
+      "type": "grick",
+      "title": "Grick de Gaernoo",
+      "role": "Gardien terrestre du caveau B8, substitution explicite aux grells du scénario papier.",
+      "notes": [
+        "Le camouflage et les résistances sont documentés par la source ; leurs effets ne sont pas automatiquement appliqués. Pas de vol ou de paralysie."
+      ]
+    },
+    {
+      "type": "ghost",
+      "title": "Sarah",
+      "role": "Victime bienveillante, liée au journal à Candlekeep, puis libérée au dénouement.",
+      "notes": [
+        "Elle refuse de nuire ; ne jamais déclencher un combat pour avoir lu le journal. Elle est muette jusqu’à sa libération. Pas de possession imposée au joueur."
+      ],
+      "npcIds": [
+        "sarah",
+        "sarah_at_rest"
+      ]
+    },
+    {
+      "type": "noble",
+      "title": "Faerl",
+      "role": "Intendant elfe de Viallis, à Waterdeep ou Greenfast selon son sort.",
+      "notes": [
+        "Le bloc source est humain générique : l’apparence et les langues de l’elfe sont narratives. L’avantage contre charme et l’immunité au sommeil du texte papier ne sont pas automatisés. Il ne révèle pas le culte sous simple persuasion."
+      ],
+      "npcIds": [
+        "faerl_city",
+        "faerl_village"
+      ]
+    },
+    {
+      "type": "knight",
+      "title": "Sir Vecken de la Corne brisée",
+      "role": "Ancien amant de Sarah ; témoin à Waterdeep, puis captif ou soutien tardif selon les actes établis.",
+      "notes": [
+        "N’ajoute pas de tour allié gratuit. Sa blessure est narrative tant qu’il reste un PNJ de carte ; ne pas présenter les 25 PV du texte papier comme une valeur suivie par le moteur."
+      ],
+      "npcIds": [
+        "vecken",
+        "vecken_rescued"
+      ]
+    },
+    {
+      "type": "commoner",
+      "title": "Profil des PNJ : L’archiviste des Avoués",
+      "notes": [],
+      "npcIds": [
+        "avowed",
+        "arnulf",
+        "cobbler",
+        "kara",
+        "old_fargo",
+        "yaeda",
+        "cemetery_keeper"
+      ]
+    }
+  ],
+  "narrativeNpcs": [
+    "L’archiviste des Avoués : Commoner, aide documentaire et profil mécanique suivi.",
+    "Arnulf : majordome des Falgarst, témoin des faits publics.",
+    "Le cordonnier : accès fiable à la piste Greenfast même sur un jet social raté.",
+    "Kara Firenni et le vieux Fargo : proches de disparus, aucune récompense mécanique inventée.",
+    "Yaeda, Jalrax, Durz, Seffra et Ashlan : groupe maison de cinq Commoners, 20 PV cumulés ; leur délivrance exige toujours l’ouverture réelle de la grille.",
+    "Le jeune Fargo : novice pouvant renoncer au culte ; exclu du preset hostile pour permettre de l’épargner sans dégâts fictifs.",
+    "La gardienne des sépultures : prépare le dernier repos sans jet bloquant."
+  ]
+}

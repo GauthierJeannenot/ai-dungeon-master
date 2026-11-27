@@ -3,13 +3,13 @@ import { logEvent } from './server-logger'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Protections anti-abus de /api/dm — chaque message coûte de l'argent (appels
-// Anthropic), et le quota invité se réinitialise en effaçant le cookie. Deux
+// vLLM), et le quota invité se réinitialise en effaçant le cookie. Deux
 // gardes complémentaires, évaluées AVANT tout débit et tout appel LLM :
 //
 //   1. Rate-limit par IP (fenêtre fixe 1 min, en mémoire). Par instance : en
 //      multi-instance chaque nœud applique sa propre fenêtre, ce qui reste une
 //      borne correcte (limite globale = limite × nb d'instances).
-//   2. Plafond global de messages par jour — disjoncteur de dépense Anthropic.
+//   2. Plafond global de messages par jour — disjoncteur de dépense LLM.
 //      Compteur Postgres atomique (table daily_usage), partagé entre instances.
 // ─────────────────────────────────────────────────────────────────────────────
 

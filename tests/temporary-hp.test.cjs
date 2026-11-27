@@ -1,0 +1,183 @@
+const test=require('node:test'),assert=require('node:assert/strict')
+const {engine,ok,replace,spawn,battle}=require('./helpers/mcp-toolkit.cjs')
+const {TemporaryHpStateSchema}=require('../mcp-server/dist/lib/temporary-hp-state.js')
+const gift=(eventId,amount=10,extra={})=>({eventId,targetId:'player',sourceId:`source-${eventId}`,
+  sourceDescription:'Source de PV temporaires établie et arbitrée explicitement par le MJ.',amount,duration:{kind:'until_long_rest'},...extra})
+const grant=async(call,input)=>ok(await call('grant_temporary_hp',input))
+const read=async(call,targetId='player')=>ok(await call('inspect_temporary_hp',{targetId}))
+const hurt=async(call,amount,targetId='player',extra={})=>ok(await call('update_hp',{entityId:targetId,delta:-amount,reason:'Dégâts de la source établie.',damageType:'fire',damageOrigin:'environment',...extra})).damageResolution
+
+test('the separate temporary-HP schema refuses invented refills and ambiguous duration lifetimes',()=>{
+  const pool={eventId:'one',sourceId:'one',sourceDescription:'Source établie.',initial:10,current:10,grantedAt:0,endOnLongRest:true}
+  const valid=p=>TemporaryHpStateSchema.safeParse({pools:{player:p},receipts:{}}).success
+  assert.equal(valid(pool),true);assert.equal(valid({...pool,current:11}),false)
+  assert.equal(valid({...pool,expiresAt:10}),false);assert.equal(valid({...pool,endOnLongRest:false}),false)
+})
+
+test('read-only inspection and a grant leave actual HP, maximum, action budgets and resources unchanged',async t=>{
+  const call=await engine(t),before=await call('get_game_state')
+  assert.equal((await read(call)).temporaryHp,0);assert.deepEqual(await call('get_game_state'),before)
+  await grant(call,gift('first',100))
+  const after=await call('get_game_state')
+  assert.deepEqual(after.player,before.player);assert.deepEqual(after.hero,before.hero)
+  for(const key of ['actionUsed','bonusActionUsed','movementUsed','worldTimeSeconds'])assert.deepEqual(after[key],before[key])
+  assert.equal((await read(call)).temporaryHp,100)
+})
+
+test('new source choice is mandatory, keep never refreshes duration, and smaller explicit replacement never stacks',async t=>{
+  const call=await engine(t)
+  await grant(call,gift('old',10,{duration:{kind:'seconds',seconds:10}}))
+  const before=await call('get_game_state')
+  assert.equal((await call('grant_temporary_hp',gift('missing',30))).code,'TEMPORARY_HP_CHOICE_REQUIRED')
+  assert.deepEqual(await call('get_game_state'),before)
+  const kept=await grant(call,gift('kept',30,{choice:'keep'}))
+  assert.equal(kept.receipt.outcome,'kept');assert.equal(kept.target.pool.sourceId,'source-old')
+  assert.equal(kept.target.pool.expiresAt,10)
+  const replacement=await grant(call,gift('smaller',4,{choice:'replace'}))
+  assert.equal(replacement.receipt.outcome,'replaced');assert.equal(replacement.target.temporaryHp,4)
+  assert.equal(replacement.target.pool.sourceId,'source-smaller')
+})
+
+test('grant receipts survive round-trip and never refill consumed buffers or reinterpret a kept event',async t=>{
+  const call=await engine(t),input=gift('receipt',10)
+  await grant(call,input);await hurt(call,4)
+  const state=await call('get_game_state')
+  ok(await call('replace_game_state',{gameState:state}))
+  assert.equal((await grant(call,input)).alreadyApplied,true)
+  assert.equal((await read(call)).temporaryHp,6)
+  assert.equal((await call('grant_temporary_hp',{...input,amount:11})).code,'TEMPORARY_HP_EVENT_CONFLICT')
+  assert.deepEqual(await call('get_game_state'),state)
+})
+
+test('resistance resolves before one buffer absorption and only the remainder reaches actual HP',async t=>{
+  const call=await engine(t)
+  await replace(call,state=>state.player.conditions.push('petrified'))
+  await grant(call,gift('resistance',8))
+  const before=await call('get_game_state'),first=await hurt(call,11)
+  assert.equal(first.damageReceived,5);assert.equal(first.temporaryHp.absorbed,5)
+  assert.equal(first.hpLost,0);assert.equal((await read(call)).temporaryHp,3)
+  const second=await hurt(call,10)
+  assert.equal(second.damageReceived,5);assert.equal(second.temporaryHp.absorbed,3);assert.equal(second.hpDamage,2)
+  assert.equal(second.hpLost,2);assert.equal((await call('get_game_state')).player.hp.current,before.player.hp.current-2)
+})
+
+test('immunity spends no temporary HP, and healing cannot restore the buffer',async t=>{
+  const call=await engine(t),zombie=await spawn(call,'zombie')
+  await grant(call,gift('immune',8,{targetId:zombie.id}))
+  const immune=await hurt(call,20,zombie.id,{damageType:'poison'})
+  assert.equal(immune.damageReceived,0);assert.equal((await read(call,zombie.id)).temporaryHp,8)
+  await grant(call,gift('no-temp-healing',5))
+  await hurt(call,8)
+  ok(await call('update_hp',{entityId:'player',delta:100,reason:'Soin réel.'}))
+  assert.equal((await read(call)).temporaryHp,0)
+  const state=await call('get_game_state');assert.equal(state.player.hp.current,state.player.hp.max)
+})
+
+test('a zero-HP grant neither wakes nor stabilizes; absorbed actual damage still causes the source critical failures once',async t=>{
+  const call=await engine(t)
+  await replace(call,state=>{state.player.hp.current=0;state.player.conditions.push('unconscious');state.player.deathSaves={successes:0,failures:0}})
+  const before=await call('get_game_state')
+  await grant(call,gift('downed',10))
+  let state=await call('get_game_state')
+  assert.deepEqual(state.player,before.player)
+  const damage=await hurt(call,3,'player',{critical:true})
+  assert.equal(damage.temporaryHp.absorbed,3);assert.equal(damage.hpLost,0)
+  state=await call('get_game_state')
+  assert.equal(state.player.hp.current,0);assert.ok(state.player.conditions.includes('unconscious'))
+  assert.equal(state.player.deathSaves.failures,2);assert.equal(Boolean(state.player.deathSaves.stable),false)
+  assert.equal((await read(call)).temporaryHp,7)
+})
+
+test('concentration uses the full post-resistance damage even when temporary HP absorb every point',async t=>{
+  const call=await engine(t,{characterId:'wizard',dice:'10,19'})
+  ok(await call('take_rest',{kind:'long'}))
+  ok(await call('prepare_spells',{spellIds:['greater-invisibility']}))
+  ok(await call('cast_spell',{spellId:'greater-invisibility',targetId:'player',slotLevel:4}))
+  await grant(call,gift('concentration',50))
+  const before=await call('get_game_state')
+  assert.ok(before.hero.concentrationIds.player)
+  const damage=await hurt(call,30)
+  assert.equal(damage.hpLost,0);assert.equal(damage.temporaryHp.absorbed,30)
+  const after=await call('get_game_state')
+  assert.equal(after.player.hp.current,before.player.hp.current)
+  assert.equal(after.hero.concentrationIds.player,undefined,'CON total 11 fails DC15, though it would pass a fictitious DC10')
+  assert.equal(ok(await call('roll_dice',{notation:'1d20'})).total,19)
+})
+
+test('undead fortitude considers actual HP reduction, while its save DC uses actual damage taken before absorption',async t=>{
+  const call=await engine(t,{dice:'20,19'}),zombie=await spawn(call,'zombie')
+  await replace(call,state=>{state.monsters[zombie.id].hp.current=1})
+  await grant(call,gift('fortitude',5,{targetId:zombie.id}))
+  const absorbed=await hurt(call,3,zombie.id)
+  assert.equal(absorbed.fortitude,undefined);assert.equal(absorbed.hpAfter,1)
+  const overflow=await hurt(call,6,zombie.id)
+  assert.equal(overflow.temporaryHp.absorbed,2);assert.equal(overflow.fortitude.dc,11)
+  assert.equal(overflow.fortitude.success,true);assert.equal(overflow.hpAfter,1)
+  assert.equal(ok(await call('roll_dice',{notation:'1d20'})).total,19)
+})
+
+test('temporary HP protect against actual HP overflow without preventing a later true massive-damage death',async t=>{
+  const call=await engine(t)
+  await replace(call,state=>{state.player.hp.current=5})
+  await grant(call,gift('massive',100))
+  assert.equal((await hurt(call,80)).hpLost,0)
+  let state=await call('get_game_state')
+  assert.equal(state.player.hp.current,5);assert.equal(Boolean(state.player.deathSaves.dead),false)
+  await hurt(call,20+state.player.hp.max+5)
+  state=await call('get_game_state');assert.equal(state.player.hp.current,0);assert.equal(state.player.deathSaves.dead,true)
+})
+
+test('a temporary buffer does not consume Death Ward until remaining damage would reduce actual HP to zero',async t=>{
+  const call=await engine(t)
+  await replace(call,state=>{state.player.hp.current=3;state.hero.effects.push({id:'temp-ward',kind:'death-ward',sourceId:'player',targetIds:['player'],expiresAt:86400,concentration:false,data:{}})})
+  await grant(call,gift('ward-buffer',10))
+  await hurt(call,5)
+  assert.ok((await call('get_game_state')).hero.effects.some(effect=>effect.id==='temp-ward'))
+  await hurt(call,10)
+  const state=await call('get_game_state')
+  assert.equal(state.player.hp.current,1);assert.ok(!state.hero.effects.some(effect=>effect.id==='temp-ward'))
+})
+
+test('no-duration grants survive short rest and end on actual long rest without refilling',async t=>{
+  const call=await engine(t)
+  await grant(call,gift('rest-source',10));await hurt(call,3)
+  ok(await call('take_rest',{kind:'short'}));assert.equal((await read(call)).temporaryHp,7)
+  ok(await call('take_rest',{kind:'long'}));assert.equal((await read(call)).temporaryHp,0)
+  assert.equal((await grant(call,gift('rest-source',10))).alreadyApplied,true)
+  assert.equal((await read(call)).temporaryHp,0)
+})
+
+test('a source duration governs expiration across a long rest and exact elapsed time',async t=>{
+  const call=await engine(t)
+  await grant(call,gift('timed-source',10,{duration:{kind:'seconds',seconds:86400}}))
+  ok(await call('take_rest',{kind:'long'}));assert.equal((await read(call)).temporaryHp,10)
+  ok(await call('advance_time',{seconds:57600}));assert.equal((await read(call)).temporaryHp,0)
+  const state=await call('get_game_state');ok(await call('replace_game_state',{gameState:state}))
+  assert.equal((await read(call)).temporaryHp,0)
+})
+
+test('Life Drain uses source damage taken even when the temporary buffer protects all actual HP damage',async t=>{
+  const call=await engine(t,{dice:'19,4,1'}),wight=await spawn(call,'wight')
+  await grant(call,gift('life-drain-buffer',100))
+  const before=await call('get_game_state')
+  await battle(call,[wight.id],wight.id)
+  const action=ok(await call('resolve_monster_action',{monsterId:wight.id,targetId:'player',actionName:'Life Drain'})),attack=action.attacks[0]
+  assert.equal(attack.damageResolution.damageReceived,6);assert.equal(attack.damageResolution.hpLost,0)
+  assert.equal(attack.damageResolution.temporaryHp.absorbed,6)
+  const state=await call('get_game_state')
+  assert.equal(state.player.hp.max,before.player.hp.max-6)
+  assert.equal(state.dmTools.temporaryHp.pools.player.current,94)
+})
+
+test('direct GameState HP deltas pass through the same buffer hook exactly once',async t=>{
+  const call=await engine(t),enemy=await spawn(call)
+  await grant(call,gift('direct-player',10));await grant(call,gift('direct-monster',10,{targetId:enemy.id}))
+  const snapshot=await call('get_game_state'),gs=require('../mcp-server/dist/mcp-server/game-state.js')
+  gs.replaceState(snapshot)
+  gs.updatePlayerHP(-7);gs.updateMonsterHP(enemy.id,-7)
+  const state=gs.getState()
+  assert.equal(state.dmTools.temporaryHp.pools.player.current,3)
+  assert.equal(state.dmTools.temporaryHp.pools[enemy.id].current,3)
+  assert.equal(state.player.hp.current,snapshot.player.hp.current)
+  assert.equal(state.monsters[enemy.id].hp.current,snapshot.monsters[enemy.id].hp.current)
+})

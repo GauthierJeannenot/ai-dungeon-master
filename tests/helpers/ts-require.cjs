@@ -18,12 +18,13 @@ function installTsRequireWithAliases() {
   const previousResolve = Module._resolveFilename
 
   Module._resolveFilename = function resolveFilename(request, parent, isMain, options) {
-    if (request.startsWith('@/')) {
-      const mapped = path.join(process.cwd(), request.slice(2))
-      return previousResolve.call(this, mapped, parent, isMain, options)
-    }
-
-    return previousResolve.call(this, request, parent, isMain, options)
+    let mapped = request
+    if (request.startsWith('@/')) mapped = path.join(process.cwd(), request.slice(2))
+    else if (request.startsWith('.') && parent?.filename) mapped = path.resolve(path.dirname(parent.filename), request)
+    // Match the application's source resolution when foo.ts and foo.json coexist.
+    // Explicit JSON imports and compiled engine JS keep their normal resolution.
+    if (path.isAbsolute(mapped) && !path.extname(mapped) && fs.existsSync(`${mapped}.ts`)) mapped += '.ts'
+    return previousResolve.call(this, mapped, parent, isMain, options)
   }
 
   Module._extensions['.ts'] = function loadTs(mod, filename) {

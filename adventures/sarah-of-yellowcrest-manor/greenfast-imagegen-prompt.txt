@@ -1,0 +1,18 @@
+Tool: built-in image_gen.imagegen
+Asset: public/adventures/sarah-of-yellowcrest-manor/greenfast-aerial.png
+Illustrative exploration map; the engine's tactical grid remains authoritative.
+
+Use case: stylized-concept
+Asset type: interactive exploration map for a French D&D village, Greenfast.
+Primary request: A beautiful richly detailed medieval village seen STRICTLY FROM DIRECTLY ABOVE, orthographic bird's-eye plan, every building roof seen from above with no visible facades, no horizon, no isometric perspective. Landscape aspect ratio 3:2, 1536x1024 or higher. Edge-to-edge painted map, NOT a UI mockup.
+Scene: a modest rural village of about twenty timber-and-stone cottages with weathered reddish tile and thatch roofs, winding dirt lanes, vegetable patches, small fields, old deciduous trees and hedges around an open central village square with a stone well. A believable organically grown settlement, warm muted earth tones, green vegetation, gentle daylight, intricate hand-painted fantasy cartography, premium tabletop roleplaying game art, readable at small scale. Buildings occupy distinct plots, wide paths connect them.
+Composition for clickable points of interest (all positions expressed in percentage from top-left, these distinctive landmarks must be clear, keep their silhouette separated):
+- upper-left around (24%,29%): a modest mayor's cottage beside a large lovely enclosed vegetable and flower garden with orderly beds and a little garden gate facing the central square. This is Kara's garden.
+- upper-middle around (50%,28%): the largest village inn, a warm red-roofed L-shaped building with courtyard, outdoor tables, barrels and a hanging sign WITHOUT lettering, facing the central square. This is the Chaudron ventru inn.
+- upper-right around (78%,29%): a prosperous but neglected pale-stone house with dark slate roof and overgrown yard, no sinister magical signs. This is Viallis's house.
+- center around (48%,51%): open village square with stone well, cart and modest market awnings.
+- lower-left around (27%,73%): a small neat steward's office of stone and timber with a cart and stacked supplies in its yard. This is Faerl's office.
+- lower-middle-right around (66%,74%): a large ordinary weathered timber barn with straw roof and hay bales, broad double doorway opening onto a clear yard connected to the square. No cult symbols, no prisoners, no visible combat.
+- far lower-right around (90%,82%): a narrow dirt footpath leaving the village southeast between old trees towards woodland, continuing off the image; the distant tower itself is NOT visible, it is an hour away.
+A main country road enters from west into square. Secondary cottages around outer edges, farmland in the corners, cohesive sense of place.
+Constraints: absolutely NO lettering, NO labels, NO numbers, NO legend, NO markers, NO grid, NO title, NO border, NO parchment margin, NO compass, NO characters or tokens, NO UI elements, NO castle, NO city walls, NO visible tower, NO dungeon-style room plan. All labels and interaction will be overlaid separately by the app.

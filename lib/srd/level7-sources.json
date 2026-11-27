@@ -1,0 +1,1062 @@
+{
+  "ruleset": "2014",
+  "retrievedAt": "2026-10-30T23:18:26.034Z",
+  "license": "CC-BY-4.0",
+  "primarySource": "https://media.wizards.com/2023/downloads/dnd/SRD_CC_v5.1.pdf",
+  "records": {
+    "classes/fighter/levels/7": {
+      "url": "https://www.dnd5eapi.co/api/2014/classes/fighter/levels/7",
+      "sha256": "5eafc9fe8b9a5a7515770238787d1621906748b1628193551b4d5663b5a90b8b",
+      "source": {
+        "level": 7,
+        "ability_score_bonuses": 2,
+        "prof_bonus": 3,
+        "features": [
+          {
+            "index": "martial-archetype-improvement-1",
+            "name": "Martial Archetype feature",
+            "url": "/api/2014/features/martial-archetype-improvement-1"
+          }
+        ],
+        "class_specific": {
+          "action_surges": 1,
+          "indomitable_uses": 0,
+          "extra_attacks": 1
+        },
+        "index": "fighter-7",
+        "class": {
+          "index": "fighter",
+          "name": "Fighter",
+          "url": "/api/2014/classes/fighter"
+        },
+        "url": "/api/2014/classes/fighter/levels/7",
+        "updated_at": "2026-04-01T20:35:37.787Z"
+      }
+    },
+    "classes/bard/levels/7": {
+      "url": "https://www.dnd5eapi.co/api/2014/classes/bard/levels/7",
+      "sha256": "e91e6f040165d1e0f557fa53658e66a9d00fc64de5a052313eda48d0d6626c76",
+      "source": {
+        "level": 7,
+        "ability_score_bonuses": 1,
+        "prof_bonus": 3,
+        "features": [],
+        "spellcasting": {
+          "cantrips_known": 3,
+          "spells_known": 10,
+          "spell_slots_level_1": 4,
+          "spell_slots_level_2": 3,
+          "spell_slots_level_3": 3,
+          "spell_slots_level_4": 1,
+          "spell_slots_level_5": 0,
+          "spell_slots_level_6": 0,
+          "spell_slots_level_7": 0,
+          "spell_slots_level_8": 0,
+          "spell_slots_level_9": 0
+        },
+        "class_specific": {
+          "bardic_inspiration_die": 8,
+          "song_of_rest_die": 6,
+          "magical_secrets_max_5": 0,
+          "magical_secrets_max_7": 0,
+          "magical_secrets_max_9": 0
+        },
+        "index": "bard-7",
+        "class": {
+          "index": "bard",
+          "name": "Bard",
+          "url": "/api/2014/classes/bard"
+        },
+        "url": "/api/2014/classes/bard/levels/7",
+        "updated_at": "2026-04-01T20:35:37.787Z"
+      }
+    },
+    "classes/wizard/levels/7": {
+      "url": "https://www.dnd5eapi.co/api/2014/classes/wizard/levels/7",
+      "sha256": "89700640184b3c47a8c0b60ed52ec2786dff71fbe80046266d84eb3c003fac57",
+      "source": {
+        "level": 7,
+        "ability_score_bonuses": 1,
+        "prof_bonus": 3,
+        "features": [],
+        "spellcasting": {
+          "cantrips_known": 4,
+          "spell_slots_level_1": 4,
+          "spell_slots_level_2": 3,
+          "spell_slots_level_3": 3,
+          "spell_slots_level_4": 1,
+          "spell_slots_level_5": 0,
+          "spell_slots_level_6": 0,
+          "spell_slots_level_7": 0,
+          "spell_slots_level_8": 0,
+          "spell_slots_level_9": 0
+        },
+        "class_specific": {
+          "arcane_recovery_levels": 4
+        },
+        "index": "wizard-7",
+        "class": {
+          "index": "wizard",
+          "name": "Wizard",
+          "url": "/api/2014/classes/wizard"
+        },
+        "url": "/api/2014/classes/wizard/levels/7",
+        "updated_at": "2026-04-01T20:35:37.787Z"
+      }
+    },
+    "classes/cleric/levels/7": {
+      "url": "https://www.dnd5eapi.co/api/2014/classes/cleric/levels/7",
+      "sha256": "e6f16ea126cb2c5258a2c10a6ae38528868e66d36921f6453bc56214ce8c7036",
+      "source": {
+        "level": 7,
+        "ability_score_bonuses": 1,
+        "prof_bonus": 3,
+        "features": [
+          {
+            "index": "domain-spells-4",
+            "name": "Domain Spells",
+            "url": "/api/2014/features/domain-spells-4"
+          }
+        ],
+        "spellcasting": {
+          "cantrips_known": 4,
+          "spell_slots_level_1": 4,
+          "spell_slots_level_2": 3,
+          "spell_slots_level_3": 3,
+          "spell_slots_level_4": 1,
+          "spell_slots_level_5": 0,
+          "spell_slots_level_6": 0,
+          "spell_slots_level_7": 0,
+          "spell_slots_level_8": 0,
+          "spell_slots_level_9": 0
+        },
+        "class_specific": {
+          "channel_divinity_charges": 2,
+          "destroy_undead_cr": 0.5
+        },
+        "index": "cleric-7",
+        "class": {
+          "index": "cleric",
+          "name": "Cleric",
+          "url": "/api/2014/classes/cleric"
+        },
+        "url": "/api/2014/classes/cleric/levels/7",
+        "updated_at": "2026-04-01T20:35:37.787Z"
+      }
+    },
+    "spells/shatter": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/shatter",
+      "sha256": "782802a9b86547bbf0857aec0f3a8ffa7899f0d6b0c1492a29614d9312898c52",
+      "source": {
+        "index": "shatter",
+        "name": "Shatter",
+        "desc": [
+          "A sudden loud ringing noise, painfully intense, erupts from a point of your choice within range. Each creature in a 10-foot-radius sphere centered on that point must make a Constitution saving throw. A creature takes 3d8 thunder damage on a failed save, or half as much damage on a successful one. A creature made of inorganic material such as stone, crystal, or metal has disadvantage on this saving throw.",
+          "A non-magical item that is not worn or carried also suffers damage if it is in the area of the spell."
+        ],
+        "higher_level": [
+          "When you cast this spell using a 3 or higher level spell slot, the damage of the spell increases by 1d8 for each level of higher spell slot 2."
+        ],
+        "range": "60 feet",
+        "components": [
+          "V",
+          "S",
+          "M"
+        ],
+        "material": "A burst of mica.",
+        "ritual": false,
+        "duration": "Instantaneous",
+        "concentration": false,
+        "casting_time": "1 action",
+        "level": 2,
+        "damage": [
+          {
+            "damage_type": {
+              "index": "thunder",
+              "name": "Thunder",
+              "url": "/api/2014/damage-types/thunder"
+            },
+            "damage_at_slot_level": {
+              "2": "3d8",
+              "3": "4d8",
+              "4": "5d8",
+              "5": "6d8",
+              "6": "7d8",
+              "7": "8d8",
+              "8": "9d8",
+              "9": "10d8"
+            }
+          }
+        ],
+        "dc": {
+          "dc_type": {
+            "index": "con",
+            "name": "CON",
+            "url": "/api/2014/ability-scores/con"
+          },
+          "dc_success": "half"
+        },
+        "area_of_effect": {
+          "type": "sphere",
+          "size": 10
+        },
+        "school": {
+          "index": "evocation",
+          "name": "Evocation",
+          "url": "/api/2014/magic-schools/evocation"
+        },
+        "classes": [
+          {
+            "index": "bard",
+            "name": "Bard",
+            "url": "/api/2014/classes/bard"
+          },
+          {
+            "index": "sorcerer",
+            "name": "Sorcerer",
+            "url": "/api/2014/classes/sorcerer"
+          },
+          {
+            "index": "warlock",
+            "name": "Warlock",
+            "url": "/api/2014/classes/warlock"
+          },
+          {
+            "index": "wizard",
+            "name": "Wizard",
+            "url": "/api/2014/classes/wizard"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          }
+        ],
+        "url": "/api/2014/spells/shatter",
+        "updated_at": "2026-09-12T22:47:56.871Z"
+      }
+    },
+    "spells/lightning-bolt": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/lightning-bolt",
+      "sha256": "964bc36097deae37e3320115b471a7ff0331774d861406e02b61d9fb2ab663f1",
+      "source": {
+        "index": "lightning-bolt",
+        "name": "Lightning Bolt",
+        "desc": [
+          "A stroke of lightning forming a line 100 feet long and 5 feet wide blasts out from you in a direction you choose. Each creature in the line must make a dexterity saving throw. A creature takes 8d6 lightning damage on a failed save, or half as much damage on a successful one.",
+          "The lightning ignites flammable objects in the area that aren't being worn or carried."
+        ],
+        "higher_level": [
+          "When you cast this spell using a spell slot of 4th level or higher, the damage increases by 1d6 for each slot level above 3rd."
+        ],
+        "range": "Self",
+        "components": [
+          "V",
+          "S",
+          "M"
+        ],
+        "material": "A bit of fur and a rod of amber, crystal, or glass.",
+        "ritual": false,
+        "duration": "Instantaneous",
+        "concentration": false,
+        "casting_time": "1 action",
+        "level": 3,
+        "damage": [
+          {
+            "damage_type": {
+              "index": "lightning",
+              "name": "Lightning",
+              "url": "/api/2014/damage-types/lightning"
+            },
+            "damage_at_slot_level": {
+              "3": "8d6",
+              "4": "9d6",
+              "5": "10d6",
+              "6": "11d6",
+              "7": "12d6",
+              "8": "13d6",
+              "9": "14d6"
+            }
+          }
+        ],
+        "dc": {
+          "dc_type": {
+            "index": "dex",
+            "name": "DEX",
+            "url": "/api/2014/ability-scores/dex"
+          },
+          "dc_success": "half"
+        },
+        "area_of_effect": {
+          "type": "line",
+          "size": 100
+        },
+        "school": {
+          "index": "evocation",
+          "name": "Evocation",
+          "url": "/api/2014/magic-schools/evocation"
+        },
+        "classes": [
+          {
+            "index": "sorcerer",
+            "name": "Sorcerer",
+            "url": "/api/2014/classes/sorcerer"
+          },
+          {
+            "index": "wizard",
+            "name": "Wizard",
+            "url": "/api/2014/classes/wizard"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          },
+          {
+            "index": "land",
+            "name": "Land",
+            "url": "/api/2014/subclasses/land"
+          }
+        ],
+        "url": "/api/2014/spells/lightning-bolt",
+        "updated_at": "2026-09-12T22:47:56.867Z"
+      }
+    },
+    "spells/dimension-door": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/dimension-door",
+      "sha256": "415b4af87106cb5b8e2d63347dcba833131451423ee2ae762b313ee62b024313",
+      "source": {
+        "higher_level": [],
+        "index": "dimension-door",
+        "name": "Dimension Door",
+        "desc": [
+          "You teleport yourself from your current location to any other spot within range. You arrive at exactly the spot desired. It can be a place you can see, one you can visualize, or one you can describe by stating distance and direction, such as \"200 feet straight downward\" or \"upward to the northwest at a 45-degree angle, 300 feet.\"",
+          "You can bring along objects as long as their weight doesn't exceed what you can carry. You can also bring one willing creature of your size or smaller who is carrying gear up to its carrying capacity. The creature must be within 5 feet of you when you cast this spell.",
+          "If you would arrive in a place already occupied by an object or a creature, you and any creature traveling with you each take 4d6 force damage, and the spell fails to teleport you."
+        ],
+        "range": "500 feet",
+        "components": [
+          "V"
+        ],
+        "ritual": false,
+        "duration": "Instantaneous",
+        "concentration": false,
+        "casting_time": "1 action",
+        "level": 4,
+        "damage": [
+          {
+            "damage_type": {
+              "index": "force",
+              "name": "Force",
+              "url": "/api/2014/damage-types/force"
+            },
+            "damage_at_slot_level": {
+              "4": "4d6"
+            }
+          }
+        ],
+        "school": {
+          "index": "conjuration",
+          "name": "Conjuration",
+          "url": "/api/2014/magic-schools/conjuration"
+        },
+        "classes": [
+          {
+            "index": "bard",
+            "name": "Bard",
+            "url": "/api/2014/classes/bard"
+          },
+          {
+            "index": "sorcerer",
+            "name": "Sorcerer",
+            "url": "/api/2014/classes/sorcerer"
+          },
+          {
+            "index": "warlock",
+            "name": "Warlock",
+            "url": "/api/2014/classes/warlock"
+          },
+          {
+            "index": "wizard",
+            "name": "Wizard",
+            "url": "/api/2014/classes/wizard"
+          }
+        ],
+        "subclasses": [],
+        "url": "/api/2014/spells/dimension-door",
+        "updated_at": "2026-09-12T22:47:56.863Z"
+      }
+    },
+    "spells/tongues": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/tongues",
+      "sha256": "a5b0c152522c07cd5a90652ba38c7da8af6aaa051ccace7dad34036a049542d4",
+      "source": {
+        "higher_level": [],
+        "index": "tongues",
+        "name": "Tongues",
+        "desc": [
+          "This spell grants the creature you touch the ability to understand any spoken language it hears. Moreover, when the target speaks, any creature that knows at least one language and can hear the target understands what it says."
+        ],
+        "range": "Touch",
+        "components": [
+          "V",
+          "M"
+        ],
+        "material": "A small clay model of a ziggurat.",
+        "ritual": false,
+        "duration": "1 hour",
+        "concentration": false,
+        "casting_time": "1 action",
+        "level": 3,
+        "school": {
+          "index": "divination",
+          "name": "Divination",
+          "url": "/api/2014/magic-schools/divination"
+        },
+        "classes": [
+          {
+            "index": "bard",
+            "name": "Bard",
+            "url": "/api/2014/classes/bard"
+          },
+          {
+            "index": "cleric",
+            "name": "Cleric",
+            "url": "/api/2014/classes/cleric"
+          },
+          {
+            "index": "sorcerer",
+            "name": "Sorcerer",
+            "url": "/api/2014/classes/sorcerer"
+          },
+          {
+            "index": "warlock",
+            "name": "Warlock",
+            "url": "/api/2014/classes/warlock"
+          },
+          {
+            "index": "wizard",
+            "name": "Wizard",
+            "url": "/api/2014/classes/wizard"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          }
+        ],
+        "url": "/api/2014/spells/tongues",
+        "updated_at": "2026-04-01T20:35:39.218Z",
+        "damage": []
+      }
+    },
+    "spells/speak-with-dead": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/speak-with-dead",
+      "sha256": "d9b33b20960d20fd09e841adcc8d400fb983a15c06a91c90bcf36d19436a0f88",
+      "source": {
+        "higher_level": [],
+        "index": "speak-with-dead",
+        "name": "Speak with Dead",
+        "desc": [
+          "You grant the semblance of life and intelligence to a corpse of your choice within range, allowing it to answer the questions you pose. The corpse must still have a mouth and can't be undead. The spell fails if the corpse was the target of this spell within the last 10 days.",
+          "Until the spell ends, you can ask the corpse up to five questions. The corpse knows only what it knew in life, including the languages it knew. Answers are usually brief, cryptic, or repetitive, and the corpse is under no compulsion to offer a truthful answer if you are hostile to it or it recognizes you as an enemy. This spell doesn't return the creature's soul to its body, only its animating spirit. Thus, the corpse can't learn new information, doesn't comprehend anything that has happened since it died, and can't speculate about future events."
+        ],
+        "range": "10 feet",
+        "components": [
+          "V",
+          "S",
+          "M"
+        ],
+        "material": "Burning incense.",
+        "ritual": false,
+        "duration": "10 minutes",
+        "concentration": false,
+        "casting_time": "1 action",
+        "level": 3,
+        "school": {
+          "index": "necromancy",
+          "name": "Necromancy",
+          "url": "/api/2014/magic-schools/necromancy"
+        },
+        "classes": [
+          {
+            "index": "bard",
+            "name": "Bard",
+            "url": "/api/2014/classes/bard"
+          },
+          {
+            "index": "cleric",
+            "name": "Cleric",
+            "url": "/api/2014/classes/cleric"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          }
+        ],
+        "url": "/api/2014/spells/speak-with-dead",
+        "updated_at": "2026-04-01T20:35:39.218Z",
+        "damage": []
+      }
+    },
+    "spells/comprehend-languages": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/comprehend-languages",
+      "sha256": "f7eca4edd85b99057609a10bc23d9302bd9841128c3582921760804800dd36bd",
+      "source": {
+        "higher_level": [],
+        "index": "comprehend-languages",
+        "name": "Comprehend Languages",
+        "desc": [
+          "For the duration, you understand the literal meaning of any spoken language that you hear. You also understand any written language that you see, but you must be touching the surface on which the words are written. It takes about 1 minute to read one page of text.",
+          "This spell doesn't decode secret messages in a text or a glyph, such as an arcane sigil, that isn't part of a written language."
+        ],
+        "range": "Self",
+        "components": [
+          "V",
+          "S",
+          "M"
+        ],
+        "material": "A pinch of soot and salt.",
+        "ritual": true,
+        "duration": "1 hour",
+        "concentration": false,
+        "casting_time": "1 action",
+        "level": 1,
+        "school": {
+          "index": "divination",
+          "name": "Divination",
+          "url": "/api/2014/magic-schools/divination"
+        },
+        "classes": [
+          {
+            "index": "bard",
+            "name": "Bard",
+            "url": "/api/2014/classes/bard"
+          },
+          {
+            "index": "sorcerer",
+            "name": "Sorcerer",
+            "url": "/api/2014/classes/sorcerer"
+          },
+          {
+            "index": "warlock",
+            "name": "Warlock",
+            "url": "/api/2014/classes/warlock"
+          },
+          {
+            "index": "wizard",
+            "name": "Wizard",
+            "url": "/api/2014/classes/wizard"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          }
+        ],
+        "url": "/api/2014/spells/comprehend-languages",
+        "updated_at": "2026-04-01T20:35:39.217Z",
+        "damage": []
+      }
+    },
+    "spells/gentle-repose": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/gentle-repose",
+      "sha256": "4be13d39dfffc98979b03add1b9842034b888daa0e02fa0ca684f79375f03647",
+      "source": {
+        "higher_level": [],
+        "index": "gentle-repose",
+        "name": "Gentle Repose",
+        "desc": [
+          "You touch a corpse or other remains. For the duration, the target is protected from decay and can't become undead.",
+          "The spell also effectively extends the time limit on raising the target from the dead, since days spent under the influence of this spell don't count against the time limit of spells such as raise dead."
+        ],
+        "range": "Touch",
+        "components": [
+          "V",
+          "S",
+          "M"
+        ],
+        "material": "A pinch of salt and one copper piece placed on each of the corpse's eyes, which must remain there for the duration.",
+        "ritual": true,
+        "duration": "10 days",
+        "concentration": false,
+        "casting_time": "1 action",
+        "level": 2,
+        "school": {
+          "index": "necromancy",
+          "name": "Necromancy",
+          "url": "/api/2014/magic-schools/necromancy"
+        },
+        "classes": [
+          {
+            "index": "cleric",
+            "name": "Cleric",
+            "url": "/api/2014/classes/cleric"
+          },
+          {
+            "index": "wizard",
+            "name": "Wizard",
+            "url": "/api/2014/classes/wizard"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          }
+        ],
+        "url": "/api/2014/spells/gentle-repose",
+        "updated_at": "2026-04-01T20:35:39.217Z",
+        "damage": []
+      }
+    },
+    "spells/prayer-of-healing": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/prayer-of-healing",
+      "sha256": "179a7da58a3c90988d57e6728398e86c315b08388b53d4ab55bae4b8e993d8ba",
+      "source": {
+        "index": "prayer-of-healing",
+        "name": "Prayer of Healing",
+        "desc": [
+          "Up to six creatures of your choice that you can see within range each regain hit points equal to 2d8 + your spellcasting ability modifier. This spell has no effect on undead or constructs."
+        ],
+        "higher_level": [
+          "When you cast this spell using a spell slot of 3rd level or higher, the healing increases by 1d8 for each slot level above 2nd."
+        ],
+        "range": "30 feet",
+        "components": [
+          "V"
+        ],
+        "ritual": false,
+        "duration": "Instantaneous",
+        "concentration": false,
+        "casting_time": "10 minutes",
+        "level": 2,
+        "heal_at_slot_level": {
+          "2": "2d8 + MOD",
+          "3": "3d8 + MOD",
+          "4": "4d8 + MOD",
+          "5": "5d8 + MOD",
+          "6": "6d8 + MOD",
+          "7": "7d8 + MOD",
+          "8": "8d8 + MOD",
+          "9": "9d8 + MOD"
+        },
+        "school": {
+          "index": "evocation",
+          "name": "Evocation",
+          "url": "/api/2014/magic-schools/evocation"
+        },
+        "classes": [
+          {
+            "index": "cleric",
+            "name": "Cleric",
+            "url": "/api/2014/classes/cleric"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          }
+        ],
+        "url": "/api/2014/spells/prayer-of-healing",
+        "updated_at": "2026-04-01T20:35:39.217Z",
+        "damage": []
+      }
+    },
+    "spells/lesser-restoration": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/lesser-restoration",
+      "sha256": "842434814f0c6815028d4fb836cc35b6ba370b0051726c45a178c9dd5d588203",
+      "source": {
+        "higher_level": [],
+        "index": "lesser-restoration",
+        "name": "Lesser Restoration",
+        "desc": [
+          "You touch a creature and can end either one disease or one condition afflicting it. The condition can be blinded, deafened, paralyzed, or poisoned."
+        ],
+        "range": "Touch",
+        "components": [
+          "V",
+          "S"
+        ],
+        "ritual": false,
+        "duration": "Instantaneous",
+        "concentration": false,
+        "casting_time": "1 action",
+        "level": 2,
+        "school": {
+          "index": "abjuration",
+          "name": "Abjuration",
+          "url": "/api/2014/magic-schools/abjuration"
+        },
+        "classes": [
+          {
+            "index": "bard",
+            "name": "Bard",
+            "url": "/api/2014/classes/bard"
+          },
+          {
+            "index": "cleric",
+            "name": "Cleric",
+            "url": "/api/2014/classes/cleric"
+          },
+          {
+            "index": "druid",
+            "name": "Druid",
+            "url": "/api/2014/classes/druid"
+          },
+          {
+            "index": "paladin",
+            "name": "Paladin",
+            "url": "/api/2014/classes/paladin"
+          },
+          {
+            "index": "ranger",
+            "name": "Ranger",
+            "url": "/api/2014/classes/ranger"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          },
+          {
+            "index": "life",
+            "name": "Life",
+            "url": "/api/2014/subclasses/life"
+          },
+          {
+            "index": "devotion",
+            "name": "Devotion",
+            "url": "/api/2014/subclasses/devotion"
+          }
+        ],
+        "url": "/api/2014/spells/lesser-restoration",
+        "updated_at": "2026-04-01T20:35:39.217Z",
+        "damage": []
+      }
+    },
+    "spells/divination": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/divination",
+      "sha256": "95576983595e5d7a54c466ca4f51ac2517c59d3063da10f979a3c940ce3fef2b",
+      "source": {
+        "higher_level": [],
+        "index": "divination",
+        "name": "Divination",
+        "desc": [
+          "Your magic and an offering put you in contact with a god or a god's servants. You ask a single question concerning a specific goal, event, or activity to occur within 7 days. The GM offers a truthful reply. The reply might be a short phrase, a cryptic rhyme, or an omen.",
+          "The spell doesn't take into account any possible circumstances that might change the outcome, such as the casting of additional spells or the loss or gain of a companion.",
+          "If you cast the spell two or more times before finishing your next long rest, there is a cumulative 25 percent chance for each casting after the first that you get a random reading. The GM makes this roll in secret."
+        ],
+        "range": "Self",
+        "components": [
+          "V",
+          "S",
+          "M"
+        ],
+        "material": "Incense and a sacrificial offering appropriate to your religion, together worth at least 25gp, which the spell consumes.",
+        "ritual": true,
+        "duration": "Instantaneous",
+        "concentration": false,
+        "casting_time": "1 action",
+        "level": 4,
+        "school": {
+          "index": "divination",
+          "name": "Divination",
+          "url": "/api/2014/magic-schools/divination"
+        },
+        "classes": [
+          {
+            "index": "druid",
+            "name": "Druid",
+            "url": "/api/2014/classes/druid"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "land",
+            "name": "Land",
+            "url": "/api/2014/subclasses/land"
+          }
+        ],
+        "url": "/api/2014/spells/divination",
+        "updated_at": "2026-04-01T20:35:39.217Z",
+        "damage": []
+      }
+    },
+    "spells/sending": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/sending",
+      "sha256": "032e117c8695a20648d571773a7841fd3191b8efc21ee7d6f446cc6a90192f87",
+      "source": {
+        "higher_level": [],
+        "index": "sending",
+        "name": "Sending",
+        "desc": [
+          "You send a short message of twenty-five words or less to a creature with which you are familiar. The creature hears the message in its mind, recognizes you as the sender if it knows you, and can answer in a like manner immediately. The spell enables creatures with Intelligence scores of at least 1 to understand the meaning of your message.",
+          "You can send the message across any distance and even to other planes of existence, but if the target is on a different plane than you, there is a 5 percent chance that the message doesn't arrive."
+        ],
+        "range": "Unlimited",
+        "components": [
+          "V",
+          "S",
+          "M"
+        ],
+        "material": "A short piece of fine copper wire.",
+        "ritual": false,
+        "duration": "1 round",
+        "concentration": false,
+        "casting_time": "1 action",
+        "level": 3,
+        "school": {
+          "index": "evocation",
+          "name": "Evocation",
+          "url": "/api/2014/magic-schools/evocation"
+        },
+        "classes": [
+          {
+            "index": "bard",
+            "name": "Bard",
+            "url": "/api/2014/classes/bard"
+          },
+          {
+            "index": "cleric",
+            "name": "Cleric",
+            "url": "/api/2014/classes/cleric"
+          },
+          {
+            "index": "wizard",
+            "name": "Wizard",
+            "url": "/api/2014/classes/wizard"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          }
+        ],
+        "url": "/api/2014/spells/sending",
+        "updated_at": "2026-04-01T20:35:39.218Z",
+        "damage": []
+      }
+    },
+    "spells/mage-hand": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/mage-hand",
+      "sha256": "e5f5e1fb1e1fc814fb20b53ce1ba8658c6b11399bae421305156c8d09751ca8f",
+      "source": {
+        "higher_level": [],
+        "index": "mage-hand",
+        "name": "Mage Hand",
+        "desc": [
+          "A spectral, floating hand appears at a point you choose within range. The hand lasts for the duration or until you dismiss it as an action. The hand vanishes if it is ever more than 30 feet away from you or if you cast this spell again.",
+          "You can use your action to control the hand. You can use the hand to manipulate an object, open an unlocked door or container, stow or retrieve an item from an open container, or pour the contents out of a vial. You can move the hand up to 30 feet each time you use it.",
+          "The hand can't attack, activate magic items, or carry more than 10 pounds."
+        ],
+        "range": "30 feet",
+        "components": [
+          "V",
+          "S"
+        ],
+        "ritual": false,
+        "duration": "1 minute",
+        "concentration": false,
+        "casting_time": "1 action",
+        "level": 0,
+        "school": {
+          "index": "conjuration",
+          "name": "Conjuration",
+          "url": "/api/2014/magic-schools/conjuration"
+        },
+        "classes": [
+          {
+            "index": "bard",
+            "name": "Bard",
+            "url": "/api/2014/classes/bard"
+          },
+          {
+            "index": "sorcerer",
+            "name": "Sorcerer",
+            "url": "/api/2014/classes/sorcerer"
+          },
+          {
+            "index": "warlock",
+            "name": "Warlock",
+            "url": "/api/2014/classes/warlock"
+          },
+          {
+            "index": "wizard",
+            "name": "Wizard",
+            "url": "/api/2014/classes/wizard"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          }
+        ],
+        "url": "/api/2014/spells/mage-hand",
+        "updated_at": "2026-04-01T20:35:39.217Z",
+        "damage": []
+      }
+    },
+    "spells/mending": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/mending",
+      "sha256": "f3e52a4d952c0b746a693f83ddb346b27cc72e67a36cd5681f01cd0bcc21fb44",
+      "source": {
+        "higher_level": [],
+        "index": "mending",
+        "name": "Mending",
+        "desc": [
+          "This spell repairs a single break or tear in an object you touch, such as a broken key, a torn cloak, or a leaking wineskin. As long as the break or tear is no longer than 1 foot in any dimension, you mend it, leaving no trace of the former damage.",
+          "This spell can physically repair a magic item or construct, but the spell can't restore magic to such an object."
+        ],
+        "range": "Touch",
+        "components": [
+          "V",
+          "S",
+          "M"
+        ],
+        "material": "Two lodestones.",
+        "ritual": false,
+        "duration": "Instantaneous",
+        "concentration": false,
+        "casting_time": "1 minute",
+        "level": 0,
+        "school": {
+          "index": "transmutation",
+          "name": "Transmutation",
+          "url": "/api/2014/magic-schools/transmutation"
+        },
+        "classes": [
+          {
+            "index": "cleric",
+            "name": "Cleric",
+            "url": "/api/2014/classes/cleric"
+          },
+          {
+            "index": "bard",
+            "name": "Bard",
+            "url": "/api/2014/classes/bard"
+          },
+          {
+            "index": "druid",
+            "name": "Druid",
+            "url": "/api/2014/classes/druid"
+          },
+          {
+            "index": "sorcerer",
+            "name": "Sorcerer",
+            "url": "/api/2014/classes/sorcerer"
+          },
+          {
+            "index": "wizard",
+            "name": "Wizard",
+            "url": "/api/2014/classes/wizard"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          }
+        ],
+        "url": "/api/2014/spells/mending",
+        "updated_at": "2026-04-01T20:35:39.217Z",
+        "damage": []
+      }
+    },
+    "spells/charm-person": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/charm-person",
+      "sha256": "03d3991bac723dedf99b785f1312e8f10b1841cf1ff5334af8ca96dcf6a8bc08",
+      "source": {
+        "index": "charm-person",
+        "name": "Charm Person",
+        "desc": [
+          "You attempt to charm a humanoid you can see within range. It must make a wisdom saving throw, and does so with advantage if you or your companions are fighting it. If it fails the saving throw, it is charmed by you until the spell ends or until you or your companions do anything harmful to it. The charmed creature regards you as a friendly acquaintance. When the spell ends, the creature knows it was charmed by you."
+        ],
+        "higher_level": [
+          "When you cast this spell using a spell slot of 2nd level or higher, you can target one additional creature for each slot level above 1st. The creatures must be within 30 feet of each other when you target them."
+        ],
+        "range": "30 feet",
+        "components": [
+          "V",
+          "S"
+        ],
+        "ritual": false,
+        "duration": "1 hour",
+        "concentration": false,
+        "casting_time": "1 action",
+        "level": 1,
+        "dc": {
+          "dc_type": {
+            "index": "wis",
+            "name": "WIS",
+            "url": "/api/2014/ability-scores/wis"
+          },
+          "dc_success": "none"
+        },
+        "school": {
+          "index": "enchantment",
+          "name": "Enchantment",
+          "url": "/api/2014/magic-schools/enchantment"
+        },
+        "classes": [
+          {
+            "index": "bard",
+            "name": "Bard",
+            "url": "/api/2014/classes/bard"
+          },
+          {
+            "index": "druid",
+            "name": "Druid",
+            "url": "/api/2014/classes/druid"
+          },
+          {
+            "index": "sorcerer",
+            "name": "Sorcerer",
+            "url": "/api/2014/classes/sorcerer"
+          },
+          {
+            "index": "warlock",
+            "name": "Warlock",
+            "url": "/api/2014/classes/warlock"
+          },
+          {
+            "index": "wizard",
+            "name": "Wizard",
+            "url": "/api/2014/classes/wizard"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          }
+        ],
+        "url": "/api/2014/spells/charm-person",
+        "updated_at": "2026-04-01T20:35:39.217Z",
+        "damage": []
+      }
+    }
+  }
+}

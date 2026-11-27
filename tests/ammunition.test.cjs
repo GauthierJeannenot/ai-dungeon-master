@@ -1,0 +1,73 @@
+const test=require('node:test'),assert=require('node:assert/strict')
+const gs=require('../mcp-server/dist/mcp-server/game-state.js')
+const {fixture,ok,refused,shot}=require('./helpers/ammunition-fixture.cjs')
+
+test('actual scene ammunition is picked up once, and immutable preparation never refills a depleted stack',async t=>{
+ const f=await fixture(t,{quantity:null,dice:'1,19'});f.state.phase='exploration';f.state.currentTurn=null
+ const created=ok(await f.call('create_ammunition',f.preparation));assert.equal(created.item.quantity,3);assert.equal(f.stock(),undefined)
+ ok(await f.call('pick_up_item',{itemId:'actual-ammo'}));assert.equal(f.stock(),3)
+ f.state.phase='combat';f.state.currentTurn='player';ok(await f.attack({ammunitionItemId:'actual-ammo'}));assert.equal(f.stock(),2)
+ f.state.phase='exploration';f.state.currentTurn=null
+ const before=structuredClone(gs.getState());ok(await f.call('create_ammunition',f.preparation));assert.deepEqual(gs.getState(),before)
+ await refused(f,'create_ammunition',{...f.preparation,quantity:20},'AMMUNITION_ID_CONFLICT')
+ assert.equal(ok(await f.call('roll_dice',{notation:'1d20'})).total,19)
+})
+test('missing and incompatible exact ammunition stacks refuse without dice, costs or fabricated stock',async t=>{
+ const f=await fixture(t,{ammunitionType:'crossbow-bolt',dice:'19'})
+ await refused(f,'resolve_player_attack',{targetId:'target',weaponOrSpell:'shortbow'},'AMMUNITION_REQUIRED')
+ await refused(f,'resolve_player_attack',shot(f),'AMMUNITION_TYPE_MISMATCH')
+ assert.equal(ok(await f.call('roll_dice',{notation:'1d20'})).total,19)
+})
+test('a missed real shot consumes exactly one actual unit and records the actual attack and action',async t=>{
+ const f=await fixture(t,{quantity:1,dice:'1,19'}),before=structuredClone(f.state.dmTools.loadout),answer=ok(await f.attack())
+ assert.equal(answer.hit,false);assert.equal(f.stock(),0);assert.equal(answer.ammunition.attackId,answer.primaryAttackId)
+ assert.equal(answer.ammunition.scopeId,f.state.hero.attackAction.id);assert.equal(Object.keys(f.state.dmTools.ammunition.expenditures).length,1)
+ assert.deepEqual(f.state.dmTools.loadout,before)
+ await refused(f,'resolve_player_attack',shot(f),'AMMUNITION_EXHAUSTED')
+ assert.equal(ok(await f.call('roll_dice',{notation:'1d20'})).total,19)
+})
+test('an explicit multiattack cannot spend its first arrow if its actual stack cannot supply the second',async t=>{
+ const f=await fixture(t,{quantity:1,dice:'19'})
+ await refused(f,'resolve_player_multiattack',{attacks:[shot(f),shot(f)]},'AMMUNITION_SEQUENCE_EXHAUSTED')
+ assert.equal(ok(await f.call('roll_dice',{notation:'1d20'})).total,19)
+})
+test('Loading is one shot per actual action across calls and permits an explicitly chosen real Action Surge action',async t=>{
+ const f=await fixture(t,{weapon:'light-crossbow',ammunitionType:'crossbow-bolt',dice:'17,4,17,3,19'})
+ await refused(f,'resolve_player_multiattack',{attacks:[shot(f),shot(f)]},'LOADING_LIMIT')
+ const first=ok(await f.attack()),scope=first.ammunition.scopeId
+ await refused(f,'resolve_player_attack',shot(f),'LOADING_LIMIT')
+ await refused(f,'resolve_player_attack',{...shot(f),newAttackAction:true},'ACTION_ALREADY_USED')
+ ok(await f.call('use_subclass_feature',{featureId:'action_surge'}))
+ const second=ok(await f.attack({newAttackAction:true}))
+ assert.notEqual(second.ammunition.scopeId,scope);assert.equal(f.stock(),1);assert.equal(f.state.hero.attackAction.remaining,1)
+ assert.equal(ok(await f.call('roll_dice',{notation:'1d20'})).total,19)
+})
+test('loading a real one-handed crossbow requires an actual free hand even though holding it beside a shield is valid',async t=>{
+ const f=await fixture(t,{weapon:'hand-crossbow',ammunitionType:'crossbow-bolt',shield:true,dice:'19'})
+ await refused(f,'resolve_player_attack',shot(f),'AMMUNITION_FREE_HAND_REQUIRED')
+ assert.equal(ok(await f.call('roll_dice',{notation:'1d20'})).total,19)
+})
+test('a held shot spends its last real projectile before the reaction, survives hydration and cannot change stacks or spend twice',async t=>{
+ const f=await fixture(t,{quantity:1,dice:'17,4,19'});f.state.hero.inspiration.push({targetId:'player',die:8,expiresAt:600})
+ const pending=ok(await f.attack()).pendingReaction;assert.ok(pending);assert.equal(f.stock(),0)
+ const saved=structuredClone(gs.getState());gs.replaceState(saved)
+ await refused(f,'resolve_reaction',{pendingId:pending.id,choice:'decline',ammunitionItemId:'actual-ammo'},'AMMUNITION_REACTION_CHOICE_INVALID')
+ const answer=ok(await f.call('resolve_reaction',{pendingId:pending.id,choice:'decline'}))
+ assert.equal(answer.attackRoll.rolls[0],17);assert.equal(f.stock(),0);assert.equal(Object.keys(gs.getState().dmTools.ammunition.expenditures).length,1)
+ assert.equal(ok(await f.call('roll_dice',{notation:'1d20'})).total,19)
+})
+test('a legacy explicit Extra Attack action shares its true action scope and consumes real ammunition for both source shots',async t=>{
+ const f=await fixture(t,{legacy:true,dice:'17,4,17,3,19'}),answer=ok(await f.call('resolve_player_multiattack',{attacks:[shot(f),shot(f)]}))
+ assert.equal(answer.attacks.length,2);assert.equal(answer.attacks[0].ammunition.scopeId,answer.attacks[1].ammunition.scopeId)
+ assert.equal(f.stock(),1);assert.equal(ok(await f.call('roll_dice',{notation:'1d20'})).total,19)
+})
+test('a readied Loading shot is a separate actual reaction and uses its explicit release-time stack',async t=>{
+ const f=await fixture(t,{weapon:'light-crossbow',ammunitionType:'crossbow-bolt',dice:'17,4,17,3,19'}),first=ok(await f.attack())
+ ok(await f.call('use_subclass_feature',{featureId:'action_surge'}))
+ ok(await f.call('combat_action',{action:'ready',readied:{kind:'attack',weaponId:'light-crossbow',trigger:'La cible fait le geste visible déclaré.'}}))
+ const ready=f.state.hero.effects.find(effect=>effect.kind==='readied-action')
+ await refused(f,'resolve_readied_action',{readyId:ready.id,choice:'ignore',ammunitionItemId:'actual-ammo'},'AMMUNITION_READIED_ATTACK_REQUIRED')
+ const answer=ok(await f.call('resolve_readied_action',{readyId:ready.id,choice:'execute',targetId:'target',ammunitionItemId:'actual-ammo',triggerObserved:'La cible vient de faire le geste visible déclaré.'}))
+ assert.notEqual(answer.ammunition.scopeId,first.ammunition.scopeId);assert.equal(f.stock(),1);assert.equal(f.state.hero.reactionsUsed.player,true)
+ assert.equal(ok(await f.call('roll_dice',{notation:'1d20'})).total,19)
+})

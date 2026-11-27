@@ -3,7 +3,6 @@ const path = require('node:path')
 const test = require('node:test')
 const { installPgMem } = require('./helpers/pg-mem.cjs')
 
-process.env.ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || 'sk-ant-test-placeholder'
 process.env.ALLOW_PAID_LLM = 'false'
 process.env.LLM_MODE = 'mock'
 // Hors runtime Next : pas de cookies() ni de next-auth chargeable — on coupe
@@ -241,4 +240,23 @@ test('DM API enforces a single primary game action per player message', async t 
   const primaryTools = ['resolve_attack', 'move_token', 'roll_ability_check', 'use_healing_potion', 'roll_death_save', 'start_encounter', 'trigger_room_event']
   const primaryUsed = data.toolsUsed.filter(tool => primaryTools.includes(tool))
   assert.ok(primaryUsed.length <= 1)
+})
+
+test('a battlemap click request moves through the AI and MCP without spending the action or ending the turn', async t => {
+  const sessionId = `api-map-click-${process.pid}-${Date.now()}`
+  t.after(() => cleanupSession(sessionId))
+  const { response, data } = await postDm({
+    message: 'Je me déplace uniquement jusqu’à la case (6, 13). Je garde mon action et je ne termine pas mon tour.',
+    sessionId,
+    gameState: baseGameState({phase:'combat',currentTurn:'player',round:1,
+      initiativeOrder:['player','goblin_a'],monsters:{goblin_a:makeGoblin({position:{x:10,y:13}})}}),
+    history: [],
+  })
+  assert.equal(response.status,200)
+  assert.deepEqual(data.newGameState.player.position,{x:6,y:13})
+  assert.equal(data.newGameState.movementUsed.player,2)
+  assert.equal(Boolean(data.newGameState.actionUsed.player),false)
+  assert.equal(data.newGameState.currentTurn,'player')
+  assert.equal(data.newGameState.round,1)
+  assert.deepEqual(data.toolsUsed,['move_token'])
 })

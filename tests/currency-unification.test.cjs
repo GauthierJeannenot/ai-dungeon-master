@@ -1,0 +1,43 @@
+const test=require('node:test'), assert=require('node:assert/strict')
+const {engine,ok,replace}=require('./helpers/mcp-toolkit.cjs')
+const {copyWork}=require('./helpers/spell-copy-supplies.cjs')
+
+test('legacy gold and coin wallet merge once on MCP hydration; fresh SRD wealth has one source',async t=>{
+  const call=await engine(t,{characterId:'wizard'})
+  const fresh=await call('get_game_state')
+  assert.equal(fresh.hero.gold,undefined);assert.equal(fresh.dmTools.wallet.gp,250)
+  fresh.hero.gold=17.23;fresh.dmTools.wallet={cp:2,sp:1,ep:0,gp:5,pp:0}
+  ok(await call('replace_game_state',{gameState:fresh}))
+  const migrated=await call('get_game_state')
+  assert.deepEqual(migrated.dmTools.wallet,{cp:5,sp:3,ep:0,gp:22,pp:0});assert.equal(migrated.hero.gold,undefined)
+  ok(await call('replace_game_state',{gameState:migrated}))
+  assert.deepEqual(await call('get_game_state'),migrated)
+})
+
+test('copying a spell uses actual wallet denominations atomically, and failed/duplicate attempts never debit or pass time',async t=>{
+  const call=await engine(t,{characterId:'wizard'})
+  await replace(call,s=>{s.player.spellbook=s.player.spellbook.filter(id=>id!=='shatter');s.player.inventory.find(item=>item.id==='spellbook').spellIds=[...s.player.spellbook];s.player.inventory.push({id:'source',name:'Recueil',type:'misc',spellIds:['shatter']});s.dmTools.wallet={cp:0,sp:500,ep:0,gp:0,pp:0}})
+  const before=await call('get_game_state')
+  assert.equal((await call('copy_spell_to_book',copyWork({spellId:'shatter',sourceItemId:'source',paid:{gp:50}}))).code,'INSUFFICIENT_COINS')
+  assert.equal((await call('copy_spell_to_book',copyWork({spellId:'shatter',sourceItemId:'source',paid:{sp:499}}))).code,'SPELL_COPY_PAYMENT_INVALID')
+  assert.deepEqual(await call('get_game_state'),before)
+  const copied=ok(await call('copy_spell_to_book',copyWork({spellId:'shatter',sourceItemId:'source',paid:{sp:500}})))
+  assert.equal(copied.wallet.sp,0);assert.equal(copied.costGold,50)
+  const after=await call('get_game_state');assert.equal(after.worldTimeSeconds,7200);assert.equal(after.hero.gold,undefined)
+  assert.equal(ok(await call('copy_spell_to_book',copyWork({spellId:'shatter',sourceItemId:'source',paid:{sp:500}}))).replayed,true)
+  assert.equal((await call('copy_spell_to_book',copyWork({eventId:'different-copy',spellId:'shatter',sourceItemId:'source',paid:{sp:500}}))).code,'SPELL_ALREADY_IN_BOOK')
+  assert.deepEqual(await call('get_game_state'),after)
+  ok(await call('replace_game_state',{gameState:after}));assert.equal((await call('get_game_state')).dmTools.wallet.sp,0)
+})
+
+test('payments, collected treasure and copying all affect the same balance',async t=>{
+  const call=await engine(t,{characterId:'wizard'})
+  ok(await call('spend_currency',{transactionId:'supplies',paid:{gp:250},reason:'Des fournitures déjà convenues.'}))
+  await replace(call,s=>{s.player.spellbook=s.player.spellbook.filter(id=>id!=='shatter');s.player.inventory.find(item=>item.id==='spellbook').spellIds=[...s.player.spellbook];s.player.inventory.push({id:'source',name:'Recueil',type:'misc',spellIds:['shatter']})})
+  assert.equal((await call('copy_spell_to_book',copyWork({spellId:'shatter',sourceItemId:'source',paid:{gp:50}}))).code,'INSUFFICIENT_COINS')
+  const state=await call('get_game_state')
+  ok(await call('create_treasure',{treasureId:'study-funds',name:'Fonds',description:'Une bourse de pièces.',cell:state.player.position,mode:'authored',coins:{gp:50}}))
+  ok(await call('collect_treasure',{treasureId:'study-funds'}))
+  ok(await call('copy_spell_to_book',copyWork({spellId:'shatter',sourceItemId:'source',paid:{gp:50}})))
+  assert.equal((await call('get_game_state')).dmTools.wallet.gp,0)
+})

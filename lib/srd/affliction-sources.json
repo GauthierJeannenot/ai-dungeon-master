@@ -1,0 +1,142 @@
+{
+  "source": "User supplied DMG 2014 Markdown",
+  "sha256": "fa75462a6ef96ef0f86fbfd2d433c624ce926ff630a43d1fcaea6a2c1249b0d1",
+  "records": {
+    "Assassin's Blood": {
+      "book": "dmg-2014",
+      "path": "rules/books/dmg-2014.md",
+      "startLine": 8509,
+      "endLine": 8517,
+      "text": "#### Assassin's Blood\n\nAdventuring Gear, Poison (Ingested), 150 GP\n\n---\n\nA creature subjected to this poison must make a DC 10 Constitution saving throw. On a failed save, it takes 6 (1d12) poison damage and is poisoned for 24 hours. On a successful save, the creature takes half damage and isn't poisoned.",
+      "sha256": "dd07f2b7288d0f30c36f0695b423a7989b23978eb2c719dae84757bf089ce65a"
+    },
+    "Burnt Othur Fumes": {
+      "book": "dmg-2014",
+      "path": "rules/books/dmg-2014.md",
+      "startLine": 8517,
+      "endLine": 8525,
+      "text": "#### Burnt Othur Fumes\n\nAdventuring Gear, Poison (Inhaled), 500 GP\n\n---\n\nA creature subjected to this poison must succeed on a DC 13 Constitution saving throw or take 10 (3d6) poison damage, and must repeat the saving throw at the start of each of its turns. On each successive failed save, the character takes 3 (1d6) poison damage. After three successful saves, the poison ends.",
+      "sha256": "cbcf19308a9082314e5cbb87880a8d73550c6416f5a9cd2d74ef1a0e43695b17"
+    },
+    "Carrion Crawler Mucus": {
+      "book": "dmg-2014",
+      "path": "rules/books/dmg-2014.md",
+      "startLine": 8525,
+      "endLine": 8533,
+      "text": "#### Carrion Crawler Mucus\n\nAdventuring Gear, Poison (Contact), 200 GP\n\n---\n\nThis poison must be harvested from a dead or incapacitated **carrion crawler**. A creature subjected to this poison must succeed on a DC 13 Constitution saving throw or be poisoned for 1 minute. The poisoned creature is paralyzed. The creature can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success.",
+      "sha256": "277ad95dc262e741c29224dcad9bb05e6c3c8b49f659798c91ef41fd6dbad5f9"
+    },
+    "Drow Poison": {
+      "book": "dmg-2014",
+      "path": "rules/books/dmg-2014.md",
+      "startLine": 8533,
+      "endLine": 8541,
+      "text": "#### Drow Poison\n\nAdventuring Gear, Poison (Injury), 200 GP\n\n---\n\nThis poison is typically made only by the **drow**, and only in a place far removed from sunlight. A creature subjected to this poison must succeed on a DC 13 Constitution saving throw or be poisoned for 1 hour. If the saving throw fails by 5 or more, the creature is also unconscious while poisoned in this way. The creature wakes up if it takes damage or if another creature takes an action to shake it awake.",
+      "sha256": "ad7b5ba01c04334d95b1913315abc099d98a426d25b60a5f4200e139e6b29c39"
+    },
+    "Essence of Ether": {
+      "book": "dmg-2014",
+      "path": "rules/books/dmg-2014.md",
+      "startLine": 8541,
+      "endLine": 8549,
+      "text": "#### Essence of Ether\n\nAdventuring Gear, Poison (Inhaled), 300 GP\n\n---\n\nA creature subjected to this poison must succeed on a DC 15 Constitution saving throw or become poisoned for 8 hours. The poisoned creature is unconscious. The creature wakes up if it takes damage or if another creature takes an action to shake it awake.",
+      "sha256": "5ba670d139ad173ba3ddeb2bc0139f31745597ed9a904c2662979d245cc5a6a8"
+    },
+    "Malice": {
+      "book": "dmg-2014",
+      "path": "rules/books/dmg-2014.md",
+      "startLine": 8549,
+      "endLine": 8557,
+      "text": "#### Malice\n\nAdventuring Gear, Poison (Inhaled), 250 GP\n\n---\n\nA creature subjected to this poison must succeed on a DC 15 Constitution saving throw or become poisoned for 1 hour. The poisoned creature is blinded.",
+      "sha256": "23fa6e2881228953bbc4d7c7cc93e4330a3105249bb2d9e538138325c48ef494"
+    },
+    "Midnight Tears": {
+      "book": "dmg-2014",
+      "path": "rules/books/dmg-2014.md",
+      "startLine": 8557,
+      "endLine": 8565,
+      "text": "#### Midnight Tears\n\nAdventuring Gear, Poison (Ingested), 1 500 GP\n\n---\n\nA creature that ingests this poison suffers no effect until the stroke of midnight. If the poison has not been neutralized before then, the creature must succeed on a DC 17 Constitution saving throw, taking 31 (9d6) poison damage on a failed save, or half as much damage on a successful one.",
+      "sha256": "d7ae7eab89739ed8b3926690addce3d5805a7ec526203544a955ffeb4b1858d4"
+    },
+    "Oil of Taggit": {
+      "book": "dmg-2014",
+      "path": "rules/books/dmg-2014.md",
+      "startLine": 8565,
+      "endLine": 8573,
+      "text": "#### Oil of Taggit\n\nAdventuring Gear, Poison (Contact), 400 GP\n\n---\n\nA creature subjected to this poison must succeed on a DC 13 Constitution saving throw or become poisoned for 24 hours. The poisoned creature is unconscious. The creature wakes up if it takes damage.",
+      "sha256": "d3b2e6ac79663776e4cf7eff5e6720bd7fa15f785ca383e44eadc02124315cc5"
+    },
+    "Pale Tincture": {
+      "book": "dmg-2014",
+      "path": "rules/books/dmg-2014.md",
+      "startLine": 8573,
+      "endLine": 8581,
+      "text": "#### Pale Tincture\n\nAdventuring Gear, Poison (Ingested), 250 GP\n\n---\n\nA creature subjected to this poison must succeed on a DC 16 Constitution saving throw or take 3 (1d6) poison damage and become poisoned. The poisoned creature must repeat the saving throw every 24 hours, taking 3 (1d6) poison damage on a failed save. Until this poison ends, the damage the poison deals can't be healed by any means. After seven successful saving throws, the effect ends and the creature can heal normally.",
+      "sha256": "e1ef2a0aff62f0854e99d62435db997c4d86889e714590c37b6a41bf0f5e83f1"
+    },
+    "Purple Worm Poison": {
+      "book": "dmg-2014",
+      "path": "rules/books/dmg-2014.md",
+      "startLine": 8581,
+      "endLine": 8589,
+      "text": "#### Purple Worm Poison\n\nAdventuring Gear, Poison (Injury), 2 000 GP\n\n---\n\nThis poison must be harvested from a dead or incapacitated **purple worm**. A creature subjected to this poison must make a DC 19 Constitution saving throw, taking 42 (12d6) poison damage on a failed save, or half as much damage on a successful one.",
+      "sha256": "dafe890cb05136c746132ff54de7e89f22fd7a4814d92f1e550375865213eef3"
+    },
+    "Serpent Venom": {
+      "book": "dmg-2014",
+      "path": "rules/books/dmg-2014.md",
+      "startLine": 8589,
+      "endLine": 8597,
+      "text": "#### Serpent Venom\n\nAdventuring Gear, Poison (Injury), 200 GP\n\n---\n\nThis poison must be harvested from a dead or incapacitated **giant poisonous snake**. A creature subjected to this poison must succeed on a DC 11 Constitution saving throw, taking 10 (3d6) poison damage on a failed save, or half as much damage on a successful one.",
+      "sha256": "bc92ae026486efc15e2b84e3ecd470d349b9fd62613eda29e6bbf54a611e4bb4"
+    },
+    "Torpor": {
+      "book": "dmg-2014",
+      "path": "rules/books/dmg-2014.md",
+      "startLine": 8597,
+      "endLine": 8605,
+      "text": "#### Torpor\n\nAdventuring Gear, Poison (Ingested), 600 GP\n\n---\n\nA creature subjected to this poison must succeed on a DC 15 Constitution saving throw or become poisoned for 4d6 hours. The poisoned creature is incapacitated.",
+      "sha256": "2b401f33c27f3fd9663efa5e4c059c4f98d1422cddf0698b135a81922d1b87ac"
+    },
+    "Truth Serum": {
+      "book": "dmg-2014",
+      "path": "rules/books/dmg-2014.md",
+      "startLine": 8605,
+      "endLine": 8613,
+      "text": "#### Truth Serum\n\nAdventuring Gear, Poison (Ingested), 150 GP\n\n---\n\nA creature subjected to this poison must succeed on a DC 11 Constitution saving throw or become poisoned for 1 hour. The poisoned creature can't knowingly speak a lie, as if under the effect of a *zone of truth* spell.",
+      "sha256": "31810fa9899dd83a123c8e500bbb0369bdd5ec6debaea7593cab789c82a63201"
+    },
+    "Wyvern Poison": {
+      "book": "dmg-2014",
+      "path": "rules/books/dmg-2014.md",
+      "startLine": 8613,
+      "endLine": 8621,
+      "text": "#### Wyvern Poison\n\nAdventuring Gear, Poison (Injury), 1 200 GP\n\n---\n\nThis poison must be harvested from a dead or incapacitated **wyvern**. A creature subjected to this poison must make a DC 15 Constitution saving throw, taking 24 (7d6) poison damage on a failed save, or half as much damage on a successful one.",
+      "sha256": "58a2976e8b031338896beee080995f329d7d0ae232a69b55ee0a4fd899fdb263"
+    },
+    "Sewer Plague": {
+      "book": "dmg-2014",
+      "path": "rules/books/dmg-2014.md",
+      "startLine": 8430,
+      "endLine": 8442,
+      "text": "## Sewer Plague\n\nSewer plague is a generic term for a broad category of illnesses that incubate in sewers, refuse heaps, and stagnant swamps, and which are sometimes transmitted by creatures that dwell in those areas, such as rats and otyughs.\n\nWhen a humanoid creature is bitten by a creature that carries the disease, or when it comes into contact with filth or offal contaminated by the disease, the creature must succeed on a DC 11 Constitution saving throw or become infected.\n\nIt takes 1d4 days for sewer plague's symptoms to manifest in an infected creature. Symptoms include fatigue and cramps. The infected creature suffers one level of exhaustion, and it regains only half the normal number of hit points from spending Hit Dice and no hit points from finishing a long rest.\n\nAt the end of each long rest, an infected creature must make a DC 11 Constitution saving throw. On a failed save, the character gains one level of exhaustion.\n\nOn a successful save, the character's exhaustion level decreases by one level. If a successful saving throw reduces the infected creature's level of exhaustion below 1, the creature recovers from the disease.",
+      "sha256": "4d51f90e4eda7640a96ff3946751c54c89b10b3d1081c4419195fd08519d2312"
+    },
+    "Sight Rot": {
+      "book": "dmg-2014",
+      "path": "rules/books/dmg-2014.md",
+      "startLine": 8442,
+      "endLine": 8450,
+      "text": "## Sight Rot\n\nThis painful infection causes bleeding from the eyes and eventually blinds the victim.\n\nA beast or humanoid that drinks water tainted by sight rot must succeed on a DC 15 Constitution saving throw or become infected. One day after infection, the creature's vision starts to become blurry. The creature takes a -1 penalty to attack rolls and ability checks that rely on sight. At the end of each long rest after the symptoms appear, the penalty worsens by 1. When it reaches -5, the victim is blinded until its sight is restored by magic such as *lesser restoration* or *heal*.\n\nSight rot can be cured using a rare flower called Eyebright, which grows in some swamps. Given an hour, a character who has proficiency with an *herbalism kit* can turn the flower into one dose of ointment. Applied to the eyes before a long rest, one dose of it prevents the disease from worsening after that rest. After three doses, the ointment cures the disease entirely.",
+      "sha256": "cd210cc37a33c6beb027472bfdf87b170cc09c1dc919f680b8fc4010d3505a46"
+    },
+    "Cackle Fever": {
+      "book": "dmg-2014",
+      "path": "rules/books/dmg-2014.md",
+      "startLine": 8418,
+      "endLine": 8430,
+      "text": "## Cackle Fever\n\nThis disease targets humanoids, although gnomes are strangely immune. While in the grips of this disease, victims frequently succumb to fits of mad laughter, giving the disease its common name and its morbid nickname: \"the shrieks.\"\n\nSymptoms manifest 1d4 hours after infection and include fever and disorientation. The infected creature gains one level of exhaustion that can't be removed until the disease is cured.\n\nAny event that causes the infected creature great stress—including entering combat, taking damage, experiencing fear, or having a nightmare—forces the creature to make a DC 13 Constitution saving throw.\n\nOn a failed save, the creature takes 5 (1d10) psychic damage and becomes incapacitated with mad laughter for 1 minute. The creature can repeat the saving throw at the end of each of its turns, ending the mad laughter and the incapacitated condition on a success. Any humanoid creature that starts its turn within 10 feet of an infected creature in the throes of mad laughter must succeed on a DC 10 Constitution saving throw or also become infected with the disease. Once a creature succeeds on this save, it is immune to the mad laughter of that particular infected creature for 24 hours.\n\nAt the end of each long rest, an infected creature can make a DC 13 Constitution saving throw. On a successful save, the DC for this save and for the save to avoid an attack of mad laughter drops by 1d6. When the saving throw DC drops to 0, the creature recovers from the disease. A creature that fails three of these saving throws gains a randomly determined form of indefinite madness.",
+      "sha256": "7116bacc9380e687cbc4dde361d0c07c61e2d0c6a7d13d3d61efb2d81210f915"
+    }
+  }
+}

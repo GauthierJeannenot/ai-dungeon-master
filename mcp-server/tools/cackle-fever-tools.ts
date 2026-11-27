@@ -1,0 +1,25 @@
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import { z } from 'zod'
+import { QualifyCackleHostSchema, SeedCackleCaseSchema, RecordCackleStressSchema, ResolveCackleEventSchema } from '../../lib/cackle-fever-state'
+import { qualifyCackleHost,recordCackleCase,recordCackleStress,resolveCackleEvent,resolveCackleOnset,resolveCackleTurn,inspectCackleFever,registerCackleResolutions } from '../cackle-fever'
+import { toolkitResult,toolkitTransaction } from '../toolkit'
+import { retainNpcRestForCackleOnset } from '../npc-resting'
+import { retainRestCheckpointForSourceEvent } from '../resting'
+import * as gs from '../game-state'
+export function registerCackleFeverTools(server:McpServer){
+ registerCackleResolutions()
+ for(const [name,description,schema,resolve] of [
+  ['qualify_cackle_fever_host','MJ explicitly qualifies one actual humanoid body and whether it is a gnome from an existing durable local fact. Catalog nonhumanoids cannot be reclassified. No racial bonus, condition, infection, action or discovery is granted.',QualifyCackleHostSchema,qualifyCackleHost],
+  ['record_cackle_fever_case','Outside combat, MJ prepares one NEW actual non-gnome humanoid NPC infection now. Requires the real existing individual body, explicit susceptibility and current physical illness fact. Rolls its one 1d4-hour incubation, no old infection date, immediate symptoms, player infection, attack, resource or monster power. Player infection requires actual source contagion.',SeedCackleCaseSchema,recordCackleCase],
+  ['record_cackle_fever_stress','MJ records a genuinely occurred external great-stress event at one actual symptomatic infected body using its current durable fact. Damage, actual combat entry and actual frightened condition already queue their source events automatically; never duplicate those by another fact. Nightmare/other stress is explicit MJ qualification, never text parsing. No action or clock advance.',RecordCackleStressSchema,recordCackleStress],
+ ] as const)server.registerTool(name,{description,inputSchema:schema,annotations:{readOnlyHint:false,destructiveHint:false,idempotentHint:true,openWorldHint:false}},async (input:unknown)=>toolkitTransaction(()=>toolkitResult(resolve(input))))
+ server.registerTool('resolve_cackle_fever_event',{description:'Resolve one retained exact Cackle Fever stress, contagion or actual completed long-rest event. Long-rest recovery explicitly chooses attemptSave true or false; declining rolls nothing and adds no failure. Stress and contagion are mandatory and reject this optional choice. Original Constitution die/DC, one incubation or psychic damage, per-carrier immunity24h and cumulative recovery failures persist. On third failed recovery only the actual DMG indefinite flaw is retained, no forced action. No synthetic turn, time, resource or NPC rest. A held original save requires resolve_reaction with its exact pendingId.',inputSchema:ResolveCackleEventSchema},async input=>toolkitTransaction(()=>resolveCackleEvent(input)))
+ server.registerTool('resolve_cackle_fever_onset',{description:'At the retained actual 1d4-hour incubation boundary, or on its explicit actual map return, apply this infection’s one exhaustion level, protected until cured. No reroll, invented illness suspension or free recovery. A fresh observed NPC rest may retain this exact zero-time symptom observation without crediting an interval; environmental round continuation remains source-linked.',inputSchema:{afflictionId:z.string().min(1).max(180)}},async input=>toolkitTransaction(()=>{
+  const onset=retainRestCheckpointForSourceEvent(()=>retainNpcRestForCackleOnset(input.afflictionId,()=>resolveCackleOnset(input.afflictionId)))
+  const pending=gs.getState().dmTools?.weather?.pendingCombatRound
+  const resumedCombatTurn=!onset.replayed&&pending?.cackleFeverAfflictionId===input.afflictionId?gs.completeSurvivalRoundTransition():undefined
+  return toolkitResult({...onset,resumedCombatTurn})
+ }))
+ server.registerTool('resolve_cackle_fever_turn',{description:'Explicitly end the current actual laughing creature’s initiative turn, choose attemptSave true or false, and if chosen repeat the original DC chosen when this exact crisis began. A success ends only its disease-sourced laughter/incapacity. The turn remains committed; then choose next_turn explicitly. No outside-combat turn is fabricated.',inputSchema:{afflictionId:z.string().min(1).max(180),endTurn:z.literal(true),attemptSave:z.boolean()}},async input=>toolkitTransaction(()=>resolveCackleTurn(input)))
+ server.registerTool('inspect_cackle_fever',{description:'Confidential read-only actual host qualifications, disease incubation, protected exhaustion, source stress/contagion/recovery events, original crises and indefinite roleplaying flaws. Does not reveal a hidden NPC or diagnose the disease to the player, roll, cure, act or advance time.',inputSchema:{},annotations:{readOnlyHint:true,idempotentHint:true}},async()=>toolkitResult(inspectCackleFever()))
+}

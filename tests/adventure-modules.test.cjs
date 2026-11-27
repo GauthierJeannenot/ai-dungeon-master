@@ -18,6 +18,7 @@ const restoreTsRequire = installTsRequireWithAliases()
 const { ADVENTURES } = require(path.join(process.cwd(), 'lib/adventures.ts'))
 const { parseAdventureModule } = require(path.join(process.cwd(), 'lib/context-loader.ts'))
 const { inferRoomIdOnMap } = require(path.join(process.cwd(), 'lib/adventure-map.ts'))
+const { listMonsterTypes } = require(path.join(process.cwd(), 'lib/srd/monsters.ts'))
 
 test.after(() => {
   restoreTsRequire()
@@ -34,8 +35,8 @@ function inBounds(cell, bounds) {
 }
 
 function roomContains(room, cell) {
-  return cell.x >= room.zone.minX && cell.x <= room.zone.maxX &&
-    cell.y >= room.zone.minY && cell.y <= room.zone.maxY
+  return (room.areas ?? [room.zone]).some(area => cell.x >= area.minX && cell.x <= area.maxX &&
+    cell.y >= area.minY && cell.y <= area.maxY)
 }
 
 // Deux zones se touchent (chevauchement ou bord commun, jamais un simple coin)
@@ -52,19 +53,7 @@ function zonesTouch(a, b) {
 
 // Types de monstres réellement définis dans le moteur MCP : extraits du source
 // de phase-tools.ts (entrées `key: { type: 'key', ... }` du template record).
-function engineMonsterTypes() {
-  const source = fs.readFileSync(path.join(process.cwd(), 'mcp-server/tools/phase-tools.ts'), 'utf8')
-  const types = new Set()
-  const pattern = /^\s{2}(\w+): \{\s*\n\s*type: '(\w+)'/gm
-  let match
-  while ((match = pattern.exec(source)) !== null) {
-    if (match[1] === match[2]) types.add(match[1])
-  }
-  assert.ok(types.size >= 5, 'extraction des templates de monstres suspecte')
-  return types
-}
-
-const MONSTER_TYPES = engineMonsterTypes()
+const MONSTER_TYPES = new Set(listMonsterTypes())
 
 // Un bloc de tests par module du registre.
 for (const adventure of ADVENTURES) {
@@ -78,6 +67,45 @@ for (const adventure of ADVENTURES) {
     return spec ? boundsForGrid(spec.grid) : null
   }
   const findRoom = roomId => map.rooms.find(room => room.id === roomId)
+
+  test(`[${label}] navigation destinations and fog regions reference rooms on their own map`, () => {
+    for (const spec of map.maps) {
+      for (const ids of [spec.explorationRoomIds, spec.fogHiddenRoomIds]) {
+        if (!ids) continue
+        assert.equal(new Set(ids).size, ids.length)
+        for (const id of ids) assert.equal(roomMapId(findRoom(id) ?? {}), spec.id, `unknown or wrong-map room ${id}`)
+        for (const id of ids) assert.ok(findRoom(id), `unknown room ${id}`)
+      }
+      const scene = adventure.scenes?.[spec.id]
+      for (const point of scene?.hotspots ?? []) if (point.destinationRoomId) {
+        assert.ok(findRoom(point.destinationRoomId))
+        assert.equal(roomMapId(findRoom(point.destinationRoomId)), spec.id)
+      }
+      for (const region of scene?.fogRegions ?? []) {
+        assert.ok(findRoom(region.roomId))
+        assert.equal(roomMapId(findRoom(region.roomId)), spec.id)
+        assert.ok(spec.fogOfWar, 'illustration masks require engine fog')
+        assert.ok(region.points.length >= 3)
+        assert.ok(region.points.flat().every(value => Number.isFinite(value) && value >= 0 && value <= 100))
+      }
+    }
+  })
+
+  test(`[${label}] door thresholds stay on their authored side and map`, () => {
+    const ids = new Set()
+    for (const door of map.doors ?? []) {
+      assert.equal(ids.has(door.id), false, `duplicate door ${door.id}`)
+      ids.add(door.id)
+      assert.equal(door.sides.length, 2)
+      assert.notEqual(door.sides[0].roomId, door.sides[1].roomId)
+      const rooms = door.sides.map(side => findRoom(side.roomId))
+      assert.ok(rooms.every(Boolean))
+      assert.equal(roomMapId(rooms[0]), roomMapId(rooms[1]))
+      for (const side of door.sides) {
+        assert.equal(inferRoomIdOnMap(side.cell, roomMapId(findRoom(side.roomId)), label), side.roomId, `${door.id}: wrong side at ${JSON.stringify(side.cell)}`)
+      }
+    }
+  })
 
   test(`[${label}] maps are declared, unique, and rooms reference them`, () => {
     assert.ok(Array.isArray(map.maps) && map.maps.length >= 1, 'un module doit déclarer au moins une map')
@@ -116,6 +144,13 @@ for (const adventure of ADVENTURES) {
       assert.ok(inBounds({ x: room.zone.minX, y: room.zone.minY }, bounds), `${room.name}: coin min hors carte`)
       assert.ok(inBounds({ x: room.zone.maxX, y: room.zone.maxY }, bounds), `${room.name}: coin max hors carte`)
       assert.ok(room.zone.minX <= room.zone.maxX && room.zone.minY <= room.zone.maxY, `${room.name}: zone inversée`)
+      if(room.areas) {
+        assert.ok(room.areas.length>0,`${room.name}: empty exact footprint`)
+        for(const area of room.areas) {
+          assert.ok(area.minX<=area.maxX&&area.minY<=area.maxY,`${room.name}: invalid exact footprint`)
+          assert.ok(area.minX>=room.zone.minX&&area.maxX<=room.zone.maxX&&area.minY>=room.zone.minY&&area.maxY<=room.zone.maxY,`${room.name}: exact footprint outside bounding box`)
+        }
+      }
     }
     // NB : on n'exige PAS l'absence de chevauchement — les salles en L sont
     // modélisées par des boîtes englobantes rectangulaires qui peuvent se
@@ -126,6 +161,7 @@ for (const adventure of ADVENTURES) {
     for (const room of map.rooms) {
       for (let x = room.zone.minX; x <= room.zone.maxX; x++) {
         for (let y = room.zone.minY; y <= room.zone.maxY; y++) {
+          if(!roomContains(room,{x,y})) continue
           const resolved = inferRoomIdOnMap({ x, y }, roomMapId(room), adventure.id)
           assert.ok(resolved !== null, `${adventure.id}: case (${x},${y}) de la salle ${room.id} ne résout vers aucune salle`)
           const resolvedRoom = findRoom(resolved)
@@ -143,6 +179,20 @@ for (const adventure of ADVENTURES) {
     const npcIds = new Set(map.npcs.map(npc => npc.id))
     const roomIds = new Set(map.rooms.map(room => room.id))
 
+    const clueIds = new Set()
+    for (const clue of map.clues ?? []) {
+      assert.ok(clue.id && !clueIds.has(clue.id), `indice vide ou dupliqué ${clue.id}`)
+      clueIds.add(clue.id)
+      assert.ok(clue.text.trim(), `${clue.id}: texte vide`)
+      assert.ok(clue.sourceNpcIds.length > 0, `${clue.id}: aucun témoin`)
+      for (const npcId of clue.sourceNpcIds) assert.ok(npcIds.has(npcId), `${clue.id}: témoin inconnu ${npcId}`)
+    }
+    for (const scene of Object.values(adventure.scenes ?? {})) {
+      for (const entry of [...scene.hotspots, ...(scene.actions ?? [])]) {
+        if (entry.requiresClueId) assert.ok(clueIds.has(entry.requiresClueId), `indice de navigation inconnu ${entry.requiresClueId}`)
+      }
+    }
+
     for (const transition of map.mapTransitions) {
       assert.ok(mapIds.has(transition.fromMapId), `${transition.id}: fromMapId inconnu`)
       assert.ok(mapIds.has(transition.toMapId), `${transition.id}: toMapId inconnu`)
@@ -151,24 +201,49 @@ for (const adventure of ADVENTURES) {
       assert.ok(arrivalRoom, `${transition.id}: arrivalRoomId inconnu`)
       assert.equal(roomMapId(arrivalRoom), transition.toMapId, `${transition.id}: salle d'arrivée hors de la map de destination`)
       assert.ok(roomContains(arrivalRoom, transition.arrivalCell), `${transition.id}: arrivalCell hors de la salle d'arrivée`)
+      if (transition.passage) {
+        const departure = findRoom(transition.passage.roomId)
+        assert.ok(departure, `${transition.id}: unknown departure room`)
+        assert.equal(roomMapId(departure), transition.fromMapId)
+        assert.ok(roomContains(departure, transition.passage.cell), `${transition.id}: departure outside room`)
+        const from = map.maps.find(m => m.id === transition.fromMapId)
+        const to = map.maps.find(m => m.id === transition.toMapId)
+        assert.ok(from.travelGroup, `${transition.id}: local passage needs a story group`)
+        assert.equal(from.travelGroup, to.travelGroup)
+        assert.ok(map.mapTransitions.some(back => back.passage && back.fromMapId === to.id && back.toMapId === from.id), `${transition.id}: no return staircase`)
+      }
       for (const companion of transition.companions ?? []) {
         assert.ok(npcIds.has(companion), `${transition.id}: compagnon inconnu ${companion}`)
       }
     }
 
+    assert.equal(new Set(map.campaignTracking?.encounterIds??[]).size,(map.campaignTracking?.encounterIds??[]).length,'Tracked encounter IDs are unique')
+    for(const id of map.campaignTracking?.encounterIds??[])assert.ok(encounterIdSet.has(id),`Tracked encounter does not exist: ${id}`)
     for (const [mapId, quest] of Object.entries(map.mapQuests)) {
       assert.ok(mapIds.has(mapId), `quête pour map inconnue ${mapId}`)
       assert.equal(quest.mapId, mapId, `quête ${mapId}: mapId incohérent`)
       for (const objective of quest.objectives) {
         const check = objective.check
-        if (check.type === 'encounterResolved') {
+        if (objective.dialogue) {
+          assert.ok(objective.dialogue.label.trim() && objective.dialogue.label.length <= 200, 'public objective label')
+          assert.ok(objective.dialogue.npcIds.length && new Set(objective.dialogue.npcIds).size === objective.dialogue.npcIds.length, 'unique dialogue sources')
+          for (const npcId of objective.dialogue.npcIds) assert.ok(npcIds.has(npcId), `unknown objective speaker ${npcId}`)
+        }
+        if (check.type === 'encounterResolved' || check.type === 'encounterOutcome') {
           assert.ok(encounterIdSet.has(check.encounterId), `objectif ${objective.id}: rencontre inconnue ${check.encounterId}`)
         } else if (check.type === 'npcDisposition') {
           assert.ok(npcIds.has(check.npcId), `objectif ${objective.id}: PNJ inconnu ${check.npcId}`)
+        } else if (check.type === 'npcPartyArrival') {
+          const npc=map.npcs.find(n=>n.id===check.npcId)
+          assert.ok(npc, `objectif ${objective.id}: PNJ escorte inconnu ${check.npcId}`)
+          assert.ok(roomIds.has(check.roomId), `objectif ${objective.id}: destination inconnue ${check.roomId}`)
+          assert.ok(npc.party?.safeRoomIds.includes(check.roomId), `objectif ${objective.id}: destination non qualifiee pour cette escorte`)
         } else if (check.type === 'roomVisited') {
           assert.ok(roomIds.has(check.roomId), `objectif ${objective.id}: salle inconnue ${check.roomId}`)
         } else if (check.type === 'itemInInventory') {
           assert.ok(typeof check.item === 'string' && check.item.length > 0, `objectif ${objective.id}: item vide`)
+        } else if (check.type === 'clueRevealed') {
+          assert.ok(clueIds.has(check.clueId), `objectif ${objective.id}: indice inconnu ${check.clueId}`)
         } else {
           assert.fail(`objectif ${objective.id}: type de condition inconnu ${check.type}`)
         }
@@ -204,6 +279,19 @@ for (const adventure of ADVENTURES) {
     assert.ok(map.initialPlayer.level >= 1, 'niveau du joueur invalide')
     if (map.initialPlayer.extraInventory !== undefined) {
       assert.ok(Array.isArray(map.initialPlayer.extraInventory), 'extraInventory doit être un tableau')
+    }
+  })
+
+  test(`[${label}] authored ground items are unique and located on their declared map`, () => {
+    const ids = new Set(map.initialPlayer.extraInventory?.map(item => item.id) ?? [])
+    for (const drop of map.groundItems ?? []) {
+      assert.ok(drop.item.id && !ids.has(drop.item.id), `duplicate ground item ${drop.item.id}`)
+      ids.add(drop.item.id)
+      const room = findRoom(drop.roomId)
+      assert.ok(room, `${drop.item.id}: unknown room`)
+      assert.equal(roomMapId(room), drop.mapId, `${drop.item.id}: wrong map`)
+      assert.ok(roomContains(room, drop.position), `${drop.item.id}: outside its room`)
+      assert.equal(inferRoomIdOnMap(drop.position, drop.mapId, label), drop.roomId)
     }
   })
 
@@ -253,7 +341,7 @@ for (const adventure of ADVENTURES) {
     }
   })
 
-  test(`[${label}] hooks, transitions and aliases only reference existing rooms`, () => {
+  test(`[${label}] hooks only reference existing rooms`, () => {
     const roomIds = new Set(map.rooms.map(room => room.id))
     for (const roomId of Object.keys(map.roomHooks)) {
       assert.ok(roomIds.has(roomId), `hook pour salle inconnue ${roomId}`)
@@ -261,13 +349,7 @@ for (const adventure of ADVENTURES) {
     for (const roomId of roomIds) {
       assert.ok(map.roomHooks[roomId], `salle ${roomId} sans accroches mécaniques`)
     }
-    for (const transition of [...map.doorTransitions, ...map.forwardTransitions]) {
-      assert.ok(roomIds.has(transition.fromRoomId), `transition depuis salle inconnue ${transition.fromRoomId}`)
-      assert.ok(roomIds.has(transition.toRoomId), `transition vers salle inconnue ${transition.toRoomId}`)
-    }
-    for (const alias of [...map.roomNavigationAliases, ...map.roomContextAliases]) {
-      assert.ok(roomIds.has(alias.roomId), `alias vers salle inconnue ${alias.roomId}`)
-    }
+
   })
 
   test(`[${label}] partitions reference contiguous, same-map rooms without duplicates`, () => {

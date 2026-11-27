@@ -1,117 +1,182 @@
 # Bestiaire & notes de maîtrise — Grammy's Country Apple Pie
 
-> Source : Monster Manual 2025 (XMM). Le moteur applique les stats ; ces blocs
-> servent la narration, les DDs annexes et le comportement des créatures.
+> Généré par `node scripts/sync-srd-bestiaries.cjs --write` depuis le snapshot SRD 2014 consulté le 2026-10-30.
+> Sources : [D&D 5e SRD API](https://www.dnd5eapi.co/) (projet communautaire 5e-bits), référentiel SRD 2014.
+> Matériel SRD 5.1 sous CC-BY-4.0 : [attribution](../../lib/srd/monsters.LICENSE.txt). Les éventuelles corrections vérifiées dans le SRD officiel sont signalées et la réponse API originale est conservée.
+> Les noms de campagne et comportements ci-dessous sont des adaptations narratives ; les valeurs de référence viennent de chaque endpoint cité. Aucun PV réduit dans les rencontres autorées.
+> Le moteur applique les dégâts typés, résistances, vulnérabilités et immunités (dégâts et états), les multiattaques du catalogue et plusieurs effets de frappe et pouvoirs actifs. Les jets, coûts, durées et recharges passent par les outils. La couverture précise et les limites de chaque créature sont renvoyées par `get_monster_stat_block.engineSupport` ; un pouvoir seulement décrit dans la source n'est jamais une résolution mécanique acquise. Voir [règles moteur](../../docs/monster-combat-rules.md).
 
-## Calibrage du module
+**Niveau du joueur : 1.** Les gardes et pâtissiers utilisent désormais le gobelin SRD à 7 PV, sans variante minion. Deux gobelins représentent 100 XP bruts avant tout multiplicateur de rencontre : danger réel pour un héros solo. Privilégier les solutions créatives et sociales prévues par le module ; ne pas réduire leurs PV en secret.
 
-- **Niveau du joueur : 1.** Règle d'or des DD : 17-18 en cas d'hésitation.
-- Budget XP (1 joueur niveau 1) : faible 50 XP · modérée 75 XP · haute 100 XP.
-  2 gobelins warriors (100 XP) = déjà dangereux pour un joueur solo.
+Les DD d'interaction propres au scénario ne sont pas des caractéristiques SRD : repérer les dryades, DD 13 Perception ; approcher leur groupe sans les faire fuir, DD 14 Charisme ; obtenir l'aide de Mac par le respect, DD 12 Persuasion. Ne pas inventer un DD générique de 17–18.
 
----
+Le chef est un hobgobelin SRD à 11 PV, pas un Goblin Boss ou un Hobgoblin Captain. Ces deux anciens blocs ne sont pas fournis par le catalogue SRD de cette API et ne servent plus de référence.
 
-## 🔴 ENNEMIS DE L'AVENTURE
+### Gobelins pâtissiers et gardes
 
-### Gobelin Minion — CR 1/8 · XP 25 *(nouveau MM 2025)*
-- **CA** 13 · **HP** 3 (1d6) · **Vitesse** 30 pieds
-- FOR −1, DEX +2, CON +0, INT +0, SAG −1, CHA −1
-- **ATT** : Cimeterre +4, 1d6+2 tranchants
-- **Fuite de gueux** : si allié tue une cible, peut se déplacer de 15 pieds gratuitement (réaction)
-- *Usage dans l'aventure* : gobelins de base facilement éliminés, chair à canon
+Source : [Goblin](https://www.dnd5eapi.co/api/2014/monsters/goblin) — SRD 2014 · type moteur `goblin`.
 
-### Gobelin Warrior — CR 1/4 · XP 50
-- **CA** 15 (armure de cuir + bouclier) · **HP** 7 (2d6) · **Vitesse** 30 pieds
-- FOR −1, DEX +2, CON +0, INT +0, SAG −1, CHA −1
-- **ATT** : Cimeterre +4, 1d6+2 tranchants OU Arc court +4, portée 80/320, 1d6+2 perforants
-- **Fuite Agile** : Désengagement ou Se cacher comme action bonus chaque tour
-- *Usage* : gobelins patrouille (salle 7), gobelins boulangerie (salle 8)
+- **Taille / type / alignement (source)** : Small / humanoid (goblinoid) / neutral evil.
+- **CA** 15 (armor) · **PV** 7 (2d6) · **FP** 1/4 · **XP** 50.
+- **Vitesses** : marche 30 ft.
+- **Caractéristiques** : FOR 8 · DEX 14 · CON 10 · INT 10 · SAG 8 · CHA 8.
+- **Maîtrises / sauvegardes (source)** : Skill: Stealth +6.
+- **Vulnérabilités** : aucune.
+- **Résistances** : aucune.
+- **Immunités aux dégâts** : aucune.
+- **Immunités aux états (identifiants source)** : aucune.
+- **Sens** : darkvision 60 ft. ; passive_perception 9.
+- **Langues (source)** : Common, Goblin.
 
-### Gobelin Boss — CR 1 · XP 200
-- **CA** 17 (armure de mailles + bouclier) · **HP** 21 (6d6) · **Vitesse** 30 pieds
-- FOR +0, DEX +2, CON +0, INT +0, SAG −1, CHA +0
-- **ATT** (Multiattaque 2×) : Cimeterre +4, 1d6+2 tranchants
-- **Rediriger l'attaque** *(réaction)* : quand ciblé par une attaque, désigne un gobelin adjacent — c'est lui qui reçoit l'attaque à la place
-- **Fuite Agile** : Désengagement ou Se cacher comme action bonus
-- *Usage* : Chef Grukk (HP réduit à 18 via hpOverride dans le module)
+**Traits et actions SRD** — descriptions originales conservées pour éviter les ajouts ou traductions erronés :
 
-### Hobgoblin Warrior — CR 1/2 · XP 100
-- **CA** 18 (cotte de mailles + bouclier) · **HP** 11 (2d8+2) · **Vitesse** 30 pieds
-- FOR +1, DEX +1, CON +1, INT +0, SAG +0, CHA −1
-- **ATT** : Épée longue +3, 1d8+1 tranchants (ou 1d10+1 à deux mains) OU Arc long +3, portée 150/600, 1d8+1 perforants
-- **Avantage martial** : +2d6 dégâts supplémentaires si un allié est à 5 pieds de la cible (1×/tour)
-- *Usage* : base de Chef Grukk
+**Traits**
 
-### Hobgoblin Captain — CR 3 · XP 700
-- **CA** 17 (demi-armure) · **HP** 52 (8d8+16) · **Vitesse** 30 pieds
-- FOR +2, DEX +2, CON +2, INT +1, SAG +0, CHA +1
-- **ATT** (Multiattaque 2×) : Espadon +4, 2d6+2 tranchants
-- **Avantage martial** : +3d6 dégâts si allié à 5 pieds (1×/tour)
-- **Leadership** *(réaction, recharge 5-6)* : un allié qui rate un jet d'attaque peut relancer le dé
-- *Note* : trop puissant pour niv.1 en combat direct — pour des rencontres futures
+- **Nimble Escape** : The goblin can take the Disengage or Hide action as a bonus action on each of its turns.
 
----
+**Actions**
 
-## 🟣 PNJ NON HOSTILES (AVENTURE)
+- **Scimitar** : Melee Weapon Attack: +4 to hit, reach 5 ft., one target. Hit: 5 (1d6 + 2) slashing damage.
+- **Shortbow** : Ranged Weapon Attack: +4 to hit, range 80/320 ft., one target. Hit: 5 (1d6 + 2) piercing damage.
 
-### Mac le Tréant — Awakened Tree · CR 2 · XP 450
-*(Pommier animé par Grammy. Utilise les stats d'Awakened Tree, pas du Treant CR 9)*
-- **CA** 13 (armure naturelle) · **HP** 59 (7d12+14) · **Vitesse** 20 pieds
-- FOR +4, DEX −2, CON +2, INT +0, SAG +0, CHA −2
-- **Vulnérabilité** : dégâts de feu (×2)
-- **Fausse apparence** : immobile, ressemble à un pommier ordinaire
-- **ATT** : Coup +6, 3d6+4 contondants
-- *Comportement* : indifférent si ignoré, bienveillant si approché avec respect, hostile si attaqué ou si le verger est menacé
-- *Interaction* : DD 12 Persuasion → révèle les dryades. Peut parler Commun et Sylvain.
-- *Note narrative* : un Treant complet (CR 9) serait une menace existentielle pour un joueur niv.1 — Mac est un "jeune" tréant ou un pommier éveillé
+**Projection moteur de base** : Scimitar, +4, 1d6+2 slashing, allonge 5 pieds ; marche 30 pieds.
 
-### Dryade — CR 1 · XP 200 *(×3 dans le verger)*
-- **CA** 11 (armure naturelle) · **HP** 22 (5d8) · **Vitesse** 30 pieds
-- FOR +0, DEX +1, CON +0, INT +2, SAG +2, CHA +5
-- **Compétences** : Nature +4, Perception +4, Discrétion +5
-- **Résistance à la magie** : Avantage sur JS contre sorts
-- **ATT** : Gourdin +2 (ou +6 avec Poigne du druide — Sylvestre), 1d4 (ou 1d8+3)
-- **Charme féerique** *(action)* : JS SAG DD 14 ou charmé 24h — traite la dryade comme amie de confiance
-- **Pas des arbres** *(déplacement)* : entre dans un arbre, ressort d'un autre arbre à 60 pieds (1×/déplacement)
-- **Sorts innés** : Façonnage du bois, Enchevêtrement (3/jour), Baies bienfaisantes (3/jour), Hérissons (1/jour)
-- *Comportement* : facétieuses et protectrices du verger. Testent le joueur avant d'aider.
-- *Interaction* : DD 13 Perception pour repérer, DD 14 CHA pour leur parler sans qu'elles fuient
+**Rôle dans ce module** : Deux pâtissiers à découvert en salle 8, occupés à essayer de faire des tartes aux pommes en se chamaillant, visibles depuis le quai par la porte ouverte selon la ligne de vue. Aucune embuscade ni combat automatique pour ces pâtissiers ; deux gardes en salle 9. Aucun gobelin dans le quai de chargement, salle 7.
 
----
+- Les armes et dégâts restent ceux du gobelin SRD ; les outils de boulangerie sont de la mise en scène et ne remplacent pas les statistiques.
 
-## ⚪ AUTRES CRÉATURES
+### Chef Grukk — hobgobelin
 
-### Zombie / Champignon Violet — CR 1/4 · XP 50
-*(Champignon Violet utilise stats Zombie avec modifications thématiques)*
-- **CA** 8 · **HP** 18 (3d8+3) · **Vitesse** 20 pieds (5 pieds pour le champignon)
-- FOR +1, DEX −2, CON +1, INT −4, SAG −2, CHA −3
-- **Immunités** : poison, épuisé, charmé, effrayé, empoisonné
-- **ATT** : Coup +3, 1d6+1 contondants
-- **Résistance des morts-vivants** : si réduit à 0 PV → JS CON DD 5 + dégâts reçus → reste à 1 PV (1×/tour)
-- *Champignon Violet* : ATT Touche corrosive +2, 1d8 nécrotiques, JS CON DD 10 ou ne peut récupérer de PV jusqu'au prochain repos long
+Source : [Hobgoblin](https://www.dnd5eapi.co/api/2014/monsters/hobgoblin) — SRD 2014 · type moteur `hobgoblin`.
 
-### Champignon Violet pur — CR 1/4 · XP 50
-- **CA** 5 · **HP** 18 (4d8) · **Vitesse** 5 pieds
-- FOR −4, DEX −5, CON +0, INT −5, SAG −4, CHA −5
-- **Fausse apparence** : immobile = impossible à distinguer d'un champignon ordinaire
-- **Multiattaque** : 1d4 attaques de Touche pourrie
-- **ATT** : Touche pourrie +2, 1d8 nécrotiques, JS CON DD 10 ou impossibilité de récupérer des PV jusqu'au repos long
+- **Taille / type / alignement (source)** : Medium / humanoid (goblinoid) / lawful evil.
+- **CA** 18 (armor) · **PV** 11 (2d8+2) · **FP** 1/2 · **XP** 100.
+- **Vitesses** : marche 30 ft.
+- **Caractéristiques** : FOR 13 · DEX 12 · CON 12 · INT 10 · SAG 10 · CHA 9.
+- **Maîtrises / sauvegardes (source)** : aucune indiquée.
+- **Vulnérabilités** : aucune.
+- **Résistances** : aucune.
+- **Immunités aux dégâts** : aucune.
+- **Immunités aux états (identifiants source)** : aucune.
+- **Sens** : darkvision 60 ft. ; passive_perception 10.
+- **Langues (source)** : Common, Goblin.
 
-### Squelette — CR 1/4 · XP 50
-- **CA** 13 (restes d'armure) · **HP** 13 (2d8+4) · **Vitesse** 30 pieds
-- FOR +0, DEX +2, CON +2, INT −2, SAG −1, CHA −3
-- **Vulnérabilité** : dégâts contondants (×2)
-- **Immunités** : poison, épuisé, empoisonné
-- **ATT** : Épée courte +4, 1d6+2 perforants OU Arc court +4, portée 80/320, 1d6+2 perforants
+**Traits et actions SRD** — descriptions originales conservées pour éviter les ajouts ou traductions erronés :
 
-### Loup — CR 1/4 · XP 50
-- **CA** 13 (armure naturelle) · **HP** 11 (2d8+2) · **Vitesse** 40 pieds
-- FOR +1, DEX +2, CON +1, INT −4, SAG +1, CHA −2
-- **Compétences** : Perception +3, Discrétion +4
-- **Tactiques de meute** : Avantage sur attaque si allié à 5 pieds de la cible
-- **ATT** : Morsure +4, 2d4+2 perforants · JS FOR DD 11 ou tombe Prone
+**Traits**
 
-### Bandit — CR 1/8 · XP 25
-- **CA** 12 (armure de cuir) · **HP** 11 (2d8+2) · **Vitesse** 30 pieds
-- FOR +0, DEX +1, CON +1, INT +0, SAG +0, CHA +0
-- **ATT** : Cimeterre +3, 1d6+1 tranchants OU Arbalète légère +3, portée 80/320, 1d8+1 perforants
+- **Martial Advantage** : Once per turn, the hobgoblin can deal an extra 7 (2d6) damage to a creature it hits with a weapon attack if that creature is within 5 ft. of an ally of the hobgoblin that isn't incapacitated.
+
+**Actions**
+
+- **Longsword** : Melee Weapon Attack: +3 to hit, reach 5 ft., one target. Hit: 5 (1d8 + 1) slashing damage, or 6 (1d10 + 1) slashing damage if used with two hands.
+- **Longbow** : Ranged Weapon Attack: +3 to hit, range 150/600 ft., one target. Hit: 5 (1d8 + 1) piercing damage.
+
+**Projection moteur de base** : Longsword, +3, 1d8+1 slashing, allonge 5 pieds ; marche 30 pieds.
+
+**Rôle dans ce module** : Chef de l'appartement, salle 9.
+
+- Son titre est narratif : ni multiattaque de capitaine ni redirection d'attaque de boss gobelin ne s'ajoutent à ce bloc. Peut tenter de fuir lorsqu'il est très blessé, uniquement après résolution du déplacement.
+
+### Champignon violet
+
+Source : [Violet Fungus](https://www.dnd5eapi.co/api/2014/monsters/violet-fungus) — SRD 2014 · type moteur `violet_fungus`.
+
+- **Taille / type / alignement (source)** : Medium / plant / unaligned.
+- **CA** 5 (dex) · **PV** 18 (4d8) · **FP** 1/4 · **XP** 50.
+- **Vitesses** : marche 5 ft.
+- **Caractéristiques** : FOR 3 · DEX 1 · CON 10 · INT 1 · SAG 3 · CHA 1.
+- **Maîtrises / sauvegardes (source)** : aucune indiquée.
+- **Vulnérabilités** : aucune.
+- **Résistances** : aucune.
+- **Immunités aux dégâts** : aucune.
+- **Immunités aux états (identifiants source)** : blinded, deafened, frightened.
+- **Sens** : blindsight 30 ft. (blind beyond this radius) ; passive_perception 6.
+- **Langues (source)** : aucune.
+
+**Traits et actions SRD** — descriptions originales conservées pour éviter les ajouts ou traductions erronés :
+
+**Traits**
+
+- **False Appearance** : While the violet fungus remains motionless, it is indistinguishable from an ordinary fungus.
+
+**Actions**
+
+- **Multiattack** : The fungus makes 1d4 Rotting Touch attacks.
+- **Rotting Touch** : Melee Weapon Attack: +2 to hit, reach 10 ft., one creature. Hit: 4 (1d8) necrotic damage.
+
+**Correction sourcée de l'API** (condition_immunities) : The API duplicates blinded; the official SRD lists blinded, deafened, frightened. [SRD officiel, p. 309](https://media.wizards.com/2023/downloads/dnd/SRD_CC_v5.1.pdf#page=309).
+
+**Projection moteur de base** : Rotting Touch, +2, 1d8 necrotic, allonge 10 pieds ; marche 5 pieds.
+
+**Rôle dans ce module** : Tas de déchets, salle 3.
+
+- Créature végétale SRD, jamais un zombie reskinné. La touche pourrie inflige des dégâts nécrotiques : aucun effet anti-soin ni sauvegarde de Constitution DD 10 n'est ajouté.
+
+### Mac — arbre éveillé
+
+Source : [Awakened Tree](https://www.dnd5eapi.co/api/2014/monsters/awakened-tree) — SRD 2014 · type moteur `awakened_tree`.
+
+- **Taille / type / alignement (source)** : Huge / plant / unaligned.
+- **CA** 13 (natural) · **PV** 59 (7d12+14) · **FP** 2 · **XP** 450.
+- **Vitesses** : marche 20 ft.
+- **Caractéristiques** : FOR 19 · DEX 6 · CON 15 · INT 10 · SAG 10 · CHA 7.
+- **Maîtrises / sauvegardes (source)** : aucune indiquée.
+- **Vulnérabilités** : fire.
+- **Résistances** : bludgeoning, piercing.
+- **Immunités aux dégâts** : aucune.
+- **Immunités aux états (identifiants source)** : aucune.
+- **Sens** : passive_perception 10.
+- **Langues (source)** : one language known by its creator.
+
+**Traits et actions SRD** — descriptions originales conservées pour éviter les ajouts ou traductions erronés :
+
+**Traits**
+
+- **False Appearance** : While the tree remains motionless, it is indistinguishable from a normal tree.
+
+**Actions**
+
+- **Slam** : Melee Weapon Attack: +6 to hit, reach 10 ft., one target. Hit: 14 (3d6 + 4) bludgeoning damage.
+
+**Projection moteur de base** : Slam, +6, 3d6+4 bludgeoning, allonge 10 pieds ; marche 20 pieds.
+
+**Rôle dans ce module** : Gardien de l'entrée extérieure, normalement neutre.
+
+- Pommier éveillé de fiction, pas le Treant FP 9. Les langues supplémentaires du scénario restent un choix narratif du module, distinct de la référence SRD.
+
+### Dryades du verger
+
+Source : [Dryad](https://www.dnd5eapi.co/api/2014/monsters/dryad) — SRD 2014 · type moteur `dryad`.
+
+- **Taille / type / alignement (source)** : Medium / fey / neutral.
+- **CA** 11 (dex) ; 16 (spell) · **PV** 22 (5d8) · **FP** 1 · **XP** 200.
+- **Vitesses** : marche 30 ft.
+- **Caractéristiques** : FOR 10 · DEX 12 · CON 11 · INT 14 · SAG 15 · CHA 18.
+- **Maîtrises / sauvegardes (source)** : Skill: Perception +4 ; Skill: Stealth +5.
+- **Vulnérabilités** : aucune.
+- **Résistances** : aucune.
+- **Immunités aux dégâts** : aucune.
+- **Immunités aux états (identifiants source)** : aucune.
+- **Sens** : darkvision 60 ft. ; passive_perception 14.
+- **Langues (source)** : Elvish, Sylvan.
+
+**Traits et actions SRD** — descriptions originales conservées pour éviter les ajouts ou traductions erronés :
+
+**Traits**
+
+- **Innate Spellcasting** : The dryad's innate spellcasting ability is Charisma (spell save DC 14). The dryad can innately cast the following spells, requiring no material components:  At will: druidcraft 3/day each: entangle, goodberry 1/day each: barkskin, pass without trace, shillelagh
+- **Magic Resistance** : The dryad has advantage on saving throws against spells and other magical effects.
+- **Speak with Beasts and Plants** : The dryad can communicate with beasts and plants as if they shared a language.
+- **Tree Stride** : Once on her turn, the dryad can use 10 ft. of her movement to step magically into one living tree within her reach and emerge from a second living tree within 60 ft. of the first tree, appearing in an unoccupied space within 5 ft. of the second tree. Both trees must be large or bigger.
+
+**Actions**
+
+- **Club** : Melee Weapon Attack: +2 to hit (+6 to hit with shillelagh), reach 5 ft., one target. Hit: 2 (1d4) bludgeoning damage, or 8 (1d8 + 4) bludgeoning damage with shillelagh.
+- **Fey Charm** : The dryad targets one humanoid or beast that she can see within 30 feet of her. If the target can see the dryad, it must succeed on a DC 14 Wisdom saving throw or be magically charmed. The charmed creature regards the dryad as a trusted friend to be heeded and protected. Although the target isn't under the dryad's control, it takes the dryad's requests or actions in the most favorable way it can. Each time the dryad or its allies do anything harmful to the target, it can repeat the saving throw, ending the effect on itself on a success. Otherwise, the effect lasts 24 hours or until the dryad dies, is on a different plane of existence from the target, or ends the effect as a bonus action. If a target's saving throw is successful, the target is immune to the dryad's Fey Charm for the next 24 hours. The dryad can have no more than one humanoid and up to three beasts charmed at a time.
+
+**Projection moteur de base** : Club, +2, 1d4 bludgeoning, allonge 5 pieds ; marche 30 pieds.
+
+**Rôle dans ce module** : Trois protectrices cachées dans la salle 2.
+
+- Charisme 18. Le gourdin de base et sa variante sous shillelagh sont distincts ; ne pas supposer le sort actif. La liste innée exacte figure ci-dessous, sans le sort inventé « Hérissons ».

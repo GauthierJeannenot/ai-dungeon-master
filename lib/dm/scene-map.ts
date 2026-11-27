@@ -1,6 +1,11 @@
 import type { GameState } from '@/lib/types'
 import type { AdventureRoom } from '@/lib/adventure-map'
-import { firstMapId, getAdventureMap, getMapSpec } from '@/lib/adventure-map'
+import { firstMapId, getAdventureMap, getMapSpec, getNavigationMode, roomContainsCell } from '@/lib/adventure-map'
+import { navigationGrid, findNavigationPath, navigationPathCost, geometricDistanceCells, savedDoorState } from '@/lib/navigation'
+import { geometryAscii } from '@/lib/battlemap-geometry'
+import { activeMapTerrain, completedRoundEvents } from '@/lib/combat-round-events'
+import { playerKnowsDoor,playerDoorGeometry,confidentialHiddenDoorContext } from '@/lib/door-discovery'
+import { localLivingMonsters, localNpcs } from './local-creatures'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Carte de la scène, générée depuis l'état du jeu à chaque tour — une seule
@@ -18,7 +23,7 @@ import { firstMapId, getAdventureMap, getMapSpec } from '@/lib/adventure-map'
 //   fine (contact, distances en cases). Hors combat elle coûterait des tokens
 //   à chaque appel pour un signal déjà couvert par zones + adjacence.
 //
-// Jamais dans le bloc statique : le cache Anthropic exige un préfixe
+// Jamais dans le bloc statique : conserver un préfixe
 // byte-identique d'un appel à l'autre.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -60,21 +65,29 @@ function directionLabel(from: Zone, to: Zone): string {
 
 export function renderSceneMap(gameState: GameState): string {
   const adventureId = gameState.adventureId
-  const mapData = getAdventureMap(adventureId)
-  const currentMap = getMapSpec(gameState.currentMapId, adventureId)
+  const mapData = getAdventureMap(gameState)
+  const currentMap = getMapSpec(gameState.currentMapId, gameState)
   const { cols, rows } = currentMap.grid
-  const defaultMapId = firstMapId(adventureId)
+  const defaultMapId = firstMapId(gameState)
   const onCurrentMap = (mapId?: string) => (mapId ?? defaultMapId) === currentMap.id
   const inBounds = (x: number, y: number) => x >= 0 && x < cols && y >= 0 && y < rows
   const inCombat = gameState.phase === 'combat'
+  const explorationOverview = getNavigationMode(gameState) === 'exploration'
 
   const mapRooms = mapData.rooms.filter(room => onCurrentMap(room.mapId))
+  const circulation = navigationGrid(gameState, 'player', currentMap.geometry)
+  const directConnection = (a: AdventureRoom, b: AdventureRoom) => {
+    for (let y = a.zone.minY; y <= a.zone.maxY; y++) for (let x = a.zone.minX; x <= a.zone.maxX; x++) {
+      const c = { x, y }
+      if (circulation.roomAt(c) !== a.id) continue
+      if (circulation.neighbors(c).some(n => circulation.roomAt(n) === b.id && circulation.step(c, n, true, false))) return true
+    }
+    return false
+  }
 
   // ── Cloisons : paires de salles contiguës qui NE communiquent PAS (déclarées
   // dans map.ts). Clé normalisée (ordre des deux salles indifférent) pour un
   // test symétrique. Toute contiguïté ABSENTE de cet ensemble est franchissable.
-  const partitionKey = (a: string, b: string) => [a, b].sort().join('|')
-  const partitions = new Set((mapData.partitions ?? []).map(([a, b]) => partitionKey(a, b)))
 
   // ── Salles : zone, entrée, statut, contiguïtés (communicantes vs cloisonnées)
   const roomLines = mapRooms.map(room => {
@@ -83,17 +96,20 @@ export function renderSceneMap(gameState: GameState): string {
     const status = gameState.currentRoomId === room.id
       ? ' — salle ACTUELLE'
       : gameState.roomsVisited.includes(room.id) ? ' — visitée' : ''
-    const neighbors = mapRooms.filter(other =>
+    const neighbors = explorationOverview ? [] : mapRooms.filter(other =>
       other.id !== room.id && zonesTouch(room.zone, other.zone))
     const label = (other: AdventureRoom) =>
       `${roomSymbol(other.id)} (${directionLabel(room.zone, other.zone)})`
     const communicating = neighbors
-      .filter(other => !partitions.has(partitionKey(room.id, other.id))).map(label)
+      .filter(other => directConnection(room, other)).map(label)
     const walled = neighbors
-      .filter(other => partitions.has(partitionKey(room.id, other.id))).map(label)
+      .filter(other => !directConnection(room, other)).map(label)
     const parts = [
       `${symbol} = Salle ${room.id} : ${room.name} (x ${room.zone.minX}-${room.zone.maxX}, y ${room.zone.minY}-${room.zone.maxY})`,
+      room.areas ? `emprise exacte ${room.areas.map(a => `x ${a.minX}-${a.maxX}, y ${a.minY}-${a.maxY}`).join(' + ')}` : '',
       entry ? `entrée (${entry.x}, ${entry.y})` : '',
+      `but explicite move_token({tokenId:"player",roomId:${JSON.stringify(room.id)}})`,
+      room.navigationEvent ? `décision avant entrée : ${room.navigationEvent.id} (${room.navigationEvent.label})` : '',
       communicating.length > 0 ? `communique avec : ${communicating.join(', ')}` : '',
       walled.length > 0 ? `contiguë mais cloisonnée (mur, pas de passage direct) : ${walled.join(', ')}` : '',
     ].filter(Boolean)
@@ -102,9 +118,8 @@ export function renderSceneMap(gameState: GameState): string {
 
   // ── Positions vivantes : joueur, PNJ révélés, monstres vivants ────────────
   const player = gameState.player.position
-  const visibleNpcs = Object.values(gameState.npcs ?? {})
-    .filter(npc => npc.visible && onCurrentMap(npc.mapId))
-  const aliveMonsters = Object.values(gameState.monsters).filter(monster => monster.isAlive)
+  const visibleNpcs = localNpcs(gameState).filter(npc => npc.visible)
+  const aliveMonsters = localLivingMonsters(gameState)
 
   const positionLines = [
     `${inCombat ? '@ = ' : '- '}LE JOUEUR, en (${player.x}, ${player.y})`,
@@ -124,13 +139,16 @@ export function renderSceneMap(gameState: GameState): string {
       const symbol = roomSymbol(room.id)
       for (let y = room.zone.minY; y <= room.zone.maxY; y++) {
         for (let x = room.zone.minX; x <= room.zone.maxX; x++) {
-          if (inBounds(x, y)) grid[y][x] = symbol
+          if (inBounds(x, y) && roomContainsCell(room, { x, y })) grid[y][x] = symbol
         }
       }
     }
     for (const [roomId, cell] of Object.entries(mapData.entryCells)) {
       const room = mapRooms.find(candidate => candidate.id === roomId)
       if (room && inBounds(cell.x, cell.y)) grid[cell.y][cell.x] = '+'
+    }
+    for (const feature of activeMapTerrain(gameState)) for (const cell of feature.cells) {
+      if (inBounds(cell.x, cell.y)) grid[cell.y][cell.x] = feature.kind === 'blocked' ? '#' : '~'
     }
     visibleNpcs.forEach((npc, index) => {
       const symbol = index < 26 ? String.fromCharCode(97 + index) : '?'
@@ -147,7 +165,7 @@ export function renderSceneMap(gameState: GameState): string {
     // caractères (le glyphe de la cellule x est à l'index 4 + 3x de sa ligne).
     const header = '   ' + Array.from({ length: cols }, (_, x) => String(x).padStart(2)).join(' ')
     gridSection = [
-      'Grille tactique (1 case = 5 pieds ; + = point d’entrée de salle, . = hors salle) :',
+      'Grille tactique (1 case = 5 pieds ; + = point d’entrée de salle, . = hors salle ; # = obstacle infranchissable, ~ = terrain difficile coût ×2) :',
       '```',
       header,
       ...grid.map((row, y) => String(y).padStart(2) + '  ' + row.join('  ')),
@@ -157,11 +175,35 @@ export function renderSceneMap(gameState: GameState): string {
 
   return [
     `Carte « ${currentMap.name} » — grille ${cols}×${rows}, coordonnées (x, y) : x = colonne (0-${cols - 1}), y = rangée (0-${rows - 1}), nord = y décroissant.`,
+    explorationOverview
+      ? `Carte d’exploration : ${currentMap.explorationRoomIds ? 'les lieux extérieurs' : 'tous les lieux de cette map'} peuvent être demandés directement par roomId, même non contigus. Ne demande pas de déplacement intermédiaire entre zones ; le moteur calcule le trajet. Une porte fermée ou une décision peut arrêter ce trajet et exige une action explicite distincte. L’illustration ne fixe pas les distances tactiques.${currentMap.explorationRoomIds ? ' Les intérieurs utilisent la navigation tactique dès le seuil franchi ; ressortir rétablit l’exploration.' : ''}`
+      : 'Carte tactique : déplacements selon la géométrie, les passages et les portes ; en combat, respecter le budget de mouvement.',
     ...gridSection,
-    'Salles de la carte (zones, communications et cloisons) :',
+    ...activeMapTerrain(gameState).map(feature => `${feature.label} : ${feature.kind === 'blocked' ? 'infranchissable' : 'terrain difficile, coût de déplacement ×2'} ; cases ${feature.cells.map(c => `(${c.x},${c.y})`).join(', ')}.`),
+    ...(currentMap.roundEvents ?? []).map(event => completedRoundEvents(gameState)[event.id]?.mechanicalSummary
+      ?? `Événement mécanique prévu : ${event.name}, à la fin du round ${event.afterRound} en salle ${event.roomId}. Trajet ${event.path.map(c => `(${c.x},${c.y})`).join(' → ')} ; ${event.damageDice} contondants et à terre pour chaque créature sur le trajet. Ne pas le résoudre par des outils supplémentaires : le moteur applique cet effet à la transition de round.`),
+    ...(inCombat && currentMap.geometry ? ['Circulation extraite (D = seuil connu, voir état des portes ci-dessous) :', '```', geometryAscii(playerDoorGeometry(gameState,currentMap.geometry)), '```'] : []),
+    explorationOverview ? 'Lieux de la carte d’exploration (destinations au choix, sans condition de contiguïté) :' : 'Salles de la carte (zones, communications et cloisons) :',
     ...roomLines,
+    ...((mapData.doors ?? []).filter(door => playerKnowsDoor(gameState,door.id)&&door.sides.some(side => mapRooms.some(r => r.id === side.roomId))).map(door => {
+      const side = door.sides.find(side => side.roomId === gameState.currentRoomId) ?? door.sides[0]
+      const other = door.sides.find(candidate => candidate !== side)!
+      return `${door.opening ? 'Passage vide sans porte' : 'Porte'} ${door.id} (${door.name}), ${side.direction} : approche côté salle ${side.roomId} = (${side.cell.x},${side.cell.y}), traversée vers salle ${other.roomId} = (${other.cell.x},${other.cell.y}), état = ${savedDoorState(gameState, door.id)}.${door.opening ? ' Toujours ouvert : traverser avec move_token, aucune ouverture/fermeture ni forçage.' : ''}`
+    })),
     'Positions :',
     ...positionLines,
-    'Cette carte reflète l’état RÉEL du moteur à ce tour : appuie-toi dessus pour situer la scène, estimer les distances et choisir les coordonnées exactes de `move_token` (les « entrée (x, y) » ci-dessus sont les cibles sûres). « communique avec » = salles accessibles directement depuis celle-ci ; « contiguë mais cloisonnée » = salle voisine sur la grille mais séparée par un mur — n’y fais pas passer le joueur directement, il faut contourner.',
-  ].join('\n')
+    `Géométrie : ${currentMap.geometry ? currentMap.geometry.review : 'legacy_unverified (murs de l’illustration non validés)'}. Une connexion topologique ne garantit pas un passage actuellement praticable.`,
+    'Aides de navigation depuis la position courante (cases de 5 pieds, diagonale = 1 ; ces buts ne limitent pas les actions de jeu de rôle) :',
+    ...mapRooms.map(room => {
+      const entry = mapData.entryCells[room.id]
+      try {
+        const path = findNavigationPath(gameState, 'player', { kind: 'room', roomId: room.id }, { geometry: currentMap.geometry })
+        const costCells = navigationPathCost(gameState, path)
+        const budget = inCombat ? Math.max(0, Math.floor(gameState.player.speed / 5) - (gameState.movementUsed.player ?? 0)) : null
+        return JSON.stringify({ roomId: room.id, name: room.name, geometricDistanceCells: entry ? geometricDistanceCells(player, entry) : null,
+          pathExistsNow: true, pathCostCells: costCells, remainingBudgetCells: budget, withinMovementBudget: budget === null || costCells <= budget })
+      } catch { return JSON.stringify({ roomId: room.id, name: room.name, pathExistsNow: false, pathCostCells: null, withinMovementBudget: false }) }
+    }),
+    'Choisis explicitement le roomId correspondant au lieu nommé. Ne calcule ni trajet intermédiaire ni distance de parcours : preview_navigation et move_token les calculent et revalident. Les états frais des tool_result priment sur cet aperçu initial. Aucun changement de map par un trajet ; utilise une transition explicite.',
+  ].join('\n')+confidentialHiddenDoorContext(gameState)
 }

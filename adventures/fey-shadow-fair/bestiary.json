@@ -1,0 +1,165 @@
+{
+  "title": "Bestiaire & notes de maîtrise — La Foire du Voleur d'Ombres",
+  "notes": [
+    "**Niveau du joueur : 3.** Tous les affrontements sont évitables par l'humour, le jeu ou la politesse selon le module : Charisme ou Sagesse DD 12–13 lorsqu'indiqué. Ces DD sont des choix de scénario, pas des pouvoirs SRD.",
+    "Les tire-goussets et brigands utilisent le gobelin SRD à 7 PV. Le Grand Flan utilise explicitement le profil de zombie à 22 PV, et le majordome le feu follet à 22 PV ; les anciens PV réduits et la variante gobelin minion sont supprimés. Les rencontres peuvent donc être plus dangereuses ; ne pas compenser en modifiant des statistiques en silence.",
+    "Les apparences comiques et comportements suivants appartiennent à cette aventure. Ils ne créent aucun nouveau pouvoir mécanique et ne transforment pas les données SRD en blocs officiels de desserts ou de reflets."
+  ],
+  "creatures": [
+    {
+      "type": "goblin",
+      "title": "Tire-goussets, croupiers, péagistes et brigands à mirliton",
+      "role": "Petits escrocs des deux cartes.",
+      "notes": [
+        "Tous partagent le même bloc gobelin SRD, sans faux CR 1/8. La fuite liée à la chute d'un compère est un comportement narratif demandant un déplacement résolu, pas une réaction SRD ajoutée."
+      ],
+      "npcIds": [
+        "nicodeme",
+        "pipotin",
+        "theophile",
+        "capitaine_mirliton"
+      ]
+    },
+    {
+      "type": "satyr",
+      "title": "Videur satyre",
+      "role": "Défend le tripot en vers de mirliton.",
+      "notes": [
+        "Rimer avec lui, Charisme DD 12 selon le scénario. Coup de tête, épée courte et arc court restent trois actions source distinctes."
+      ]
+    },
+    {
+      "type": "wolf",
+      "title": "Loups savants échappés",
+      "role": "Artistes du carrousel.",
+      "notes": [
+        "Un cerceau et un test de Dressage DD 10 peuvent les apaiser. Cela n'ajoute ni langage ni aptitude magique au loup SRD."
+      ]
+    },
+    {
+      "type": "zombie",
+      "title": "Le Grand Flan — apparence narrative, profil zombie",
+      "role": "Dessert de parade animé, salle du festin.",
+      "notes": [
+        "Il n'existe pas de bloc « Grand Flan » dans cette API. Le module emprunte explicitement le profil zombie intact ; l'apparence gélatineuse n'ajoute aucune résistance ni attaque acide. Un compliment ou une part reprise avec conviction peut désamorcer la scène, Charisme DD 12."
+      ]
+    },
+    {
+      "type": "bandit",
+      "title": "Reflets désobligeants — apparence narrative, profil bandit",
+      "role": "Imitations vexantes du héros.",
+      "notes": [
+        "Ils utilisent les armes et dégâts du bandit SRD, pas les statistiques ou dégâts réels du personnage joueur. Un geste ridicule assumé peut les désamorcer, Charisme DD 12."
+      ]
+    },
+    {
+      "type": "violet_fungus",
+      "title": "Champignons moqueurs",
+      "role": "Champignons très lents des deux cartes.",
+      "notes": [
+        "Le rire est de la couleur narrative ; la touche pourrie n'empêche pas les soins. Leur multiattaque source est une capacité distincte, pas un dégât inventé."
+      ]
+    },
+    {
+      "type": "giant_frog",
+      "title": "Grenouilles de bal",
+      "role": "Convives susceptibles du Bois-Ricanant.",
+      "notes": [
+        "Une révérence correcte peut les apaiser, Charisme DD 12. Agrippement, restriction de taille et déglutition sont conservés dans la référence source ci-dessous."
+      ],
+      "npcIds": [
+        "baronne_grenouille"
+      ]
+    },
+    {
+      "type": "blink_dog",
+      "title": "Chien-clin — meute des chiens esquiveurs",
+      "role": "Meute joueuse du Bois-Ricanant.",
+      "notes": [
+        "La téléportation source est de 40 pieds et se recharge sur 4–6 ; le moteur ne la résout pas comme une marche ordinaire. Ils n'achèvent pas un joueur à terre."
+      ]
+    },
+    {
+      "type": "sprite",
+      "title": "Ombres-cotillons et lutins duellistes",
+      "role": "Danseurs et duellistes miniatures.",
+      "notes": [
+        "L'épée longue de cette créature minuscule touche à +2 et inflige exactement 1 dégât tranchant. L'arc touche à +6, inflige 1 dégât perforant et possède ses propres conditions d'empoisonnement ; ne pas mélanger ces deux attaques. Marche 10 pieds et vol 40 pieds sont distincts."
+      ],
+      "npcIds": [
+        "maitre_filou"
+      ]
+    },
+    {
+      "type": "will_o_wisp",
+      "title": "Feu follet majordome",
+      "role": "Serviteur de la cour du Prince.",
+      "notes": [
+        "22 PV, marche 0 et vol 50 pieds stationnaire. Décharge, invisibilité et absorption de vie restent les capacités exactes de la source ; son ton cérémonieux n'ajoute aucun pouvoir."
+      ]
+    },
+    {
+      "type": "awakened_shrub",
+      "npcIds": [
+        "barnabe"
+      ],
+      "title": "Barnabé — arbuste éveillé",
+      "role": "Compagnon potentiel de la salle 3 et de la transition.",
+      "notes": [
+        "Normalement neutre ; ne suit le joueur qu'après amitié établie selon les règles du module. Sa griffure peut infliger 0 dégât après le modificateur de −1."
+      ]
+    },
+    {
+      "type": "mage",
+      "title": "Profil des PNJ : Madame Bougie",
+      "notes": [],
+      "npcIds": [
+        "madame_bougie"
+      ]
+    },
+    {
+      "type": "ape",
+      "title": "Profil des PNJ : Ernestine",
+      "notes": [],
+      "npcIds": [
+        "ernestine"
+      ]
+    },
+    {
+      "type": "commoner",
+      "title": "Profil des PNJ : Mirabelle",
+      "notes": [],
+      "npcIds": [
+        "mirabelle",
+        "miroslav"
+      ]
+    },
+    {
+      "type": "gargoyle",
+      "title": "Profil des PNJ : Les Têtes Jacassantes",
+      "notes": [],
+      "npcIds": [
+        "tetes_jacassantes"
+      ]
+    },
+    {
+      "type": "shadow",
+      "title": "Profil des PNJ : L'Ombre Soliste",
+      "notes": [],
+      "npcIds": [
+        "ombre_soliste"
+      ]
+    },
+    {
+      "type": "archmage",
+      "title": "Profil des PNJ : Le Prince des Farces",
+      "notes": [],
+      "npcIds": [
+        "prince_farces"
+      ]
+    }
+  ],
+  "narrativeNpcs": [
+    "Tous les PNJ disposent désormais du profil mécanique explicitement affecté dans map.ts. Le Prince utilise Archmage, Madame Bougie Mage, les artistes sans magie Commoner. Les trois Têtes Jacassantes forment un groupe maison de trois Gargoyles ; leurs PV et leur effectif sont suivis dans l’état."
+  ]
+}

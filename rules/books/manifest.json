@@ -1,0 +1,58 @@
+[
+  {
+    "id": "phb-2014",
+    "title": "Player's Handbook (2014)",
+    "originalFilename": "Player's Handbook (2014).md",
+    "edition": "2014",
+    "file": "phb-2014.md",
+    "sha256": "7d0651f7bc7f31c5f0562516b4f8d8104f241ff5649645950cd5028281470fb3",
+    "originalSha256": "9ace993d569cb85ddab249b11fb77015a095da2c1ebe989324aa2b5a3fa05c0e",
+    "amendments": [
+      {
+        "type": "homebrew",
+        "addedAt": "2026-10-31",
+        "sections": [
+          "Homebrew: Trinkets — babioles inventées"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dmg-2014",
+    "title": "Dungeon Master's Guide (2014)",
+    "originalFilename": "Dungeon Master's Guide (2014).md",
+    "edition": "2014",
+    "file": "dmg-2014.md",
+    "sha256": "fa75462a6ef96ef0f86fbfd2d433c624ce926ff630a43d1fcaea6a2c1249b0d1"
+  },
+  {
+    "id": "xge",
+    "title": "Xanathar's Guide to Everything",
+    "originalFilename": "Xanathar's Guide to Everything.md",
+    "edition": "2014",
+    "file": "xge.md",
+    "sha256": "519584ec7fc7da6fea056c182a22254bc807db5d077c2fc205801bd872d761bf",
+    "originalSha256": "2a60ae4748c93f68a95b22a09af71fe71f298b3f4fee02e597267034da9f28c5",
+    "amendments": [
+      {
+        "type": "homebrew",
+        "addedAt": "2026-10-31",
+        "sections": [
+          "Homebrew: Tool Uses — exemples d’utilisation inventés",
+          "Homebrew: Identify a Spell — identifier un sort",
+          "Homebrew: Given Names — prénoms inventés",
+          "Homebrew: Family Names — noms de famille inventés",
+          "Homebrew: Nicknames — surnoms inventés"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "mm-2014",
+    "title": "Monster Manual (2014)",
+    "originalFilename": "Monster Manual (2014).md",
+    "edition": "2014",
+    "file": "mm-2014.md",
+    "sha256": "224df7212a963b502f419a34f0703f2b5c987377520762d94abb366aa19e0999"
+  }
+]

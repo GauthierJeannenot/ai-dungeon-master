@@ -2,6 +2,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 import * as gs from '../game-state'
 import * as rules from '../rules'
+import { socialActors } from '../../lib/social'
 
 export function registerEnvTools(server: McpServer): void {
   // Triggers a predefined room event and marks room as visited
@@ -57,14 +58,14 @@ export function registerEnvTools(server: McpServer): void {
     }
   )
 
-  // Reveals one or more NPCs that are present but hidden in the current room.
+  // Reveals NPCs or updates an already-visible NPC's established disposition.
   server.tool(
     'reveal_npc',
-    'Reveals one or more NPCs that are present but hidden in the current room (shows their map token). Target by npcId or by kind (e.g. kind:"dryad" reveals all dryads). Use when hidden NPCs show themselves to the player (offering accepted, successful social check, ambush sprung).',
+    'Reveals NPCs in the current room or updates the disposition of an already-visible NPC after an established interaction. Target by exact npcId or by kind. Use disposition to record trust, an accepted mission or testimony even when certain and requiring no roll; a successful check or narrative alone does not change it. Never grant trust just to satisfy a quest condition. Also shows hidden NPC map tokens.',
     {
       npcId: z.string().optional().describe('Exact NPC id to reveal (e.g. "mac", "dryad_1")'),
       kind: z.string().optional().describe('Reveal every hidden NPC of this kind in the room (e.g. "dryad")'),
-      disposition: z.enum(['hostile', 'wary', 'neutral', 'helpful', 'offended']).optional().describe('Optional new disposition to set on the revealed NPCs'),
+      disposition: z.enum(['hostile', 'wary', 'neutral', 'helpful', 'offended']).optional().describe('Established disposition to record, including for an already-visible NPC; not implied by a roll or by narration.'),
       reason: z.string().optional().describe('Narrative reason for the reveal (logged)'),
     },
     async ({ npcId, kind, disposition, reason }) => {
@@ -72,9 +73,21 @@ export function registerEnvTools(server: McpServer): void {
         return rules.ruleErrorResult(new rules.RuleViolation('NPC_REVEAL_NO_TARGET', 'reveal_npc requires either npcId or kind.', {}))
       }
 
+      if (disposition) {
+        const state = gs.getState()
+        const cooperation = { hostile: 0, offended: 1, wary: 1, neutral: 2, helpful: 3 }
+        const locked = socialActors(state).find(actor => {
+          const npc = state.npcs?.[actor.targetId]
+          return npc && !actor.profile.influenceable && cooperation[disposition] > cooperation[npc.disposition]
+            && actor.mapId === state.currentMapId && (npc.roomId === null || npc.roomId === state.currentRoomId)
+            && (npcId === npc.id || kind === npc.kind || kind === npc.id)
+        })
+        if (locked) return rules.ruleErrorResult(new rules.RuleViolation('SOCIAL_TARGET_UNINFLUENCEABLE',
+          locked.profile.refusalReason ?? 'Campaign rule: this actor cannot be socially influenced.', { targetId: locked.targetId }))
+      }
       const revealed = gs.revealNpcs({ npcId, kind, disposition })
       if (revealed.length === 0) {
-        return rules.ruleErrorResult(new rules.RuleViolation('NPC_NOT_FOUND', 'No hidden NPC matched in the current room.', {
+        return rules.ruleErrorResult(new rules.RuleViolation('NPC_NOT_FOUND', 'No NPC matched in the current room.', {
           npcId,
           kind,
           currentRoomId: gs.getState().currentRoomId,

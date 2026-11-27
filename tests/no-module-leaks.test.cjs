@@ -66,8 +66,7 @@ function walk(dir) {
   return out
 }
 
-// adventures/_shared/ = règles DM servies à TOUS les modules (seul contenu
-// partagé) : le vocabulaire d'un module y serait une fuite inter-modules
+// adventures/_shared/ = règles MJ et joueur servies à TOUS les modules : le vocabulaire d'un module y serait une fuite inter-modules
 // directe dans les prompts. Le bestiaire et les reskins vivent dans le
 // bestiary.md de chaque module — rien à excuser ici.
 test('no adventure-specific vocabulary leaks into adventures/_shared', () => {
@@ -86,7 +85,7 @@ test('no adventure-specific vocabulary leaks into adventures/_shared', () => {
   assert.deepEqual(
     violations,
     [],
-    `Vocabulaire de module dans les règles DM partagées :\n${violations.join('\n')}\n` +
+    `Vocabulaire de module dans les règles partagées :\n${violations.join('\n')}\n` +
     `→ ce contenu appartient au bestiary.md/adventure-module.md du module concerné.`
   )
 })

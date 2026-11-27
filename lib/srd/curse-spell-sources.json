@@ -1,0 +1,141 @@
+{
+  "ruleset": "2014",
+  "retrievedAt": "2026-10-31T12:49:53.236421+00:00",
+  "license": "CC-BY-4.0",
+  "primarySource": "https://media.wizards.com/2023/downloads/dnd/SRD_CC_v5.1.pdf",
+  "records": {
+    "spells/bestow-curse": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/bestow-curse",
+      "sha256": "bbc00efe65141b522f1fd61927b475c81a5c2ea4c05b84341e56ff6757a48b38",
+      "source": {
+        "index": "bestow-curse",
+        "name": "Bestow Curse",
+        "desc": [
+          "You touch a creature, and that creature must succeed on a wisdom saving throw or become cursed for the duration of the spell. When you cast this spell, choose the nature of the curse from the following options:",
+          "- Choose one ability score. While cursed, the target has disadvantage on ability checks and saving throws made with that ability score.",
+          "- While cursed, the target has disadvantage on attack rolls against you.",
+          "- While cursed, the target must make a wisdom saving throw at the start of each of its turns. If it fails, it wastes its action that turn doing nothing.",
+          "- While the target is cursed, your attacks and spells deal an extra 1d8 necrotic damage to the target.",
+          "A remove curse spell ends this effect. At the GM's option, you may choose an alternative curse effect, but it should be no more powerful than those described above. The GM has final say on such a curse's effect."
+        ],
+        "higher_level": [
+          "If you cast this spell using a spell slot of 4th level or higher, the duration is concentration, up to 10 minutes. If you use a spell slot of 5th level or higher, the duration is 8 hours. If you use a spell slot of 7th level or higher, the duration is 24 hours. If you use a 9th level spell slot, the spell lasts until it is dispelled. Using a spell slot of 5th level or higher grants a duration that doesn't require concentration."
+        ],
+        "range": "Touch",
+        "components": [
+          "V",
+          "S"
+        ],
+        "ritual": false,
+        "duration": "Up to 1 minute",
+        "concentration": true,
+        "casting_time": "1 action",
+        "level": 3,
+        "dc": {
+          "dc_type": {
+            "index": "wis",
+            "name": "WIS",
+            "url": "/api/2014/ability-scores/wis"
+          },
+          "dc_success": "none",
+          "desc": "On fail, become cursed for the duration of the spell."
+        },
+        "school": {
+          "index": "necromancy",
+          "name": "Necromancy",
+          "url": "/api/2014/magic-schools/necromancy"
+        },
+        "classes": [
+          {
+            "index": "bard",
+            "name": "Bard",
+            "url": "/api/2014/classes/bard"
+          },
+          {
+            "index": "cleric",
+            "name": "Cleric",
+            "url": "/api/2014/classes/cleric"
+          },
+          {
+            "index": "wizard",
+            "name": "Wizard",
+            "url": "/api/2014/classes/wizard"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          }
+        ],
+        "url": "/api/2014/spells/bestow-curse",
+        "updated_at": "2026-04-01T20:35:39.217Z",
+        "damage": []
+      },
+      "responseSha256": "bbc00efe65141b522f1fd61927b475c81a5c2ea4c05b84341e56ff6757a48b38",
+      "primaryPage": 121
+    },
+    "spells/remove-curse": {
+      "url": "https://www.dnd5eapi.co/api/2014/spells/remove-curse",
+      "sha256": "7ee7409fc0068cc974500cb41f3300d935d0d34b9c0ac6cd1b00d8322c2aef4a",
+      "source": {
+        "higher_level": [],
+        "index": "remove-curse",
+        "name": "Remove Curse",
+        "desc": [
+          "At your touch, all curses affecting one creature or object end. If the object is a cursed magic item, its curse remains, but the spell breaks its owner's attunement to the object so it can be removed or discarded."
+        ],
+        "range": "Touch",
+        "components": [
+          "V",
+          "S"
+        ],
+        "ritual": false,
+        "duration": "Instantaneous",
+        "concentration": false,
+        "casting_time": "1 action",
+        "level": 3,
+        "school": {
+          "index": "abjuration",
+          "name": "Abjuration",
+          "url": "/api/2014/magic-schools/abjuration"
+        },
+        "classes": [
+          {
+            "index": "cleric",
+            "name": "Cleric",
+            "url": "/api/2014/classes/cleric"
+          },
+          {
+            "index": "paladin",
+            "name": "Paladin",
+            "url": "/api/2014/classes/paladin"
+          },
+          {
+            "index": "warlock",
+            "name": "Warlock",
+            "url": "/api/2014/classes/warlock"
+          },
+          {
+            "index": "wizard",
+            "name": "Wizard",
+            "url": "/api/2014/classes/wizard"
+          }
+        ],
+        "subclasses": [
+          {
+            "index": "lore",
+            "name": "Lore",
+            "url": "/api/2014/subclasses/lore"
+          }
+        ],
+        "url": "/api/2014/spells/remove-curse",
+        "updated_at": "2026-04-01T20:35:39.217Z",
+        "damage": []
+      },
+      "responseSha256": "7ee7409fc0068cc974500cb41f3300d935d0d34b9c0ac6cd1b00d8322c2aef4a",
+      "primaryPage": 174
+    }
+  }
+}

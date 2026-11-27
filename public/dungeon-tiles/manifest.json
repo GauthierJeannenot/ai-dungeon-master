@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "style": "graphite-pencil",
+  "tileSize": 512,
+  "atlas": "graphite-atlas.png",
+  "grid": {
+    "columns": 3,
+    "rows": 2
+  },
+  "exits": {
+    "north": 1,
+    "east": 2,
+    "south": 4,
+    "west": 8
+  },
+  "rotation": "clockwise-degrees",
+  "note": "Graphite artwork has hand-drawn seams; exit masks define logical connectivity, not engine collision geometry.",
+  "tiles": [
+    {
+      "id": "dead-end",
+      "label": "Cul-de-sac",
+      "exits": 1,
+      "file": "dead-end.png"
+    },
+    {
+      "id": "straight",
+      "label": "Couloir droit",
+      "exits": 5,
+      "file": "straight.png"
+    },
+    {
+      "id": "corner",
+      "label": "Angle",
+      "exits": 3,
+      "file": "corner.png"
+    },
+    {
+      "id": "tee",
+      "label": "Jonction en T",
+      "exits": 11,
+      "file": "tee.png"
+    },
+    {
+      "id": "cross",
+      "label": "Croisement",
+      "exits": 15,
+      "file": "cross.png"
+    },
+    {
+      "id": "room",
+      "label": "Salle",
+      "exits": 15,
+      "file": "room.png"
+    }
+  ]
+}

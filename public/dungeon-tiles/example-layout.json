@@ -1,0 +1,186 @@
+{
+  "version": 1,
+  "seed": "crayon-01",
+  "width": 7,
+  "height": 7,
+  "tileSize": 512,
+  "entrance": {
+    "x": 6,
+    "y": 1
+  },
+  "objective": {
+    "x": 0,
+    "y": 2
+  },
+  "tiles": [
+    {
+      "x": 3,
+      "y": 3,
+      "exits": 15,
+      "tileId": "room",
+      "rotation": 0
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "exits": 5,
+      "tileId": "straight",
+      "rotation": 180
+    },
+    {
+      "x": 4,
+      "y": 3,
+      "exits": 11,
+      "tileId": "tee",
+      "rotation": 0
+    },
+    {
+      "x": 3,
+      "y": 4,
+      "exits": 11,
+      "tileId": "tee",
+      "rotation": 0
+    },
+    {
+      "x": 2,
+      "y": 3,
+      "exits": 11,
+      "tileId": "tee",
+      "rotation": 0
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "exits": 13,
+      "tileId": "tee",
+      "rotation": 270
+    },
+    {
+      "x": 4,
+      "y": 2,
+      "exits": 7,
+      "tileId": "tee",
+      "rotation": 90
+    },
+    {
+      "x": 2,
+      "y": 4,
+      "exits": 2,
+      "tileId": "dead-end",
+      "rotation": 90
+    },
+    {
+      "x": 4,
+      "y": 1,
+      "exits": 6,
+      "tileId": "corner",
+      "rotation": 90
+    },
+    {
+      "x": 5,
+      "y": 1,
+      "exits": 11,
+      "tileId": "tee",
+      "rotation": 0
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "exits": 11,
+      "tileId": "tee",
+      "rotation": 0
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "exits": 2,
+      "tileId": "dead-end",
+      "rotation": 90
+    },
+    {
+      "x": 5,
+      "y": 0,
+      "exits": 4,
+      "tileId": "dead-end",
+      "rotation": 180
+    },
+    {
+      "x": 5,
+      "y": 2,
+      "exits": 10,
+      "tileId": "straight",
+      "rotation": 270
+    },
+    {
+      "x": 4,
+      "y": 4,
+      "exits": 8,
+      "tileId": "dead-end",
+      "rotation": 270
+    },
+    {
+      "x": 5,
+      "y": 3,
+      "exits": 8,
+      "tileId": "dead-end",
+      "rotation": 270
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "exits": 5,
+      "tileId": "straight",
+      "rotation": 180
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "exits": 4,
+      "tileId": "dead-end",
+      "rotation": 180
+    },
+    {
+      "x": 6,
+      "y": 2,
+      "exits": 8,
+      "tileId": "dead-end",
+      "rotation": 270
+    },
+    {
+      "x": 1,
+      "y": 3,
+      "exits": 2,
+      "tileId": "dead-end",
+      "rotation": 90
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "exits": 4,
+      "tileId": "dead-end",
+      "rotation": 180
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "exits": 5,
+      "tileId": "straight",
+      "rotation": 180
+    },
+    {
+      "x": 6,
+      "y": 1,
+      "exits": 8,
+      "tileId": "dead-end",
+      "rotation": 270
+    },
+    {
+      "x": 2,
+      "y": 0,
+      "exits": 4,
+      "tileId": "dead-end",
+      "rotation": 180
+    }
+  ],
+  "notice": "Composition visuelle de préparation. Aucun état de partie, mur moteur, rencontre ou transition de session créé."
+}
